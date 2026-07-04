@@ -24,7 +24,12 @@ export function signRefreshToken(payload: RefreshTokenPayload): string {
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.JWT_SECRET) as AccessTokenPayload;
+  const payload = jwt.verify(token, env.JWT_SECRET) as Record<string, unknown>;
+  // Reject tokens that don't look like access tokens (e.g. QR checkin tokens)
+  if (typeof payload.userId !== 'string' || typeof payload.email !== 'string') {
+    throw new Error('Invalid access token shape');
+  }
+  return payload as unknown as AccessTokenPayload;
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {

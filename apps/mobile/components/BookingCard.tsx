@@ -7,6 +7,7 @@ import { bookingsApi, type Booking } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
 const STATUS_CONFIG = {
+  pending:     { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6' },
   upcoming:    { label: 'Upcoming',    color: '#2563EB', bg: '#DBEAFE' },
   in_progress: { label: 'In Progress', color: '#D97706', bg: '#FEF3C7' },
   completed:   { label: 'Completed',   color: '#16A34A', bg: '#DCFCE7' },
@@ -85,8 +86,8 @@ export function BookingCard({ booking, onCancel, onReview }: Props) {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {/* QR Code — show for active bookings */}
-          {(booking.status === 'upcoming' || booking.status === 'in_progress') && (
+          {/* QR Code — show for all active bookings so partner can scan to check in */}
+          {(booking.status === 'pending' || booking.status === 'upcoming' || booking.status === 'in_progress') && (
             <TouchableOpacity
               onPress={openQR}
               style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.secondary, flex: 0, paddingHorizontal: 14 }]}
