@@ -16,6 +16,16 @@ The workflow `Start application` runs `pnpm dev`, which starts both servers conc
 - **Frontend**: http://localhost:5000 (Vite dev server, proxies `/api` → backend)
 - **Backend**: http://localhost:8000 (Express API)
 
+### Expo Mobile (Expo Go)
+
+A separate **Expo Mobile** workflow is available for the React Native app. Start it manually from the Replit workflow panel.
+
+Before starting it, add `EXPO_PUBLIC_API_URL` as a Replit Secret set to your Replit dev domain, e.g.:
+```
+EXPO_PUBLIC_API_URL=https://<your-repl>.<username>.repl.co
+```
+Once running, scan the QR code shown in the console with the **Expo Go** app on your phone.
+
 ## Running locally
 
 ```bash
