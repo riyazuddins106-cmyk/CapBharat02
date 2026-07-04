@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { useColors } from '@/hooks/useColors';
 import type { Booking } from '@/lib/api';
 
@@ -24,45 +25,58 @@ interface Props {
 export function BookingCard({ booking, onCancel, onReview }: Props) {
   const colors = useColors();
   const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.upcoming;
+  const [showQR, setShowQR] = useState(false);
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.iconWrap}>
-          <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
-            <Ionicons name="construct-outline" size={18} color={colors.primary} />
+    <>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.iconWrap}>
+            <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="construct-outline" size={18} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={[styles.service, { color: colors.foreground }]} numberOfLines={1}>{booking.serviceName}</Text>
+              <Text style={[styles.pro, { color: colors.mutedForeground }]}>{booking.proName}</Text>
+            </View>
           </View>
-          <View>
-            <Text style={[styles.service, { color: colors.foreground }]} numberOfLines={1}>{booking.serviceName}</Text>
-            <Text style={[styles.pro, { color: colors.mutedForeground }]}>{booking.proName}</Text>
+          <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+            <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
         </View>
-        <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-          <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
-        </View>
-      </View>
 
-      {/* Details */}
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      <View style={styles.details}>
-        <View style={styles.detail}>
-          <Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.detailText, { color: colors.mutedForeground }]}>{fmtDate(booking.scheduledAt)}</Text>
+        {/* Details */}
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <View style={styles.details}>
+          <View style={styles.detail}>
+            <Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
+            <Text style={[styles.detailText, { color: colors.mutedForeground }]}>{fmtDate(booking.scheduledAt)}</Text>
+          </View>
+          <View style={styles.detail}>
+            <Ionicons name="cash-outline" size={14} color={colors.mutedForeground} />
+            <Text style={[styles.detailText, { color: colors.foreground, fontWeight: '600' }]}>₹{booking.price}</Text>
+          </View>
         </View>
-        <View style={styles.detail}>
-          <Ionicons name="cash-outline" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.detailText, { color: colors.foreground, fontWeight: '600' }]}>₹{booking.price}</Text>
-        </View>
-      </View>
 
-      {booking.notes && (
-        <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={2}>"{booking.notes}"</Text>
-      )}
+        {booking.notes && (
+          <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={2}>"{booking.notes}"</Text>
+        )}
 
-      {/* Actions */}
-      {(booking.status === 'upcoming' || (booking.status === 'completed' && !booking.reviewed)) && (
+        {/* Actions */}
         <View style={styles.actions}>
+          {/* QR Code — show for upcoming and in-progress */}
+          {(booking.status === 'upcoming' || booking.status === 'in_progress') && (
+            <TouchableOpacity
+              onPress={() => setShowQR(true)}
+              style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.secondary, flex: 0, paddingHorizontal: 14 }]}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="qr-code-outline" size={15} color={colors.primary} />
+              <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
+            </TouchableOpacity>
+          )}
+
           {booking.status === 'upcoming' && onCancel && (
             <TouchableOpacity
               onPress={() => onCancel(booking.id)}
@@ -82,8 +96,43 @@ export function BookingCard({ booking, onCancel, onReview }: Props) {
             </TouchableOpacity>
           )}
         </View>
-      )}
-    </View>
+      </View>
+
+      {/* QR Code Modal */}
+      <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.qrSheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
+            <View style={styles.qrHeader}>
+              <View>
+                <Text style={[styles.qrTitle, { color: colors.foreground }]}>Booking QR Code</Text>
+                <Text style={[styles.qrSub, { color: colors.mutedForeground }]}>{booking.serviceName} · {booking.proName}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowQR(false)}>
+                <Ionicons name="close-circle" size={28} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.qrBox, { borderColor: colors.border, borderRadius: colors.radius }]}>
+              <QRCode
+                value={booking.id}
+                size={200}
+                color={colors.foreground}
+                backgroundColor={colors.card}
+              />
+            </View>
+
+            <Text style={[styles.qrHint, { color: colors.mutedForeground }]}>
+              Show this to your service partner when they arrive to check in
+            </Text>
+
+            <View style={[styles.qrBadge, { backgroundColor: cfg.bg, borderRadius: colors.radius }]}>
+              <View style={[styles.qrBadgeDot, { backgroundColor: cfg.color }]} />
+              <Text style={[styles.qrBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -102,6 +151,17 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 12 },
   notes: { fontSize: 12, fontStyle: 'italic', marginTop: 6 },
   actions: { marginTop: 12, flexDirection: 'row', gap: 8 },
-  actionBtn: { flex: 1, borderWidth: 1.5, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  actionBtn: { flex: 1, borderWidth: 1.5, borderRadius: 8, paddingVertical: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5 },
   actionBtnText: { fontSize: 13, fontWeight: '700' },
+  // QR Modal
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  qrSheet: { width: '100%', maxWidth: 340, padding: 24, gap: 18 },
+  qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  qrTitle: { fontSize: 17, fontWeight: '700' },
+  qrSub: { fontSize: 12, marginTop: 2 },
+  qrBox: { alignSelf: 'center', padding: 16, borderWidth: 1 },
+  qrHint: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  qrBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10 },
+  qrBadgeDot: { width: 7, height: 7, borderRadius: 4 },
+  qrBadgeText: { fontSize: 13, fontWeight: '700' },
 });

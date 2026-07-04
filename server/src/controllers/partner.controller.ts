@@ -1,0 +1,35 @@
+import type { Request, Response } from 'express';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { partnerService } from '../services/partner.service.js';
+
+export const partnerController = {
+  getProfile: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.getProfile(req.user!.userId);
+    res.json({ success: true, data });
+  }),
+
+  listJobs: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.listJobs(req.user!.userId);
+    res.json({ success: true, data });
+  }),
+
+  getJob: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.getJob(req.user!.userId, req.params.id);
+    res.json({ success: true, data });
+  }),
+
+  checkIn: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.checkIn(req.user!.userId, req.params.id);
+    res.json({ success: true, data });
+  }),
+
+  completeJob: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.completeJob(req.user!.userId, req.params.id);
+    res.json({ success: true, data });
+  }),
+
+  getEarnings: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.getEarnings(req.user!.userId);
+    res.json({ success: true, data });
+  }),
+};
