@@ -31,12 +31,14 @@ pnpm dev              # start frontend + backend concurrently
 | `SUPABASE_URL` | Supabase project URL — e.g. `https://xxxx.supabase.co` |
 | `SUPABASE_ANON_KEY` | Supabase anonymous/public API key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (admin) |
-| `DATABASE_URL` | Direct PostgreSQL connection string for Drizzle ORM |
+| `SUPABASE_DATABASE_URL` | Direct PostgreSQL connection string for Drizzle ORM (Settings → Database → URI) |
 | `JWT_SECRET` | Secret for signing access tokens (min 16 chars) |
 | `JWT_REFRESH_SECRET` | Secret for signing refresh tokens (min 16 chars) |
 | `PORT` | (Optional) Backend port — defaults to `8000` |
 
-> ⚠️ `SUPABASE_URL` must be the project REST URL (`https://xxxx.supabase.co`), **not** the postgres connection string. The postgres connection string goes in `DATABASE_URL`.
+> ⚠️ `SUPABASE_URL` must be the project REST URL (`https://xxxx.supabase.co`), **not** the postgres connection string. The postgres connection string goes in `SUPABASE_DATABASE_URL`.
+>
+> ⚠️ OTPs are printed to server logs (workflow console). In production, wire up an SMTP or transactional email provider in `server/src/services/otp.service.ts`.
 
 ## API routes
 

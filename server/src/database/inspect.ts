@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import postgres from 'postgres';
 
-const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require', max: 1 });
+const sql = postgres(process.env.SUPABASE_DATABASE_URL!, { ssl: 'require', max: 1 });
 
 async function main() {
   const tables = await sql<{ table_name: string; column_name: string; udt_name: string }[]>`

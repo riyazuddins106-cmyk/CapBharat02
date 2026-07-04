@@ -1,15 +1,18 @@
 ---
-name: SUPABASE_URL vs DATABASE_URL
-description: Common misconfiguration — user may set SUPABASE_URL to the postgres string instead of the REST URL
+name: SUPABASE_URL vs SUPABASE_DATABASE_URL
+description: These are two different things; confusing them breaks the app.
 ---
 
-**Rule:** `SUPABASE_URL` must be the Supabase project REST URL in the format `https://xxxx.supabase.co`. It is **not** the postgres connection string.
+# SUPABASE_URL vs SUPABASE_DATABASE_URL
 
-**Why:** The Supabase JS client (`@supabase/supabase-js`) uses `SUPABASE_URL` to make HTTP calls to the REST API and Storage API. If set to a `postgresql://` connection string, the storage bucket setup will fail with: `Request cannot be constructed from a URL that includes credentials: postgresql://...`
+**SUPABASE_URL** = the REST project URL: `https://xxx.supabase.co`
+- Used by `@supabase/supabase-js` client for Auth and Storage APIs
+- Must NOT be a postgres connection string
 
-**Observed symptom:**
-```
-[storage] Failed to list buckets: Request cannot be constructed from a URL that includes credentials: postgresql://...
-```
+**SUPABASE_DATABASE_URL** = the Postgres connection string: `postgresql://postgres:[password]@db.xxx.supabase.co:5432/postgres?sslmode=require`
+- Used by Drizzle ORM via the `postgres` npm package
+- Must NOT be the REST URL
 
-**Fix:** Ask the user to update the `SUPABASE_URL` secret to their Supabase project URL (found in Supabase dashboard → Settings → API → Project URL). The core database API still works when this is wrong because it uses `DATABASE_URL` directly via Drizzle ORM.
+**Why:** Both look like URLs so users frequently mix them up. The Zod schema in `env.ts` validates `SUPABASE_URL` as a URL (it would accept either), so the mistake won't be caught at startup.
+
+**How to apply:** When asking the user for Supabase credentials, explicitly say "SUPABASE_DATABASE_URL is the connection string from Settings → Database → URI, not the project URL."

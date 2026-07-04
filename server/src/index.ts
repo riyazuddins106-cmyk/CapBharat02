@@ -9,7 +9,7 @@ async function main() {
   const app = createApp();
   const port = Number(env.PORT);
 
-  app.listen(port, 'localhost', () => {
+  app.listen(port, '0.0.0.0', () => {
     logger.info(`ServeNow API listening on http://localhost:${port}`);
   });
 }

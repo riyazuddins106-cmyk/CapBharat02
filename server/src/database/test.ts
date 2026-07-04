@@ -39,7 +39,7 @@ function ok(label: string, pass: boolean, detail = '') {
 
 /* ── helpers ── */
 import postgres from 'postgres';
-const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require', max: 1 });
+const sql = postgres(process.env.SUPABASE_DATABASE_URL!, { ssl: 'require', max: 1 });
 
 async function getOtp(email: string, purpose: string): Promise<string | null> {
   const rows = await sql`

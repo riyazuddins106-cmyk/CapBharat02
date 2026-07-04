@@ -6,7 +6,7 @@ import 'dotenv/config';
 import postgres from 'postgres';
 import bcrypt from 'bcryptjs';
 
-const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require', max: 1 });
+const sql = postgres(process.env.SUPABASE_DATABASE_URL!, { ssl: 'require', max: 1 });
 
 async function main() {
   console.log('\n══════════════════════════════════════════');
