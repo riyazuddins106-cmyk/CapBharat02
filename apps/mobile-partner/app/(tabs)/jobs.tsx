@@ -89,7 +89,7 @@ export default function JobsScreen() {
   });
 
   const activeTab = TABS.find((t) => t.key === tab)!;
-  const filtered = jobs.filter((j) => activeTab.statuses.includes(j.status));
+  const filtered = jobs.filter((j: Job) => activeTab.statuses.includes(j.status));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

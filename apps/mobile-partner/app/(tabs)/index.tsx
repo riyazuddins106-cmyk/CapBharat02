@@ -66,13 +66,13 @@ export default function DashboardScreen() {
     enabled: !!accessToken,
   });
 
-  const todayJobs = (jobs ?? []).filter((j) => {
+  const todayJobs = (jobs ?? []).filter((j: Job) => {
     const d = new Date(j.scheduledAt);
     const now = new Date();
     return d.toDateString() === now.toDateString();
   });
 
-  const activeJobs = (jobs ?? []).filter((j) => ['upcoming', 'in_progress', 'pending'].includes(j.status));
+  const activeJobs = (jobs ?? []).filter((j: Job) => ['upcoming', 'in_progress', 'pending'].includes(j.status));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

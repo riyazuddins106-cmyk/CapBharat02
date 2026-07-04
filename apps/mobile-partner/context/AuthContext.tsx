@@ -30,28 +30,35 @@ async function clearTokens() {
   await SecureStore.deleteItemAsync(REFRESH_KEY);
 }
 
+function isPartnerRole(role: string) {
+  return role === 'partner' || role === 'admin';
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session on mount
+  // Restore session on mount — re-validate role after token refresh
   useEffect(() => {
     (async () => {
       try {
         const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
-        if (refresh) {
-          const tokens = await authApi.refresh(refresh);
-          await persistTokens(tokens.accessToken, tokens.refreshToken);
-          setAccessToken(tokens.accessToken);
-          // Fetch profile via partner API
-          const { partnerApi } = await import('@/lib/api');
-          try {
-            // We just need to verify it's a partner account — profile comes from partner endpoint
-            // If it throws, user is not a partner
-          } catch {}
-          // Decode user from a follow-up me call if needed; for now set basic info
+        if (!refresh) return;
+
+        const tokens = await authApi.refresh(refresh);
+        await persistTokens(tokens.accessToken, tokens.refreshToken);
+
+        // Fetch user profile to confirm role
+        const profile = await authApi.getMe(tokens.accessToken);
+        if (!isPartnerRole(profile.role)) {
+          // Stored session belongs to a customer account — clear it
+          await clearTokens();
+          return;
         }
+
+        setAccessToken(tokens.accessToken);
+        setUser(profile);
       } catch {
         await clearTokens();
       } finally {
@@ -62,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await authApi.login({ email, password });
-    if (data.user.role !== 'partner' && data.user.role !== 'admin') {
+    if (!isPartnerRole(data.user.role)) {
       throw new Error('This account is not registered as a partner. Please use the ServeNow customer app.');
     }
     await persistTokens(data.accessToken, data.refreshToken);

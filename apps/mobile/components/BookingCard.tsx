@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { useColors } from '@/hooks/useColors';
-import type { Booking } from '@/lib/api';
+import { bookingsApi, type Booking } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 const STATUS_CONFIG = {
   upcoming:    { label: 'Upcoming',    color: '#2563EB', bg: '#DBEAFE' },
@@ -24,8 +25,27 @@ interface Props {
 
 export function BookingCard({ booking, onCancel, onReview }: Props) {
   const colors = useColors();
+  const { accessToken } = useAuth();
   const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.upcoming;
   const [showQR, setShowQR] = useState(false);
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+
+  const openQR = async () => {
+    setShowQR(true);
+    if (qrToken) return; // already fetched
+    setQrLoading(true);
+    setQrError(null);
+    try {
+      const data = await bookingsApi.getQrToken(booking.id, accessToken!);
+      setQrToken(data.qrToken);
+    } catch (e: any) {
+      setQrError(e.message ?? 'Failed to load QR code');
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   return (
     <>
@@ -65,10 +85,10 @@ export function BookingCard({ booking, onCancel, onReview }: Props) {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {/* QR Code — show for upcoming and in-progress */}
+          {/* QR Code — show for active bookings */}
           {(booking.status === 'upcoming' || booking.status === 'in_progress') && (
             <TouchableOpacity
-              onPress={() => setShowQR(true)}
+              onPress={openQR}
               style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.secondary, flex: 0, paddingHorizontal: 14 }]}
               activeOpacity={0.8}
             >
@@ -76,7 +96,6 @@ export function BookingCard({ booking, onCancel, onReview }: Props) {
               <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
             </TouchableOpacity>
           )}
-
           {booking.status === 'upcoming' && onCancel && (
             <TouchableOpacity
               onPress={() => onCancel(booking.id)}
@@ -113,12 +132,21 @@ export function BookingCard({ booking, onCancel, onReview }: Props) {
             </View>
 
             <View style={[styles.qrBox, { borderColor: colors.border, borderRadius: colors.radius }]}>
-              <QRCode
-                value={booking.id}
-                size={200}
-                color={colors.foreground}
-                backgroundColor={colors.card}
-              />
+              {qrLoading && <ActivityIndicator size="large" color={colors.primary} style={{ width: 200, height: 200 }} />}
+              {qrError && (
+                <View style={{ width: 200, height: 200, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="warning-outline" size={32} color={colors.destructive} />
+                  <Text style={{ color: colors.destructive, fontSize: 12, textAlign: 'center', marginTop: 8 }}>{qrError}</Text>
+                </View>
+              )}
+              {qrToken && !qrLoading && (
+                <QRCode
+                  value={qrToken}
+                  size={200}
+                  color={colors.foreground}
+                  backgroundColor={colors.card}
+                />
+              )}
             </View>
 
             <Text style={[styles.qrHint, { color: colors.mutedForeground }]}>

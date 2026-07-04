@@ -23,7 +23,7 @@ export default function EarningsScreen() {
     enabled: !!accessToken,
   });
 
-  const weekly = earnings?.weekly ?? [];
+  const weekly: { date: string; amount: number }[] = earnings?.weekly ?? [];
   const maxAmount = Math.max(...weekly.map((w) => w.amount), 1);
 
   return (
@@ -46,7 +46,7 @@ export default function EarningsScreen() {
         <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
           <Text style={[styles.chartTitle, { color: colors.foreground }]}>Last 7 Days</Text>
           <View style={styles.chart}>
-            {weekly.map((w) => {
+            {weekly.map((w: { date: string; amount: number }) => {
               const pct = maxAmount > 0 ? w.amount / maxAmount : 0;
               const barH = Math.max(pct * 120, w.amount > 0 ? 8 : 3);
               return (

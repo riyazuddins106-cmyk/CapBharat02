@@ -159,6 +159,8 @@ export const bookingsApi = {
     request<Booking>(`/api/bookings/${id}/cancel`, { method: 'PATCH', token }),
   reschedule: (id: string, scheduledAt: string, token: string) =>
     request<Booking>(`/api/bookings/${id}/reschedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }), token }),
+  getQrToken: (id: string, token: string) =>
+    request<{ qrToken: string }>(`/api/bookings/${id}/qr`, { token }),
 };
 
 // ── Favorites ──────────────────────────────────────────────

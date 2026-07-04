@@ -101,6 +101,9 @@ export const authApi = {
       method: 'POST', body: JSON.stringify({ refreshToken }),
     }),
 
+  getMe: (token: string) =>
+    request<User>('/api/profile/me', { token }),
+
   forgotPassword: (email: string) =>
     request<void>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
 
@@ -122,8 +125,8 @@ export const partnerApi = {
   getJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}`, { token }),
 
-  checkIn: (id: string, token: string) =>
-    request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', token }),
+  checkIn: (id: string, qrToken: string, token: string) =>
+    request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', body: JSON.stringify({ qrToken }), token }),
 
   completeJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/complete`, { method: 'PATCH', token }),

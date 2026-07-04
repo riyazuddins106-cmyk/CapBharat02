@@ -22,7 +22,7 @@ export const partnerService = {
     return job;
   },
 
-  async checkIn(userId: string, bookingId: string) {
+  async checkIn(userId: string, bookingId: string, qrToken: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
@@ -30,6 +30,18 @@ export const partnerService = {
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'upcoming' && job.status !== 'pending') {
       throw AppError.badRequest(`Cannot check in a booking with status "${job.status}".`);
+    }
+
+    // Verify the QR token is valid and matches this booking
+    try {
+      const { verifyBookingQrToken } = await import('../utils/bookingQr.js');
+      const { bookingId: tokenBookingId } = verifyBookingQrToken(qrToken);
+      if (tokenBookingId !== bookingId) {
+        throw AppError.badRequest('QR code does not match this booking.');
+      }
+    } catch (err: any) {
+      if (err?.statusCode) throw err;
+      throw AppError.badRequest('Invalid or expired QR code. Ask the customer to refresh their booking QR.');
     }
 
     return partnerRepository.updateStatus(bookingId, 'in_progress');

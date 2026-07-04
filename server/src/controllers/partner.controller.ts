@@ -19,7 +19,9 @@ export const partnerController = {
   }),
 
   checkIn: asyncHandler(async (req: Request, res: Response) => {
-    const data = await partnerService.checkIn(req.user!.userId, req.params.id);
+    const { qrToken } = req.body as { qrToken?: string };
+    if (!qrToken) throw new (await import('../utils/AppError.js')).AppError('qrToken is required in request body', 400);
+    const data = await partnerService.checkIn(req.user!.userId, req.params.id, qrToken);
     res.json({ success: true, data });
   }),
 

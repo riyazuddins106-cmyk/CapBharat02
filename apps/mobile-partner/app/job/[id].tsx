@@ -41,7 +41,7 @@ export default function JobDetailScreen() {
   });
 
   const checkInMutation = useMutation({
-    mutationFn: () => partnerApi.checkIn(id!, accessToken!),
+    mutationFn: (qrToken: string) => partnerApi.checkIn(id!, qrToken, accessToken!),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
@@ -66,23 +66,15 @@ export default function JobDetailScreen() {
     if (scanned) return;
     setScanned(true);
 
-    // The QR encodes the booking ID
-    const scannedId = data.trim();
-    if (scannedId !== id) {
-      Alert.alert(
-        'Wrong Booking',
-        'This QR code does not match the current job. Please scan the correct customer QR.',
-        [{ text: 'Try Again', onPress: () => setScanned(false) }],
-      );
-      return;
-    }
+    // The QR encodes a signed JWT token containing the booking ID
+    const scannedToken = data.trim();
 
     Alert.alert(
       'Check In',
-      'QR verified! Mark this job as in progress?',
+      'QR scanned! Mark this job as in progress?',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => setScanned(false) },
-        { text: 'Check In', onPress: () => checkInMutation.mutate() },
+        { text: 'Check In', onPress: () => checkInMutation.mutate(scannedToken) },
       ],
     );
   };
@@ -99,7 +91,7 @@ export default function JobDetailScreen() {
     setShowScanner(true);
   };
 
-  const cfg = job ? (STATUS_CONFIG[job.status] ?? STATUS_CONFIG.upcoming) : STATUS_CONFIG.upcoming;
+  const cfg = job ? (STATUS_CONFIG[job.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.upcoming) : STATUS_CONFIG.upcoming;
 
   if (!job) {
     return (
