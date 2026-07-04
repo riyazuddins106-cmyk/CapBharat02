@@ -1,0 +1,26 @@
+import { pgTable, uuid, varchar, integer, doublePrecision, boolean, timestamp, text, json } from 'drizzle-orm/pg-core';
+import { serviceCategories } from './serviceCategories';
+import { users } from './users';
+
+export const professionals = pgTable('professionals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  categoryId: uuid('category_id').notNull().references(() => serviceCategories.id, { onDelete: 'restrict' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  bio: text('bio'),
+  rating: doublePrecision('rating').notNull().default(0),
+  reviewCount: integer('review_count').notNull().default(0),
+  basePrice: integer('base_price').notNull().default(0),
+  priceUnit: varchar('price_unit', { length: 32 }).notNull().default('/visit'),
+  badge: varchar('badge', { length: 64 }),
+  avatarUrl: varchar('avatar_url', { length: 512 }),
+  tags: json('tags').$type<string[]>().notNull().default([]),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+export type Professional = typeof professionals.$inferSelect;
+export type NewProfessional = typeof professionals.$inferInsert;
