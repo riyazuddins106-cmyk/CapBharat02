@@ -1,0 +1,701 @@
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Senior UI Engineer, Senior Database Architect, Senior DevOps Engineer, and Senior Security Engineer.
+
+IMPORTANT:
+Before changing any code, analyze the entire project completely.
+
+This project was generated from Figma Make.
+
+The existing UI should be preserved.
+
+Do NOT redesign screens unless absolutely required to make them functional.
+
+The objective is to convert this static Figma UI into a production-ready enterprise application.
+
+
+
+==================================================
+TECH STACK
+==================================================
+
+Frontend
+- React
+- Vite
+- TypeScript
+
+Backend
+- Node.js
+- Express
+- TypeScript
+
+Database
+- Supabase PostgreSQL
+
+ORM
+- Drizzle ORM
+
+Authentication
+- JWT
+- bcrypt
+
+Validation
+- Zod
+
+Storage
+- Supabase Storage
+
+State Management
+- Use modern scalable architecture
+
+==================================================
+STEP 1
+RESTRUCTURE THE ENTIRE PROJECT
+==================================================
+
+Create the following structure.
+
+ServeNow/
+
+apps/
+
+customer-web/
+
+admin-web/
+
+customer-mobile/
+
+partner-mobile/
+
+packages/
+
+shared/
+
+ui/
+
+types/
+
+api-client/
+
+server/
+
+src/
+
+config/
+
+controllers/
+
+routes/
+
+middleware/
+
+services/
+
+repositories/
+
+validators/
+
+database/
+
+drizzle/
+
+migrations/
+
+models/
+
+storage/
+
+uploads/
+
+jobs/
+
+sockets/
+
+utils/
+
+constants/
+
+types/
+
+database/
+
+schema/
+
+migrations/
+
+seed/
+
+backup/
+
+docs/
+
+architecture/
+
+api/
+
+database/
+
+deployment/
+
+requirements/
+
+screens/
+
+assets/
+
+logs/
+
+server/
+
+errors/
+
+access/
+
+scripts/
+
+setup/
+
+deployment/
+
+backup/
+
+restore/
+
+cleanup/
+
+shared/
+
+constants/
+
+dto/
+
+interfaces/
+
+enums/
+
+types/
+
+validation/
+
+.github/
+
+workflows/
+
+.env.example
+
+README.md
+
+docker-compose.yml
+
+package.json
+
+pnpm-workspace.yaml
+
+.gitignore
+
+==================================================
+STEP 2
+ANALYZE THE ENTIRE UI
+==================================================
+
+Inspect every page.
+
+Understand every component.
+
+Identify
+
+User Flow
+
+Business Flow
+
+Navigation
+
+Missing Features
+
+Missing APIs
+
+Missing Database Tables
+
+Missing Validations
+
+Missing States
+
+Missing Loading Screens
+
+Missing Error Screens
+
+Missing Empty States
+
+Do NOT leave placeholders.
+
+==================================================
+STEP 3
+DATABASE DESIGN
+==================================================
+
+Design a professional PostgreSQL database.
+
+Normalize all tables.
+
+Create relationships.
+
+Create indexes.
+
+Generate Drizzle schema.
+
+Generate SQL migrations.
+
+Use UUID primary keys.
+
+Every table should contain
+
+created_at
+
+updated_at
+
+deleted_at (where applicable)
+
+created_by (where applicable)
+
+updated_by (where applicable)
+
+==================================================
+STEP 4
+CONNECT SUPABASE
+==================================================
+
+Configure
+
+Supabase PostgreSQL
+
+Supabase Authentication
+
+Supabase Storage
+
+Use environment variables only.
+
+Generate
+
+.env.example
+
+Never hardcode secrets.
+
+==================================================
+STEP 5
+MAKE CUSTOMER APP FULLY FUNCTIONAL
+==================================================
+
+Implement every feature.
+
+No placeholders.
+
+Features include
+
+User Registration
+
+Login
+
+Logout
+
+Forgot Password
+
+OTP Verification
+
+JWT Authentication
+
+Refresh Tokens
+
+User Profile
+
+Edit Profile
+
+Upload Profile Picture
+
+Addresses
+
+Current Location
+
+Location Search
+
+Service Categories
+
+Services
+
+Search
+
+Filtering
+
+Booking
+
+Instant Booking
+
+Scheduled Booking
+
+Booking Tracking
+
+Booking History
+
+Booking Details
+
+Cancel Booking
+
+Reschedule Booking
+
+Favourite Services
+
+Coupons
+
+Offers
+
+Wallet (if UI exists)
+
+Payments
+
+Notifications
+
+Ratings
+
+Reviews
+
+Support
+
+Help Center
+
+Contact Support
+
+Settings
+
+Privacy
+
+Terms
+
+==================================================
+STEP 6
+CRUD
+==================================================
+
+Implement complete CRUD APIs wherever applicable.
+
+Every endpoint must include
+
+Validation
+
+Authorization
+
+Authentication
+
+Error Handling
+
+Pagination
+
+Filtering
+
+Sorting
+
+Searching
+
+==================================================
+STEP 7
+SERVER ARCHITECTURE
+==================================================
+
+Never access the database directly from controllers.
+
+Use
+
+Routes
+
+↓
+
+Controllers
+
+↓
+
+Services
+
+↓
+
+Repositories
+
+↓
+
+Database
+
+Follow SOLID principles.
+
+No duplicate logic.
+
+Reusable code only.
+
+==================================================
+STEP 8
+SECURITY
+==================================================
+
+Implement
+
+Helmet
+
+CORS
+
+Rate Limiting
+
+Password Hashing
+
+JWT
+
+Input Validation
+
+Environment Variables
+
+Request Validation
+
+Response Validation
+
+==================================================
+STEP 9
+ERROR HANDLING
+==================================================
+
+Create centralized
+
+Error Handler
+
+Logger
+
+Response Formatter
+
+Return proper HTTP status codes.
+
+==================================================
+STEP 10
+LOGGING
+==================================================
+
+Morgan
+
+Error Logs
+
+Request Logs
+
+Access Logs
+
+==================================================
+STEP 11
+FILE STORAGE
+==================================================
+
+Store uploaded files inside Supabase Storage.
+
+Generate reusable upload services.
+
+==================================================
+STEP 12
+CODE QUALITY
+==================================================
+
+Use TypeScript Strict Mode.
+
+Reusable Components.
+
+Reusable Hooks.
+
+Reusable Services.
+
+Reusable API Client.
+
+Reusable Utilities.
+
+Reusable Types.
+
+No duplicated code.
+
+==================================================
+STEP 13
+TEAM DEVELOPMENT
+==================================================
+
+This project will be developed by multiple developers.
+
+Document everything.
+
+Generate README files.
+
+Generate architecture documentation.
+
+Generate API documentation.
+
+Generate folder documentation.
+
+Maintain enterprise naming conventions.
+
+Use clean architecture.
+
+==================================================
+STEP 14
+DO NOT
+==================================================
+
+Do NOT redesign UI.
+
+Do NOT remove components.
+
+Do NOT remove routing.
+
+Do NOT remove animations.
+
+Do NOT break responsiveness.
+
+Do NOT leave TODO comments.
+
+Do NOT generate placeholder code.
+
+==================================================
+STEP 15
+OUTPUT
+==================================================
+
+Before changing anything
+
+1. Analyze entire project.
+
+2. Produce implementation plan.
+
+3. Explain required changes.
+
+4. Then implement features one by one.
+
+Keep the application runnable after every change.
+
+==================================================
+IMPORTANT
+==================================================
+
+Work ONLY on the Customer App.
+
+Do NOT start Partner App.
+
+Do NOT start Admin Panel.
+
+However, design the backend and database so Partner App and Admin Panel can be added later without restructuring the project.
+
+Everything must be production-ready.
+
+Assume this application will go live for real users.  
+
+
+
+==================================================
+MANDATORY DATABASE REQUIREMENTS
+==================================================
+
+IMPORTANT
+
+This project MUST NOT use:
+
+- Replit Database
+- Replit Auth
+- Replit Object Storage
+- Replit KV
+- Replit PostgreSQL
+- Any Replit Cloud services
+
+The ONLY backend database must be my own Supabase project.
+
+Use only:
+
+- Supabase PostgreSQL
+- Supabase Authentication
+- Supabase Storage
+
+Database access must use:
+
+Node.js
+Express
+Drizzle ORM
+PostgreSQL
+
+Store ALL credentials in environment variables.
+
+Generate an `.env.example` file with the following variables:
+
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+DATABASE_URL=
+JWT_SECRET=
+JWT_REFRESH_SECRET=
+PORT=
+
+Do NOT hardcode secrets anywhere.
+
+If database credentials are missing, STOP and ask me to add them as Replit Secrets instead of continuing.
+
+Use DATABASE_URL for Drizzle migrations and PostgreSQL connections.
+
+==================================================
+BACKEND REQUIREMENTS
+==================================================
+
+All business logic must execute on my Node.js backend.
+
+The React frontend must NEVER communicate directly with PostgreSQL.
+
+Communication flow must be:
+
+React Frontend
+↓
+
+Express REST API
+
+↓
+
+Service Layer
+
+↓
+
+Repository Layer
+
+↓
+
+Drizzle ORM
+
+↓
+
+Supabase PostgreSQL
+
+==================================================
+AUTHENTICATION
+==================================================
+
+Use Supabase Authentication only.
+
+Support:
+
+- Email/Password
+- JWT verification
+- Protected APIs
+- Refresh Tokens
+- Password Reset
+- Email Verification
+
+==================================================
+STORAGE
+==================================================
+
+Use Supabase Storage only.
+
+Store:
+
+- Profile Photos
+- Service Images
+- Documents
+- Attachments
+
+==================================================
+DEPLOYMENT
+==================================================
+
+The application must run locally and on Replit without changing the codebase.
+
+The only required configuration should be environment variables.
+
+Do not use any Replit-specific cloud database or storage features.
