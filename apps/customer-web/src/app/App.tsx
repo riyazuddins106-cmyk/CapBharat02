@@ -1,4 +1,5 @@
 import { useState } from "react";
+import CustomerAppLive from './CustomerApp';
 import {
   Search, MapPin, Star, ChevronRight, Bell, Heart, Home, Grid, BookOpen,
   User, Clock, Shield, Sparkles, Wrench, Scissors, Zap, Droplets, Paintbrush,
@@ -71,7 +72,7 @@ export default function App() {
       </div>
 
       {/* Rendered view */}
-      {appMode === "customer" && <CustomerApp />}
+      {appMode === "customer" && <CustomerAppLive />}
       {appMode === "partner"  && <PartnerApp />}
       {appMode === "admin"    && <AdminPanel />}
     </div>
