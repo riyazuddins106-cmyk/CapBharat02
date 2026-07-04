@@ -11,6 +11,6 @@ export const favoriteController = {
 
   toggle: asyncHandler(async (req: Request, res: Response) => {
     const result = await favoriteService.toggle(req.user!.userId, req.params.professionalId);
-    sendSuccess(res, result);
+    sendSuccess(res, result, result.isFavorite ? 201 : 200);
   }),
 };
