@@ -1,0 +1,14 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "b5YYM1Fa-ZVt-_wpJ2kKB"
+uri = "file://expo-partner-qr.png"
+type = "image"
+title = "Partner App QR — scan with Expo Go"
+
+[[outputs]]
+id = "YRQMGYkdJ1gp-10qoUFJO"
+uri = "file://expo-customer-qr.png"
+type = "image"
+title = "Customer App QR — scan with Expo Go"

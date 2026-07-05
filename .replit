@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "python-base-3.13"]
+modules = ["nodejs-20", "web", "python-base-3.13", "postgresql-16"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -34,17 +34,6 @@ waitForPort = 5001
 outputType = "webview"
 
 [[workflows.workflow]]
-name = "Expo Mobile"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd apps/mobile && bash ../../scripts/expo-tunnel.sh 8081 --clear"
-
-[[workflows.workflow]]
 name = "Project"
 mode = "parallel"
 author = "agent"
@@ -67,6 +56,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --clear --port 8082"
+
+[[workflows.workflow]]
+name = "Expo Mobile"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/mobile && bash ../../scripts/expo-lan.sh 8081 --clear"
 
 [[ports]]
 localPort = 5000
@@ -97,4 +97,4 @@ run = ["node", "server/dist/index.js"]
 
 [userenv.shared]
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
-EXPO_PUBLIC_API_URL = "https://fd52b957-0273-4e0a-88e9-095ee44c96cf-00-24eucvevwr1ic.pike.replit.dev"
+EXPO_PUBLIC_API_URL = "https://0dabb0ef-3e33-49f2-b9d8-5d3eadc6d55c-00-1ua17odk4x9ue.sisko.replit.dev"
