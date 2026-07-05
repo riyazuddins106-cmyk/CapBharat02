@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "postinstall": "find node_modules/.pnpm -name 'esbuild' -path '*/bin/esbuild' -exec chmod +x {} +",
     "dev": "concurrently -n server,web -c blue,magenta \"pnpm --filter @servenow/server dev\" \"pnpm --filter @servenow/customer-web dev\"",
     "dev:admin": "pnpm --filter @servenow/admin-web dev",
     "dev:server": "pnpm --filter @servenow/server dev",

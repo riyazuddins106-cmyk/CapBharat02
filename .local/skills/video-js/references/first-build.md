@@ -17,7 +17,7 @@ Pre-installed packages (do NOT install these): `framer-motion`, `gsap`, `@react-
 
 ## Build sequence
 
-Execute these 5 steps in order. No additional steps.
+Execute these 4 steps in order. No additional steps.
 
 ### Step 1: Delegate to DESIGN subagent
 
@@ -37,8 +37,6 @@ subagent({
 
 The design subagent handles the visual animation: creative direction, asset generation (images, video clips, web-sourced reference images), scene building, CSS theming, validation (`validate-recording.sh`), and finalization (frame containment, loop integrity). You do not verify or fix its output.
 
-Do not ask the design subagent to generate, plan, or wire audio. Background music, audio controls, and time-synced playback are main-agent post-build work after the design subagent returns.
-
 ### Step 2: Restart the workflow
 
 ```javascript
@@ -53,23 +51,11 @@ await refresh_all_logs();
 
 Read the workflow logs. If there are build errors (missing imports, syntax errors, etc.), fix them and restart the workflow again. If the logs are clean, proceed to step 4.
 
-### Step 4: Generate default background music (main agent only -- do not delegate)
+### Step 4: Add scene selectors (main agent only -- do not delegate)
 
-After the design subagent has finished and workflow logs are clean, generate exactly one default background music bed with the `generateMusic` callback. Do not generate voiceover/TTS or SFX unless the user explicitly requested them.
+After the design subagent has finished and workflow logs are clean, add an interactive control bar at the bottom of the video so the viewer can jump between scenes and toggle scene-lock. The bar renders only when the video is inside an iframe (the Replit preview pane). The exporter launches the video as the top-level document, so the gate hides the bar during export and the exported frame stays clean.
 
-Follow `.local/skills/video-js/references/audio.md` exactly for music prompting, output paths, runtime matching, extra user-requested audio, and playback wiring. Generate the audio before editing the animation controls so you know which file path the player will use.
-
-### Step 5: Add scene controls, audio controls, and synced audio (main agent only -- do not delegate)
-
-After the default music has been generated, add the interactive control bar at the bottom of the video so the viewer can jump between scenes, toggle scene-lock, and mute/unmute preview audio. The bar renders only when the video is inside an iframe (the Replit preview pane). The exporter launches the video as the top-level document, so the gate hides the bar during export and the exported frame stays clean.
-
-Follow `.local/skills/video-js/references/scene-selectors.md` for the scene-control architecture. While making those edits, follow `.local/skills/video-js/references/audio.md` in this order:
-
-1. Add the audio controls to `VideoWithControls` and pass `muted` into `VideoTemplate`.
-2. Then wire the generated audio into `VideoTemplate` with scene-synced playback.
-3. Then run the final validation/restart/log/present sequence from `scene-selectors.md`.
-
-Do NOT delegate this step to any subagent. Do NOT add details about scene selectors or audio to any subagent task description. The design subagent must never be informed that scene selectors or default audio exist.
+Follow `.local/skills/video-js/references/scene-selectors.md` exactly. Do NOT delegate this step to any subagent. Do NOT add details about scene selectors to any subagent task description. The design subagent must never be informed that scene selectors exist.
 
 `scene-selectors.md` owns the final workflow restart, log check, and `presentArtifact` call. Once that file's steps complete, the first build is done -- do NOT restart the workflow again and do NOT call `presentArtifact` a second time.
 
@@ -82,6 +68,6 @@ Do NOT delegate this step to any subagent. Do NOT add details about scene select
 - Do NOT take screenshots during the build.
 - Do NOT call `SuggestUserAction({ action: "deploy", message: "..." })` -- video artifacts are not deployable. They are exported from the preview pane.
 - Do NOT delegate finalization separately -- the design subagent handles it per `<completing_your_run>` in the skill.
-- Do NOT delegate the audio or scene-selector step. The main agent runs both directly after the design subagent finishes. The design subagent must not be told about scene selectors or default audio.
+- Do NOT delegate the scene-selector step (step 4). The main agent runs it directly after the design subagent finishes. The design subagent must not be told about scene selectors.
 - There is no need to test or code review the first build beyond the scene-selector validation.
 </first_build>
