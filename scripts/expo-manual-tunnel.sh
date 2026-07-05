@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 # expo-manual-tunnel.sh <port> [--authtoken-var VARNAME] [expo-args...]
-#
-# Bypasses @expo/ngrok entirely to avoid the shared-config-file conflict.
-# Instead:
-#   1. Starts the ngrok binary directly with --authtoken (no config file used)
-#   2. Polls ngrok's local API to get the public tunnel URL
-#   3. Passes that URL's hostname to Metro via REACT_NATIVE_PACKAGER_HOSTNAME
-#   4. Starts Expo in --host lan mode — QR code uses the ngrok hostname
+# Works with ngrok v3. Starts a tunnel then launches Expo in LAN mode.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,59 +22,72 @@ if [[ -z "$AUTHTOKEN" ]]; then
   exit 1
 fi
 
-# Kill any stale ngrok or Metro process on this port
-pkill -f "ngrok.*${PORT}" 2>/dev/null || true
-sleep 2
-
-# Pick an unused ngrok API port (default 4040 may be taken by the other app)
-# Use port 4040 for the first app (8081) and 4042 for the second (8082)
+# Pick app directory based on port
 if [[ "$PORT" == "8081" ]]; then
-  NGROK_API_PORT=4040
+  APP_DIR="$WORKSPACE_ROOT/apps/mobile"
 else
-  NGROK_API_PORT=4042
+  APP_DIR="$WORKSPACE_ROOT/apps/mobile-partner"
 fi
 
-echo "Starting ngrok tunnel for port $PORT (API on $NGROK_API_PORT)..."
+EXPO_BIN="$APP_DIR/node_modules/.bin/expo"
 
-# Start ngrok directly — pass authtoken via flag (not config file), so the
-# two apps' tokens never touch the same config file.
+if [[ ! -f "$EXPO_BIN" ]]; then
+  echo "ERROR: expo not found at $EXPO_BIN — run pnpm install first"
+  exit 1
+fi
+
+# Kill stale ngrok on this port
+pkill -f "ngrok.*${PORT}" 2>/dev/null || true
+sleep 1
+
+echo "Starting ngrok tunnel for port $PORT..."
 "$NGROK" http "$PORT" \
   --authtoken "$AUTHTOKEN" \
   --log stdout \
-  --web-addr "127.0.0.1:${NGROK_API_PORT}" \
+  --log-format json \
   > /tmp/ngrok-${PORT}.log 2>&1 &
 NGROK_PID=$!
 
-# Poll until the tunnel URL appears in ngrok's local API
 echo "Waiting for ngrok tunnel..."
 TUNNEL_URL=""
 for i in $(seq 1 30); do
   sleep 2
-  TUNNEL_URL=$(curl -s "http://127.0.0.1:${NGROK_API_PORT}/api/tunnels" 2>/dev/null \
-    | grep -o '"public_url":"https://[^"]*"' \
-    | head -1 \
-    | sed 's/"public_url":"//;s/"//')
+  TUNNEL_URL=$(curl -s "http://127.0.0.1:4040/api/tunnels" 2>/dev/null \
+    | python3 -c "
+import sys, json
+try:
+  data = json.load(sys.stdin)
+  tunnels = data.get('tunnels', [])
+  port = '$PORT'
+  for t in tunnels:
+    addr = t.get('config', {}).get('addr', '')
+    if port in addr:
+      print(t['public_url'])
+      sys.exit(0)
+  if tunnels:
+    print(tunnels[-1]['public_url'])
+except:
+  pass
+" 2>/dev/null || true)
   if [[ -n "$TUNNEL_URL" ]]; then
     break
   fi
 done
 
 if [[ -z "$TUNNEL_URL" ]]; then
-  echo "ERROR: ngrok tunnel did not start. Check /tmp/ngrok-${PORT}.log"
-  cat /tmp/ngrok-${PORT}.log
+  echo "ERROR: ngrok tunnel did not start. Log:"
+  cat /tmp/ngrok-${PORT}.log | tail -20
   kill $NGROK_PID 2>/dev/null || true
   exit 1
 fi
 
-# Extract just the hostname (strip https://)
 NGROK_HOST="${TUNNEL_URL#https://}"
+echo ""
 echo "Tunnel ready: $TUNNEL_URL"
-echo "Expo QR code will use: exp://$NGROK_HOST:$PORT"
+echo "Expo QR: exp://$NGROK_HOST"
+echo ""
 
-# Start Expo in LAN mode with the ngrok hostname injected.
-# Expo Go reads exp://NGROK_HOST:PORT from the QR code and connects via ngrok.
-exec yes | REACT_NATIVE_PACKAGER_HOSTNAME="$NGROK_HOST" \
-  pnpm expo start \
-  --port "$PORT" \
-  --host lan \
-  "$@"
+# Run Expo from inside the app directory using its local binary
+cd "$APP_DIR"
+exec env REACT_NATIVE_PACKAGER_HOSTNAME="$NGROK_HOST" \
+  bash -c "yes | '$EXPO_BIN' start --port $PORT --host lan"

@@ -55,12 +55,12 @@ args = "Expo Partner App"
 name = "Expo Customer App"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd apps/mobile && bash ../../scripts/expo-tunnel.sh 8081 --authtoken-var NGROK_AUTHTOKEN --clear"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/mobile && bash ../../scripts/expo-tunnel.sh 8081 --authtoken-var NGROK_AUTHTOKEN --config-home /tmp/ngrok-customer"
 
 [[workflows.workflow]]
 name = "Expo Partner App"
@@ -71,7 +71,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_PARTNER --config-home /tmp/ngrok-partner"
+args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner"
 
 [[ports]]
 localPort = 5000
@@ -102,4 +102,4 @@ run = ["node", "server/dist/index.js"]
 
 [userenv.shared]
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
-EXPO_PUBLIC_API_URL = "https://0dabb0ef-3e33-49f2-b9d8-5d3eadc6d55c-00-1ua17odk4x9ue.sisko.replit.dev"
+EXPO_PUBLIC_API_URL = "https://3985d845-fb4e-4e02-b44d-ab13deef289f-00-2do2ymwx95dq1.sisko.replit.dev:8000"
