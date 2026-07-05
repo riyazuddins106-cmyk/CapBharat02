@@ -1,0 +1,41 @@
+
+> servenow@0.0.1 dev /home/runner/workspace
+> concurrently -n server,web -c blue,magenta "pnpm --filter @servenow/server dev" "pnpm --filter @servenow/customer-web dev"
+
+[35m[web][39m 
+[35m[web][39m > @servenow/customer-web@0.0.1 dev /home/runner/workspace/apps/customer-web
+[35m[web][39m > vite
+[35m[web][39m 
+[34m[server][39m 
+[34m[server][39m > @servenow/server@0.0.1 dev /home/runner/workspace/server
+[34m[server][39m > tsx watch src/index.ts
+[34m[server][39m 
+[35m[web][39m [2m4:08:41 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
+[35m[web][39m 
+[35m[web][39m   [32m[1mVITE[22m v6.3.5[39m  [2mready in [0m[1m1384[22m[2m[0m ms[22m
+[35m[web][39m 
+[35m[web][39m   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5000[22m/[39m
+[35m[web][39m   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.24.0.2:[1m5000[22m/[39m
+[34m[server][39m [2026-07-04T16:08:43.607Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [0mGET /api/professionals [36m304[0m 719.044 ms - -[0m
+[34m[server][39m [0mGET /api/categories [36m304[0m 730.603 ms - -[0m
+[34m[server][39m [0mGET /api/health [32m200[0m 0.733 ms - 78[0m
+[34m[server][39m [0mGET /api/partner/jobs [33m401[0m 0.999 ms - 79[0m
+[34m[server][39m [0mGET /api/categories [32m200[0m 131.162 ms - 2178[0m
+[34m[server][39m [0mGET /api/professionals [32m200[0m 130.435 ms - 4896[0m
+[34m[server][39m [90m4:12:43 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/services/partner.service.ts[39m [33mRestarting...[39m
+[34m[server][39m c[2026-07-04T16:12:45.141Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [90m4:12:45 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/controllers/partner.controller.ts[39m [33mRestarting...[39m
+[34m[server][39m c[2026-07-04T16:12:47.314Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [90m4:12:52 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/routes/booking.routes.ts[39m [33mRestarting...[39m
+[34m[server][39m c[2026-07-04T16:12:54.928Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [90m4:17:40 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/utils/bookingQr.ts[39m [33mRestarting...[39m
+[34m[server][39m c[90m4:17:43 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/utils/jwt.ts[39m [33mRestarting...[39m
+[34m[server][39m c[2026-07-04T16:17:45.119Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [90m4:17:55 PM[39m [96m[tsx][39m [33mPrevious process hasn't exited yet. Force killing...[39m
+[34m[server][39m [0mpnpm --filter @servenow/server dev exited with code SIGTERM[0m
+[35m[web][39m /home/runner/workspace/apps/customer-web:
+[35m[web][39m [41m[30m ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL [39m[49m [31m@servenow/customer-web@0.0.1 dev: `vite`[39m
+[35m[web][39m [31mCommand failed with signal "SIGTERM"[39m
+[35m[web][39m [0mpnpm --filter @servenow/customer-web dev exited with code SIGTERM[0m
+[41m[30m ELIFECYCLE [39m[49m [31mCommand failed with exit code 1.[39m

@@ -1,0 +1,35 @@
+import React from "react";
+import type { View, ViewProps } from "react-native";
+export type KeyboardStickyViewProps = {
+    /**
+     * Specify additional offset to the view for given keyboard state.
+     */
+    offset?: {
+        /**
+         * Adds additional `translateY` when keyboard is close. By default `0`.
+         */
+        closed?: number;
+        /**
+         * Adds additional `translateY` when keyboard is open. By default `0`.
+         */
+        opened?: number;
+    };
+} & ViewProps;
+declare const KeyboardStickyView: React.ForwardRefExoticComponent<{
+    /**
+     * Specify additional offset to the view for given keyboard state.
+     */
+    offset?: {
+        /**
+         * Adds additional `translateY` when keyboard is close. By default `0`.
+         */
+        closed?: number;
+        /**
+         * Adds additional `translateY` when keyboard is open. By default `0`.
+         */
+        opened?: number;
+    };
+} & ViewProps & {
+    children?: React.ReactNode | undefined;
+} & React.RefAttributes<View>>;
+export default KeyboardStickyView;

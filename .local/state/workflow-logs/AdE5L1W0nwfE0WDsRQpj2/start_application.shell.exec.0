@@ -1,0 +1,37 @@
+
+> servenow@0.0.1 dev /home/runner/workspace
+> concurrently -n server,web -c blue,magenta "pnpm --filter @servenow/server dev" "pnpm --filter @servenow/customer-web dev"
+
+[34m[server][39m 
+[34m[server][39m > @servenow/server@0.0.1 dev /home/runner/workspace/server
+[34m[server][39m > tsx watch src/index.ts
+[34m[server][39m 
+[35m[web][39m 
+[35m[web][39m > @servenow/customer-web@0.0.1 dev /home/runner/workspace/apps/customer-web
+[35m[web][39m > vite
+[35m[web][39m 
+[35m[web][39m 
+[35m[web][39m   [32m[1mVITE[22m v6.3.5[39m  [2mready in [0m[1m1334[22m[2m[0m ms[22m
+[35m[web][39m 
+[35m[web][39m   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5000[22m/[39m
+[35m[web][39m   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.24.0.2:[1m5000[22m/[39m
+[34m[server][39m [2026-07-04T14:16:46.204Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [0mGET /api/professionals [32m200[0m 706.490 ms - 4896[0m
+[34m[server][39m [0mGET /api/categories [32m200[0m 719.335 ms - 2178[0m
+[34m[server][39m [0mGET /api/categories [32m200[0m 127.969 ms - 2178[0m
+[34m[server][39m [0mGET /api/professionals [32m200[0m 129.535 ms - 4896[0m
+[34m[server][39m [90m2:18:37 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/middleware/authenticate.ts[39m [33mRestarting...[39m
+[34m[server][39m c[2026-07-04T14:18:39.865Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [0mPOST /api/seed [32m200[0m 774.648 ms - 115[0m
+[34m[server][39m [90m2:20:05 PM[39m [96m[tsx][39m [95mchange[39m in [92m./src/routes/professional.routes.ts[39m [33mRestarting...[39m
+[34m[server][39m c[2026-07-04T14:20:06.799Z] [INFO] ServeNow API listening on http://localhost:8000
+[34m[server][39m [90m2:20:12 PM[39m [96m[tsx][39m [33mPrevious process hasn't exited yet. Force killing...[39m
+[35m[web][39m /home/runner/workspace/apps/customer-web:
+[35m[web][39m [41m[30m ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL [39m[49m [31m@servenow/customer-web@0.0.1 dev: `vite`[39m
+[35m[web][39m [31mExit status 143[39m
+[35m[web][39m [0mpnpm --filter @servenow/customer-web dev exited with code SIGTERM[0m
+[34m[server][39m /home/runner/workspace/server:
+[34m[server][39m [41m[30m ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL [39m[49m [31m@servenow/server@0.0.1 dev: `tsx watch src/index.ts`[39m
+[34m[server][39m [31mExit status 143[39m
+[34m[server][39m [0mpnpm --filter @servenow/server dev exited with code SIGTERM[0m
+[41m[30m ELIFECYCLE [39m[49m [31mCommand failed with exit code 1.[39m
