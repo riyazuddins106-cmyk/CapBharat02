@@ -32,7 +32,6 @@ async function main() {
   await q('drop service_categories','DROP TABLE IF EXISTS service_categories CASCADE');
   await q('drop users',             'DROP TABLE IF EXISTS users CASCADE');
 
-  // Drop old enums
   await q('drop enum booking_status', 'DROP TYPE IF EXISTS booking_status CASCADE');
   await q('drop enum user_role',      'DROP TYPE IF EXISTS user_role CASCADE');
 
