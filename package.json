@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"pnpm --filter @servenow/server dev\" \"pnpm --filter @servenow/customer-web dev\"",
+    "dev:admin": "pnpm --filter @servenow/admin-web dev",
     "dev:server": "pnpm --filter @servenow/server dev",
     "dev:web": "pnpm --filter @servenow/customer-web dev",
     "build": "pnpm --filter @servenow/customer-web build && pnpm --filter @servenow/server build",
@@ -19,5 +20,8 @@
     "overrides": {
       "vite": "6.3.5"
     }
+  },
+  "dependencies": {
+    "@expo/ngrok": "^4.1.3"
   }
 }

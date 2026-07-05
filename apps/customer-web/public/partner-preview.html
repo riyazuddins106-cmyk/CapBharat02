@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ServeNow Partner App Preview</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+       display:flex;align-items:center;justify-content:center;min-height:100vh;color:#fff}
+  .wrap{display:flex;flex-direction:column;align-items:center;gap:32px;padding:24px}
+  .badge{background:linear-gradient(135deg,#16A34A,#22c55e);padding:6px 18px;border-radius:99px;
+         font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  h1{font-size:26px;font-weight:800;letter-spacing:-.02em;text-align:center}
+  h1 span{color:#22c55e}
+  .phone{width:280px;height:560px;background:#1a1f2e;border-radius:40px;
+         border:2px solid rgba(255,255,255,.12);overflow:hidden;position:relative;
+         box-shadow:0 40px 80px rgba(0,0,0,.6)}
+  .phone-notch{width:100px;height:28px;background:#0f1117;border-radius:0 0 18px 18px;
+               position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:10}
+  .phone-screen{display:flex;flex-direction:column;height:100%;padding-top:40px}
+  .screen-header{background:linear-gradient(135deg,#16A34A,#22c55e);padding:20px 20px 28px;
+                 display:flex;flex-direction:column;gap:4px}
+  .screen-header .greeting{font-size:12px;color:rgba(255,255,255,.7);font-weight:500}
+  .screen-header .name{font-size:20px;font-weight:800}
+  .screen-header .status{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);
+                          border-radius:99px;padding:4px 10px;font-size:11px;font-weight:600;margin-top:4px;align-self:flex-start}
+  .dot{width:7px;height:7px;background:#fff;border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px;flex:1;align-content:start}
+  .card{background:rgba(255,255,255,.06);border-radius:16px;padding:14px;border:1px solid rgba(255,255,255,.08)}
+  .card-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:8px}
+  .card-val{font-size:22px;font-weight:800;line-height:1}
+  .card-lbl{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px}
+  .tabs{display:flex;border-top:1px solid rgba(255,255,255,.08);padding:8px 0 4px}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+       font-size:9px;color:rgba(255,255,255,.35);cursor:pointer}
+  .tab.active{color:#22c55e}
+  .tab-icon{font-size:18px}
+
+  .info{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;
+        padding:24px;max-width:320px;display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
+  .qr-box{width:120px;height:120px;background:#fff;border-radius:12px;display:flex;align-items:center;
+           justify-content:center;font-size:11px;color:#666;padding:10px;text-align:center;line-height:1.4}
+  .steps{text-align:left;font-size:13px;color:rgba(255,255,255,.6);line-height:1.8}
+  .steps strong{color:#22c55e;font-weight:600}
+  .pill{background:#16A34A22;border:1px solid #22c55e44;color:#22c55e;font-size:11px;font-weight:700;
+        padding:4px 12px;border-radius:99px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge">Partner App</div>
+  <h1>ServeNow <span>Partner</span></h1>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-header">
+        <div class="greeting">Good morning 👋</div>
+        <div class="name">Partner Dashboard</div>
+        <div class="status"><div class="dot"></div> Online &amp; Available</div>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon" style="background:#22c55e20">📋</div>
+          <div class="card-val">3</div>
+          <div class="card-lbl">New Jobs</div>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:#5B3EF520">💰</div>
+          <div class="card-val">₹4,200</div>
+          <div class="card-lbl">Today</div>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:#f5950020">⭐</div>
+          <div class="card-val">4.9</div>
+          <div class="card-lbl">Rating</div>
+        </div>
+        <div class="card">
+          <div class="card-icon" style="background:#ec489920">✅</div>
+          <div class="card-val">47</div>
+          <div class="card-lbl">Completed</div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab active"><div class="tab-icon">🏠</div>Home</div>
+        <div class="tab"><div class="tab-icon">📋</div>Jobs</div>
+        <div class="tab"><div class="tab-icon">💬</div>Chat</div>
+        <div class="tab"><div class="tab-icon">👤</div>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info">
+    <div class="pill">📱 Test on Real Device</div>
+    <div class="qr-box">
+      Start<br/><strong>Expo Partner</strong><br/>workflow<br/>to get QR code
+    </div>
+    <div class="steps">
+      1. Open <strong>Expo Partner</strong> workflow in Replit<br/>
+      2. Install <strong>Expo Go</strong> on your phone<br/>
+      3. Scan the QR code shown in the console<br/>
+      4. Full native app runs on your device ✨
+    </div>
+  </div>
+</div>
+</body>
+</html>

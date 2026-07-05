@@ -44,6 +44,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/admin-panel': {
+        target: 'http://localhost:5001',
+        changeOrigin: true,
+      },
     },
   },
   preview: {

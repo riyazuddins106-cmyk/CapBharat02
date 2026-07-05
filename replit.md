@@ -1,26 +1,41 @@
 # ServeNow (Urban Clap Clone)
 
-A full-stack monorepo home-services app built from a Figma UI. The customer-facing React app connects to a Node/Express REST API backed by Supabase PostgreSQL.
+A full-stack monorepo home-services marketplace with three independent applications sharing one backend.
+
+## Architecture
+
+| App | Path | Platform | Port | Workflow |
+|---|---|---|---|---|
+| Customer Web | `apps/customer-web` | Web (React + Vite) | 5000 | Start application |
+| Admin Panel | `apps/admin-web` | Web (React + Vite) | 5001 | Admin Panel |
+| Customer Mobile | `apps/mobile` | iOS + Android (Expo) | — | Expo Mobile |
+| Partner Mobile | `apps/mobile-partner` | iOS + Android (Expo) | — | Expo Partner |
+| Shared Backend | `server` | Node.js + Express | 8000 | (started by Start application) |
+
+All four apps share one Express server and one Supabase PostgreSQL database. No backend code is duplicated.
 
 ## Stack
 
-- **Frontend** (`apps/customer-web`): React 18, Vite, TypeScript, Tailwind CSS v4, Radix UI / Shadcn UI, Lucide React
-- **Backend** (`server`): Node.js 20, Express 4, TypeScript, Drizzle ORM, Zod validation, JWT auth, bcrypt, Morgan, Helmet
+- **Customer Web** (`apps/customer-web`): React 18, Vite, TypeScript, Tailwind CSS v4, Radix UI / Shadcn UI, Lucide React — live Supabase connection
+- **Admin Panel** (`apps/admin-web`): React 18, Vite, TypeScript, Tailwind CSS v4, Lucide React — proxies `/api` to shared backend
+- **Customer Mobile** (`apps/mobile`): Expo SDK 52, React Native, Expo Router
+- **Partner Mobile** (`apps/mobile-partner`): Expo SDK 52, React Native, Expo Router
+- **Backend** (`server`): Node.js 20, Express 4, TypeScript, Drizzle ORM, Zod, JWT auth, bcrypt
 - **Shared** (`packages/shared`): Common TypeScript types
 - **Database / Storage**: Supabase (PostgreSQL via Drizzle ORM, Supabase Storage for avatars)
 - **Package manager**: pnpm workspaces
 
 ## Running on Replit
 
-The workflow `Start application` runs `pnpm dev`, which starts both servers concurrently:
-- **Frontend**: http://localhost:5000 (Vite dev server, proxies `/api` → backend)
-- **Backend**: http://localhost:8000 (Express API)
+**Start application** (`pnpm dev`) — starts customer-web (port 5000) + backend (port 8000) together.
+
+**Admin Panel** (`pnpm --filter @servenow/admin-web dev`) — starts admin-web on port 5001. Launch from the Replit workflow panel.
 
 ### Expo Mobile (Expo Go)
 
-A separate **Expo Mobile** workflow is available for the React Native app. Start it manually from the Replit workflow panel.
+**Expo Mobile** and **Expo Partner** workflows are available for the React Native apps. Start manually from the Replit workflow panel.
 
-Before starting it, add `EXPO_PUBLIC_API_URL` as a Replit Secret set to your Replit dev domain, e.g.:
+Before starting, add `EXPO_PUBLIC_API_URL` as a Replit Secret set to your Replit dev domain, e.g.:
 ```
 EXPO_PUBLIC_API_URL=https://<your-repl>.<username>.repl.co
 ```

@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-20", "web", "python-base-3.13"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -22,15 +22,27 @@ waitForPort = 5000
 outputType = "webview"
 
 [[workflows.workflow]]
-name = "Expo Mobile"
+name = "Admin Panel"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile && pnpm expo start --tunnel"
+args = "pnpm --filter @servenow/admin-web dev"
+waitForPort = 5001
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "Expo Mobile"
+author = "agent"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/mobile && yes | pnpm expo start --tunnel"
 
 [[workflows.workflow]]
 name = "Project"
@@ -41,24 +53,40 @@ author = "agent"
 task = "workflow.run"
 args = "Expo Partner"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Expo Mobile"
+
 [[workflows.workflow]]
 name = "Expo Partner"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd apps/mobile-partner && pnpm expo start --tunnel"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/mobile-partner && yes | pnpm expo start --tunnel --port 8082"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 5001
+externalPort = 5001
+
+[[ports]]
 localPort = 8000
 externalPort = 8000
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3001
 
 [deployment]
 deploymentTarget = "autoscale"

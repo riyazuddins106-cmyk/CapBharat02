@@ -1,3 +1,4 @@
 - [Env variable contract](env-contract.md) — server uses DATABASE_URL (not SUPABASE_DATABASE_URL); all DB scripts must match this.
 - [Drizzle-kit ESM compat](drizzle-kit-esm.md) — schema/index.ts must use extensionless imports; drizzle-kit uses CJS require() internally and cannot resolve .js extensions on .ts files.
 - [SUPABASE_URL vs DATABASE_URL](supabase-url-warning.md) — SUPABASE_URL must be the REST project URL (https://xxx.supabase.co), not the postgres connection string.
+- [ServeNow app separation](servenow-arch.md) — three apps share one server; admin-web extracted from App.tsx prototype; mobile apps were already isolated.
