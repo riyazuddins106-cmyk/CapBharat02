@@ -13,6 +13,10 @@ export const refreshTokenRepository = {
     return token;
   },
 
+  async updateHash(id: string, tokenHash: string): Promise<void> {
+    await db.update(refreshTokens).set({ tokenHash }).where(eq(refreshTokens.id, id));
+  },
+
   async revoke(id: string): Promise<void> {
     await db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, id));
   },

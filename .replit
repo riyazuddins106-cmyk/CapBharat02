@@ -71,7 +71,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner"
+args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner --start-delay 25"
 
 [[ports]]
 localPort = 5000
@@ -106,4 +106,4 @@ run = ["node", "server/dist/index.js"]
 
 [userenv.shared]
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
-EXPO_PUBLIC_API_URL = "https://a5541275-b8d1-4438-a4d0-f783129b82f1-00-3eh6tge7ul3k4.pike.replit.dev"
+EXPO_PUBLIC_API_URL = "https://7b86297c-45d1-4142-b410-4dbfe9faa586-00-2zzm1okr4qpxw.pike.replit.dev"

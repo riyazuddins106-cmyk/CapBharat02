@@ -24,22 +24,22 @@ function toPublicUser(user: User) {
 async function issueTokenPair(user: User) {
   const accessToken = signAccessToken({ userId: user.id, email: user.email });
 
-  const refreshTokenRecord = await refreshTokenRepository.create({
+  // Step 1: create a placeholder record to get a stable DB-generated ID
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+  const record = await refreshTokenRepository.create({
     userId: user.id,
     tokenHash: 'pending',
-    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    expiresAt,
   });
 
-  const refreshToken = signRefreshToken({ userId: user.id, tokenId: refreshTokenRecord.id });
+  // Step 2: sign the JWT using that real ID
+  const refreshToken = signRefreshToken({ userId: user.id, tokenId: record.id });
+
+  // Step 3: hash the exact token we are returning, then update the record
   const tokenHash = await bcrypt.hash(refreshToken, 10);
-  await refreshTokenRepository.revoke(refreshTokenRecord.id);
-  const updated = await refreshTokenRepository.create({
-    userId: user.id,
-    tokenHash,
-    expiresAt: refreshTokenRecord.expiresAt,
-  });
+  await refreshTokenRepository.updateHash(record.id, tokenHash);
 
-  return { accessToken, refreshToken: signRefreshToken({ userId: user.id, tokenId: updated.id }) };
+  return { accessToken, refreshToken };
 }
 
 export const authService = {
@@ -132,6 +132,9 @@ export const authService = {
     const user = await userRepository.findById(payload.userId);
     if (!user) {
       throw AppError.unauthorized('Account no longer exists.');
+    }
+    if (!user.isActive) {
+      throw AppError.forbidden('This account has been disabled.');
     }
 
     const tokens = await issueTokenPair(user);

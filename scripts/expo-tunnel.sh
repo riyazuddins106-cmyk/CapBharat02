@@ -13,6 +13,7 @@ shift || true
 
 AUTHTOKEN_VAR="NGROK_AUTHTOKEN"
 CONFIG_HOME=""
+START_DELAY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,8 @@ while [[ $# -gt 0 ]]; do
       AUTHTOKEN_VAR="$2"; shift 2 ;;
     --config-home)
       CONFIG_HOME="$2"; shift 2 ;;
+    --start-delay)
+      START_DELAY="$2"; shift 2 ;;
     *)
       break ;;
   esac
@@ -45,7 +48,27 @@ fi
 # Also export as env var so expo-cli / @expo/ngrok picks it up
 export NGROK_AUTHTOKEN="$AUTHTOKEN"
 
-# @expo/ngrok-bin has been replaced with the ngrok v3 binary (bin/ngrok).
-# The v3 binary already uses XDG_CONFIG_HOME set above, so no extra setup needed.
+# Optional startup delay — lets the other app's tunnel establish first
+if [[ "$START_DELAY" -gt 0 ]]; then
+  echo "Waiting ${START_DELAY}s before starting tunnel (stagger to avoid ngrok conflicts)…"
+  sleep "$START_DELAY"
+fi
 
-exec yes | pnpm expo start --tunnel --port "$PORT" "$@"
+# Retry loop — ngrok tunnels sometimes fail on first attempt when two are
+# started in rapid succession; retrying with a short pause usually succeeds.
+MAX_RETRIES=5
+RETRY_DELAY=15
+
+for attempt in $(seq 1 $MAX_RETRIES); do
+  echo "Starting Expo tunnel (attempt $attempt/$MAX_RETRIES)…"
+  yes | pnpm expo start --tunnel --port "$PORT" "$@" && exit 0
+
+  EXIT_CODE=$?
+  if [[ $attempt -lt $MAX_RETRIES ]]; then
+    echo "Tunnel exited with code $EXIT_CODE. Retrying in ${RETRY_DELAY}s…"
+    sleep "$RETRY_DELAY"
+  fi
+done
+
+echo "All $MAX_RETRIES tunnel attempts failed."
+exit 1
