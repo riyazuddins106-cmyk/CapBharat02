@@ -1,31 +1,106 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   MapPin, Star, ChevronRight, Bell, Home, BookOpen,
-  Sparkles, TrendingUp, DollarSign, Search, Clock, MessageSquare,
+  Sparkles, TrendingUp, DollarSign, Search, Clock,
   BarChart2, Users, Settings, ChevronDown, Package, Filter,
   CheckCircle, XCircle, Wallet, Award, FileText, Eye, Ban, RefreshCw,
   PlusCircle, Percent, Activity, ArrowUpRight, ArrowDownRight,
-  AlertCircle, Phone, Navigation,
+  AlertCircle, Phone, Navigation, LogOut, Loader2,
 } from "lucide-react";
+import { adminAuth, authApi, adminApi } from "@/lib/api";
+import type { AdminUser, Booking, Professional, DashboardStats } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
-   ADMIN PANEL  (tablet-wide layout)
+   LOGIN PAGE
 ═══════════════════════════════════════════════════════════════════ */
 
-const ALL_BOOKINGS = [
-  { id: "UC91030", customer: "Rohan Gupta",  service: "Cleaning",   pro: "Priya Sharma", date: "Jul 3, 3:00 PM",  amount: "₹399", status: "Upcoming"   },
-  { id: "UC91029", customer: "Anita Desai",  service: "Electrical", pro: "Rajan Verma",  date: "Jul 3, 11:00 AM", amount: "₹249", status: "Ongoing"    },
-  { id: "UC91028", customer: "Vikram Nair",  service: "Salon",      pro: "Meena Pillai", date: "Jul 2, 5:00 PM",  amount: "₹599", status: "Completed"  },
-  { id: "UC91027", customer: "Sunita Reddy", service: "Plumbing",   pro: "Arun Pillai",  date: "Jul 2, 2:00 PM",  amount: "₹350", status: "Cancelled"  },
-  { id: "UC91026", customer: "Deepa Iyer",   service: "AC Repair",  pro: "Suresh Kumar", date: "Jul 1, 10:00 AM", amount: "₹450", status: "Completed"  },
-];
+function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, refresh: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-const ALL_PROS = [
-  { name: "Priya Sharma", service: "Cleaning",   rating: 4.9, jobs: 312, status: "Active",   earnings: "₹62,400", img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&auto=format" },
-  { name: "Rajan Verma",  service: "Electrical", rating: 4.8, jobs: 189, status: "Active",   earnings: "₹47,250", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop&auto=format" },
-  { name: "Meena Pillai", service: "Salon",      rating: 4.9, jobs: 447, status: "Active",   earnings: "₹89,300", img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&auto=format" },
-  { name: "Arun Pillai",  service: "Plumbing",   rating: 4.5, jobs: 98,  status: "Suspended",earnings: "₹24,500", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&auto=format" },
-];
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = await authApi.login(email, password);
+      adminAuth.store(data.accessToken, data.refreshToken, data.user);
+      onLogin(data.user, data.accessToken, data.refreshToken);
+    } catch (err: any) {
+      setError(err.message ?? "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#0f1117" }}>
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-8 justify-center">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            <Sparkles size={20} color="white" />
+          </div>
+          <span className="text-white font-bold text-xl">ServeNow Admin</span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#161B27" }}>
+          <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
+          <p className="text-white/40 text-sm mb-6">Sign in to the admin panel</p>
+
+          {error && (
+            <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20" style={{ background: "rgba(239,68,68,0.08)" }}>
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-white/60 text-xs font-medium mb-1.5">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                placeholder="admin@servenow.in"
+                className="w-full rounded-xl px-4 py-3 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+                style={{ background: "rgba(255,255,255,0.05)" }}
+              />
+            </div>
+            <div>
+              <label className="block text-white/60 text-xs font-medium mb-1.5">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                className="w-full rounded-xl px-4 py-3 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+                style={{ background: "rgba(255,255,255,0.05)" }}
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADMIN PANEL  (tablet-wide layout — now with live data)
+═══════════════════════════════════════════════════════════════════ */
 
 const ADMIN_SIDEBAR = [
   { id: "dashboard", icon: Home,      label: "Dashboard"     },
@@ -35,279 +110,298 @@ const ADMIN_SIDEBAR = [
   { id: "settings",  icon: Settings,  label: "Settings"      },
 ];
 
-function AdminPanel() {
+const STATUS_COLOR: Record<string, string> = {
+  upcoming:    "#5B3EF5",
+  in_progress: "#F59E0B",
+  completed:   "#16A34A",
+  cancelled:   "#EF4444",
+  pending:     "#6B7280",
+};
+
+function fmt(n: number) {
+  return `₹${n.toLocaleString("en-IN")}`;
+}
+
+function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessToken: string; onLogout: () => void }) {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen]     = useState(true);
+  const [stats, setStats]       = useState<DashboardStats | null>(null);
+  const [bookingList, setBookingList] = useState<Booking[]>([]);
+  const [proList, setProList]   = useState<Professional[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [s, b, p] = await Promise.all([
+        adminApi.getStats(accessToken),
+        adminApi.getBookings(accessToken),
+        adminApi.getProfessionals(accessToken),
+      ]);
+      setStats(s);
+      setBookingList(b.bookings as any);
+      setProList(p.professionals as any);
+    } catch (err: any) {
+      console.error("Admin load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const togglePro = async (id: string, active: boolean) => {
+    try {
+      if (active) await adminApi.suspendProfessional(id, accessToken);
+      else await adminApi.activateProfessional(id, accessToken);
+      setActionMsg(active ? "Professional suspended" : "Professional activated");
+      setTimeout(() => setActionMsg(null), 3000);
+      load();
+    } catch (err: any) {
+      setActionMsg(err.message);
+      setTimeout(() => setActionMsg(null), 3000);
+    }
+  };
 
   return (
-    <div
-      className="flex overflow-hidden rounded-3xl shadow-2xl border border-white/10"
-      style={{ width: 900, height: 680, background: "#0f1117" }}
-    >
-      {/* Sidebar */}
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "#0f1117" }}>
+      {/* Toast */}
+      {actionMsg && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm text-white border border-white/10 shadow-xl" style={{ background: "#1e2535" }}>
+          {actionMsg}
+        </div>
+      )}
+
       <div
-        className="flex flex-col border-r border-white/[0.08] transition-all"
-        style={{ width: sidebarOpen ? 200 : 64, background: "#161B27" }}
+        className="flex overflow-hidden rounded-3xl shadow-2xl border border-white/10"
+        style={{ width: 940, minHeight: 680, background: "#0f1117" }}
       >
-        {/* Logo */}
-        <div className="px-4 py-5 flex items-center gap-3 border-b border-white/[0.08]">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-            <Sparkles size={16} color="white" />
+        {/* Sidebar */}
+        <div
+          className="flex flex-col border-r border-white/[0.08] transition-all flex-shrink-0"
+          style={{ width: sidebarOpen ? 200 : 64, background: "#161B27" }}
+        >
+          <div className="px-4 py-5 flex items-center gap-3 border-b border-white/[0.08]">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 cursor-pointer"
+              style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              onClick={() => setSidebarOpen(v => !v)}
+            >
+              <Sparkles size={16} color="white" />
+            </div>
+            {sidebarOpen && <span className="text-white font-bold text-sm whitespace-nowrap">ServeNow Admin</span>}
           </div>
-          {sidebarOpen && <span className="text-white font-bold text-sm whitespace-nowrap">UrbanClap</span>}
-        </div>
 
-        {/* Nav */}
-        <div className="flex-1 py-3 flex flex-col gap-1 px-2">
-          {ADMIN_SIDEBAR.map((item) => {
-            const Icon = item.icon;
-            const active = activeSection === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left"
-                style={{ background: active ? "rgba(91,62,245,0.2)" : "transparent", color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)" }}
-              >
-                <Icon size={18} strokeWidth={active ? 2.5 : 2} />
-                {sidebarOpen && <span className="text-sm font-semibold whitespace-nowrap">{item.label}</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Bottom */}
-        <div className="p-3 border-t border-white/[0.08]">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            <ChevronRight size={18} style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
-            {sidebarOpen && <span className="text-xs font-medium">Collapse</span>}
-          </button>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#0f1117" }}>
-        {/* Topbar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08]">
-          <div>
-            <h1 className="text-white font-bold text-base capitalize">{activeSection === "pros" ? "Professionals" : activeSection}</h1>
-            <p className="text-white/40 text-xs">Urban Company Admin · July 3, 2026</p>
+          <div className="flex-1 py-3 flex flex-col gap-1 px-2">
+            {ADMIN_SIDEBAR.map((item) => {
+              const Icon = item.icon;
+              const active = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left w-full"
+                  style={{
+                    background: active ? "rgba(91,62,245,0.15)" : "transparent",
+                    color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)",
+                  }}
+                >
+                  <Icon size={18} className="flex-shrink-0" />
+                  {sidebarOpen && <span className="text-sm font-semibold">{item.label}</span>}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex items-center gap-3">
-            <button className="relative w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)" }}>
-              <Bell size={16} color="rgba(255,255,255,0.6)" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: "#FF6B35" }} />
+
+          {/* User + Logout */}
+          <div className="p-3 border-t border-white/[0.08]">
+            {sidebarOpen && (
+              <div className="flex items-center gap-2 mb-2 px-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: "#5B3EF5" }}>
+                  {user.fullName?.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-xs font-semibold truncate">{user.fullName}</p>
+                  <p className="text-white/30 text-[10px] truncate">{user.email}</p>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl w-full text-red-400 hover:bg-red-400/10 transition-colors"
+            >
+              <LogOut size={16} className="flex-shrink-0" />
+              {sidebarOpen && <span className="text-sm font-semibold">Sign out</span>}
             </button>
-            <div className="flex items-center gap-2">
-              <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&auto=format" alt="Admin" className="w-8 h-8 rounded-xl object-cover" />
-              <div className="hidden sm:block"><p className="text-white text-xs font-bold">Vikash Singh</p><p className="text-white/40 text-[10px]">Super Admin</p></div>
+          </div>
+        </div>
+
+        {/* Main */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Topbar */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08]">
+            <div>
+              <h1 className="text-white font-bold text-base capitalize">{activeSection}</h1>
+              <p className="text-white/30 text-xs">ServeNow Admin Panel</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={load}
+                className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors"
+              >
+                <RefreshCw size={14} color="rgba(255,255,255,0.5)" />
+              </button>
+              <button className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors">
+                <Bell size={14} color="rgba(255,255,255,0.5)" />
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Section content */}
-        <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "none" }}>
-          {activeSection === "dashboard" && <AdminDashboard />}
-          {activeSection === "bookings"  && <AdminBookings />}
-          {activeSection === "pros"      && <AdminPros />}
-          {activeSection === "analytics" && <AdminAnalytics />}
-          {activeSection === "settings"  && <AdminSettings />}
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {loading ? (
+              <div className="flex items-center justify-center h-48">
+                <Loader2 size={32} className="animate-spin text-violet-500" />
+              </div>
+            ) : activeSection === "dashboard" ? (
+              <DashboardView stats={stats} bookings={bookingList} pros={proList} />
+            ) : activeSection === "bookings" ? (
+              <BookingsView bookings={bookingList} />
+            ) : activeSection === "pros" ? (
+              <ProsView pros={proList} onToggle={togglePro} />
+            ) : activeSection === "analytics" ? (
+              <AnalyticsView stats={stats} />
+            ) : (
+              <SettingsView user={user} />
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function AdminDashboard() {
-  const kpis = [
-    { label: "Total Bookings", val: "12,847", delta: "+8.2%", up: true,  icon: BookOpen,  color: "#5B3EF5", bg: "rgba(91,62,245,0.15)" },
-    { label: "Gross Revenue",  val: "₹51.4L", delta: "+12.4%",up: true,  icon: DollarSign,color: "#16A34A", bg: "rgba(22,163,74,0.15)"  },
-    { label: "Active Pros",    val: "2,341",  delta: "+3.1%", up: true,  icon: Users,     color: "#E65100", bg: "rgba(230,81,0,0.15)"   },
-    { label: "Cancellation",   val: "4.2%",   delta: "-0.8%", up: false, icon: XCircle,   color: "#DB2777", bg: "rgba(219,39,119,0.15)" },
+/* ── Dashboard ────────────────────────────────────────────────── */
+function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null; bookings: Booking[]; pros: Professional[] }) {
+  const cards = [
+    { label: "Total Bookings",   value: stats?.totalBookings ?? 0,    icon: BookOpen,   color: "#5B3EF5", suffix: "" },
+    { label: "Active Bookings",  value: stats?.activeBookings ?? 0,   icon: Clock,      color: "#F59E0B", suffix: "" },
+    { label: "Professionals",    value: stats?.totalProfessionals ?? 0,icon: Users,      color: "#16A34A", suffix: "" },
+    { label: "Total Revenue",    value: stats?.totalRevenue ?? 0,     icon: DollarSign, color: "#DB2777", suffix: "₹", money: true },
   ];
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* KPI cards */}
+    <div className="space-y-6">
+      {/* Stats row */}
       <div className="grid grid-cols-4 gap-4">
-        {kpis.map((k) => {
-          const Icon = k.icon;
+        {cards.map((c) => {
+          const Icon = c.icon;
           return (
-            <div key={k.label} className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div key={c.label} className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: k.bg }}><Icon size={16} color={k.color} /></div>
-                <span className="text-xs font-bold flex items-center gap-0.5" style={{ color: k.up ? "#4ADE80" : "#F87171" }}>
-                  {k.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}{k.delta}
-                </span>
+                <p className="text-white/40 text-xs">{c.label}</p>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: c.color + "20" }}>
+                  <Icon size={14} color={c.color} />
+                </div>
               </div>
-              <p className="text-white text-xl font-bold">{k.val}</p>
-              <p className="text-white/40 text-xs mt-0.5">{k.label}</p>
+              <p className="text-white font-bold text-2xl">
+                {c.money ? `₹${(c.value as number).toLocaleString("en-IN")}` : c.value}
+              </p>
             </div>
           );
         })}
-      </div>
-
-      <div className="grid grid-cols-5 gap-4">
-        {/* Revenue chart */}
-        <div className="col-span-3 rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-bold text-sm">Revenue Trend</h3>
-            <select className="text-xs font-semibold rounded-lg px-2 py-1 border border-white/10 outline-none" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
-              <option>Last 7 days</option><option>Last 30 days</option>
-            </select>
-          </div>
-          <div className="flex gap-1.5 items-end h-28">
-            {[35,60,45,75,55,90,70,85,65,80,50,95,75,100].map((h, i) => (
-              <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: i === 13 ? "#5B3EF5" : "rgba(91,62,245,0.3)", minWidth: 0 }} />
-            ))}
-          </div>
-        </div>
-
-        {/* Service breakdown */}
-        <div className="col-span-2 rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-          <h3 className="text-white font-bold text-sm mb-4">Top Services</h3>
-          <div className="flex flex-col gap-3">
-            {[{ label: "Cleaning", pct: 34, color: "#5B3EF5" }, { label: "Salon", pct: 28, color: "#DB2777" }, { label: "Electrical", pct: 18, color: "#16A34A" }, { label: "Plumbing", pct: 12, color: "#D97706" }, { label: "Other", pct: 8, color: "#6B7280" }].map((s) => (
-              <div key={s.label}>
-                <div className="flex items-center justify-between mb-1"><span className="text-white/70 text-xs">{s.label}</span><span className="text-white text-xs font-bold">{s.pct}%</span></div>
-                <div className="h-1.5 bg-white/10 rounded-full"><div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color }} /></div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Recent bookings */}
-      <div className="rounded-2xl border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.07]">
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <div className="px-5 py-4 border-b border-white/[0.07]">
           <h3 className="text-white font-bold text-sm">Recent Bookings</h3>
-          <button className="text-xs font-semibold" style={{ color: "#7C5BF8" }}>View all</button>
         </div>
-        <table className="w-full">
-          <thead><tr className="border-b border-white/[0.06]">
-            {["ID","Customer","Service","Professional","Date","Amount","Status"].map((h) => <th key={h} className="text-left px-4 py-2.5 text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.3)" }}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {ALL_BOOKINGS.map((b) => {
-              const sc: Record<string, [string,string]> = { Upcoming: ["#EDE9FD","#7C5BF8"], Ongoing: ["rgba(255,143,0,0.2)","#FF8F00"], Completed: ["rgba(22,163,74,0.2)","#4ADE80"], Cancelled: ["rgba(239,68,68,0.2)","#F87171"] };
-              const [bg, fg] = sc[b.status] || ["#F3F4F6","#6B7280"];
-              return (
-                <tr key={b.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-2.5 text-xs font-mono" style={{ color: "#7C5BF8" }}>{b.id}</td>
-                  <td className="px-4 py-2.5 text-xs text-white/80 font-medium">{b.customer}</td>
-                  <td className="px-4 py-2.5 text-xs text-white/60">{b.service}</td>
-                  <td className="px-4 py-2.5 text-xs text-white/60">{b.pro}</td>
-                  <td className="px-4 py-2.5 text-xs text-white/50">{b.date}</td>
-                  <td className="px-4 py-2.5 text-xs font-bold text-white">{b.amount}</td>
-                  <td className="px-4 py-2.5"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: bg, color: fg }}>{b.status}</span></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="divide-y divide-white/[0.05]">
+          {bookings.slice(0, 5).map((b: any) => (
+            <div key={b.id} className="px-5 py-3 flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-white text-sm font-semibold">{b.serviceName}</p>
+                <p className="text-white/40 text-xs">{b.customerName ?? "Customer"}</p>
+              </div>
+              <p className="text-white/60 text-xs">{b.proName}</p>
+              <p className="text-white/60 text-xs">{fmt(b.price)}</p>
+              <span
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize"
+                style={{
+                  background: (STATUS_COLOR[b.status] ?? "#6B7280") + "20",
+                  color: STATUS_COLOR[b.status] ?? "#6B7280",
+                }}
+              >
+                {b.status.replace("_", " ")}
+              </span>
+            </div>
+          ))}
+          {bookings.length === 0 && (
+            <p className="px-5 py-6 text-white/30 text-sm text-center">No bookings yet</p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function AdminBookings() {
+/* ── Bookings ─────────────────────────────────────────────────── */
+function BookingsView({ bookings }: { bookings: Booking[] }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const statuses = ["All","Upcoming","Ongoing","Completed","Cancelled"];
-  const filtered = ALL_BOOKINGS.filter((b) =>
-    (statusFilter === "All" || b.status === statusFilter) &&
-    (b.customer.toLowerCase().includes(search.toLowerCase()) || b.service.toLowerCase().includes(search.toLowerCase()))
+  const filtered = (bookings as any[]).filter(b =>
+    b.serviceName?.toLowerCase().includes(search.toLowerCase()) ||
+    b.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+    b.proName?.toLowerCase().includes(search.toLowerCase())
   );
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2.5 border border-white/10" style={{ background: "rgba(255,255,255,0.06)" }}>
-          <Search size={15} color="rgba(255,255,255,0.3)" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bookings..." className="flex-1 bg-transparent outline-none text-sm text-white placeholder-white/30" />
-        </div>
-        <div className="flex gap-1.5">
-          {statuses.map((s) => <button key={s} onClick={() => setStatusFilter(s)} className="px-3 py-2 rounded-lg text-xs font-bold transition-all" style={{ background: statusFilter === s ? "#5B3EF5" : "rgba(255,255,255,0.06)", color: statusFilter === s ? "#fff" : "rgba(255,255,255,0.4)" }}>{s}</button>)}
-        </div>
-      </div>
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
-        <table className="w-full">
-          <thead><tr className="border-b border-white/[0.07]">
-            {["ID","Customer","Service","Professional","Date","Amount","Status","Actions"].map((h) => <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.3)" }}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {filtered.map((b) => {
-              const sc: Record<string, [string,string]> = { Upcoming: ["rgba(91,62,245,0.2)","#7C5BF8"], Ongoing: ["rgba(255,143,0,0.2)","#FF8F00"], Completed: ["rgba(22,163,74,0.2)","#4ADE80"], Cancelled: ["rgba(239,68,68,0.2)","#F87171"] };
-              const [bg, fg] = sc[b.status] || ["rgba(107,114,128,0.2)","#9CA3AF"];
-              return (
-                <tr key={b.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-3 text-xs font-mono" style={{ color: "#7C5BF8" }}>{b.id}</td>
-                  <td className="px-4 py-3 text-xs text-white/80 font-medium">{b.customer}</td>
-                  <td className="px-4 py-3 text-xs text-white/60">{b.service}</td>
-                  <td className="px-4 py-3 text-xs text-white/60">{b.pro}</td>
-                  <td className="px-4 py-3 text-xs text-white/50">{b.date}</td>
-                  <td className="px-4 py-3 text-xs font-bold text-white">{b.amount}</td>
-                  <td className="px-4 py-3"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: bg, color: fg }}>{b.status}</span></td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button title="View"><Eye size={13} color="rgba(255,255,255,0.4)" /></button>
-                      <button title="Reassign"><RefreshCw size={13} color="rgba(255,255,255,0.4)" /></button>
-                      {b.status !== "Cancelled" && <button title="Cancel"><Ban size={13} color="#F87171" /></button>}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {filtered.length === 0 && <div className="text-center py-10 text-white/30 text-sm">No bookings found</div>}
-      </div>
-    </div>
-  );
-}
 
-function AdminPros() {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 border border-white/10" style={{ background: "rgba(255,255,255,0.06)", width: 260 }}>
-          <Search size={15} color="rgba(255,255,255,0.3)" />
-          <input placeholder="Search professionals..." className="flex-1 bg-transparent outline-none text-sm text-white placeholder-white/30" />
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white" style={{ background: "#5B3EF5" }}><PlusCircle size={14} />Add Professional</button>
+    <div className="space-y-4">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search bookings…"
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none"
+          style={{ background: "rgba(255,255,255,0.05)" }}
+        />
       </div>
+
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
-        <table className="w-full">
-          <thead><tr className="border-b border-white/[0.07]">
-            {["Professional","Service","Rating","Jobs","Earnings","Status","Actions"].map((h) => <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold" style={{ color: "rgba(255,255,255,0.3)" }}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {ALL_PROS.map((p) => (
-              <tr key={p.name} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.07]">
+              {["Service", "Customer", "Professional", "Amount", "Scheduled", "Status"].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/[0.04]">
+            {filtered.map((b: any) => (
+              <tr key={b.id} className="hover:bg-white/[0.02]">
+                <td className="px-4 py-3 text-white font-medium">{b.serviceName}</td>
+                <td className="px-4 py-3 text-white/60">{b.customerName ?? "—"}</td>
+                <td className="px-4 py-3 text-white/60">{b.proName}</td>
+                <td className="px-4 py-3 text-white/80">{fmt(b.price)}</td>
+                <td className="px-4 py-3 text-white/40 text-xs">{new Date(b.scheduledAt).toLocaleDateString("en-IN")}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <img src={p.img} alt={p.name} className="w-8 h-8 rounded-lg object-cover" />
-                    <span className="text-sm font-semibold text-white">{p.name}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-xs text-white/60">{p.service}</td>
-                <td className="px-4 py-3"><div className="flex items-center gap-1"><Star size={11} fill="#FBBF24" color="#FBBF24" /><span className="text-xs font-bold text-white">{p.rating}</span></div></td>
-                <td className="px-4 py-3 text-xs text-white/60">{p.jobs}</td>
-                <td className="px-4 py-3 text-xs font-bold text-white">{p.earnings}</td>
-                <td className="px-4 py-3">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: p.status === "Active" ? "rgba(22,163,74,0.2)" : "rgba(239,68,68,0.15)", color: p.status === "Active" ? "#4ADE80" : "#F87171" }}>{p.status}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <button title="View"><Eye size={13} color="rgba(255,255,255,0.4)" /></button>
-                    <button title="Suspend/Activate">{p.status === "Active" ? <Ban size={13} color="#F87171" /> : <CheckCircle size={13} color="#4ADE80" />}</button>
-                    <button title="Message"><MessageSquare size={13} color="rgba(255,255,255,0.4)" /></button>
-                  </div>
+                  <span
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize"
+                    style={{
+                      background: (STATUS_COLOR[b.status] ?? "#6B7280") + "20",
+                      color: STATUS_COLOR[b.status] ?? "#6B7280",
+                    }}
+                  >
+                    {b.status.replace("_", " ")}
+                  </span>
                 </td>
               </tr>
             ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-white/30 text-center">No bookings found</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -315,119 +409,203 @@ function AdminPros() {
   );
 }
 
-function AdminAnalytics() {
-  const metrics = [
-    { label: "Avg Booking Value",  val: "₹412",   delta: "+5.2%",  up: true  },
-    { label: "Customer Retention", val: "68.4%",   delta: "+2.1%",  up: true  },
-    { label: "Pro Utilisation",    val: "74.2%",   delta: "-1.4%",  up: false },
-    { label: "Avg Rating",         val: "4.78",    delta: "+0.03",  up: true  },
+/* ── Professionals ────────────────────────────────────────────── */
+function ProsView({ pros, onToggle }: { pros: Professional[]; onToggle: (id: string, active: boolean) => void }) {
+  const [search, setSearch] = useState("");
+  const filtered = (pros as any[]).filter(p =>
+    p.name?.toLowerCase().includes(search.toLowerCase()) ||
+    p.categoryName?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search professionals…"
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none"
+          style={{ background: "rgba(255,255,255,0.05)" }}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.07]">
+              {["Professional", "Category", "Rating", "Price", "Status", "Action"].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/[0.04]">
+            {filtered.map((p: any) => (
+              <tr key={p.id} className="hover:bg-white/[0.02]">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    {p.avatarUrl ? (
+                      <img src={p.avatarUrl} alt={p.name} className="w-8 h-8 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: "#5B3EF5" }}>
+                        {p.name?.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-white font-semibold text-sm">{p.name}</p>
+                      <p className="text-white/40 text-xs">{p.title}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-white/60">{p.categoryName ?? "—"}</td>
+                <td className="px-4 py-3 text-white/80">⭐ {p.rating?.toFixed(1)}</td>
+                <td className="px-4 py-3 text-white/80">{fmt(p.basePrice)}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                    style={p.isActive
+                      ? { background: "#16A34A20", color: "#16A34A" }
+                      : { background: "#EF444420", color: "#EF4444" }}
+                  >
+                    {p.isActive ? "Active" : "Suspended"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => onToggle(p.id, p.isActive)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors"
+                    style={p.isActive
+                      ? { borderColor: "rgba(239,68,68,0.3)", color: "#EF4444" }
+                      : { borderColor: "rgba(22,163,74,0.3)", color: "#16A34A" }}
+                  >
+                    {p.isActive ? "Suspend" : "Activate"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-white/30 text-center">No professionals found</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Analytics ────────────────────────────────────────────────── */
+function AnalyticsView({ stats }: { stats: DashboardStats | null }) {
+  const items = [
+    { label: "Total Revenue",       value: stats ? fmt(stats.totalRevenue) : "—",   icon: DollarSign, color: "#5B3EF5" },
+    { label: "Total Bookings",      value: String(stats?.totalBookings ?? 0),        icon: BookOpen,   color: "#F59E0B" },
+    { label: "Active Bookings",     value: String(stats?.activeBookings ?? 0),       icon: Activity,   color: "#16A34A" },
+    { label: "Total Professionals", value: String(stats?.totalProfessionals ?? 0),   icon: Users,      color: "#DB2777" },
+    { label: "Total Customers",     value: String(stats?.totalCustomers ?? 0),       icon: Users,      color: "#0EA5E9" },
   ];
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-4 gap-4">
-        {metrics.map((m) => (
-          <div key={m.label} className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-            <p className="text-white/40 text-xs mb-2">{m.label}</p>
-            <p className="text-white text-2xl font-bold">{m.val}</p>
-            <span className="text-xs font-bold flex items-center gap-0.5 mt-1" style={{ color: m.up ? "#4ADE80" : "#F87171" }}>
-              {m.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}{m.delta} vs last month
+    <div className="grid grid-cols-3 gap-4">
+      {items.map((i) => {
+        const Icon = i.icon;
+        return (
+          <div key={i.label} className="rounded-2xl p-5 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: i.color + "20" }}>
+              <Icon size={18} color={i.color} />
+            </div>
+            <p className="text-white/40 text-xs mb-1">{i.label}</p>
+            <p className="text-white font-bold text-2xl">{i.value}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Settings ─────────────────────────────────────────────────── */
+function SettingsView({ user }: { user: AdminUser }) {
+  return (
+    <div className="max-w-md space-y-4">
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <h3 className="text-white font-bold text-sm mb-4">Account Info</h3>
+        <div className="space-y-3">
+          <div>
+            <p className="text-white/40 text-xs mb-0.5">Full Name</p>
+            <p className="text-white text-sm">{user.fullName}</p>
+          </div>
+          <div>
+            <p className="text-white/40 text-xs mb-0.5">Email</p>
+            <p className="text-white text-sm">{user.email}</p>
+          </div>
+          <div>
+            <p className="text-white/40 text-xs mb-0.5">Role</p>
+            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold" style={{ background: "#5B3EF520", color: "#5B3EF5" }}>
+              {user.role?.toUpperCase()}
             </span>
           </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-          <h3 className="text-white font-bold text-sm mb-4">Bookings by City</h3>
-          {[{ city: "Mumbai", pct: 38 }, { city: "Delhi", pct: 25 }, { city: "Bangalore", pct: 18 }, { city: "Hyderabad", pct: 11 }, { city: "Chennai", pct: 8 }].map((c) => (
-            <div key={c.city} className="mb-3">
-              <div className="flex justify-between mb-1"><span className="text-white/60 text-xs">{c.city}</span><span className="text-white text-xs font-bold">{c.pct}%</span></div>
-              <div className="h-1.5 bg-white/10 rounded-full"><div className="h-full rounded-full" style={{ width: `${c.pct}%`, background: "linear-gradient(90deg,#5B3EF5,#7C5BF8)" }} /></div>
-            </div>
-          ))}
-        </div>
-        <div className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-          <h3 className="text-white font-bold text-sm mb-4">Monthly Revenue</h3>
-          <div className="flex gap-1 items-end h-32">
-            {[65,70,55,80,60,90,75,85,70,95,80,100].map((h, i) => (
-              <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: i === 11 ? "#5B3EF5" : "rgba(91,62,245,0.3)" }} />
-            ))}
-          </div>
-          <div className="flex justify-between mt-2">
-            {["J","F","M","A","M","J","J","A","S","O","N","D"].map((m) => <span key={m} className="flex-1 text-center text-[9px] text-white/30">{m}</span>)}
-          </div>
-        </div>
-      </div>
-      <div className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-        <h3 className="text-white font-bold text-sm mb-3">Platform Health</h3>
-        <div className="grid grid-cols-4 gap-4">
-          {[{ label: "New Customers/day", val: "284", icon: Users, color: "#5B3EF5" }, { label: "New Pros/week", val: "42", icon: Award, color: "#E65100" }, { label: "Avg Response Time", val: "4.2 min", icon: Clock, color: "#16A34A" }, { label: "Dispute Rate", val: "1.8%", icon: AlertCircle, color: "#DB2777" }].map((s) => {
-            const Icon = s.icon;
-            return (
-              <div key={s.label} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: s.color + "22" }}><Icon size={16} color={s.color} /></div>
-                <div><p className="text-white font-bold text-sm">{s.val}</p><p className="text-white/40 text-[10px]">{s.label}</p></div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
   );
 }
 
-function AdminSettings() {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4">
-        {[
-          { title: "Commission Rate", desc: "Set platform commission percentage", icon: Percent, val: "18%",  color: "#5B3EF5" },
-          { title: "Promo Codes",     desc: "Active discount campaigns",          icon: Activity,val: "3 active", color: "#E65100" },
-          { title: "Service Areas",   desc: "Manage operational cities",          icon: MapPin,  val: "12 cities", color: "#16A34A" },
-          { title: "Notifications",   desc: "Push & email alert settings",        icon: Bell,    val: "Enabled",color: "#DB2777" },
-        ].map((s) => {
-          const Icon = s.icon;
-          return (
-            <div key={s.title} className="rounded-2xl p-4 border border-white/[0.07] flex items-start gap-4 cursor-pointer hover:bg-white/[0.03] transition-colors" style={{ background: "rgba(255,255,255,0.04)" }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: s.color + "20" }}><Icon size={18} color={s.color} /></div>
-              <div className="flex-1">
-                <h4 className="text-white font-bold text-sm">{s.title}</h4>
-                <p className="text-white/40 text-xs mt-0.5">{s.desc}</p>
-                <p className="text-xs font-bold mt-2" style={{ color: s.color }}>{s.val}</p>
-              </div>
-              <ChevronRight size={16} color="rgba(255,255,255,0.2)" />
-            </div>
-          );
-        })}
-      </div>
-      <div className="rounded-2xl p-5 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
-        <h3 className="text-white font-bold text-sm mb-4">Admin Users</h3>
-        {[
-          { name: "Vikash Singh", role: "Super Admin", img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&auto=format" },
-          { name: "Kavita Rao",   role: "Operations",  img: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=60&h=60&fit=crop&auto=format" },
-          { name: "Amit Sharma",  role: "Finance",     img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=60&h=60&fit=crop&auto=format" },
-        ].map((u) => (
-          <div key={u.name} className="flex items-center justify-between py-3 border-b border-white/[0.06] last:border-0">
-            <div className="flex items-center gap-3">
-              <img src={u.img} alt={u.name} className="w-8 h-8 rounded-lg object-cover" />
-              <div><p className="text-white text-sm font-semibold">{u.name}</p><p className="text-white/40 text-xs">{u.role}</p></div>
-            </div>
-            <div className="flex gap-2">
-              <button className="px-3 py-1.5 rounded-lg text-xs font-bold border border-white/10 text-white/50">Edit</button>
-              {u.role !== "Super Admin" && <button className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-400 border border-red-400/20">Remove</button>}
-            </div>
-          </div>
-        ))}
-        <button className="mt-3 flex items-center gap-2 text-xs font-bold" style={{ color: "#5B3EF5" }}><PlusCircle size={14} />Add Admin User</button>
-      </div>
-    </div>
-  );
-}
-
+/* ═══════════════════════════════════════════════════════════════════
+   ROOT — handles auth session
+═══════════════════════════════════════════════════════════════════ */
 
 export default function App() {
-  return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#0f1117" }}>
-      <AdminPanel />
-    </div>
-  );
+  const [user, setUser]         = useState<AdminUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  // Restore session on mount
+  useEffect(() => {
+    (async () => {
+      const stored = adminAuth.getUser();
+      const storedAccess = adminAuth.getToken();
+      const storedRefresh = adminAuth.getRefreshToken();
+
+      if (storedRefresh) {
+        try {
+          const data = await authApi.refresh(storedRefresh);
+          adminAuth.store(data.accessToken, data.refreshToken, data.user);
+          setUser(data.user);
+          setAccessToken(data.accessToken);
+          setRefreshToken(data.refreshToken);
+        } catch {
+          adminAuth.clear();
+        }
+      }
+      setChecking(false);
+    })();
+  }, []);
+
+  const handleLogin = (u: AdminUser, access: string, refresh: string) => {
+    setUser(u);
+    setAccessToken(access);
+    setRefreshToken(refresh);
+  };
+
+  const handleLogout = async () => {
+    if (refreshToken && accessToken) {
+      await authApi.logout(refreshToken, accessToken);
+    }
+    adminAuth.clear();
+    setUser(null);
+    setAccessToken(null);
+    setRefreshToken(null);
+  };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0f1117" }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: "#5B3EF5" }} />
+      </div>
+    );
+  }
+
+  if (!user || !accessToken) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  return <AdminPanel user={user} accessToken={accessToken} onLogout={handleLogout} />;
 }

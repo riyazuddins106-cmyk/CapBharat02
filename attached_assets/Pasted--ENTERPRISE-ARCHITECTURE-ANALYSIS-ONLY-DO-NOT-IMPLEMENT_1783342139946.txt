@@ -1,0 +1,166 @@
+# ENTERPRISE ARCHITECTURE ANALYSIS ONLY (DO NOT IMPLEMENT)
+
+Do NOT modify any code.
+
+Do NOT move any files.
+
+Do NOT refactor anything.
+
+Do NOT create new applications yet.
+
+Your task is ONLY to analyze the existing project and generate a complete architecture report.
+
+## Project Context
+
+The project currently contains:
+
+* Customer Application
+* Partner Application
+* Admin Panel
+
+They currently exist inside one frontend codebase.
+
+The backend must remain ONE shared backend.
+
+The database must remain ONE shared Supabase PostgreSQL database.
+
+The authentication system must remain ONE shared Supabase Authentication system with role-based access.
+
+The final architecture should eventually become:
+
+* Customer Mobile App (independent)
+* Partner Mobile App (independent)
+* Admin Web Panel (independent)
+
+sharing:
+
+* One Backend
+* One Database
+* One Authentication System
+* One API Layer
+* Shared Business Logic
+* Shared Types
+* Shared Utilities
+
+Do NOT implement this yet.
+
+Only analyze the current project.
+
+## Generate a detailed report containing:
+
+### 1. Current Folder Structure
+
+List every important folder and explain its purpose.
+
+### 2. Frontend Architecture
+
+Explain:
+
+* Routing
+* Layouts
+* Pages
+* Components
+* Hooks
+* Context Providers
+* State Management
+* API Calls
+* Authentication Flow
+
+### 3. Backend Architecture
+
+Explain:
+
+* Routes
+* Controllers
+* Services
+* Repositories
+* Middleware
+* Utilities
+* Validation
+* Error Handling
+
+### 4. Database
+
+Explain:
+
+* All tables
+* Relationships
+* User roles
+* Existing migrations
+* Drizzle schema
+
+### 5. Supabase Integration
+
+Explain:
+
+* Authentication
+* Storage
+* Database usage
+* JWT flow
+
+### 6. Screen Inventory
+
+Categorize every screen into:
+
+* Customer
+* Partner
+* Admin
+* Shared
+
+Do not guess.
+
+### 7. Shared Code
+
+Identify:
+
+* Shared Components
+* Shared Hooks
+* Shared Utilities
+* Shared API Client
+* Shared Types
+
+### 8. Authentication Analysis
+
+Determine:
+
+* How customer authentication currently works
+* How partner authentication currently works
+* Whether they share the same auth state
+* Whether they share the same localStorage, cookies, or session
+* Why logging into one application logs the other one out
+
+### 9. Current Problems
+
+List every architectural issue including:
+
+* Shared authentication
+* Shared routing
+* Shared navigation
+* Shared state
+* Shared local storage
+* Duplicate code
+* Tight coupling
+* Technical debt
+
+### 10. Recommended Enterprise Architecture
+
+Do NOT implement it.
+
+Only explain:
+
+* What should become Customer Mobile
+* What should become Partner Mobile
+* What should become Admin Web
+* Which code should remain shared
+* Which code should move to packages
+* Which backend code remains common
+
+### 11. Migration Plan
+
+Produce a step-by-step migration plan that keeps the project working after every phase.
+
+Do not modify any files.
+
+Do not generate code.
+
+Return only the analysis report.

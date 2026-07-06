@@ -9,6 +9,7 @@ import reviewRoutes from './review.routes.js';
 import favoriteRoutes from './favorite.routes.js';
 import seedRoutes from './seed.routes.js';
 import partnerRoutes from './partner.routes.js';
+import adminRoutes from './admin.routes.js';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/reviews', reviewRoutes);
 router.use('/favorites', favoriteRoutes);
 router.use('/seed', seedRoutes);
 router.use('/partner', partnerRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

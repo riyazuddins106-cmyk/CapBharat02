@@ -39,7 +39,13 @@ if [[ -n "$CONFIG_HOME" ]]; then
   export XDG_CONFIG_HOME="$CONFIG_HOME"
 fi
 
-# Write this app's authtoken into its own config directory
+# Write this app's authtoken into its own config directory (for bin/ngrok v3)
 "$NGROK" config add-authtoken "$AUTHTOKEN" 2>/dev/null || true
+
+# Also export as env var so expo-cli / @expo/ngrok picks it up
+export NGROK_AUTHTOKEN="$AUTHTOKEN"
+
+# @expo/ngrok-bin has been replaced with the ngrok v3 binary (bin/ngrok).
+# The v3 binary already uses XDG_CONFIG_HOME set above, so no extra setup needed.
 
 exec yes | pnpm expo start --tunnel --port "$PORT" "$@"
