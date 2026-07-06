@@ -106,4 +106,4 @@ run = ["node", "server/dist/index.js"]
 
 [userenv.shared]
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
-EXPO_PUBLIC_API_URL = "https://7b86297c-45d1-4142-b410-4dbfe9faa586-00-2zzm1okr4qpxw.pike.replit.dev"
+EXPO_PUBLIC_API_URL = "https://25b8dfac-09f4-4249-8bfa-41c9786060cd-00-1881epq62rqq5.sisko.replit.dev"

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # expo-tunnel.sh <port> [--authtoken-var VARNAME] [--config-home DIR] [expo-args...]
-# Pre-configures ngrok authtoken then starts Expo in --tunnel mode.
-# Use --config-home to isolate each app's ngrok config so tokens don't overwrite each other.
+# Pre-configures ngrok v2 authtoken then starts Expo in --tunnel mode.
+# Each app gets its own config file; ~/.ngrok2/ngrok.yml is symlinked per-app
+# so @expo/ngrok picks up the right token even though it hardcodes that path.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-NGROK="$WORKSPACE_ROOT/bin/ngrok"
 
 PORT=${1:-8081}
 shift || true
@@ -34,28 +34,48 @@ if [[ -z "$AUTHTOKEN" ]]; then
   exit 1
 fi
 
-# If a custom config home is requested, isolate this app's ngrok config there.
-# This prevents two apps from overwriting each other's authtoken in the shared
-# $XDG_CONFIG_HOME/ngrok/ngrok.yml file.
-if [[ -n "$CONFIG_HOME" ]]; then
-  mkdir -p "$CONFIG_HOME/ngrok"
-  export XDG_CONFIG_HOME="$CONFIG_HOME"
+# Find the @expo/ngrok-bin v2 binary bundled in node_modules
+NGROK_V2=$(find "$WORKSPACE_ROOT/node_modules" -path "*/@expo/ngrok-bin-linux-x64*/ngrok" -type f 2>/dev/null | head -1)
+if [[ -z "$NGROK_V2" ]]; then
+  NGROK_V2=$(find "$WORKSPACE_ROOT/node_modules" -path "*/@expo/ngrok-bin-linux*/ngrok" -type f 2>/dev/null | head -1)
 fi
 
-# Write this app's authtoken into its own config directory (for bin/ngrok v3)
-"$NGROK" config add-authtoken "$AUTHTOKEN" 2>/dev/null || true
+if [[ -z "$NGROK_V2" ]]; then
+  echo "ERROR: Could not find @expo/ngrok-bin binary."
+  exit 1
+fi
 
-# Also export as env var so expo-cli / @expo/ngrok picks it up
+# Determine per-app config file path
+if [[ -n "$CONFIG_HOME" ]]; then
+  APP_NGROK_CONFIG="$CONFIG_HOME/ngrok.yml"
+  mkdir -p "$CONFIG_HOME"
+else
+  APP_NGROK_CONFIG="/tmp/ngrok-default/ngrok.yml"
+  mkdir -p "/tmp/ngrok-default"
+fi
+
+# Write this app's authtoken into its own dedicated config file
+echo "Configuring ngrok authtoken → $APP_NGROK_CONFIG"
+"$NGROK_V2" authtoken --config="$APP_NGROK_CONFIG" "$AUTHTOKEN" 2>/dev/null || true
+
+# @expo/ngrok hardcodes ~/.ngrok2/ngrok.yml — atomically replace it with a
+# symlink to our per-app config so the right token is always used.
+mkdir -p "$HOME/.ngrok2"
+# Remove any existing file/symlink, then symlink ours in
+rm -f "$HOME/.ngrok2/ngrok.yml"
+ln -sf "$APP_NGROK_CONFIG" "$HOME/.ngrok2/ngrok.yml"
+echo "Symlinked $HOME/.ngrok2/ngrok.yml → $APP_NGROK_CONFIG"
+
+# Export as env var too
 export NGROK_AUTHTOKEN="$AUTHTOKEN"
 
-# Optional startup delay — lets the other app's tunnel establish first
+# Optional startup delay — lets the first app's tunnel establish first
 if [[ "$START_DELAY" -gt 0 ]]; then
   echo "Waiting ${START_DELAY}s before starting tunnel (stagger to avoid ngrok conflicts)…"
   sleep "$START_DELAY"
 fi
 
-# Retry loop — ngrok tunnels sometimes fail on first attempt when two are
-# started in rapid succession; retrying with a short pause usually succeeds.
+# Retry loop
 MAX_RETRIES=5
 RETRY_DELAY=15
 
