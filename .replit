@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "bash", "web"]
+modules = ["nodejs-20", "bash", "web", "python-3.11"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -14,13 +14,13 @@ runButton = "Project"
 name = "Start application"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "webview"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm dev"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[workflows.workflow]]
 name = "Admin Panel"
@@ -55,23 +55,23 @@ args = "Expo Partner App"
 name = "Expo Customer App"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "console"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd apps/mobile && bash ../../scripts/expo-tunnel.sh 8081 --authtoken-var NGROK_AUTHTOKEN --config-home /tmp/ngrok-customer"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[workflows.workflow]]
 name = "Expo Partner App"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "console"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner --start-delay 25"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
@@ -106,4 +106,4 @@ run = ["node", "server/dist/index.js"]
 
 [userenv.shared]
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
-EXPO_PUBLIC_API_URL = "https://d56cc7f8-bbb5-4464-a143-2b55c2311c53-00-19x9w8ygcmw8f.pike.replit.dev"
+EXPO_PUBLIC_API_URL = "https://c683899a-1f4c-4f7f-8b54-72f73765cf1f-00-r1dhmw3w1ekl.sisko.replit.dev"
