@@ -54,6 +54,15 @@ export interface Professional {
   service?: { name: string } | null;
 }
 
+export interface CustomerUser {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface DashboardStats {
   totalBookings: number;
   activeBookings: number;
@@ -105,8 +114,12 @@ export const adminApi = {
     request<{ professionals: Professional[]; total: number }>('/admin/professionals', { token }),
   getStats: (token: string) =>
     request<DashboardStats>('/admin/stats', { token }),
+  getUsers: (token: string) =>
+    request<{ users: CustomerUser[]; total: number }>('/admin/users', { token }),
   suspendProfessional: (id: string, token: string) =>
     request(`/admin/professionals/${id}/suspend`, { method: 'PATCH', token }),
   activateProfessional: (id: string, token: string) =>
     request(`/admin/professionals/${id}/activate`, { method: 'PATCH', token }),
+  cancelBooking: (id: string, token: string) =>
+    request(`/admin/bookings/${id}/cancel`, { method: 'PATCH', token }),
 };

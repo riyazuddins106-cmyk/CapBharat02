@@ -101,9 +101,3 @@ externalPort = 3000
 deploymentTarget = "autoscale"
 build = ["pnpm", "build"]
 run = ["node", "server/dist/index.js"]
-
-[userenv]
-
-[userenv.shared]
-SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
-EXPO_PUBLIC_API_URL = "https://c683899a-1f4c-4f7f-8b54-72f73765cf1f-00-r1dhmw3w1ekl.sisko.replit.dev"
