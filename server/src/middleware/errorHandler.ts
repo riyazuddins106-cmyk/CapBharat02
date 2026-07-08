@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import multer from 'multer';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { sendError } from '../utils/response.js';
@@ -12,6 +13,10 @@ export function notFoundHandler(req: Request, res: Response) {
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
     return sendError(res, 400, 'Validation failed', err.flatten());
+  }
+
+  if (err instanceof multer.MulterError || (err instanceof Error && /only .* images? are allowed/i.test(err.message))) {
+    return sendError(res, 400, (err as Error).message);
   }
 
   if (err instanceof AppError) {

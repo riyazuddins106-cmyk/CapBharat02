@@ -7,3 +7,6 @@ export * from './professionals';
 export * from './bookings';
 export * from './reviews';
 export * from './favorites';
+export * from './auditLogs';
+export * from './payments';
+export * from './payoutRequests';

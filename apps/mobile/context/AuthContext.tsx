@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, profileApi, type User } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
+import { getExpoPushToken } from '@/lib/pushNotifications';
 
 const TOKEN_KEY = 'sn_access_token';
 const REFRESH_KEY = 'sn_refresh_token';
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const me = await profileApi.me(storedAccess);
             setUser(me);
             setAccessToken(storedAccess);
+            registerPushTokenRef.current(storedAccess);
           } catch {
             // Try refreshing
             if (storedRefresh) {
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const me = await profileApi.me(tokens.accessToken);
                 setUser(me);
                 setAccessToken(tokens.accessToken);
+                registerPushTokenRef.current(tokens.accessToken);
               } catch {
                 await clearTokens();
               }
@@ -86,13 +89,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  const registerPushToken = useCallback((token: string) => {
+    getExpoPushToken()
+      .then((pushToken) => {
+        if (pushToken) profileApi.registerPushToken(pushToken, token).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
+  const registerPushTokenRef = useRef(registerPushToken);
+  registerPushTokenRef.current = registerPushToken;
+
   const login = useCallback(async (email: string, password: string) => {
     const data = await authApi.login({ email, password });
     await persistTokens(data.accessToken, data.refreshToken);
     setAccessToken(data.accessToken);
     setUser(data.user);
     queryClient.clear();
-  }, []);
+    registerPushToken(data.accessToken);
+  }, [registerPushToken]);
 
   const register = useCallback(async (payload: { fullName: string; email: string; password: string; phone?: string }) => {
     return authApi.register(payload);
@@ -104,7 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(data.accessToken);
     setUser(data.user);
     queryClient.clear();
-  }, []);
+    registerPushToken(data.accessToken);
+  }, [registerPushToken]);
 
   const logout = useCallback(async () => {
     const refresh = await SecureStore.getItemAsync(REFRESH_KEY);

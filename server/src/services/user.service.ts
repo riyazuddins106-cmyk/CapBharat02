@@ -35,4 +35,11 @@ export const userService = {
     }
     return this.getProfile(userId);
   },
+
+  async updatePushToken(userId: string, pushToken: string) {
+    const user = await userRepository.update(userId, { pushToken });
+    if (!user) {
+      throw AppError.notFound('User not found.');
+    }
+  },
 };

@@ -175,6 +175,60 @@ async function migrate() {
   await run('index: reviews_professional',     `CREATE INDEX IF NOT EXISTS idx_reviews_professional   ON reviews(professional_id)`);
   await run('index: favorites_customer',       `CREATE INDEX IF NOT EXISTS idx_favorites_customer     ON favorites(customer_id)`);
 
+  await run('column: users.push_token',
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token VARCHAR(255)`);
+
+  await run('table: audit_logs', `
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      action VARCHAR(64) NOT NULL,
+      target_type VARCHAR(32) NOT NULL,
+      target_id UUID,
+      metadata JSONB NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: audit_logs_admin', `CREATE INDEX IF NOT EXISTS idx_audit_logs_admin ON audit_logs(admin_id)`);
+  await run('index: audit_logs_created', `CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`);
+
+  await run('enum: payment_status',
+    `CREATE TYPE payment_status AS ENUM ('created', 'paid', 'failed', 'refunded')`);
+  await run('enum: payment_method',
+    `CREATE TYPE payment_method AS ENUM ('card', 'netbanking', 'upi', 'wallet', 'other')`);
+
+  await run('table: payments', `
+    CREATE TABLE IF NOT EXISTS payments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      currency VARCHAR(8) NOT NULL DEFAULT 'INR',
+      status payment_status NOT NULL DEFAULT 'created',
+      method payment_method,
+      razorpay_order_id VARCHAR(128) NOT NULL,
+      razorpay_payment_id VARCHAR(128),
+      razorpay_signature VARCHAR(256),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: payments_booking', `CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id)`);
+  await run('index: payments_customer', `CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id)`);
+
+  await run('enum: payout_status',
+    `CREATE TYPE payout_status AS ENUM ('pending', 'paid', 'rejected')`);
+
+  await run('table: payout_requests', `
+    CREATE TABLE IF NOT EXISTS payout_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      professional_id UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      status payout_status NOT NULL DEFAULT 'pending',
+      note VARCHAR(512),
+      requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      resolved_at TIMESTAMPTZ
+    )`);
+  await run('index: payout_requests_professional', `CREATE INDEX IF NOT EXISTS idx_payout_requests_professional ON payout_requests(professional_id)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

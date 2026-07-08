@@ -150,6 +150,10 @@ export const authService = {
     }
   },
 
+  async logoutAll(userId: string) {
+    await refreshTokenRepository.revokeAllForUser(userId);
+  },
+
   async forgotPassword(email: string) {
     const user = await userRepository.findByEmail(email);
     if (!user) {

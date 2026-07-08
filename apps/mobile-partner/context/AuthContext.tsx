@@ -1,7 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, type User } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
+import { getExpoPushToken } from '@/lib/pushNotifications';
 
 const ACCESS_KEY = 'partner_access_token';
 const REFRESH_KEY = 'partner_refresh_token';
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setAccessToken(tokens.accessToken);
         setUser(profile);
+        registerPushTokenRef.current(tokens.accessToken);
       } catch {
         await clearTokens();
       } finally {
@@ -66,6 +68,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  const registerPushToken = useCallback((token: string) => {
+    getExpoPushToken()
+      .then((pushToken) => {
+        if (pushToken) authApi.registerPushToken(pushToken, token).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
+  const registerPushTokenRef = useRef(registerPushToken);
+  registerPushTokenRef.current = registerPushToken;
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await authApi.login({ email, password });
@@ -76,7 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(data.accessToken);
     setUser(data.user);
     queryClient.clear();
-  }, []);
+    registerPushToken(data.accessToken);
+  }, [registerPushToken]);
 
   const logout = useCallback(async () => {
     const refresh = await SecureStore.getItemAsync(REFRESH_KEY);

@@ -38,6 +38,11 @@ export const authController = {
     sendSuccess(res, { message: 'Logged out.' });
   }),
 
+  logoutAll: asyncHandler(async (req: Request, res: Response) => {
+    await authService.logoutAll(req.user!.userId);
+    sendSuccess(res, { message: 'Logged out of all devices.' });
+  }),
+
   forgotPassword: asyncHandler(async (req: Request, res: Response) => {
     await authService.forgotPassword(req.body.email);
     sendSuccess(res, { message: 'If an account exists, a reset code has been sent.' });

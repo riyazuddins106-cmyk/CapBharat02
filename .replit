@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "bash", "web", "python-3.11", "postgresql-16"]
+modules = ["nodejs-20", "bash", "web"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -105,3 +105,12 @@ externalPort = 4200
 deploymentTarget = "autoscale"
 build = ["pnpm", "build"]
 run = ["node", "server/dist/index.js"]
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "e8466fcc6f875fe10992ddf0fd84b2313de6e950f745e39ee7115c6247bf69a4"
+JWT_REFRESH_SECRET = "d96b75a3407ba94b9862eb32d348ba6f86af55196b2cfe67d94b8d95b4548afc"
+NGROK_AUTHTOKEN = "3G5PZwninwQ76ufwFl5zbpTuiHq_3xSAtQKSB1nfajWiiuxtH"
+NGROK_AUTHTOKEN_2 = "3G5eNenlmBGMQ5fuepvDHhhJN67_4QHwQ6XUN41F5jYRxYvVY"
+EXPO_PUBLIC_API_URL = "https://c683899a-1f4c-4f7f-8b54-72f73765cf1f-00-r1dhmw3w1ekl.sisko.replit.dev"

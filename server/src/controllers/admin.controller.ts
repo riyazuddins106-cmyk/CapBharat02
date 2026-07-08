@@ -1,9 +1,11 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
-import { bookings, users, professionals, serviceCategories, reviews } from '../database/schema/index.js';
+import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
 import { eq, desc, count, sum, ne, isNull, and, avg } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
+import { auditLogService } from '../services/auditLog.service.js';
+import { notificationService } from '../services/notification.service.js';
 
 export const adminController = {
   /* ───────────────────────── Dashboard ───────────────────────── */
@@ -107,6 +109,15 @@ export const adminController = {
       .where(eq(bookings.id, id))
       .returning();
     if (!row) throw AppError.notFound('Booking not found');
+    await auditLogService.record(req.user!.userId, 'booking.update', 'booking', id, patch);
+    if (status !== undefined) {
+      void notificationService.sendToUser(
+        row.customerId,
+        'Your booking was updated',
+        `Your ${row.serviceName} booking status is now "${status}".`,
+        { bookingId: id, type: 'booking_status_changed' },
+      );
+    }
     res.json({ success: true, data: row });
   }),
 
@@ -124,6 +135,13 @@ export const adminController = {
       .where(eq(bookings.id, id))
       .returning();
     if (!row) throw AppError.notFound('Booking not found');
+    await auditLogService.record(req.user!.userId, 'booking.cancel', 'booking', id);
+    void notificationService.sendToUser(
+      row.customerId,
+      'Booking cancelled',
+      `Your ${row.serviceName} booking was cancelled by the admin team.`,
+      { bookingId: id, type: 'booking_cancelled' },
+    );
     res.json({ success: true, data: row });
   }),
 
@@ -141,6 +159,7 @@ export const adminController = {
       .where(eq(bookings.id, id))
       .returning({ id: bookings.id });
     if (!row) throw AppError.notFound('Booking not found');
+    await auditLogService.record(req.user!.userId, 'booking.delete', 'booking', id);
     res.json({ success: true, data: { id: row.id } });
   }),
 
@@ -215,6 +234,7 @@ export const adminController = {
       .where(eq(professionals.id, id))
       .returning();
     if (!row) throw AppError.notFound('Professional not found');
+    await auditLogService.record(req.user!.userId, 'professional.update', 'professional', id, patch);
     res.json({ success: true, data: row });
   }),
 
@@ -231,6 +251,7 @@ export const adminController = {
       .where(eq(professionals.id, req.params.id))
       .returning({ id: professionals.id, isActive: professionals.isActive });
     if (!row) throw AppError.notFound('Professional not found');
+    await auditLogService.record(req.user!.userId, 'professional.suspend', 'professional', req.params.id);
     res.json({ success: true, data: row });
   }),
 
@@ -247,6 +268,7 @@ export const adminController = {
       .where(eq(professionals.id, req.params.id))
       .returning({ id: professionals.id, isActive: professionals.isActive });
     if (!row) throw AppError.notFound('Professional not found');
+    await auditLogService.record(req.user!.userId, 'professional.activate', 'professional', req.params.id);
     res.json({ success: true, data: row });
   }),
 
@@ -264,6 +286,7 @@ export const adminController = {
       .where(eq(professionals.id, id))
       .returning({ id: professionals.id });
     if (!row) throw AppError.notFound('Professional not found');
+    await auditLogService.record(req.user!.userId, 'professional.delete', 'professional', id);
     res.json({ success: true, data: { id: row.id } });
   }),
 
@@ -336,6 +359,7 @@ export const adminController = {
         avatarUrl: users.avatarUrl, createdAt: users.createdAt,
       });
     if (!row) throw AppError.notFound('User not found');
+    await auditLogService.record(req.user!.userId, 'user.update', 'user', id, patch);
     res.json({ success: true, data: row });
   }),
 
@@ -354,6 +378,7 @@ export const adminController = {
       .where(eq(users.id, id))
       .returning({ id: users.id });
     if (!row) throw AppError.notFound('User not found');
+    await auditLogService.record(req.user!.userId, 'user.delete', 'user', id);
     res.json({ success: true, data: { id: row.id } });
   }),
 
@@ -371,6 +396,7 @@ export const adminController = {
       .where(eq(users.id, req.params.id))
       .returning({ id: users.id, isActive: users.isActive });
     if (!row) throw AppError.notFound('User not found');
+    await auditLogService.record(req.user!.userId, 'user.suspend', 'user', req.params.id);
     res.json({ success: true, data: row });
   }),
 
@@ -388,6 +414,7 @@ export const adminController = {
       .where(eq(users.id, req.params.id))
       .returning({ id: users.id, isActive: users.isActive });
     if (!row) throw AppError.notFound('User not found');
+    await auditLogService.record(req.user!.userId, 'user.activate', 'user', req.params.id);
     res.json({ success: true, data: row });
   }),
 
@@ -420,6 +447,7 @@ export const adminController = {
         isActive:    true,
       })
       .returning();
+    await auditLogService.record(req.user!.userId, 'category.create', 'category', row.id, { name: row.name });
     res.status(201).json({ success: true, data: row });
   }),
 
@@ -453,6 +481,7 @@ export const adminController = {
       .where(eq(serviceCategories.id, id))
       .returning();
     if (!row) throw AppError.notFound('Category not found');
+    await auditLogService.record(req.user!.userId, 'category.update', 'category', id, patch);
     res.json({ success: true, data: row });
   }),
 
@@ -470,6 +499,7 @@ export const adminController = {
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(serviceCategories.id, id))
       .returning({ id: serviceCategories.id });
+    await auditLogService.record(req.user!.userId, 'category.delete', 'category', id);
     res.json({ success: true, data: { id: row.id } });
   }),
 
@@ -529,6 +559,78 @@ export const adminController = {
       })
       .where(eq(professionals.id, existing.professionalId));
 
+    await auditLogService.record(req.user!.userId, 'review.delete', 'review', id);
     res.json({ success: true, data: { id } });
+  }),
+
+  /* ──────────────────────── Audit Logs ───────────────────────── */
+  listAuditLogs: asyncHandler(async (req: Request, res: Response) => {
+    const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
+    const offset = Number(req.query.offset ?? 0);
+    const { rows, total } = await auditLogService.list(limit, offset);
+    res.json({ success: true, data: { logs: rows, total } });
+  }),
+
+  /* ──────────────────────── Payouts ──────────────────────────── */
+  listPayoutRequests: asyncHandler(async (req: Request, res: Response) => {
+    const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
+    const offset = Number(req.query.offset ?? 0);
+
+    const rows = await db
+      .select({
+        id: payoutRequests.id,
+        professionalId: payoutRequests.professionalId,
+        proName: professionals.name,
+        amount: payoutRequests.amount,
+        status: payoutRequests.status,
+        note: payoutRequests.note,
+        requestedAt: payoutRequests.requestedAt,
+        resolvedAt: payoutRequests.resolvedAt,
+      })
+      .from(payoutRequests)
+      .leftJoin(professionals, eq(payoutRequests.professionalId, professionals.id))
+      .orderBy(desc(payoutRequests.requestedAt))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ total }] = await db.select({ total: count(payoutRequests.id) }).from(payoutRequests);
+
+    res.json({ success: true, data: { payouts: rows, total: Number(total) } });
+  }),
+
+  resolvePayoutRequest: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status } = req.body as { status?: string };
+    if (status !== 'paid' && status !== 'rejected') {
+      throw AppError.badRequest('status must be "paid" or "rejected"');
+    }
+
+    const [existing] = await db.select().from(payoutRequests).where(eq(payoutRequests.id, id));
+    if (!existing) throw AppError.notFound('Payout request not found');
+    if (existing.status !== 'pending') {
+      throw AppError.badRequest(`Payout request is already ${existing.status}.`);
+    }
+
+    const [row] = await db
+      .update(payoutRequests)
+      .set({ status, resolvedAt: new Date() })
+      .where(eq(payoutRequests.id, id))
+      .returning();
+
+    await auditLogService.record(req.user!.userId, `payout.${status}`, 'payout_request', id, { amount: existing.amount });
+
+    const [pro] = await db.select({ userId: professionals.userId }).from(professionals).where(eq(professionals.id, existing.professionalId));
+    if (pro?.userId) {
+      void notificationService.sendToUser(
+        pro.userId,
+        status === 'paid' ? 'Payout sent' : 'Payout request rejected',
+        status === 'paid'
+          ? `Your payout of ₹${existing.amount} has been processed.`
+          : `Your payout request of ₹${existing.amount} was rejected.`,
+        { payoutId: id, type: `payout_${status}` },
+      );
+    }
+
+    res.json({ success: true, data: row });
   }),
 };

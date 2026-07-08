@@ -133,6 +133,12 @@ export const profileApi = {
   me: (token: string) => request<User>('/api/profile/me', { token }),
   update: (data: Partial<Pick<User, 'fullName' | 'phone'>>, token: string) =>
     request<User>('/api/profile/me', { method: 'PATCH', body: JSON.stringify(data), token }),
+  registerPushToken: (pushToken: string, token: string) =>
+    request<{ message: string }>('/api/profile/me/push-token', {
+      method: 'PATCH',
+      body: JSON.stringify({ pushToken }),
+      token,
+    }),
 };
 
 // ── Categories ─────────────────────────────────────────────

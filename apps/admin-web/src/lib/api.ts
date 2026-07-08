@@ -107,6 +107,27 @@ export interface DashboardStats {
   totalCustomers: number;
 }
 
+export interface AuditLogRow {
+  id: string;
+  adminId: string;
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface PayoutRow {
+  id: string;
+  professionalId: string;
+  proName: string | null;
+  amount: number;
+  status: 'pending' | 'paid' | 'rejected';
+  note: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+}
+
 // ── Base request ─────────────────────────────────────────────────────────────
 async function request<T>(path: string, options: RequestInit & { token?: string } = {}): Promise<T> {
   const { token, ...init } = options;
@@ -197,4 +218,14 @@ export const adminApi = {
     request<{ reviews: ReviewRow[]; total: number }>('/admin/reviews', { token }),
   deleteReview: (id: string, token: string) =>
     request<{ id: string }>(`/admin/reviews/${id}`, { method: 'DELETE', token }),
+
+  // Audit logs
+  getAuditLogs: (token: string) =>
+    request<{ logs: AuditLogRow[]; total: number }>('/admin/audit-logs?limit=100', { token }),
+
+  // Payouts
+  getPayouts: (token: string) =>
+    request<{ payouts: PayoutRow[]; total: number }>('/admin/payouts?limit=100', { token }),
+  resolvePayout: (id: string, status: 'paid' | 'rejected', token: string) =>
+    request<PayoutRow>(`/admin/payouts/${id}`, { method: 'PATCH', token, body: JSON.stringify({ status }) }),
 };

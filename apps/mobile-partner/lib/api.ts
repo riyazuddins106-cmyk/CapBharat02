@@ -104,6 +104,13 @@ export const authApi = {
   getMe: (token: string) =>
     request<User>('/api/profile/me', { token }),
 
+  registerPushToken: (pushToken: string, token: string) =>
+    request<{ message: string }>('/api/profile/me/push-token', {
+      method: 'PATCH',
+      body: JSON.stringify({ pushToken }),
+      token,
+    }),
+
   forgotPassword: (email: string) =>
     request<void>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
 

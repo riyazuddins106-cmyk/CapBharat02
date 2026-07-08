@@ -24,4 +24,13 @@ export const profileController = {
     const profile = await userService.updateAvatar(req.user!.userId, avatarUrl);
     sendSuccess(res, profile);
   }),
+
+  registerPushToken: asyncHandler(async (req: Request, res: Response) => {
+    const { pushToken } = req.body as { pushToken?: string };
+    if (!pushToken || typeof pushToken !== 'string') {
+      throw AppError.badRequest('pushToken is required');
+    }
+    await userService.updatePushToken(req.user!.userId, pushToken);
+    sendSuccess(res, { message: 'Push token registered.' });
+  }),
 };

@@ -40,4 +40,11 @@ router.delete('/categories/:id',      adminController.deleteCategory);
 router.get('/reviews',                adminController.listReviews);
 router.delete('/reviews/:id',         adminController.deleteReview);
 
+// Audit log
+router.get('/audit-logs',             adminController.listAuditLogs);
+
+// Payouts
+router.get('/payouts',                adminController.listPayoutRequests);
+router.patch('/payouts/:id',          adminController.resolvePayoutRequest);
+
 export default router;

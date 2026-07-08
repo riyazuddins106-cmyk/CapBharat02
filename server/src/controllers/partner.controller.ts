@@ -34,4 +34,15 @@ export const partnerController = {
     const data = await partnerService.getEarnings(req.user!.userId);
     res.json({ success: true, data });
   }),
+
+  requestPayout: asyncHandler(async (req: Request, res: Response) => {
+    const { amount, note } = req.body as { amount?: number; note?: string };
+    const data = await partnerService.requestPayout(req.user!.userId, Number(amount), note);
+    res.json({ success: true, data });
+  }),
+
+  listPayoutRequests: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.listPayoutRequests(req.user!.userId);
+    res.json({ success: true, data });
+  }),
 };

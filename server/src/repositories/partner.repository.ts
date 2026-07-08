@@ -1,5 +1,5 @@
 import { db } from '../config/database.js';
-import { bookings, professionals, users } from '../database/schema/index.js';
+import { bookings, professionals, users, payoutRequests } from '../database/schema/index.js';
 import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 
 export const partnerRepository = {
@@ -128,5 +128,35 @@ export const partnerRepository = {
       today,
       weekly: Object.entries(weeklyMap).map(([date, amount]) => ({ date, amount })),
     };
+  },
+
+  /** Sum of amount already requested (pending or paid) for a professional */
+  async getPayoutTotals(professionalId: string) {
+    const rows = await db
+      .select({ status: payoutRequests.status, amount: payoutRequests.amount })
+      .from(payoutRequests)
+      .where(eq(payoutRequests.professionalId, professionalId));
+    let pending = 0, paid = 0;
+    for (const row of rows) {
+      if (row.status === 'pending') pending += row.amount;
+      if (row.status === 'paid') paid += row.amount;
+    }
+    return { pending, paid };
+  },
+
+  async createPayoutRequest(professionalId: string, amount: number, note?: string) {
+    const [row] = await db
+      .insert(payoutRequests)
+      .values({ professionalId, amount, note: note ?? null })
+      .returning();
+    return row;
+  },
+
+  async listPayoutRequestsForProfessional(professionalId: string) {
+    return db
+      .select()
+      .from(payoutRequests)
+      .where(eq(payoutRequests.professionalId, professionalId))
+      .orderBy(desc(payoutRequests.requestedAt));
   },
 };

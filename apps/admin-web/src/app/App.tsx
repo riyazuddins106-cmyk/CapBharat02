@@ -8,7 +8,7 @@ import {
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
-  Category, ReviewRow, DashboardStats,
+  Category, ReviewRow, DashboardStats, AuditLogRow,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -255,6 +255,7 @@ const ADMIN_SIDEBAR = [
   { id: "categories", icon: Grid,       label: "Categories"    },
   { id: "reviews",    icon: Star,       label: "Reviews"       },
   { id: "analytics",  icon: BarChart2,  label: "Analytics"     },
+  { id: "audit-logs", icon: Activity,   label: "Audit Logs"    },
   { id: "settings",   icon: Settings,   label: "Settings"      },
 ];
 
@@ -278,6 +279,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [userList,     setUserList]     = useState<CustomerUser[]>([]);
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
+  const [auditLogs,    setAuditLogs]    = useState<AuditLogRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -289,13 +291,14 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u, c, r] = await Promise.all([
+      const [s, b, p, u, c, r, a] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken),
         adminApi.getUsers(accessToken),
         adminApi.getCategories(accessToken),
         adminApi.getReviews(accessToken),
+        adminApi.getAuditLogs(accessToken),
       ]);
       setStats(s);
       setBookingList(b.bookings);
@@ -303,6 +306,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setUserList(u.users);
       setCategoryList(c.categories);
       setReviewList(r.reviews);
+      setAuditLogs(a.logs);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
@@ -468,6 +472,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <ReviewsView reviews={reviewList} onDelete={deleteReview} />
           ) : activeSection === "analytics" ? (
             <AnalyticsView stats={stats} />
+          ) : activeSection === "audit-logs" ? (
+            <AuditLogsView logs={auditLogs} />
           ) : (
             <SettingsView user={user} />
           )}
@@ -1287,6 +1293,55 @@ function ReviewsView({ reviews, onDelete }: { reviews: ReviewRow[]; onDelete: (i
                 </tr>
               ))}
               {filtered.length === 0 && <EmptyRow cols={6} text="No reviews found" />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUDIT LOGS
+═══════════════════════════════════════════════════════════════════ */
+
+function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
+  const [search, setSearch] = useState("");
+
+  const filtered = logs.filter(l =>
+    l.action.toLowerCase().includes(search.toLowerCase()) ||
+    l.targetType.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      <SearchBar value={search} onChange={setSearch} placeholder="Search actions or entity type…" />
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.07]">
+                {["Action", "Target Type", "Target ID", "Details", "Date"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {filtered.map((l) => (
+                <tr key={l.id} className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3 text-white font-medium whitespace-nowrap">{l.action}</td>
+                  <td className="px-4 py-3 text-white/60 whitespace-nowrap capitalize">{l.targetType}</td>
+                  <td className="px-4 py-3 text-white/40 text-[11px] font-mono whitespace-nowrap">{l.targetId ? l.targetId.slice(0, 8) : "—"}</td>
+                  <td className="px-4 py-3 text-white/40 text-xs max-w-[280px]">
+                    <p className="truncate">{Object.keys(l.metadata ?? {}).length > 0 ? JSON.stringify(l.metadata) : "—"}</p>
+                  </td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                    {new Date(l.createdAt).toLocaleString("en-IN")}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <EmptyRow cols={5} text="No audit log entries yet" />}
             </tbody>
           </table>
         </div>

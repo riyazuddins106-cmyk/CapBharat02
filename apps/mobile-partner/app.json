@@ -44,7 +44,8 @@
           "cameraPermission": "Allow ServeNow Partner to access your camera to scan booking QR codes."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true

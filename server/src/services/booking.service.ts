@@ -1,6 +1,7 @@
 import { AppError } from '../utils/AppError.js';
 import { bookingRepository } from '../repositories/booking.repository.js';
 import { professionalRepository } from '../repositories/professional.repository.js';
+import { notificationService } from './notification.service.js';
 import type { CreateBookingInput, RescheduleBookingInput } from '../validators/booking.validators.js';
 
 export const bookingService = {
@@ -18,7 +19,7 @@ export const bookingService = {
     const pro = await professionalRepository.findById(input.professionalId);
     if (!pro || !pro.isActive) throw AppError.notFound('Professional not found or unavailable.');
 
-    return bookingRepository.create({
+    const booking = await bookingRepository.create({
       customerId,
       professionalId: pro.id,
       categoryId: pro.categoryId,
@@ -30,6 +31,17 @@ export const bookingService = {
       price: pro.basePrice,
       status: 'upcoming',
     });
+
+    if (pro.userId) {
+      void notificationService.sendToUser(
+        pro.userId,
+        'New booking request',
+        `You have a new booking for ${pro.title}.`,
+        { bookingId: booking.id, type: 'booking_created' },
+      );
+    }
+
+    return booking;
   },
 
   async cancel(customerId: string, bookingId: string) {
@@ -38,7 +50,19 @@ export const bookingService = {
     if (!['pending', 'upcoming'].includes(booking.status)) {
       throw AppError.badRequest('Only pending or upcoming bookings can be cancelled.');
     }
-    return bookingRepository.updateStatus(bookingId, 'cancelled');
+    const updated = await bookingRepository.updateStatus(bookingId, 'cancelled');
+
+    const pro = await professionalRepository.findById(booking.professionalId);
+    if (pro?.userId) {
+      void notificationService.sendToUser(
+        pro.userId,
+        'Booking cancelled',
+        `A booking for ${booking.serviceName} was cancelled by the customer.`,
+        { bookingId, type: 'booking_cancelled' },
+      );
+    }
+
+    return updated;
   },
 
   async reschedule(customerId: string, bookingId: string, input: RescheduleBookingInput) {

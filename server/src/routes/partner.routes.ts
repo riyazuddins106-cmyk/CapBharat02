@@ -13,5 +13,7 @@ router.get('/jobs/:id', partnerController.getJob);
 router.patch('/jobs/:id/checkin', partnerController.checkIn);
 router.patch('/jobs/:id/complete', partnerController.completeJob);
 router.get('/earnings', partnerController.getEarnings);
+router.post('/payouts', partnerController.requestPayout);
+router.get('/payouts', partnerController.listPayoutRequests);
 
 export default router;

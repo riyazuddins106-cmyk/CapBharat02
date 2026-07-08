@@ -1,5 +1,6 @@
 import { AppError } from '../utils/AppError.js';
 import { partnerRepository } from '../repositories/partner.repository.js';
+import { notificationService } from './notification.service.js';
 
 export const partnerService = {
   async getProfile(userId: string) {
@@ -44,7 +45,18 @@ export const partnerService = {
       throw AppError.badRequest('Invalid or expired QR code. Ask the customer to refresh their booking QR.');
     }
 
-    return partnerRepository.updateStatus(bookingId, 'in_progress');
+    const updated = await partnerRepository.updateStatus(bookingId, 'in_progress');
+
+    if (job.customerId) {
+      void notificationService.sendToUser(
+        job.customerId,
+        'Your service partner has arrived',
+        `${pro.name} has checked in for your ${job.serviceName} booking.`,
+        { bookingId, type: 'booking_in_progress' },
+      );
+    }
+
+    return updated;
   },
 
   async completeJob(userId: string, bookingId: string) {
@@ -57,12 +69,49 @@ export const partnerService = {
       throw AppError.badRequest(`Cannot complete a booking with status "${job.status}". Check in first.`);
     }
 
-    return partnerRepository.updateStatus(bookingId, 'completed');
+    const updated = await partnerRepository.updateStatus(bookingId, 'completed');
+
+    if (job.customerId) {
+      void notificationService.sendToUser(
+        job.customerId,
+        'Service completed',
+        `Your ${job.serviceName} booking with ${pro.name} is complete. Thanks for using ServeNow!`,
+        { bookingId, type: 'booking_completed' },
+      );
+    }
+
+    return updated;
   },
 
   async getEarnings(userId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
-    return partnerRepository.getEarnings(pro.id);
+    const earnings = await partnerRepository.getEarnings(pro.id);
+    const payoutTotals = await partnerRepository.getPayoutTotals(pro.id);
+    const available = Math.max(0, earnings.total - payoutTotals.pending - payoutTotals.paid);
+    return { ...earnings, pendingPayout: payoutTotals.pending, paidOut: payoutTotals.paid, available };
+  },
+
+  async requestPayout(userId: string, amount: number, note?: string) {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw AppError.badRequest('Payout amount must be a positive number.');
+    }
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const earnings = await partnerRepository.getEarnings(pro.id);
+    const payoutTotals = await partnerRepository.getPayoutTotals(pro.id);
+    const available = earnings.total - payoutTotals.pending - payoutTotals.paid;
+    if (amount > available) {
+      throw AppError.badRequest(`Requested amount exceeds available balance (₹${available}).`);
+    }
+
+    return partnerRepository.createPayoutRequest(pro.id, amount, note);
+  },
+
+  async listPayoutRequests(userId: string) {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    return partnerRepository.listPayoutRequestsForProfessional(pro.id);
   },
 };

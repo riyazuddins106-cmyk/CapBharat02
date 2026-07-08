@@ -13,6 +13,7 @@ export const users = pgTable('users', {
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),
   isActive: boolean('is_active').notNull().default(true),
+  pushToken: varchar('push_token', { length: 255 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
