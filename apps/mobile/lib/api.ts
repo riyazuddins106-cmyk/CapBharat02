@@ -1,5 +1,13 @@
-// API base: routes through the Vite proxy (/api → localhost:8000)
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+// On web, call the Express server on port 8000 directly using the same
+// hostname the browser is already on. Port 8000 is exposed by Replit's proxy
+// and Express has CORS open (origin: true), so this works from any port.
+function getApiBase(): string {
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+}
+const API_BASE = getApiBase();
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

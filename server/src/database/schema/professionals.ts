@@ -4,7 +4,7 @@ import { users } from './users';
 
 export const professionals = pgTable('professionals', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').unique().references(() => users.id, { onDelete: 'set null' }),
   categoryId: uuid('category_id').notNull().references(() => serviceCategories.id, { onDelete: 'restrict' }),
   name: varchar('name', { length: 255 }).notNull(),
   title: varchar('title', { length: 255 }).notNull(),

@@ -49,30 +49,13 @@ const ebStyles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
-// On web: wraps the app in a centered phone shell so it looks like a mobile device.
+// On web: fills the full viewport so the app is scrollable and fits the screen.
 // On native: renders children directly with no extra wrapper.
 function WebPhoneFrame({ children }: { children: ReactNode }) {
   if (Platform.OS !== 'web') return <>{children}</>;
   return (
-    <View style={[
-      StyleSheet.absoluteFillObject,
-      { backgroundColor: '#e0f2ef', alignItems: 'center', justifyContent: 'center' },
-    ]}>
-      <View style={{
-        width: 393,
-        height: 852,
-        borderRadius: 48,
-        borderWidth: 10,
-        borderColor: '#1a1a2e',
-        overflow: 'hidden',
-        backgroundColor: '#f0faf9',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 24 },
-        shadowOpacity: 0.45,
-        shadowRadius: 48,
-      }}>
-        {children}
-      </View>
+    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#f0faf9' }]}>
+      {children}
     </View>
   );
 }

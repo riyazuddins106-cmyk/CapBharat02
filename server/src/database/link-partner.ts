@@ -14,9 +14,14 @@ async function main() {
   const dbUrl = process.env.SUPABASE_DATABASE_URL;
   if (!dbUrl) throw new Error('SUPABASE_DATABASE_URL is not set');
 
-  const isProd = process.argv.includes('--prod') === false && process.env.NODE_ENV === 'production';
-  if (isProd) {
-    console.error('ERROR: Refusing to run link-partner in production without --prod flag.');
+  // Fail closed: block unless --allow-prod is explicitly passed when the URL
+  // looks like a production Supabase project (contains ".supabase.co" and is not
+  // a local/pooler dev URL). NODE_ENV alone is unreliable as a guard.
+  const looksLikeProd = /\.supabase\.co/i.test(dbUrl) && !/localhost|127\.0\.0\.1/.test(dbUrl);
+  const allowProd = process.argv.includes('--allow-prod');
+  if (looksLikeProd && !allowProd) {
+    console.error('ERROR: This looks like a production Supabase database.');
+    console.error('       Pass --allow-prod explicitly if you truly intend to modify production data.');
     process.exit(1);
   }
 

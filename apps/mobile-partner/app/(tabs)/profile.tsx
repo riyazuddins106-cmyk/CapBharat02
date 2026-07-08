@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -31,12 +31,16 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         {/* Header */}
         <View style={[styles.headerBg, { paddingTop: topPadding + 12, backgroundColor: colors.primary }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.avatarText, { color: colors.primary }]}>
-              {(user?.fullName ?? 'P')[0].toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.name}>{user?.fullName ?? 'Partner'}</Text>
+          {profile?.avatarUrl ? (
+            <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImg} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.avatarText, { color: colors.primary }]}>
+                {(profile?.name ?? user?.fullName ?? 'P')[0].toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.name}>{profile?.name ?? user?.fullName ?? 'Partner'}</Text>
           <Text style={styles.email}>{user?.email ?? ''}</Text>
           {profile && (
             <View style={styles.ratingRow}>
@@ -108,6 +112,7 @@ function InfoRow({ icon, label, value, colors }: any) {
 const styles = StyleSheet.create({
   headerBg: { paddingHorizontal: 20, paddingBottom: 28, alignItems: 'center', gap: 6 },
   avatar: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  avatarImg: { width: 80, height: 80, borderRadius: 40, marginBottom: 4, borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
   avatarText: { fontSize: 34, fontWeight: '800' },
   name: { color: '#fff', fontSize: 22, fontWeight: '800' },
   email: { color: 'rgba(255,255,255,0.75)', fontSize: 13 },

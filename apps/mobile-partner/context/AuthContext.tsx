@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setAccessToken(tokens.accessToken);
         setUser(profile);
+        setupRefreshHandler(tokens.refreshToken);
         registerPushTokenRef.current(tokens.accessToken);
       } catch {
         await clearTokens();

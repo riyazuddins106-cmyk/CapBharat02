@@ -26,13 +26,13 @@ outputType = "webview"
 name = "Admin Panel"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @servenow/admin-web dev"
-waitForPort = 5001
-
-[workflows.workflow.metadata]
-outputType = "webview"
+waitForPort = 3000
 
 [[workflows.workflow]]
 name = "Project"
@@ -51,16 +51,21 @@ args = "Expo Customer App"
 task = "workflow.run"
 args = "Expo Partner App"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Admin Panel"
+
 [[workflows.workflow]]
 name = "Expo Customer App"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd apps/mobile && bash ../../scripts/expo-tunnel.sh 8081 --authtoken-var NGROK_AUTHTOKEN --config-home /tmp/ngrok-customer"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 pnpm exec expo start --web --port 8080 --host lan"
+waitForPort = 8080
 
 [[workflows.workflow]]
 name = "Expo Partner App"
@@ -71,7 +76,12 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner --start-delay 60"
+args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 pnpm exec expo start --web --port 8099 --host lan"
+waitForPort = 8099
+
+[[ports]]
+localPort = 3000
+externalPort = 3003
 
 [[ports]]
 localPort = 5000
@@ -84,6 +94,10 @@ externalPort = 3002
 [[ports]]
 localPort = 8000
 externalPort = 8000
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
 
 [[ports]]
 localPort = 8081
@@ -100,6 +114,10 @@ externalPort = 3000
 [[ports]]
 localPort = 8084
 externalPort = 4200
+
+[[ports]]
+localPort = 8099
+externalPort = 8099
 
 [deployment]
 deploymentTarget = "autoscale"
