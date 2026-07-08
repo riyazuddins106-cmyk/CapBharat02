@@ -6,3 +6,6 @@
 - [Expo Replit-native tunnel](expo-replit-native-tunnel.md) — skip ngrok on Replit via REPLIT_EXPO_DEV_DOMAIN; Replit check MUST come before ngrok auth/binary checks in the script.
 - [Auth token issuance fix](auth-token-issuance-fix.md) — critical bug in issueTokenPair fixed: returned JWT and stored hash must reference the same token ID; added updateHash to refreshTokenRepository.
 - [Expo SDK 57 upgrade blocked](expo-sdk57-upgrade-blocked.md) — pnpm release-age policy blocks SDK 57; partial upgrade corrupts state; recovery steps documented.
+- [Expo native module version drift](expo-native-module-drift.md) — expo-device/expo-notifications pinned to wrong majors (^57.x) broke Expo Go on SDK 54; always `expo install --check`/`--fix` after adding native modules, don't hand-pin versions.
+- [Metro + pnpm duplicate React](metro-pnpm-react-resolution.md) — pnpm's shared hoist folder can supply a wrong React version before Metro's extraNodeModules fallback ever runs; must force via resolveRequest instead.
+- [Bash exit-code after `|| true`](bash-exit-code-after-or-true.md) — `cmd || true; EXIT_CODE=$?` always yields 0, silently defeating retry loops; use `set +e`/`set -e` instead.

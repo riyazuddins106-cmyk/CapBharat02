@@ -1,0 +1,10 @@
+---
+name: Metro + pnpm duplicate React resolution
+description: Why "Invalid hook call" / "useState of null" crashes happen in Expo Go monorepos using pnpm, and why extraNodeModules doesn't fix it.
+---
+
+In a pnpm workspace with multiple apps depending on different React versions (e.g. web apps on react@18, an Expo app on react@19), any package imported by the Expo app that has NO explicit `react` peer/dependency of its own (e.g. font packages like `@expo-google-fonts/*` that just call `useFonts`) can resolve `react` through pnpm's shared virtual-store hoist folder (`node_modules/.pnpm/node_modules/react`) instead of the Expo app's own `react`. This pulls in a second, mismatched React copy at runtime, producing "Invalid hook call" / "useState of null" crashes that are otherwise inexplicable since the app's own `package.json` looks correct.
+
+**Why:** Metro's `resolver.extraNodeModules` is only a *fallback* consulted after normal node resolution — it is not an override. If pnpm's hoist folder can resolve `react` at all (which it usually can), Metro never reaches the extraNodeModules fallback, so pinning versions there silently does nothing.
+
+**How to apply:** To force a single React (and other singleton packages like react-dom, react-native, react-native-reanimated) across the whole bundle, add a `resolver.resolveRequest` hook in `metro.config.js` that intercepts requests for those module names and forcibly returns `{type:'sourceFile', filePath}` where `filePath` is resolved via `require.resolve(pkg, {paths:[projectRoot]})` then passed through `fs.realpathSync` to get the actual entry file (not just a directory — pointing at a directory causes a Metro "Failed to get SHA-1" error). Also set `resolver.unstable_enableSymlinks = true` for pnpm's symlinked structure. Verify the fix by running `npx expo export --platform android --dump-sourcemap` and checking the `.hbc.map`'s `sources` array contains only one `.../react/index.js` path — this is a rigorous way to confirm without needing a physical device.

@@ -55,8 +55,10 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   REPLIT_RETRY_DELAY=30
   for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
     echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
+    set +e
     yes | pnpm expo start --tunnel --port "$PORT" "$@"
     EXIT_CODE=$?
+    set -e
     if [[ $EXIT_CODE -eq 0 ]]; then
       exit 0
     fi
@@ -208,7 +210,7 @@ for attempt in $(seq 1 $MAX_RETRIES); do
 
   if start_ngrok; then
     echo "Launching Expo --tunnel with pre-set URL: $EXPO_TUNNEL_URL"
-    yes | pnpm expo start --tunnel --port "$PORT" "$@"
+    yes | pnpm expo start --tunnel --port "$PORT" "$@" || true
     EXPO_EXIT=$?
 
     echo "Expo exited (code $EXPO_EXIT). Checking ngrok…"

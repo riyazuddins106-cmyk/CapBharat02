@@ -48,3 +48,15 @@ id = "bnMVkVO9u3PvU9P3TgFSE"
 uri = "file://qr-partner-sdk54.png"
 type = "image"
 title = "📱 Partner App — SDK 54 (Expo Go)"
+
+[[outputs]]
+id = "212Phy0WTBuQqvJmFrRlM"
+uri = "file://qr-customer-current.png"
+type = "image"
+title = "Customer App QR (Expo Go)"
+
+[[outputs]]
+id = "LlLi-fI3g12DV3Bbsd23c"
+uri = "file://qr-partner-current.png"
+type = "image"
+title = "Partner App QR (Expo Go)"
