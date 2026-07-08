@@ -74,7 +74,7 @@ export interface Booking {
   serviceName: string;
   proName: string;
   scheduledAt: string;
-  status: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
   price: number;
   notes: string | null;
   reviewed?: boolean;

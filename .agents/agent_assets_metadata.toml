@@ -24,3 +24,27 @@ id = "GxjfPihsYKDlJ2829fCWM"
 uri = "file://partner-app-qr.png"
 type = "image"
 title = "📱 Partner App — exp://9oqy2ew-anonymous-8082.exp.direct"
+
+[[outputs]]
+id = "Cn_s_kGVxywuPEXliyjq8"
+uri = "file://qr-customer.png"
+type = "image"
+title = "📱 Customer App — Scan with Expo Go"
+
+[[outputs]]
+id = "HUPp8Gml1PfUY5KwXeSwr"
+uri = "file://qr-partner.png"
+type = "image"
+title = "📱 Partner App — Scan with Expo Go"
+
+[[outputs]]
+id = "9Nvjv1hUaUCnwqr8_quO8"
+uri = "file://qr-customer-sdk54.png"
+type = "image"
+title = "📱 Customer App — SDK 54 (Expo Go)"
+
+[[outputs]]
+id = "bnMVkVO9u3PvU9P3TgFSE"
+uri = "file://qr-partner-sdk54.png"
+type = "image"
+title = "📱 Partner App — SDK 54 (Expo Go)"

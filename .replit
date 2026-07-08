@@ -97,6 +97,10 @@ externalPort = 3001
 localPort = 8083
 externalPort = 3000
 
+[[ports]]
+localPort = 8084
+externalPort = 4200
+
 [deployment]
 deploymentTarget = "autoscale"
 build = ["pnpm", "build"]
