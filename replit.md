@@ -1,70 +1,82 @@
 # ServeNow
 
-Service marketplace monorepo (Urban Company clone) — Node.js backend + React web + Expo mobile apps.
-
-## Architecture
-
-| App | Port | URL |
-|-----|------|-----|
-| Customer Web | 5000 | `https://<replit-domain>/` |
-| Admin Panel | 5001 | `https://<replit-domain>/admin-panel/` |
-| Server API | 8000 | `https://<replit-domain>/api/` |
-| Customer Mobile | 8081 | QR in Expo Customer App workflow |
-| Partner Mobile | 8082 | QR in Expo Partner App workflow |
+A service-marketplace monorepo (Urban Clap-style) with admin dashboard, customer web portal, and iOS/Android mobile apps for both customers and service partners.
 
 ## Stack
+- **Backend:** Node.js + Express + TypeScript + Drizzle ORM + PostgreSQL (Supabase)
+- **Web frontends:** React 18 + Vite + Tailwind CSS + Radix UI
+- **Mobile:** React Native + Expo SDK 54 + Expo Router
+- **Auth:** JWT (access + refresh tokens) + OTP email verification
 
-- **Backend**: Node.js + Express + TypeScript + Drizzle ORM + Supabase (Postgres)
-- **Customer Web**: React + Vite + Tailwind CSS + shadcn/ui (port 5000)
-- **Admin Panel**: React + Vite + Tailwind CSS, real auth with `admin_` prefixed tokens (port 5001)
-- **Mobile**: React Native + Expo Router (Customer: port 8081, Partner: port 8082)
-
-## Running
-
-### All at once
-```bash
-pnpm dev          # server + customer web (Start application workflow)
-pnpm dev:admin    # admin panel         (Admin Panel workflow)
-# Expo Customer App workflow → QR for customer mobile
-# Expo Partner App workflow  → QR for partner mobile
+## Project structure
+```
+apps/
+  admin-web/       # Admin dashboard (port 5001)
+  customer-web/    # Customer web portal (port 5000)
+  mobile/          # Customer Expo app (port 8081)
+  mobile-partner/  # Partner Expo app (port 8082)
+server/            # Express API (port 8000)
+packages/shared/   # Shared types & utilities
+scripts/           # expo-tunnel.sh — Replit-native Expo tunneling
 ```
 
-### Database
+## Running the project
+
+| Workflow | Command | URL |
+|---|---|---|
+| Start application | `pnpm dev` | Port 5000 (customer web) + 8000 (API) |
+| Admin Panel | `pnpm --filter @servenow/admin-web dev` | Port 5001 |
+| Expo Customer App | `expo-tunnel.sh 8081 ...` | Expo Go QR in console |
+| Expo Partner App | `expo-tunnel.sh 8082 ...` | Expo Go QR in console |
+
+## Database setup
 ```bash
-pnpm db:push      # push schema to Supabase
-pnpm db:generate  # generate migrations
+# Run migrations (idempotent)
+cd server && npx tsx src/database/migrate.ts
+
+# Seed test accounts
+cd server && npx tsx src/database/seed-test-accounts.ts
+
+# Seed demo data (categories + professionals)
+cd server && npx tsx src/database/seed-demo.ts
 ```
 
-## Required Secrets
+## Test credentials
+| Role | Email | Password |
+|---|---|---|
+| Admin | admin@servenow.in | Admin@1234 |
+| Partner | partner@servenow.in | Partner@1234 |
+| Customer | customer@servenow.in | Customer@1234 |
 
-Set in Replit Secrets:
-- `SUPABASE_URL` — Supabase project REST URL (https://xxx.supabase.co)
-- `SUPABASE_ANON_KEY` — public anon key
-- `SUPABASE_SERVICE_ROLE_KEY` — service role key
-- `SUPABASE_DATABASE_URL` — postgres connection string
-- `JWT_SECRET` — ≥16 char string
-- `JWT_REFRESH_SECRET` — ≥16 char string
-- `NGROK_AUTHTOKEN` — ngrok token for Customer App tunnel
-- `NGROK_AUTHTOKEN_2` — ngrok token for Partner App tunnel
+## API routes (base: `/api`)
+- `POST /auth/register` → register (triggers OTP)
+- `POST /auth/verify-otp` → verify email
+- `POST /auth/login` → login → `{ accessToken, refreshToken, user }`
+- `POST /auth/refresh` → refresh access token
+- `POST /auth/logout` → revoke refresh token
+- `GET/PATCH /profile/me` → read / update profile (**note: `/me` suffix required**)
+- `GET/POST /addresses` · `PATCH/DELETE /addresses/:id`
+- `GET /categories` · `GET /categories/:id`
+- `GET /professionals` · `GET /professionals/:id` · `GET /professionals/:id/reviews`
+- `GET/POST /bookings` · `GET /bookings/:id` · `PATCH /bookings/:id/cancel`
+- `GET /admin/stats` · `GET /admin/users` · `GET /admin/bookings` · `GET /admin/professionals`
 
-## Auth / Login Separation
+## Expo tunneling (Replit-native)
+`expo-tunnel.sh` detects `REPLIT_EXPO_DEV_DOMAIN` and skips ngrok entirely, using Replit's built-in Expo proxy. No ngrok tokens needed when running on Replit. ngrok is only used as a fallback outside of Replit.
 
-| App | Storage keys | Notes |
-|-----|-------------|-------|
-| Customer Web | `sn_access_token`, `sn_refresh_token` | localStorage |
-| Admin Panel | `admin_access_token`, `admin_refresh_token` | localStorage — never clashes with customer-web |
-| Customer Mobile | `sn_access_token`, `sn_refresh_token` | Expo SecureStore (isolated) |
-| Partner Mobile | `partner_access_token`, `partner_refresh_token` | Expo SecureStore (isolated) |
+## Required secrets
+| Secret | Purpose |
+|---|---|
+| SUPABASE_URL | Supabase REST project URL |
+| SUPABASE_ANON_KEY | Supabase anonymous key |
+| SUPABASE_SERVICE_ROLE_KEY | Supabase service role key |
+| SUPABASE_DATABASE_URL | Postgres connection string |
+| JWT_SECRET | Access token signing secret |
+| JWT_REFRESH_SECRET | Refresh token signing secret |
+| NGROK_AUTHTOKEN | Customer App ngrok (fallback outside Replit) |
+| NGROK_AUTHTOKEN_2 | Partner App ngrok (fallback outside Replit) |
 
-All four can be logged in simultaneously with no token conflicts.
-
-## Known Issues / Notes
-
-- `drizzle-kit push` hangs on Supabase if schema already exists with check constraints — patched drizzle-kit's bin.cjs with a null guard
-- Expo `--tunnel` uses `@expo/ngrok-bin` (ngrok v2) NOT `./bin/ngrok` (v3); expo-tunnel.sh configures both
-- `EXPO_PUBLIC_API_URL` env var controls the API base for mobile apps (already set to Replit dev domain)
-
-## User Preferences
-
-- Keep existing project structure (monorepo with pnpm workspaces)
-- Admin panel uses real auth with `admin_` prefixed storage keys to avoid conflicts
+## User preferences
+- Use existing project structure and stack — no migration or restructure
+- Expo SDK 54 (latest: 54.0.35)
+- No Replit cloud deployment needed

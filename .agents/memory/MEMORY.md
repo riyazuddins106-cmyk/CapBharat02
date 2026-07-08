@@ -3,4 +3,5 @@
 - [SUPABASE_URL vs DATABASE_URL](supabase-url-warning.md) — SUPABASE_URL must be the REST project URL (https://xxx.supabase.co), not the postgres connection string.
 - [ServeNow app separation](servenow-arch.md) — three apps share one server; admin-web extracted from App.tsx prototype; mobile apps were already isolated.
 - [Expo tunnel retry](expo-tunnel-retry.md) — Partner App ngrok tunnel fails when started simultaneously with Customer App; fixed with --start-delay 25 + 5-attempt retry loop in expo-tunnel.sh.
+- [Expo Replit-native tunnel](expo-replit-native-tunnel.md) — skip ngrok on Replit via REPLIT_EXPO_DEV_DOMAIN; Replit check MUST come before ngrok auth/binary checks in the script.
 - [Auth token issuance fix](auth-token-issuance-fix.md) — critical bug in issueTokenPair fixed: returned JWT and stored hash must reference the same token ID; added updateHash to refreshTokenRepository.

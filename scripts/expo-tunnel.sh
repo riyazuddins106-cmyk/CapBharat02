@@ -33,6 +33,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Optional startup delay (stagger Partner App behind Customer App)
+if [[ "$START_DELAY" -gt 0 ]]; then
+  echo "Waiting ${START_DELAY}s before starting tunnel (stagger)…"
+  sleep "$START_DELAY"
+fi
+
+# ── Replit-native mode (skip ngrok entirely) ─────────────────────────────────
+# MUST run before the ngrok token/binary checks below.
+#
+# Expo SDK 53+ uses Expo's own tunnel relay (exp.direct) — NOT ngrok — when
+# `expo start --tunnel` is invoked. ngrok is only a legacy fallback. On Replit
+# we simply skip the ngrok validation and let Expo use its own service.
+if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
+  echo "=== Replit: skipping ngrok, using Expo tunnel service (exp.direct) ==="
+  echo "Starting Expo on port $PORT…"
+  yes | pnpm expo start --tunnel --port "$PORT" "$@"
+  exit $?
+fi
+
+# ── ngrok fallback (outside Replit) ──────────────────────────────────────────
 AUTHTOKEN="${!AUTHTOKEN_VAR}"
 if [[ -z "$AUTHTOKEN" ]]; then
   echo "ERROR: $AUTHTOKEN_VAR is not set. Add it to Replit Secrets."
@@ -71,12 +91,6 @@ NGROK_EOF
   echo "Wrote ngrok v3 config → $NGROK_CONFIG (web_addr 127.0.0.1:$WEB_PORT)"
 }
 
-# Optional startup delay (stagger Partner App behind Customer App)
-if [[ "$START_DELAY" -gt 0 ]]; then
-  echo "Waiting ${START_DELAY}s before starting tunnel (stagger)…"
-  sleep "$START_DELAY"
-fi
-
 # ── Cleanup handler ──────────────────────────────────────────────────────────
 NGROK_PID=""
 cleanup() {
@@ -98,7 +112,8 @@ start_ngrok() {
   "$NGROK_V3" http "$PORT" \
     --config "$NGROK_CONFIG" \
     --log-format json \
-    --log "$NGROK_LOG" &
+    --log "$NGROK_LOG" \
+    --pooling-enabled &
   NGROK_PID=$!
 
   echo "ngrok v3 pid: $NGROK_PID — waiting for tunnel URL…"
@@ -168,8 +183,8 @@ PY
 }
 
 # ── Main retry loop ──────────────────────────────────────────────────────────
-MAX_RETRIES=3
-RETRY_DELAY=20
+MAX_RETRIES=5
+RETRY_DELAY=60
 
 for attempt in $(seq 1 $MAX_RETRIES); do
   echo "=== Tunnel attempt $attempt/$MAX_RETRIES ==="

@@ -25,10 +25,12 @@ export const otpService = {
       expiresAt: new Date(Date.now() + OTP_TTL_MS),
     });
 
-    // No transactional email provider is configured yet. Logging the OTP so the
-    // flow is fully testable end-to-end in development. Wire up a real email
-    // provider (e.g. Supabase's SMTP or Resend) before going to production.
-    logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);
+    // No transactional email provider is configured yet. OTP is logged in
+    // development only so the flow is testable end-to-end. Wire up a real email
+    // provider (e.g. Supabase SMTP or Resend) before going to production.
+    if (process.env.NODE_ENV !== 'production') {
+      logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);
+    }
   },
 
   async verify(email: string, purpose: OtpCode['purpose'], code: string): Promise<void> {

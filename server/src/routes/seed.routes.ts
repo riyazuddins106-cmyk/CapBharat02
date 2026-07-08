@@ -6,12 +6,17 @@ import { serviceCategories } from '../database/schema/serviceCategories.js';
 import { professionals } from '../database/schema/professionals.js';
 import { isProduction } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
+import { authenticate } from '../middleware/authenticate.js';
+import { requireRole } from '../middleware/requireRole.js';
 import { eq } from 'drizzle-orm';
 
 const router = Router();
 
+// Seed endpoint is admin-only and disabled in production
 router.post(
   '/',
+  authenticate,
+  requireRole('admin'),
   asyncHandler(async (_req, res) => {
     if (isProduction) throw AppError.forbidden('Seeding is disabled in production.');
 
