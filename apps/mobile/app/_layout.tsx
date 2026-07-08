@@ -1,5 +1,5 @@
 import React, { useEffect, Component, type ReactNode } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -52,6 +52,34 @@ const ebStyles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
+// On web: wraps the app in a centered phone shell so it looks like a mobile device.
+// On native: renders children directly with no extra wrapper.
+function WebPhoneFrame({ children }: { children: ReactNode }) {
+  if (Platform.OS !== 'web') return <>{children}</>;
+  return (
+    <View style={[
+      StyleSheet.absoluteFillObject,
+      { backgroundColor: '#eeedf8', alignItems: 'center', justifyContent: 'center' },
+    ]}>
+      <View style={{
+        width: 393,
+        height: 852,
+        borderRadius: 48,
+        borderWidth: 10,
+        borderColor: '#1a1a2e',
+        overflow: 'hidden',
+        backgroundColor: '#f7f8fa',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 24 },
+        shadowOpacity: 0.45,
+        shadowRadius: 48,
+      }}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
@@ -70,6 +98,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+      <WebPhoneFrame>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
@@ -84,6 +113,7 @@ export default function RootLayout() {
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
+      </WebPhoneFrame>
     </ErrorBoundary>
   );
 }

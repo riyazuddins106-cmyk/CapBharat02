@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ServeNow</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body {
+        height: 100%;
+        background: #f0f0f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      /* Phone shell */
+      .phone-shell {
+        position: relative;
+        width: 393px;
+        height: 852px;
+        border-radius: 48px;
+        border: 10px solid #1a1a2e;
+        background: #f7f8fa;
+        box-shadow:
+          0 0 0 1px #333,
+          0 30px 80px rgba(0,0,0,0.45),
+          inset 0 0 0 1px #444;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      /* Status bar */
+      .status-bar {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        z-index: 9999;
+        pointer-events: none;
+      }
+      .status-bar .time {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f1117;
+      }
+      .status-bar .icons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Dynamic island */
+      .dynamic-island {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 34px;
+        background: #000;
+        border-radius: 20px;
+        z-index: 10000;
+        pointer-events: none;
+      }
+
+      /* Side buttons */
+      .btn-left-1 {
+        position: absolute;
+        left: -13px; top: 120px;
+        width: 4px; height: 32px;
+        background: #111;
+        border-radius: 2px 0 0 2px;
+      }
+      .btn-left-2 {
+        position: absolute;
+        left: -13px; top: 166px;
+        width: 4px; height: 64px;
+        background: #111;
+        border-radius: 2px 0 0 2px;
+      }
+      .btn-left-3 {
+        position: absolute;
+        left: -13px; top: 244px;
+        width: 4px; height: 64px;
+        background: #111;
+        border-radius: 2px 0 0 2px;
+      }
+      .btn-right {
+        position: absolute;
+        right: -13px; top: 180px;
+        width: 4px; height: 96px;
+        background: #111;
+        border-radius: 0 2px 2px 0;
+      }
+
+      /* App root fills phone */
+      #root {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        border-radius: 38px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phone-shell">
+      <!-- Side buttons -->
+      <div class="btn-left-1"></div>
+      <div class="btn-left-2"></div>
+      <div class="btn-left-3"></div>
+      <div class="btn-right"></div>
+
+      <!-- Dynamic island -->
+      <div class="dynamic-island"></div>
+
+      <!-- Status bar -->
+      <div class="status-bar">
+        <span class="time" id="clock">9:41</span>
+        <div class="icons">
+          <!-- Signal -->
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+            <rect x="0" y="4" width="3" height="8" rx="1" fill="#0f1117"/>
+            <rect x="4.5" y="2.5" width="3" height="9.5" rx="1" fill="#0f1117"/>
+            <rect x="9" y="0" width="3" height="12" rx="1" fill="#0f1117"/>
+            <rect x="13.5" y="0" width="3" height="12" rx="1" fill="#0f1117" opacity="0.3"/>
+          </svg>
+          <!-- Battery -->
+          <svg width="26" height="13" viewBox="0 0 26 13" fill="none">
+            <rect x="0.5" y="0.5" width="22" height="12" rx="3.5" stroke="#0f1117" stroke-opacity="0.35"/>
+            <rect x="2" y="2" width="17" height="9" rx="2" fill="#0f1117"/>
+            <path d="M24 4.5V8.5C24.8 8.2 25.5 7.2 25.5 6.5C25.5 5.8 24.8 4.8 24 4.5Z" fill="#0f1117" fill-opacity="0.4"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Expo app mounts here -->
+      <div id="root"></div>
+    </div>
+
+    <script>
+      // Live clock
+      function tick() {
+        const now = new Date();
+        let h = now.getHours(), m = now.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        document.getElementById('clock').textContent =
+          h + ':' + String(m).padStart(2, '0');
+      }
+      tick();
+      setInterval(tick, 10000);
+    </script>
+  </body>
+</html>

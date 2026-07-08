@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import { authApi, profileApi, setRefreshHandler, type User } from '@/lib/api';
+import { storage } from '@/lib/storage';
 import { queryClient } from '@/lib/queryClient';
 import { getExpoPushToken } from '@/lib/pushNotifications';
 
@@ -47,16 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Android when the Keystore is invalidated (e.g. after biometric change).
   const persistTokens = async (access: string, refresh: string) => {
     try {
-      await SecureStore.setItemAsync(TOKEN_KEY, access);
-      await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+      await storage.setItem(TOKEN_KEY, access);
+      await storage.setItem(REFRESH_KEY, refresh);
     } catch {
       // Non-fatal: user will be prompted to log in again on next launch
     }
   };
   const clearTokens = async () => {
     try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(REFRESH_KEY);
+      await storage.deleteItem(TOKEN_KEY);
+      await storage.deleteItem(REFRESH_KEY);
     } catch {
       // Ignore — keys may not exist
     }
@@ -66,8 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const storedAccess = await SecureStore.getItemAsync(TOKEN_KEY);
-        const storedRefresh = await SecureStore.getItemAsync(REFRESH_KEY);
+        const storedAccess = await storage.getItem(TOKEN_KEY);
+        const storedRefresh = await storage.getItem(REFRESH_KEY);
         if (storedAccess) {
           try {
             const me = await profileApi.me(storedAccess);
@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
+      const refresh = await storage.getItem(REFRESH_KEY);
       if (refresh && accessToken) {
         await authApi.logout(refresh, accessToken).catch(() => {});
       }

@@ -1,0 +1,315 @@
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Senior Mobile Engineer, Senior Backend Engineer, Senior Database Architect, Senior DevOps Engineer, Senior Security Engineer, Senior UI/UX Engineer, Senior QA Engineer, and Senior Business Analyst.
+
+IMPORTANT INSTRUCTIONS
+
+DO NOT start coding immediately.
+
+FIRST perform a complete analysis of the entire project.
+
+Analyze everything including:
+
+- Customer App
+- Partner App
+- Admin Panel
+- Backend
+- Database
+- APIs
+- Authentication & Authorization
+- File Storage
+- Image Upload
+- Notifications
+- Real-time Updates
+- Roles & Permissions
+- Business Logic
+- UI
+- Navigation
+- State Management
+
+Treat the project as ONE integrated platform, not three separate applications.
+
+=========================================================
+SYSTEM ANALYSIS
+=========================================================
+
+For EVERY screen, module, button, form, menu, API, database table, and workflow:
+
+1. Determine its purpose.
+2. Identify where the data comes from.
+3. Identify which application owns the data.
+4. Verify database tables and relationships.
+5. Verify API endpoints.
+6. Verify Create, Read, Update and Delete functionality.
+7. Verify validation.
+8. Verify image upload.
+9. Verify file upload.
+10. Verify permissions.
+11. Verify business rules.
+12. Verify notifications.
+13. Verify synchronization between Customer App, Partner App and Admin Panel.
+14. Verify loading states.
+15. Verify error handling.
+16. Verify security.
+17. Verify performance.
+18. Verify real-time updates.
+19. Verify reports and analytics.
+20. Verify every user flow from beginning to end.
+
+=========================================================
+AUTOMATIC GAP DETECTION
+=========================================================
+
+Do NOT wait for me to tell you what is missing.
+
+Automatically detect everything that is incomplete.
+
+Examples:
+
+If Customer App shows a profile image but Partner App cannot upload it,
+create the complete profile image management feature.
+
+If Customer App shows price but Partner App cannot edit it,
+create the complete pricing management feature.
+
+If Customer App displays availability but Partner App cannot manage availability,
+implement it.
+
+If any data exists without a management screen,
+create the missing screen.
+
+If any backend API is missing,
+create it.
+
+If any database column is missing,
+add it safely.
+
+If any validation is missing,
+implement it.
+
+If any notification is missing,
+implement it.
+
+If any workflow is incomplete,
+complete it.
+
+If any screen is only UI without backend,
+connect it properly.
+
+If any module is disconnected,
+integrate it.
+
+=========================================================
+SYNCHRONIZATION
+=========================================================
+
+Ensure there is ONLY ONE SOURCE OF TRUTH.
+
+Every update made in:
+
+Partner App
+
+Admin Panel
+
+Backend
+
+must automatically be reflected everywhere that information is used.
+
+There must never be duplicated data.
+
+=========================================================
+IMAGE MANAGEMENT
+=========================================================
+
+Verify every image in the platform.
+
+If an image is displayed anywhere,
+there must be a way to:
+
+Upload
+
+Replace
+
+Delete
+
+Preview
+
+Compress
+
+Store securely
+
+Retrieve correctly
+
+Update automatically
+
+=========================================================
+COMPLETE FEATURE VERIFICATION
+=========================================================
+
+Check every module including but not limited to:
+
+Authentication
+
+Registration
+
+OTP
+
+Login
+
+Profile
+
+Partner Profile
+
+Service Management
+
+Categories
+
+Subcategories
+
+Bookings
+
+Booking Status
+
+Scheduling
+
+Availability
+
+Pricing
+
+Discounts
+
+Coupons
+
+Wallet
+
+Payments
+
+Invoices
+
+Addresses
+
+Location
+
+Maps
+
+Ratings
+
+Reviews
+
+Chat
+
+Notifications
+
+Documents
+
+KYC
+
+Gallery
+
+Certificates
+
+Dashboard
+
+Reports
+
+Analytics
+
+Admin Approval
+
+Roles
+
+Permissions
+
+Settings
+
+Support
+
+FAQ
+
+Static Pages
+
+Search
+
+Filters
+
+Favorites
+
+Referral
+
+Loyalty
+
+Push Notifications
+
+Email
+
+SMS
+
+Audit Logs
+
+Activity Logs
+
+Security
+
+=========================================================
+IMPLEMENTATION RULES
+=========================================================
+
+Maintain enterprise-grade architecture.
+
+Do not duplicate code.
+
+Reuse existing components.
+
+Follow existing project structure.
+
+Maintain coding standards.
+
+Write clean, modular and scalable code.
+
+Maintain database integrity.
+
+Do not break existing functionality.
+
+Add proper validation.
+
+Add proper logging.
+
+Handle all errors gracefully.
+
+Optimize performance.
+
+=========================================================
+WORKFLOW
+=========================================================
+
+Step 1
+Generate a complete GAP ANALYSIS REPORT.
+
+Step 2
+Prioritize missing functionality.
+
+Step 3
+Implement missing functionality module by module.
+
+Step 4
+Verify each implementation.
+
+Step 5
+Update database if required.
+
+Step 6
+Update backend APIs.
+
+Step 7
+Update mobile apps.
+
+Step 8
+Update admin panel.
+
+Step 9
+Test complete workflow.
+
+Step 10
+Repeat until no missing functionality remains.
+
+Do not stop after fixing one issue.
+
+Continue analyzing and implementing until the entire platform is fully synchronized, production-ready, and every feature displayed anywhere in the system has complete backend functionality and management screens.

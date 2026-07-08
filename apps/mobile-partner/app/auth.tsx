@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, KeyboardAvoidingView, Platform,
+  ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,8 @@ export default function AuthScreen() {
 
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,42 +27,50 @@ export default function AuthScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
 
+  const clearMessages = () => { setError(''); setSuccessMsg(''); };
+
   const doLogin = async () => {
-    if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
+    clearMessages();
+    if (!email || !password) return setError('Please fill in all fields');
     setLoading(true);
     try {
       await login(email.trim(), password);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Haptics is non-critical — kept outside the auth flow so it never
+      // swallows the successful login or triggers the error handler.
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (e: any) {
-      Alert.alert('Login Failed', e.message);
+      setError(e?.message ?? 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const doForgot = async () => {
-    if (!email) return Alert.alert('Error', 'Enter your email address');
+    clearMessages();
+    if (!email) return setError('Enter your email address');
     setLoading(true);
     try {
       await forgotPassword(email.trim());
       setPendingEmail(email.trim());
+      setSuccessMsg('Reset code sent — check your email.');
       setMode('reset');
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      setError(e?.message ?? 'Could not send reset email.');
     } finally {
       setLoading(false);
     }
   };
 
   const doReset = async () => {
-    if (otp.length !== 6 || !newPassword) return Alert.alert('Error', 'Fill in all fields');
+    clearMessages();
+    if (otp.length !== 6 || !newPassword) return setError('Fill in all fields');
     setLoading(true);
     try {
       await resetPassword(pendingEmail, otp, newPassword);
       await login(pendingEmail, newPassword);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      setError(e?.message ?? 'Reset failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -86,6 +96,20 @@ export default function AuthScreen() {
           </Text>
         </View>
 
+        {/* Inline error / success banners */}
+        {error ? (
+          <View style={[styles.banner, styles.bannerError]}>
+            <Ionicons name="alert-circle" size={16} color="#dc2626" />
+            <Text style={styles.bannerErrorText}>{error}</Text>
+          </View>
+        ) : null}
+        {successMsg ? (
+          <View style={[styles.banner, styles.bannerSuccess]}>
+            <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+            <Text style={styles.bannerSuccessText}>{successMsg}</Text>
+          </View>
+        ) : null}
+
         {/* Card */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
           {mode === 'login' && (
@@ -95,6 +119,7 @@ export default function AuthScreen() {
                 <TextInput
                   value={email} onChangeText={setEmail}
                   keyboardType="email-address" autoCapitalize="none"
+                  autoCorrect={false}
                   placeholder="your@email.com"
                   placeholderTextColor={colors.mutedForeground}
                   style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
@@ -115,7 +140,7 @@ export default function AuthScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setMode('forgot')} style={styles.forgotLink}>
+              <TouchableOpacity onPress={() => { clearMessages(); setMode('forgot'); }} style={styles.forgotLink}>
                 <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -135,6 +160,7 @@ export default function AuthScreen() {
                 <TextInput
                   value={email} onChangeText={setEmail}
                   keyboardType="email-address" autoCapitalize="none"
+                  autoCorrect={false}
                   placeholder="your@email.com"
                   placeholderTextColor={colors.mutedForeground}
                   style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
@@ -147,7 +173,7 @@ export default function AuthScreen() {
               >
                 <Text style={styles.btnText}>{loading ? 'Sending…' : 'Send Reset Code'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setMode('login')} style={styles.forgotLink}>
+              <TouchableOpacity onPress={() => { clearMessages(); setMode('login'); }} style={styles.forgotLink}>
                 <Text style={[styles.forgotText, { color: colors.primary }]}>← Back to sign in</Text>
               </TouchableOpacity>
             </>
@@ -185,7 +211,15 @@ export default function AuthScreen() {
                 <Text style={styles.btnText}>{loading ? 'Resetting…' : 'Reset Password'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => resendOtp(pendingEmail, 'password_reset')}
+                onPress={async () => {
+                  clearMessages();
+                  try {
+                    await resendOtp(pendingEmail, 'password_reset');
+                    setSuccessMsg('Code resent — check your email.');
+                  } catch (e: any) {
+                    setError(e?.message ?? 'Could not resend code.');
+                  }
+                }}
                 style={styles.forgotLink}
               >
                 <Text style={[styles.forgotText, { color: colors.primary }]}>Resend code</Text>
@@ -208,6 +242,11 @@ const styles = StyleSheet.create({
   logoCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   appName: { fontSize: 26, fontWeight: '800' },
   appSub: { fontSize: 14, textAlign: 'center' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 8 },
+  bannerError: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
+  bannerSuccess: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0' },
+  bannerErrorText: { color: '#dc2626', fontSize: 13, flex: 1 },
+  bannerSuccessText: { color: '#16a34a', fontSize: 13, flex: 1 },
   card: { padding: 20, borderWidth: 1, gap: 14 },
   field: { gap: 6 },
   label: { fontSize: 13, fontWeight: '600' },

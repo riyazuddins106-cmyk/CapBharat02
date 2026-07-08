@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import { authApi, setRefreshHandler, type User } from '@/lib/api';
+import { storage } from '@/lib/storage';
 import { queryClient } from '@/lib/queryClient';
 import { getExpoPushToken } from '@/lib/pushNotifications';
 
@@ -25,8 +25,8 @@ const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 // is invalidated (e.g. after biometric/PIN changes on the device).
 async function persistTokens(access: string, refresh: string) {
   try {
-    await SecureStore.setItemAsync(ACCESS_KEY, access);
-    await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+    await storage.setItem(ACCESS_KEY, access);
+    await storage.setItem(REFRESH_KEY, refresh);
   } catch {
     // Non-fatal: user will be prompted to log in again on next launch
   }
@@ -34,8 +34,8 @@ async function persistTokens(access: string, refresh: string) {
 
 async function clearTokens() {
   try {
-    await SecureStore.deleteItemAsync(ACCESS_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_KEY);
+    await storage.deleteItem(ACCESS_KEY);
+    await storage.deleteItem(REFRESH_KEY);
   } catch {
     // Ignore — keys may not exist
   }
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
+        const refresh = await storage.getItem(REFRESH_KEY);
         if (!refresh) return;
 
         const tokens = await authApi.refresh(refresh);
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
+      const refresh = await storage.getItem(REFRESH_KEY);
       if (refresh && accessToken) {
         await authApi.logout(refresh, accessToken).catch(() => {});
       }
