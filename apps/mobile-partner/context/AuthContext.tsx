@@ -21,14 +21,24 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
+// Wrapped in try/catch: SecureStore can throw on Android when the Keystore
+// is invalidated (e.g. after biometric/PIN changes on the device).
 async function persistTokens(access: string, refresh: string) {
-  await SecureStore.setItemAsync(ACCESS_KEY, access);
-  await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+  try {
+    await SecureStore.setItemAsync(ACCESS_KEY, access);
+    await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+  } catch {
+    // Non-fatal: user will be prompted to log in again on next launch
+  }
 }
 
 async function clearTokens() {
-  await SecureStore.deleteItemAsync(ACCESS_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  try {
+    await SecureStore.deleteItemAsync(ACCESS_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_KEY);
+  } catch {
+    // Ignore — keys may not exist
+  }
 }
 
 function isPartnerRole(role: string) {
@@ -93,9 +103,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [registerPushToken]);
 
   const logout = useCallback(async () => {
-    const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
-    if (refresh && accessToken) {
-      await authApi.logout(refresh, accessToken).catch(() => {});
+    try {
+      const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
+      if (refresh && accessToken) {
+        await authApi.logout(refresh, accessToken).catch(() => {});
+      }
+    } catch {
+      // Keystore unavailable — proceed to clear local state anyway
     }
     await clearTokens();
     setUser(null);

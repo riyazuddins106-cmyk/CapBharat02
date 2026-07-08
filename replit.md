@@ -32,13 +32,16 @@ scripts/           # expo-tunnel.sh — Replit-native Expo tunneling
 ## Database setup
 ```bash
 # Run migrations (idempotent)
-cd server && npx tsx src/database/migrate.ts
+pnpm --filter @servenow/server exec tsx src/database/migrate.ts
 
-# Seed test accounts
-cd server && npx tsx src/database/seed-test-accounts.ts
+# Seed test accounts (admin, customer, partner users)
+pnpm --filter @servenow/server exec tsx src/database/seed-test-accounts.ts
+
+# Link test partner user to a professional record (required for Partner App login)
+pnpm --filter @servenow/server exec tsx src/database/link-partner.ts
 
 # Seed demo data (categories + professionals)
-cd server && npx tsx src/database/seed-demo.ts
+pnpm --filter @servenow/server exec tsx src/database/seed-demo.ts
 ```
 
 ## Test credentials
@@ -60,6 +63,12 @@ cd server && npx tsx src/database/seed-demo.ts
 - `GET /professionals` · `GET /professionals/:id` · `GET /professionals/:id/reviews`
 - `GET/POST /bookings` · `GET /bookings/:id` · `PATCH /bookings/:id/cancel`
 - `GET /admin/stats` · `GET /admin/users` · `GET /admin/bookings` · `GET /admin/professionals`
+
+## Admin Panel URL
+`https://b7d707c8-f61f-41e2-9ab5-53bd5f73b2a8-00-3eo90w1jtqr1m.pike.replit.dev/admin-panel/`
+
+## Push notifications
+Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. No EAS `projectId` is set — tokens are obtained through the Expo Go anonymous identity. For production standalone builds, run `eas init` in each app directory to get a `projectId` and add it to `app.json` under `extra.eas.projectId`.
 
 ## Expo tunneling (Replit-native)
 `expo-tunnel.sh` detects `REPLIT_EXPO_DEV_DOMAIN` and skips ngrok entirely, using Replit's built-in Expo proxy. No ngrok tokens needed when running on Replit. ngrok is only used as a fallback outside of Replit.

@@ -60,9 +60,9 @@ export default function ProfileScreen() {
                   <Text style={[styles.bioText, { color: colors.foreground }]}>{profile.bio}</Text>
                 </View>
               ) : null}
-              {(profile.tags as string[]).length > 0 && (
+              {((profile.tags as string[]) ?? []).length > 0 && (
                 <View style={styles.tagsWrap}>
-                  {(profile.tags as string[]).map((tag) => (
+                  {((profile.tags as string[]) ?? []).map((tag) => (
                     <View key={tag} style={[styles.tag, { backgroundColor: colors.secondary, borderRadius: 100 }]}>
                       <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
                     </View>

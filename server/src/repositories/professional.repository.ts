@@ -1,4 +1,4 @@
-import { and, eq, isNull, like, desc, asc, sql } from 'drizzle-orm';
+import { and, eq, isNull, ilike, desc, asc, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { professionals, type Professional, type NewProfessional } from '../database/schema/professionals.js';
 
@@ -16,7 +16,7 @@ export const professionalRepository = {
 
     const conditions = [isNull(professionals.deletedAt), eq(professionals.isActive, true)];
     if (categoryId) conditions.push(eq(professionals.categoryId, categoryId));
-    if (search) conditions.push(like(professionals.name, `%${search}%`));
+    if (search) conditions.push(ilike(professionals.name, `%${search}%`));
 
     const where = and(...conditions);
 

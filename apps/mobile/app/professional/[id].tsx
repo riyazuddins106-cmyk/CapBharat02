@@ -138,10 +138,10 @@ export default function ProfessionalScreen() {
         </View>
 
         {/* Tags */}
-        {pro.tags.length > 0 && (
+        {(pro.tags ?? []).length > 0 && (
           <View style={[styles.section, { paddingHorizontal: 16, marginTop: 16 }]}>
             <View style={styles.tags}>
-              {pro.tags.map((t) => (
+              {(pro.tags ?? []).map((t) => (
                 <View key={t} style={[styles.tag, { backgroundColor: colors.secondary, borderRadius: 100 }]}>
                   <Text style={[styles.tagText, { color: colors.primary }]}>{t}</Text>
                 </View>

@@ -7,7 +7,8 @@ const router = Router();
 
 // Public — optionally authenticated so isFavorite is populated for logged-in users
 router.get('/', optionalAuthenticate, professionalController.list);
-router.get('/:id', optionalAuthenticate, professionalController.getById);
-router.get('/:professionalId/reviews', reviewController.listForProfessional);
+// NOTE: static routes must come before /:id to avoid "me" being treated as a UUID
+router.get('/:id([0-9a-f-]{36})', optionalAuthenticate, professionalController.getById);
+router.get('/:professionalId([0-9a-f-]{36})/reviews', reviewController.listForProfessional);
 
 export default router;

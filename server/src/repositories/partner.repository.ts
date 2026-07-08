@@ -126,6 +126,7 @@ export const partnerRepository = {
       total,
       thisMonth,
       today,
+      completedJobs: rows.length,
       weekly: Object.entries(weeklyMap).map(([date, amount]) => ({ date, amount })),
     };
   },

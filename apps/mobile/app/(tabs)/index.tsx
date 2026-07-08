@@ -65,7 +65,7 @@ export default function HomeScreen() {
         <View>
           <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{greeting()}</Text>
           <Text style={[styles.name, { color: colors.foreground }]}>
-            {user ? user.fullName.split(' ')[0] : 'Guest'} 👋
+            {user ? (user.fullName?.split(' ')?.[0] ?? 'User') : 'Guest'} 👋
           </Text>
         </View>
         <View style={styles.headerRight}>

@@ -9,3 +9,4 @@
 - [Expo native module version drift](expo-native-module-drift.md) — expo-device/expo-notifications pinned to wrong majors (^57.x) broke Expo Go on SDK 54; always `expo install --check`/`--fix` after adding native modules, don't hand-pin versions.
 - [Metro + pnpm duplicate React](metro-pnpm-react-resolution.md) — pnpm's shared hoist folder can supply a wrong React version before Metro's extraNodeModules fallback ever runs; must force via resolveRequest instead.
 - [Bash exit-code after `|| true`](bash-exit-code-after-or-true.md) — `cmd || true; EXIT_CODE=$?` always yields 0, silently defeating retry loops; use `set +e`/`set -e` instead.
+- [Expo pnpm exec fix](expo-pnpm-exec.md) — `pnpm expo start` fails; must use `pnpm exec expo start` in ALL script branches (Replit-native and ngrok fallback).

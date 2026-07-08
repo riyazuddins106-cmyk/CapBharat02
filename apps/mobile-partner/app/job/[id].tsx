@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform,
 } from 'react-native';
@@ -33,12 +33,21 @@ export default function JobDetailScreen() {
   const [showScanner, setShowScanner] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  // Ref-based lock: guards against rapid-fire barcode events on Android where
+  // multiple scan callbacks can fire before the state re-render runs.
+  const processingRef = useRef(false);
 
   const { data: job, refetch } = useQuery({
     queryKey: ['/api/partner/jobs', id, accessToken],
     queryFn: () => partnerApi.getJob(id!, accessToken!),
     enabled: !!accessToken && !!id,
   });
+
+  // Reset both the state and ref lock together so they never diverge.
+  const resetScanLock = () => {
+    setScanned(false);
+    processingRef.current = false;
+  };
 
   const checkInMutation = useMutation({
     mutationFn: (qrToken: string) => partnerApi.checkIn(id!, qrToken, accessToken!),
@@ -47,9 +56,12 @@ export default function JobDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
       refetch();
       setShowScanner(false);
-      setScanned(false);
+      resetScanLock();
     },
-    onError: (e: any) => Alert.alert('Check-in Failed', e.message),
+    onError: (e: any) => {
+      resetScanLock();
+      Alert.alert('Check-in Failed', e.message);
+    },
   });
 
   const completeMutation = useMutation({
@@ -63,7 +75,10 @@ export default function JobDetailScreen() {
   });
 
   const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
+    // Double-guard: state check (for UI) + ref check (prevents rapid Android callbacks
+    // that fire before the state re-render flushes).
+    if (scanned || processingRef.current) return;
+    processingRef.current = true;
     setScanned(true);
 
     // The QR encodes a signed JWT token containing the booking ID
@@ -73,10 +88,15 @@ export default function JobDetailScreen() {
       'Check In',
       'QR scanned! Mark this job as in progress?',
       [
-        { text: 'Cancel', style: 'cancel', onPress: () => setScanned(false) },
+        { text: 'Cancel', style: 'cancel', onPress: resetScanLock },
         { text: 'Check In', onPress: () => checkInMutation.mutate(scannedToken) },
       ],
     );
+  };
+
+  const closeScanner = () => {
+    setShowScanner(false);
+    resetScanLock();
   };
 
   const openScanner = async () => {
@@ -87,7 +107,7 @@ export default function JobDetailScreen() {
         return;
       }
     }
-    setScanned(false);
+    resetScanLock();
     setShowScanner(true);
   };
 
@@ -114,7 +134,7 @@ export default function JobDetailScreen() {
           {/* Overlay */}
           <View style={styles.scanOverlay}>
             <View style={[styles.scanTopBar, { paddingTop: insets.top + 8 }]}>
-              <TouchableOpacity onPress={() => setShowScanner(false)} style={styles.scanClose}>
+              <TouchableOpacity onPress={closeScanner} style={styles.scanClose}>
                 <Ionicons name="close" size={26} color="#fff" />
               </TouchableOpacity>
               <Text style={styles.scanTitle}>Scan Customer QR</Text>

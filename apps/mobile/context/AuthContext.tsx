@@ -43,14 +43,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Persist tokens
+  // Persist tokens — wrapped in try/catch because SecureStore can throw on
+  // Android when the Keystore is invalidated (e.g. after biometric change).
   const persistTokens = async (access: string, refresh: string) => {
-    await SecureStore.setItemAsync(TOKEN_KEY, access);
-    await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+    try {
+      await SecureStore.setItemAsync(TOKEN_KEY, access);
+      await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+    } catch {
+      // Non-fatal: user will be prompted to log in again on next launch
+    }
   };
   const clearTokens = async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_KEY);
+    try {
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_KEY);
+    } catch {
+      // Ignore — keys may not exist
+    }
   };
 
   // Restore session on mount
@@ -123,9 +132,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [registerPushToken]);
 
   const logout = useCallback(async () => {
-    const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
-    if (refresh && accessToken) {
-      await authApi.logout(refresh, accessToken).catch(() => {});
+    try {
+      const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
+      if (refresh && accessToken) {
+        await authApi.logout(refresh, accessToken).catch(() => {});
+      }
+    } catch {
+      // Keystore unavailable — proceed to clear local state anyway
     }
     await clearTokens();
     setUser(null);

@@ -95,6 +95,40 @@ function PhoneFrame({ children, statusDark }: { children: React.ReactNode; statu
 /* ═══════════════════════════════════════════════════════════════
    LOGIN / REGISTER SCREEN
 ═══════════════════════════════════════════════════════════════ */
+
+// Defined OUTSIDE LoginScreen so the component reference is stable across
+// re-renders. If defined inside, React sees a new component type on every
+// keystroke, unmounts the old <input>, and mounts a fresh one — losing focus
+// and making the field appear uneditable.
+function AuthInput({ placeholder, value, onChange, type = "text" }: {
+  placeholder: string; value: string; onChange: (v: string) => void; type?: string;
+}) {
+  return (
+    <input
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-400"
+    />
+  );
+}
+
+function AuthBtn({ label, onClick, disabled, loading }: {
+  label: string; onClick: () => void; disabled?: boolean; loading?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50"
+      style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+    >
+      {loading ? "Please wait…" : label}
+    </button>
+  );
+}
+
 type AuthScreen = "login" | "register" | "verify-otp" | "forgot" | "reset";
 
 interface LoginScreenProps {
@@ -172,27 +206,6 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
     } finally { setLoading(false); }
   }
 
-  const Input = ({ placeholder, value, onChange, type = "text" }: { placeholder: string; value: string; onChange: (v: string) => void; type?: string }) => (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-400"
-    />
-  );
-
-  const Btn = ({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled || loading}
-      className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50"
-      style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
-    >
-      {loading ? "Please wait…" : label}
-    </button>
-  );
-
   return (
     <PhoneFrame statusDark>
       <div className="flex-1 overflow-y-auto px-6 pt-4 pb-8 flex flex-col" style={{ scrollbarWidth: "none" }}>
@@ -206,12 +219,12 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
           <h2 className="text-xl font-bold mb-1">Welcome back 👋</h2>
           <p className="text-gray-400 text-xs mb-5">Sign in to your ServeNow account</p>
           <div className="flex flex-col gap-3">
-            <Input placeholder="Email address" value={email} onChange={setEmail} type="email" />
-            <Input placeholder="Password" value={password} onChange={setPassword} type="password" />
+            <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
+            <AuthInput placeholder="Password" value={password} onChange={setPassword} type="password" />
           </div>
           <button onClick={() => { setScreen("forgot"); setError(""); }} className="text-xs font-semibold mt-2 text-right w-full" style={{ color: "#5B3EF5" }}>Forgot password?</button>
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><Btn label="Sign In" onClick={handleLogin} /></div>
+          <div className="mt-5"><AuthBtn label="Sign In" onClick={handleLogin} loading={loading} /></div>
           <button onClick={() => { setScreen("register"); setError(""); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
             Don't have an account? <span style={{ color: "#5B3EF5" }}>Sign up</span>
           </button>
@@ -221,13 +234,13 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
           <h2 className="text-xl font-bold mb-1">Create account</h2>
           <p className="text-gray-400 text-xs mb-5">Join ServeNow today</p>
           <div className="flex flex-col gap-3">
-            <Input placeholder="Full name" value={fullName} onChange={setFullName} />
-            <Input placeholder="Email address" value={email} onChange={setEmail} type="email" />
-            <Input placeholder="Phone (optional)" value={phone} onChange={setPhone} type="tel" />
-            <Input placeholder="Password (min 8 chars, uppercase + number)" value={password} onChange={setPassword} type="password" />
+            <AuthInput placeholder="Full name" value={fullName} onChange={setFullName} />
+            <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
+            <AuthInput placeholder="Phone (optional)" value={phone} onChange={setPhone} type="tel" />
+            <AuthInput placeholder="Password (min 8 chars, uppercase + number)" value={password} onChange={setPassword} type="password" />
           </div>
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><Btn label="Create Account" onClick={handleRegister} /></div>
+          <div className="mt-5"><AuthBtn label="Create Account" onClick={handleRegister} loading={loading} /></div>
           <button onClick={() => { setScreen("login"); setError(""); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
             Already have an account? <span style={{ color: "#5B3EF5" }}>Sign in</span>
           </button>
@@ -237,9 +250,9 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
           <h2 className="text-xl font-bold mb-1">Verify your email</h2>
           <p className="text-gray-400 text-xs mb-5">Enter the 6-digit code sent to <span className="font-bold text-gray-600">{email}</span></p>
           {success && <p className="text-green-600 text-xs mb-3">{success}</p>}
-          <Input placeholder="Enter 6-digit OTP" value={otp} onChange={setOtp} />
+          <AuthInput placeholder="Enter 6-digit OTP" value={otp} onChange={setOtp} />
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><Btn label="Verify OTP" onClick={handleVerifyOtp} /></div>
+          <div className="mt-5"><AuthBtn label="Verify OTP" onClick={handleVerifyOtp} loading={loading} /></div>
           <button onClick={async () => { setError(""); await authApi.resendOtp(email, otpPurpose); setSuccess("Code resent!"); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
             Didn't receive it? <span style={{ color: "#5B3EF5" }}>Resend code</span>
           </button>
@@ -248,9 +261,9 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
         {screen === "forgot" && <>
           <h2 className="text-xl font-bold mb-1">Forgot password?</h2>
           <p className="text-gray-400 text-xs mb-5">Enter your email to receive a reset code</p>
-          <Input placeholder="Email address" value={email} onChange={setEmail} type="email" />
+          <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><Btn label="Send Reset Code" onClick={handleForgot} /></div>
+          <div className="mt-5"><AuthBtn label="Send Reset Code" onClick={handleForgot} loading={loading} /></div>
           <button onClick={() => { setScreen("login"); setError(""); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
             Back to <span style={{ color: "#5B3EF5" }}>Sign in</span>
           </button>
@@ -260,12 +273,12 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
           <h2 className="text-xl font-bold mb-1">Reset password</h2>
           <p className="text-gray-400 text-xs mb-5">Enter the OTP and your new password</p>
           <div className="flex flex-col gap-3">
-            <Input placeholder="6-digit OTP" value={otp} onChange={setOtp} />
-            <Input placeholder="New password" value={newPassword} onChange={setNewPassword} type="password" />
+            <AuthInput placeholder="6-digit OTP" value={otp} onChange={setOtp} />
+            <AuthInput placeholder="New password" value={newPassword} onChange={setNewPassword} type="password" />
           </div>
           {success && <p className="text-green-600 text-xs mt-2">{success}</p>}
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><Btn label="Reset Password" onClick={handleReset} /></div>
+          <div className="mt-5"><AuthBtn label="Reset Password" onClick={handleReset} loading={loading} /></div>
         </>}
       </div>
     </PhoneFrame>

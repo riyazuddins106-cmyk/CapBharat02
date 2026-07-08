@@ -26,7 +26,7 @@ router.get('/:id/qr', asyncHandler(async (req, res) => {
     throw AppError.badRequest('QR code is only available for active bookings.');
   }
   const qrToken = signBookingQrToken(booking.id);
-  res.json({ success: true, data: { qrToken } });
+  res.json({ success: true, data: { qrToken, expiresIn: 300 } }); // 300s = 5 min TTL
 }));
 
 export default router;

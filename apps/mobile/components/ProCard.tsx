@@ -55,9 +55,9 @@ export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, co
           <Text style={[styles.priceUnit, { color: colors.mutedForeground }]}>{pro.priceUnit}</Text>
         </View>
 
-        {!compact && pro.tags.length > 0 && (
+        {!compact && (pro.tags ?? []).length > 0 && (
           <View style={styles.tags}>
-            {pro.tags.slice(0, 3).map((tag) => (
+            {(pro.tags ?? []).slice(0, 3).map((tag) => (
               <View key={tag} style={[styles.tag, { backgroundColor: colors.secondary }]}>
                 <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
               </View>

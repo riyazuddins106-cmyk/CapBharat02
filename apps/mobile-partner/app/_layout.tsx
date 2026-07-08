@@ -1,3 +1,5 @@
+import React, { useEffect, Component, type ReactNode } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -5,7 +7,46 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { useRouter, useSegments } from 'expo-router';
-import { useEffect } from 'react';
+
+// ── Error boundary: prevents a single render error from crashing the whole app ──
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={ebStyles.container}>
+          <Text style={ebStyles.title}>Something went wrong</Text>
+          <Text style={ebStyles.message}>
+            {(this.state.error as Error | null)?.message ?? 'An unexpected error occurred.'}
+          </Text>
+          <TouchableOpacity
+            style={ebStyles.btn}
+            onPress={() => this.setState({ hasError: false, error: null })}
+          >
+            <Text style={ebStyles.btnText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const ebStyles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#f7f8fa' },
+  title: { fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 },
+  message: { fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 24 },
+  btn: { backgroundColor: '#5B3EF5', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+});
 
 function AuthGate() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -27,14 +68,16 @@ function AuthGate() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <AuthGate />
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false }} />
-        </AuthProvider>
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <AuthGate />
+            <StatusBar style="dark" />
+            <Stack screenOptions={{ headerShown: false }} />
+          </AuthProvider>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

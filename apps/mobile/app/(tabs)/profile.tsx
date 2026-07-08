@@ -58,7 +58,13 @@ export default function ProfileScreen() {
     );
   }
 
-  const initials = user!.fullName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const initials = (user?.fullName ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} showsVerticalScrollIndicator={false}>
@@ -67,12 +73,12 @@ export default function ProfileScreen() {
         <View style={[styles.avatarLg, { backgroundColor: colors.secondary }]}>
           <Text style={[styles.avatarText, { color: colors.primary }]}>{initials}</Text>
         </View>
-        <Text style={[styles.profileName, { color: colors.foreground }]}>{user!.fullName}</Text>
-        <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>{user!.email}</Text>
-        {user!.phone && <Text style={[styles.profilePhone, { color: colors.mutedForeground }]}>{user!.phone}</Text>}
+        <Text style={[styles.profileName, { color: colors.foreground }]}>{user?.fullName ?? ''}</Text>
+        <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>{user?.email ?? ''}</Text>
+        {user?.phone && <Text style={[styles.profilePhone, { color: colors.mutedForeground }]}>{user.phone}</Text>}
 
         <TouchableOpacity
-          onPress={() => { setFullName(user!.fullName); setPhone(user!.phone ?? ''); setEditModal(true); }}
+          onPress={() => { setFullName(user?.fullName ?? ''); setPhone(user?.phone ?? ''); setEditModal(true); }}
           style={[styles.editBtn, { borderColor: colors.primary, borderRadius: 100 }]}
           activeOpacity={0.8}
         >
