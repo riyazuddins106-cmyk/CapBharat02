@@ -5,3 +5,4 @@
 - [Expo tunnel retry](expo-tunnel-retry.md) — Partner App ngrok tunnel fails when started simultaneously with Customer App; fixed with --start-delay 25 + 5-attempt retry loop in expo-tunnel.sh.
 - [Expo Replit-native tunnel](expo-replit-native-tunnel.md) — skip ngrok on Replit via REPLIT_EXPO_DEV_DOMAIN; Replit check MUST come before ngrok auth/binary checks in the script.
 - [Auth token issuance fix](auth-token-issuance-fix.md) — critical bug in issueTokenPair fixed: returned JWT and stored hash must reference the same token ID; added updateHash to refreshTokenRepository.
+- [Expo SDK 57 upgrade blocked](expo-sdk57-upgrade-blocked.md) — pnpm release-age policy blocks SDK 57; partial upgrade corrupts state; recovery steps documented.

@@ -48,8 +48,25 @@ fi
 if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   echo "=== Replit: skipping ngrok, using Expo tunnel service (exp.direct) ==="
   echo "Starting Expo on port $PORT…"
-  yes | pnpm expo start --tunnel --port "$PORT" "$@"
-  exit $?
+
+  # Retry loop — exp.direct can transiently reject connections, especially
+  # when both apps start near-simultaneously. Retry up to 5 times.
+  REPLIT_MAX_RETRIES=5
+  REPLIT_RETRY_DELAY=15
+  for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
+    echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
+    yes | pnpm expo start --tunnel --port "$PORT" "$@"
+    EXIT_CODE=$?
+    if [[ $EXIT_CODE -eq 0 ]]; then
+      exit 0
+    fi
+    if [[ $attempt -lt $REPLIT_MAX_RETRIES ]]; then
+      echo "Tunnel exited (code $EXIT_CODE). Retrying in ${REPLIT_RETRY_DELAY}s…"
+      sleep "$REPLIT_RETRY_DELAY"
+    fi
+  done
+  echo "All $REPLIT_MAX_RETRIES tunnel attempts failed."
+  exit 1
 fi
 
 # ── ngrok fallback (outside Replit) ──────────────────────────────────────────

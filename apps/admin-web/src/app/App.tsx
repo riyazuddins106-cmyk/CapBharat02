@@ -1,37 +1,207 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Bell, Home, BookOpen,
-  Sparkles, DollarSign, Search, Clock,
-  BarChart2, Users, Settings,
-  RefreshCw, Activity, LogOut, Loader2, UserCheck,
-  XCircle,
+  Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock,
+  BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
+  Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
+  ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
-import type { AdminUser, Booking, Professional, DashboardStats, CustomerUser } from "@/lib/api";
+import type {
+  AdminUser, BookingRow, ProfessionalRow, CustomerUser,
+  Category, ReviewRow, DashboardStats,
+} from "@/lib/api";
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARED UI HELPERS
+═══════════════════════════════════════════════════════════════════ */
+
+const CARD = { background: "rgba(255,255,255,0.04)" } as const;
+const MODAL_BG = { background: "#1a2035" } as const;
+const INPUT_STYLE = {
+  background: "rgba(255,255,255,0.05)",
+  WebkitAppearance: "none",
+} as const;
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="w-full max-w-md rounded-2xl border border-white/10 p-6 max-h-[90vh] overflow-y-auto" style={MODAL_BG}>
+        <h3 className="text-white font-bold text-base mb-5">{title}</h3>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  title, body, confirmLabel = "Confirm", danger = true, saving, onConfirm, onCancel,
+}: {
+  title: string; body: string; confirmLabel?: string; danger?: boolean;
+  saving: boolean; onConfirm: () => void; onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="w-full max-w-sm rounded-2xl border p-6" style={{ ...MODAL_BG, borderColor: danger ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.1)" }}>
+        <h3 className="text-white font-bold text-base mb-2">{title}</h3>
+        <p className="text-white/50 text-sm mb-6">{body}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onConfirm} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-colors disabled:opacity-60"
+            style={{ background: danger ? "#DC2626" : "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            {saving ? "…" : confirmLabel}
+          </button>
+          <button onClick={onCancel} className="px-5 py-2.5 rounded-xl font-bold text-sm border border-white/10 text-white/60 hover:bg-white/5">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label, children,
+}: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-white/50 text-xs mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function TextInput({ value, onChange, type = "text", placeholder }: {
+  value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+}) {
+  return (
+    <input
+      type={type} value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+      style={INPUT_STYLE}
+    />
+  );
+}
+
+function TextArea({ value, onChange, placeholder, rows = 3 }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  return (
+    <textarea
+      value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} rows={rows}
+      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors resize-none"
+      style={INPUT_STYLE}
+    />
+  );
+}
+
+function SelectInput({ value, onChange, children }: {
+  value: string; onChange: (v: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <select
+      value={value} onChange={e => onChange(e.target.value)}
+      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+      style={{ background: "#1a2035" }}
+    >
+      {children}
+    </select>
+  );
+}
+
+function SaveCancelButtons({ onSave, onCancel, saving, saveLabel = "Save changes" }: {
+  onSave: () => void; onCancel: () => void; saving: boolean; saveLabel?: string;
+}) {
+  return (
+    <div className="flex gap-3 mt-6">
+      <button
+        onClick={onSave} disabled={saving}
+        className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-opacity disabled:opacity-60"
+        style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+      >
+        {saving ? "Saving…" : saveLabel}
+      </button>
+      <button onClick={onCancel} className="px-5 py-2.5 rounded-xl font-bold text-sm border border-white/10 text-white/60 hover:bg-white/5">
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+function SearchBar({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div className="relative">
+      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+      <input
+        value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none"
+        style={{ background: "rgba(255,255,255,0.05)" }}
+      />
+    </div>
+  );
+}
+
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+      className="px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize whitespace-nowrap"
+      style={{ background: color + "20", color }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ActionBtn({
+  onClick, variant, children, disabled,
+}: {
+  onClick: () => void; variant: "edit" | "danger" | "warn" | "green"; children: React.ReactNode; disabled?: boolean;
+}) {
+  const styles = {
+    edit:   { borderColor: "rgba(91,62,245,0.3)",  color: "#7C5BF8" },
+    danger: { borderColor: "rgba(239,68,68,0.3)",  color: "#EF4444" },
+    warn:   { borderColor: "rgba(245,158,11,0.3)", color: "#F59E0B" },
+    green:  { borderColor: "rgba(22,163,74,0.3)",  color: "#16A34A" },
+  };
+  return (
+    <button
+      onClick={onClick} disabled={disabled}
+      className="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors whitespace-nowrap disabled:opacity-40"
+      style={styles[variant]}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyRow({ cols, text }: { cols: number; text: string }) {
+  return <tr><td colSpan={cols} className="px-4 py-8 text-white/30 text-center text-sm">{text}</td></tr>;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    LOGIN PAGE
 ═══════════════════════════════════════════════════════════════════ */
 
 function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, refresh: string) => void }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
+    setError(""); setLoading(true);
     try {
       const data = await authApi.login(email, password);
       adminAuth.store(data.accessToken, data.refreshToken, data.user);
       onLogin(data.user, data.accessToken, data.refreshToken);
     } catch (err: any) {
       setError(err.message ?? "Login failed");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
@@ -43,49 +213,24 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
           </div>
           <span className="text-white font-bold text-xl">ServeNow Admin</span>
         </div>
-
         <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#161B27" }}>
           <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
           <p className="text-white/40 text-sm mb-6">Sign in to the admin panel</p>
-
           {error && (
             <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20" style={{ background: "rgba(239,68,68,0.08)" }}>
               {error}
             </div>
           )}
-
           <div className="space-y-4">
-            <div>
-              <label className="block text-white/60 text-xs font-medium mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                placeholder="admin@servenow.in"
-                autoComplete="email"
-                className="w-full rounded-xl px-4 py-3 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
-                style={{ background: "rgba(255,255,255,0.05)" }}
-              />
-            </div>
-            <div>
-              <label className="block text-white/60 text-xs font-medium mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                autoComplete="current-password"
-                className="w-full rounded-xl px-4 py-3 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
-                style={{ background: "rgba(255,255,255,0.05)" }}
-              />
-            </div>
+            <Field label="Email">
+              <TextInput type="email" value={email} onChange={setEmail} placeholder="admin@servenow.in" />
+            </Field>
+            <Field label="Password">
+              <TextInput type="password" value={password} onChange={setPassword} placeholder="••••••••" />
+            </Field>
           </div>
-
           <button
-            type="submit"
-            disabled={loading}
+            type="submit" disabled={loading}
             className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
           >
@@ -99,7 +244,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ADMIN PANEL — full-screen layout
+   ADMIN PANEL SHELL
 ═══════════════════════════════════════════════════════════════════ */
 
 const ADMIN_SIDEBAR = [
@@ -107,6 +252,8 @@ const ADMIN_SIDEBAR = [
   { id: "bookings",   icon: BookOpen,   label: "Bookings"      },
   { id: "pros",       icon: Users,      label: "Professionals" },
   { id: "users",      icon: UserCheck,  label: "Users"         },
+  { id: "categories", icon: Grid,       label: "Categories"    },
+  { id: "reviews",    icon: Star,       label: "Reviews"       },
   { id: "analytics",  icon: BarChart2,  label: "Analytics"     },
   { id: "settings",   icon: Settings,   label: "Settings"      },
 ];
@@ -119,18 +266,19 @@ const STATUS_COLOR: Record<string, string> = {
   pending:     "#6B7280",
 };
 
-function fmt(n: number) {
-  return `₹${n.toLocaleString("en-IN")}`;
-}
+function fmt(n: number) { return `₹${n.toLocaleString("en-IN")}`; }
 
 function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessToken: string; onLogout: () => void }) {
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen]     = useState(true);
-  const [stats, setStats]       = useState<DashboardStats | null>(null);
-  const [bookingList, setBookingList] = useState<Booking[]>([]);
-  const [proList, setProList]   = useState<Professional[]>([]);
-  const [userList, setUserList] = useState<CustomerUser[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [sidebarOpen,   setSidebarOpen]   = useState(true);
+
+  const [stats,        setStats]        = useState<DashboardStats | null>(null);
+  const [bookingList,  setBookingList]  = useState<BookingRow[]>([]);
+  const [proList,      setProList]      = useState<ProfessionalRow[]>([]);
+  const [userList,     setUserList]     = useState<CustomerUser[]>([]);
+  const [categoryList, setCategoryList] = useState<Category[]>([]);
+  const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
+  const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const showMsg = (text: string, type: "success" | "error" = "success") => {
@@ -141,94 +289,121 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u] = await Promise.all([
+      const [s, b, p, u, c, r] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken),
         adminApi.getUsers(accessToken),
+        adminApi.getCategories(accessToken),
+        adminApi.getReviews(accessToken),
       ]);
       setStats(s);
-      setBookingList(b.bookings as any);
-      setProList(p.professionals as any);
-      setUserList(u.users as any);
+      setBookingList(b.bookings);
+      setProList(p.professionals);
+      setUserList(u.users);
+      setCategoryList(c.categories);
+      setReviewList(r.reviews);
     } catch (err: any) {
-      console.error("Admin load error:", err);
       showMsg(err.message ?? "Failed to load data", "error");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
 
-  const togglePro = async (id: string, active: boolean) => {
-    try {
-      if (active) await adminApi.suspendProfessional(id, accessToken);
-      else        await adminApi.activateProfessional(id, accessToken);
-      showMsg(active ? "Professional suspended" : "Professional activated");
-      load();
-    } catch (err: any) {
-      showMsg(err.message ?? "Action failed", "error");
-    }
+  /* ── Booking handlers ── */
+  const editBooking = async (id: string, patch: { status?: string; notes?: string; price?: number; scheduledAt?: string }) => {
+    await adminApi.updateBooking(id, patch, accessToken);
+    showMsg("Booking updated"); load();
+  };
+  const deleteBooking = async (id: string) => {
+    await adminApi.deleteBooking(id, accessToken);
+    showMsg("Booking deleted"); load();
+  };
+  const cancelBooking = async (id: string) => {
+    await adminApi.cancelBooking(id, accessToken);
+    showMsg("Booking cancelled"); load();
   };
 
-  const cancelBooking = async (id: string) => {
-    try {
-      await adminApi.cancelBooking(id, accessToken);
-      showMsg("Booking cancelled");
-      load();
-    } catch (err: any) {
-      showMsg(err.message ?? "Cancel failed", "error");
-    }
+  /* ── Professional handlers ── */
+  const editPro = async (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[] }) => {
+    await adminApi.updateProfessional(id, patch, accessToken);
+    showMsg("Professional updated"); load();
+  };
+  const togglePro = async (id: string, active: boolean) => {
+    if (active) await adminApi.suspendProfessional(id, accessToken);
+    else        await adminApi.activateProfessional(id, accessToken);
+    showMsg(active ? "Professional suspended" : "Professional activated"); load();
+  };
+  const deletePro = async (id: string) => {
+    await adminApi.deleteProfessional(id, accessToken);
+    showMsg("Professional deleted"); load();
+  };
+
+  /* ── User handlers ── */
+  const editUser = async (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => {
+    await adminApi.updateUser(u.id, patch, accessToken);
+    showMsg("User updated"); load();
+  };
+  const deleteUser = async (id: string) => {
+    await adminApi.deleteUser(id, accessToken);
+    showMsg("User deleted"); load();
+  };
+  const toggleUser = async (id: string, active: boolean) => {
+    if (active) await adminApi.suspendUser(id, accessToken);
+    else        await adminApi.activateUser(id, accessToken);
+    showMsg(active ? "User suspended" : "User activated"); load();
+  };
+
+  /* ── Category handlers ── */
+  const createCategory = async (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number }) => {
+    await adminApi.createCategory(data, accessToken);
+    showMsg("Category created"); load();
+  };
+  const editCategory = async (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean }) => {
+    await adminApi.updateCategory(id, data, accessToken);
+    showMsg("Category updated"); load();
+  };
+  const deleteCategory = async (id: string) => {
+    await adminApi.deleteCategory(id, accessToken);
+    showMsg("Category deactivated"); load();
+  };
+
+  /* ── Review handlers ── */
+  const deleteReview = async (id: string) => {
+    await adminApi.deleteReview(id, accessToken);
+    showMsg("Review deleted"); load();
   };
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#0f1117" }}>
       {/* Toast */}
       {actionMsg && (
-        <div
-          className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm text-white border shadow-xl"
-          style={{
-            background: "#1e2535",
-            borderColor: actionMsg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.1)",
-          }}
-        >
+        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm text-white border shadow-xl"
+          style={{ background: "#1e2535", borderColor: actionMsg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.1)" }}>
           {actionMsg.text}
         </div>
       )}
 
       {/* Sidebar */}
-      <div
-        className="flex flex-col border-r border-white/[0.08] transition-all duration-200 flex-shrink-0 h-full"
-        style={{ width: sidebarOpen ? 220 : 64, background: "#161B27" }}
-      >
-        {/* Logo */}
+      <div className="flex flex-col border-r border-white/[0.08] transition-all duration-200 flex-shrink-0 h-full"
+        style={{ width: sidebarOpen ? 220 : 64, background: "#161B27" }}>
         <div className="px-4 py-5 flex items-center gap-3 border-b border-white/[0.08]">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 cursor-pointer"
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 cursor-pointer"
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
-            onClick={() => setSidebarOpen(v => !v)}
-          >
+            onClick={() => setSidebarOpen(v => !v)}>
             <Sparkles size={16} color="white" />
           </div>
           {sidebarOpen && <span className="text-white font-bold text-sm whitespace-nowrap">ServeNow Admin</span>}
         </div>
 
-        {/* Nav */}
         <div className="flex-1 py-3 flex flex-col gap-1 px-2 overflow-y-auto">
           {ADMIN_SIDEBAR.map((item) => {
             const Icon = item.icon;
             const active = activeSection === item.id;
             return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
+              <button key={item.id} onClick={() => setActiveSection(item.id)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left w-full"
-                style={{
-                  background: active ? "rgba(91,62,245,0.15)" : "transparent",
-                  color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)",
-                }}
-              >
+                style={{ background: active ? "rgba(91,62,245,0.15)" : "transparent", color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)" }}>
                 <Icon size={18} className="flex-shrink-0" />
                 {sidebarOpen && <span className="text-sm font-semibold">{item.label}</span>}
               </button>
@@ -236,7 +411,6 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           })}
         </div>
 
-        {/* User + Logout */}
         <div className="p-3 border-t border-white/[0.08]">
           {sidebarOpen && (
             <div className="flex items-center gap-2 mb-2 px-2">
@@ -249,10 +423,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
               </div>
             </div>
           )}
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl w-full text-red-400 hover:bg-red-400/10 transition-colors"
-          >
+          <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 rounded-xl w-full text-red-400 hover:bg-red-400/10 transition-colors">
             <LogOut size={16} className="flex-shrink-0" />
             {sidebarOpen && <span className="text-sm font-semibold">Sign out</span>}
           </button>
@@ -261,18 +432,15 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Topbar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] flex-shrink-0">
           <div>
-            <h1 className="text-white font-bold text-base capitalize">{activeSection}</h1>
+            <h1 className="text-white font-bold text-base capitalize">
+              {ADMIN_SIDEBAR.find(s => s.id === activeSection)?.label ?? activeSection}
+            </h1>
             <p className="text-white/30 text-xs">ServeNow Admin Panel</p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={load}
-              className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors"
-              title="Refresh"
-            >
+            <button onClick={load} className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors" title="Refresh">
               <RefreshCw size={14} color="rgba(255,255,255,0.5)" />
             </button>
             <button className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors">
@@ -281,7 +449,6 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center h-48">
@@ -290,11 +457,15 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "dashboard" ? (
             <DashboardView stats={stats} bookings={bookingList} pros={proList} />
           ) : activeSection === "bookings" ? (
-            <BookingsView bookings={bookingList} onCancel={cancelBooking} />
+            <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onToggle={togglePro} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} />
           ) : activeSection === "users" ? (
-            <UsersView users={userList} />
+            <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
+          ) : activeSection === "categories" ? (
+            <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} />
+          ) : activeSection === "reviews" ? (
+            <ReviewsView reviews={reviewList} onDelete={deleteReview} />
           ) : activeSection === "analytics" ? (
             <AnalyticsView stats={stats} />
           ) : (
@@ -306,24 +477,26 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   );
 }
 
-/* ── Dashboard ─────────────────────────────────────────────────── */
-function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null; bookings: Booking[]; pros: Professional[] }) {
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════════════════════ */
+
+function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null; bookings: BookingRow[]; pros: ProfessionalRow[] }) {
   const cards = [
-    { label: "Total Bookings",   value: stats?.totalBookings ?? 0,     icon: BookOpen,   color: "#5B3EF5", money: false },
-    { label: "Active Bookings",  value: stats?.activeBookings ?? 0,    icon: Clock,      color: "#F59E0B", money: false },
-    { label: "Professionals",    value: stats?.totalProfessionals ?? 0, icon: Users,      color: "#16A34A", money: false },
-    { label: "Total Customers",  value: stats?.totalCustomers ?? 0,    icon: UserCheck,  color: "#0EA5E9", money: false },
-    { label: "Total Revenue",    value: stats?.totalRevenue ?? 0,      icon: DollarSign, color: "#DB2777", money: true  },
+    { label: "Total Bookings",    value: stats?.totalBookings   ?? 0, icon: BookOpen,   color: "#5B3EF5", money: false },
+    { label: "Active Bookings",   value: stats?.activeBookings  ?? 0, icon: Clock,      color: "#F59E0B", money: false },
+    { label: "Professionals",     value: stats?.totalProfessionals ?? 0, icon: Users,   color: "#16A34A", money: false },
+    { label: "Total Customers",   value: stats?.totalCustomers  ?? 0, icon: UserCheck,  color: "#0EA5E9", money: false },
+    { label: "Total Revenue",     value: stats?.totalRevenue    ?? 0, icon: DollarSign, color: "#DB2777", money: true  },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {cards.map((c) => {
           const Icon = c.icon;
           return (
-            <div key={c.label} className="rounded-2xl p-4 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div key={c.label} className="rounded-2xl p-4 border border-white/[0.07]" style={CARD}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-white/40 text-xs">{c.label}</p>
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: c.color + "20" }}>
@@ -331,52 +504,39 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
                 </div>
               </div>
               <p className="text-white font-bold text-2xl">
-                {c.money ? `₹${(c.value as number).toLocaleString("en-IN")}` : c.value}
+                {c.money ? fmt(c.value as number) : c.value}
               </p>
             </div>
           );
         })}
       </div>
 
-      {/* Recent bookings + active pros side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Bookings */}
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
           <div className="px-5 py-4 border-b border-white/[0.07]">
             <h3 className="text-white font-bold text-sm">Recent Bookings</h3>
           </div>
           <div className="divide-y divide-white/[0.05]">
-            {bookings.slice(0, 6).map((b: any) => (
+            {bookings.slice(0, 6).map((b) => (
               <div key={b.id} className="px-5 py-3 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-semibold truncate">{b.serviceName}</p>
                   <p className="text-white/40 text-xs truncate">{b.customerName ?? "Customer"}</p>
                 </div>
                 <p className="text-white/60 text-xs flex-shrink-0">{fmt(b.price)}</p>
-                <span
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize flex-shrink-0"
-                  style={{
-                    background: (STATUS_COLOR[b.status] ?? "#6B7280") + "20",
-                    color: STATUS_COLOR[b.status] ?? "#6B7280",
-                  }}
-                >
-                  {b.status.replace("_", " ")}
-                </span>
+                <Badge label={b.status.replace("_", " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
               </div>
             ))}
-            {bookings.length === 0 && (
-              <p className="px-5 py-6 text-white/30 text-sm text-center">No bookings yet</p>
-            )}
+            {bookings.length === 0 && <p className="px-5 py-6 text-white/30 text-sm text-center">No bookings yet</p>}
           </div>
         </div>
 
-        {/* Top Professionals */}
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
           <div className="px-5 py-4 border-b border-white/[0.07]">
             <h3 className="text-white font-bold text-sm">Professionals</h3>
           </div>
           <div className="divide-y divide-white/[0.05]">
-            {pros.slice(0, 6).map((p: any) => (
+            {pros.slice(0, 6).map((p) => (
               <div key={p.id} className="px-5 py-3 flex items-center gap-3">
                 {p.avatarUrl ? (
                   <img src={p.avatarUrl} alt={p.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
@@ -389,19 +549,10 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
                   <p className="text-white text-sm font-semibold truncate">{p.name}</p>
                   <p className="text-white/40 text-xs truncate">{p.categoryName ?? p.title}</p>
                 </div>
-                <span
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold flex-shrink-0"
-                  style={p.isActive
-                    ? { background: "#16A34A20", color: "#16A34A" }
-                    : { background: "#EF444420", color: "#EF4444" }}
-                >
-                  {p.isActive ? "Active" : "Suspended"}
-                </span>
+                <Badge label={p.isActive ? "Active" : "Suspended"} color={p.isActive ? "#16A34A" : "#EF4444"} />
               </div>
             ))}
-            {pros.length === 0 && (
-              <p className="px-5 py-6 text-white/30 text-sm text-center">No professionals yet</p>
-            )}
+            {pros.length === 0 && <p className="px-5 py-6 text-white/30 text-sm text-center">No professionals yet</p>}
           </div>
         </div>
       </div>
@@ -409,12 +560,68 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
   );
 }
 
-/* ── Bookings ─────────────────────────────────────────────────── */
-function BookingsView({ bookings, onCancel }: { bookings: Booking[]; onCancel: (id: string) => void }) {
-  const [search, setSearch] = useState("");
-  const [confirming, setConfirming] = useState<string | null>(null);
+/* ═══════════════════════════════════════════════════════════════════
+   BOOKINGS
+═══════════════════════════════════════════════════════════════════ */
 
-  const filtered = (bookings as any[]).filter(b =>
+type BookingPatch = { status: string; notes: string; price: number; scheduledAt: string };
+
+function BookingsView({
+  bookings, onEdit, onCancel, onDelete,
+}: {
+  bookings: BookingRow[];
+  onEdit: (id: string, patch: { status?: string; notes?: string; price?: number; scheduledAt?: string }) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [search,      setSearch]      = useState("");
+  const [editTarget,  setEditTarget]  = useState<BookingRow | null>(null);
+  const [deleteId,    setDeleteId]    = useState<string | null>(null);
+  const [form,        setForm]        = useState<BookingPatch>({ status: "", notes: "", price: 0, scheduledAt: "" });
+  const [saving,      setSaving]      = useState(false);
+  const [busyId,      setBusyId]      = useState<string | null>(null);
+
+  const openEdit = (b: BookingRow) => {
+    setForm({
+      status: b.status,
+      notes: b.notes ?? "",
+      price: b.price,
+      scheduledAt: b.scheduledAt ? new Date(b.scheduledAt).toISOString().slice(0, 16) : "",
+    });
+    setEditTarget(b);
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try {
+      await onEdit(editTarget.id, {
+        status: form.status,
+        notes: form.notes,
+        price: Number(form.price),
+        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
+      });
+      setEditTarget(null);
+    } catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleCancel = async (id: string) => {
+    setBusyId(id);
+    try { await onCancel(id); }
+    catch (err: any) { alert(err.message); }
+    finally { setBusyId(null); }
+  };
+
+  const filtered = bookings.filter(b =>
     b.serviceName?.toLowerCase().includes(search.toLowerCase()) ||
     b.customerName?.toLowerCase().includes(search.toLowerCase()) ||
     b.proName?.toLowerCase().includes(search.toLowerCase())
@@ -422,29 +629,55 @@ function BookingsView({ bookings, onCancel }: { bookings: Booking[]; onCancel: (
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search bookings…"
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none"
-          style={{ background: "rgba(255,255,255,0.05)" }}
-        />
-      </div>
+      {editTarget && (
+        <Modal title="Edit Booking" onClose={() => setEditTarget(null)}>
+          <div className="space-y-4">
+            <Field label="Status">
+              <SelectInput value={form.status} onChange={v => setForm(f => ({ ...f, status: v }))}>
+                {["pending", "upcoming", "in_progress", "completed", "cancelled"].map(s => (
+                  <option key={s} value={s}>{s.replace("_", " ")}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Scheduled At">
+              <TextInput type="datetime-local" value={form.scheduledAt} onChange={v => setForm(f => ({ ...f, scheduledAt: v }))} />
+            </Field>
+            <Field label="Price (₹)">
+              <TextInput type="number" value={String(form.price)} onChange={v => setForm(f => ({ ...f, price: Number(v) }))} />
+            </Field>
+            <Field label="Notes">
+              <TextArea value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Optional notes…" />
+            </Field>
+          </div>
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete Booking?"
+          body="The booking will be permanently removed from the list."
+          confirmLabel="Yes, delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      <SearchBar value={search} onChange={setSearch} placeholder="Search bookings…" />
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Service", "Customer", "Professional", "Amount", "Scheduled", "Status", "Action"].map(h => (
+                {["Service", "Customer", "Professional", "Amount", "Scheduled", "Status", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((b: any) => (
+              {filtered.map((b) => (
                 <tr key={b.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3 text-white font-medium whitespace-nowrap">{b.serviceName}</td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.customerName ?? "—"}</td>
@@ -452,51 +685,22 @@ function BookingsView({ bookings, onCancel }: { bookings: Booking[]; onCancel: (
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">{fmt(b.price)}</td>
                   <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{new Date(b.scheduledAt).toLocaleDateString("en-IN")}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize whitespace-nowrap"
-                      style={{
-                        background: (STATUS_COLOR[b.status] ?? "#6B7280") + "20",
-                        color: STATUS_COLOR[b.status] ?? "#6B7280",
-                      }}
-                    >
-                      {b.status.replace("_", " ")}
-                    </span>
+                    <Badge label={b.status.replace("_", " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
                   </td>
                   <td className="px-4 py-3">
-                    {b.status !== "cancelled" && b.status !== "completed" ? (
-                      confirming === b.id ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => { onCancel(b.id); setConfirming(null); }}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-red-400/30 text-red-400 hover:bg-red-400/10"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => setConfirming(null)}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-white/10 text-white/40 hover:bg-white/5"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirming(b.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-400/20 text-red-400 hover:bg-red-400/10 transition-colors"
-                        >
-                          <XCircle size={12} />
+                    <div className="flex items-center gap-2">
+                      <ActionBtn variant="edit" onClick={() => openEdit(b)}>Edit</ActionBtn>
+                      {b.status !== "cancelled" && b.status !== "completed" && (
+                        <ActionBtn variant="warn" onClick={() => handleCancel(b.id)} disabled={busyId === b.id}>
                           Cancel
-                        </button>
-                      )
-                    ) : (
-                      <span className="text-white/20 text-xs">—</span>
-                    )}
+                        </ActionBtn>
+                      )}
+                      <ActionBtn variant="danger" onClick={() => setDeleteId(b.id)}>Delete</ActionBtn>
+                    </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-white/30 text-center">No bookings found</td></tr>
-              )}
+              {filtered.length === 0 && <EmptyRow cols={7} text="No bookings found" />}
             </tbody>
           </table>
         </div>
@@ -505,39 +709,120 @@ function BookingsView({ bookings, onCancel }: { bookings: Booking[]; onCancel: (
   );
 }
 
-/* ── Professionals ────────────────────────────────────────────── */
-function ProsView({ pros, onToggle }: { pros: Professional[]; onToggle: (id: string, active: boolean) => void }) {
-  const [search, setSearch] = useState("");
-  const filtered = (pros as any[]).filter(p =>
+/* ═══════════════════════════════════════════════════════════════════
+   PROFESSIONALS
+═══════════════════════════════════════════════════════════════════ */
+
+type ProPatch = { name: string; title: string; bio: string; basePrice: number; priceUnit: string; badge: string; tags: string };
+
+function ProsView({
+  pros, onEdit, onToggle, onDelete,
+}: {
+  pros: ProfessionalRow[];
+  onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[] }) => Promise<void>;
+  onToggle: (id: string, active: boolean) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [search,     setSearch]     = useState("");
+  const [editTarget, setEditTarget] = useState<ProfessionalRow | null>(null);
+  const [deleteId,   setDeleteId]   = useState<string | null>(null);
+  const [form,       setForm]       = useState<ProPatch>({ name: "", title: "", bio: "", basePrice: 0, priceUnit: "/visit", badge: "", tags: "" });
+  const [saving,     setSaving]     = useState(false);
+  const [busyId,     setBusyId]     = useState<string | null>(null);
+
+  const openEdit = (p: ProfessionalRow) => {
+    setForm({
+      name: p.name, title: p.title, bio: p.bio ?? "",
+      basePrice: p.basePrice, priceUnit: p.priceUnit,
+      badge: p.badge ?? "", tags: (p.tags ?? []).join(", "),
+    });
+    setEditTarget(p);
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try {
+      await onEdit(editTarget.id, {
+        name: form.name, title: form.title, bio: form.bio,
+        basePrice: Number(form.basePrice), priceUnit: form.priceUnit,
+        badge: form.badge,
+        tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+      });
+      setEditTarget(null);
+    } catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (p: ProfessionalRow) => {
+    setBusyId(p.id);
+    try { await onToggle(p.id, p.isActive); }
+    catch (err: any) { alert(err.message); }
+    finally { setBusyId(null); }
+  };
+
+  const filtered = pros.filter(p =>
     p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.categoryName?.toLowerCase().includes(search.toLowerCase())
+    p.categoryName?.toLowerCase().includes(search.toLowerCase()) ||
+    p.title?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search professionals…"
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none"
-          style={{ background: "rgba(255,255,255,0.05)" }}
-        />
-      </div>
+      {editTarget && (
+        <Modal title="Edit Professional" onClose={() => setEditTarget(null)}>
+          <div className="space-y-4">
+            <Field label="Name"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Title"><TextInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} /></Field>
+            <Field label="Bio"><TextArea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} placeholder="Professional bio…" /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Base Price (₹)"><TextInput type="number" value={String(form.basePrice)} onChange={v => setForm(f => ({ ...f, basePrice: Number(v) }))} /></Field>
+              <Field label="Price Unit">
+                <SelectInput value={form.priceUnit} onChange={v => setForm(f => ({ ...f, priceUnit: v }))}>
+                  {["/visit", "/hr", "/day", "/session"].map(u => <option key={u} value={u}>{u}</option>)}
+                </SelectInput>
+              </Field>
+            </div>
+            <Field label="Badge (optional)"><TextInput value={form.badge} onChange={v => setForm(f => ({ ...f, badge: v }))} placeholder="e.g. Top Rated" /></Field>
+            <Field label="Tags (comma-separated)"><TextInput value={form.tags} onChange={v => setForm(f => ({ ...f, tags: v }))} placeholder="cleaning, deep clean, …" /></Field>
+          </div>
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete Professional?"
+          body="The professional profile will be soft-deleted and hidden from the Customer App."
+          confirmLabel="Yes, delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      <SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" />
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Professional", "Category", "Rating", "Price", "Status", "Action"].map(h => (
+                {["Professional", "Category", "Rating", "Price", "Status", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((p: any) => (
+              {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -556,33 +841,26 @@ function ProsView({ pros, onToggle }: { pros: Professional[]; onToggle: (id: str
                   </td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{p.categoryName ?? "—"}</td>
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">⭐ {p.rating?.toFixed(1) ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/80 whitespace-nowrap">{fmt(p.basePrice)}</td>
+                  <td className="px-4 py-3 text-white/80 whitespace-nowrap">{fmt(p.basePrice)}{p.priceUnit}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap"
-                      style={p.isActive
-                        ? { background: "#16A34A20", color: "#16A34A" }
-                        : { background: "#EF444420", color: "#EF4444" }}
-                    >
-                      {p.isActive ? "Active" : "Suspended"}
-                    </span>
+                    <Badge label={p.isActive ? "Active" : "Suspended"} color={p.isActive ? "#16A34A" : "#EF4444"} />
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => onToggle(p.id, p.isActive)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors whitespace-nowrap"
-                      style={p.isActive
-                        ? { borderColor: "rgba(239,68,68,0.3)", color: "#EF4444" }
-                        : { borderColor: "rgba(22,163,74,0.3)", color: "#16A34A" }}
-                    >
-                      {p.isActive ? "Suspend" : "Activate"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <ActionBtn variant="edit" onClick={() => openEdit(p)}>Edit</ActionBtn>
+                      <ActionBtn
+                        variant={p.isActive ? "warn" : "green"}
+                        onClick={() => handleToggle(p)}
+                        disabled={busyId === p.id}
+                      >
+                        {p.isActive ? "Suspend" : "Activate"}
+                      </ActionBtn>
+                      <ActionBtn variant="danger" onClick={() => setDeleteId(p.id)}>Delete</ActionBtn>
+                    </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-white/30 text-center">No professionals found</td></tr>
-              )}
+              {filtered.length === 0 && <EmptyRow cols={6} text="No professionals found" />}
             </tbody>
           </table>
         </div>
@@ -591,40 +869,116 @@ function ProsView({ pros, onToggle }: { pros: Professional[]; onToggle: (id: str
   );
 }
 
-/* ── Users ────────────────────────────────────────────────────── */
-function UsersView({ users }: { users: CustomerUser[] }) {
-  const [search, setSearch] = useState("");
-  const filtered = users.filter(u =>
-    u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase()) ||
-    u.role?.toLowerCase().includes(search.toLowerCase())
-  );
+/* ═══════════════════════════════════════════════════════════════════
+   USERS
+═══════════════════════════════════════════════════════════════════ */
 
-  const ROLE_COLOR: Record<string, string> = {
-    customer: "#0EA5E9",
-    partner:  "#F59E0B",
-    admin:    "#5B3EF5",
+const ROLE_COLOR: Record<string, string> = {
+  customer: "#0EA5E9", partner: "#F59E0B", admin: "#5B3EF5",
+};
+
+function UsersView({
+  users, onEdit, onDelete, onToggle,
+}: {
+  users: CustomerUser[];
+  onEdit: (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onToggle: (id: string, active: boolean) => Promise<void>;
+}) {
+  const [search,     setSearch]     = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [editTarget, setEditTarget] = useState<CustomerUser | null>(null);
+  const [deleteId,   setDeleteId]   = useState<string | null>(null);
+  const [form,       setForm]       = useState({ fullName: "", email: "", phone: "", role: "" });
+  const [saving,     setSaving]     = useState(false);
+  const [busyId,     setBusyId]     = useState<string | null>(null);
+
+  const openEdit = (u: CustomerUser) => {
+    setForm({ fullName: u.fullName, email: u.email, phone: u.phone ?? "", role: u.role });
+    setEditTarget(u);
   };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try { await onEdit(editTarget, form); setEditTarget(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (u: CustomerUser) => {
+    setBusyId(u.id);
+    try { await onToggle(u.id, u.isActive); }
+    catch (err: any) { alert(err.message); }
+    finally { setBusyId(null); }
+  };
+
+  const filtered = users.filter(u =>
+    (roleFilter === "all" || u.role === roleFilter) &&
+    (u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+     u.email?.toLowerCase().includes(search.toLowerCase()) ||
+     u.role?.toLowerCase().includes(search.toLowerCase()))
+  );
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search users…"
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none"
-          style={{ background: "rgba(255,255,255,0.05)" }}
+      {editTarget && (
+        <Modal title="Edit User" onClose={() => setEditTarget(null)}>
+          <div className="space-y-4">
+            <Field label="Full Name"><TextInput value={form.fullName} onChange={v => setForm(f => ({ ...f, fullName: v }))} /></Field>
+            <Field label="Email"><TextInput type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} /></Field>
+            <Field label="Phone"><TextInput type="tel" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} /></Field>
+            <Field label="Role">
+              <SelectInput value={form.role} onChange={v => setForm(f => ({ ...f, role: v }))}>
+                <option value="customer">Customer</option>
+                <option value="partner">Partner</option>
+              </SelectInput>
+            </Field>
+          </div>
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
+
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete User?"
+          body="The user account will be permanently deactivated. This cannot be undone."
+          confirmLabel="Yes, delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
         />
+      )}
+
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search users…" />
+        </div>
+        <select
+          value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
+          className="rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10"
+          style={{ background: "rgba(255,255,255,0.05)" }}
+        >
+          <option value="all">All roles</option>
+          <option value="customer">Customers</option>
+          <option value="partner">Partners</option>
+        </select>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Name", "Email", "Role", "Status", "Joined"].map(h => (
+                {["Name", "Email", "Phone", "Role", "Status", "Joined", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -642,28 +996,32 @@ function UsersView({ users }: { users: CustomerUser[] }) {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{u.email}</td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{u.phone ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize whitespace-nowrap"
-                      style={{ background: (ROLE_COLOR[u.role] ?? "#5B3EF5") + "20", color: ROLE_COLOR[u.role] ?? "#5B3EF5" }}>
-                      {u.role}
-                    </span>
+                    <Badge label={u.role} color={ROLE_COLOR[u.role] ?? "#5B3EF5"} />
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap"
-                      style={u.isActive
-                        ? { background: "#16A34A20", color: "#16A34A" }
-                        : { background: "#EF444420", color: "#EF4444" }}>
-                      {u.isActive ? "Active" : "Inactive"}
-                    </span>
+                    <Badge label={u.isActive ? "Active" : "Inactive"} color={u.isActive ? "#16A34A" : "#EF4444"} />
                   </td>
                   <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
                     {new Date(u.createdAt).toLocaleDateString("en-IN")}
                   </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <ActionBtn variant="edit" onClick={() => openEdit(u)}>Edit</ActionBtn>
+                      <ActionBtn
+                        variant={u.isActive ? "warn" : "green"}
+                        onClick={() => handleToggle(u)}
+                        disabled={busyId === u.id}
+                      >
+                        {u.isActive ? "Suspend" : "Activate"}
+                      </ActionBtn>
+                      <ActionBtn variant="danger" onClick={() => setDeleteId(u.id)}>Delete</ActionBtn>
+                    </div>
+                  </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-white/30 text-center">No users found</td></tr>
-              )}
+              {filtered.length === 0 && <EmptyRow cols={7} text="No users found" />}
             </tbody>
           </table>
         </div>
@@ -672,21 +1030,289 @@ function UsersView({ users }: { users: CustomerUser[] }) {
   );
 }
 
-/* ── Analytics ────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   CATEGORIES
+═══════════════════════════════════════════════════════════════════ */
+
+type CatForm = { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean };
+const EMPTY_CAT: CatForm = { name: "", description: "", iconName: "Grid", color: "#F3F4F6", iconColor: "#6B7280", sortOrder: 0, isActive: true };
+
+function CategoriesView({
+  categories, onCreate, onEdit, onDelete,
+}: {
+  categories: Category[];
+  onCreate: (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number }) => Promise<void>;
+  onEdit: (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [search,     setSearch]     = useState("");
+  const [editTarget, setEditTarget] = useState<Category | null>(null);
+  const [creating,   setCreating]   = useState(false);
+  const [deleteId,   setDeleteId]   = useState<string | null>(null);
+  const [form,       setForm]       = useState<CatForm>(EMPTY_CAT);
+  const [saving,     setSaving]     = useState(false);
+  const [busyId,     setBusyId]     = useState<string | null>(null);
+
+  const openCreate = () => { setForm(EMPTY_CAT); setCreating(true); };
+  const openEdit   = (c: Category) => {
+    setForm({ name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: c.isActive });
+    setEditTarget(c);
+  };
+
+  const handleCreate = async () => {
+    setSaving(true);
+    try { await onCreate({ name: form.name, description: form.description, iconName: form.iconName, color: form.color, iconColor: form.iconColor, sortOrder: form.sortOrder }); setCreating(false); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try { await onEdit(editTarget.id, form); setEditTarget(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggleActive = async (c: Category) => {
+    setBusyId(c.id);
+    try { await onEdit(c.id, { name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: !c.isActive }); }
+    catch (err: any) { alert(err.message); }
+    finally { setBusyId(null); }
+  };
+
+  const CatFormFields = () => (
+    <div className="space-y-4">
+      <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Home Cleaning" /></Field>
+      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Short description…" rows={2} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Icon Name"><TextInput value={form.iconName} onChange={v => setForm(f => ({ ...f, iconName: v }))} placeholder="Grid" /></Field>
+        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Card Color">
+          <div className="flex gap-2 items-center">
+            <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+            <TextInput value={form.color} onChange={v => setForm(f => ({ ...f, color: v }))} />
+          </div>
+        </Field>
+        <Field label="Icon Color">
+          <div className="flex gap-2 items-center">
+            <input type="color" value={form.iconColor} onChange={e => setForm(f => ({ ...f, iconColor: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+            <TextInput value={form.iconColor} onChange={v => setForm(f => ({ ...f, iconColor: v }))} />
+          </div>
+        </Field>
+      </div>
+    </div>
+  );
+
+  const filtered = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="space-y-4">
+      {creating && (
+        <Modal title="New Category" onClose={() => setCreating(false)}>
+          <CatFormFields />
+          <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create category" />
+        </Modal>
+      )}
+
+      {editTarget && (
+        <Modal title="Edit Category" onClose={() => setEditTarget(null)}>
+          <CatFormFields />
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
+
+      {deleteId && (
+        <ConfirmDialog
+          title="Deactivate Category?"
+          body="This will hide the category from the Customer App. Existing professionals and bookings are not affected."
+          confirmLabel="Deactivate"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search categories…" />
+        </div>
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap"
+          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+        >
+          <Plus size={14} /> New Category
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.07]">
+                {["Category", "Description", "Icon", "Colors", "Order", "Status", "Actions"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {filtered.map((c) => (
+                <tr key={c.id} className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: c.color }}>
+                        <Grid size={14} color={c.iconColor} />
+                      </div>
+                      <span className="text-white font-semibold whitespace-nowrap">{c.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-white/50 text-xs max-w-[200px] truncate">{c.description ?? "—"}</td>
+                  <td className="px-4 py-3 text-white/60 text-xs whitespace-nowrap">{c.iconName}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-sm border border-white/20 flex-shrink-0" style={{ background: c.color }} />
+                      <span className="w-4 h-4 rounded-sm border border-white/20 flex-shrink-0" style={{ background: c.iconColor }} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-white/60 text-xs whitespace-nowrap">{c.sortOrder}</td>
+                  <td className="px-4 py-3">
+                    <Badge label={c.isActive ? "Active" : "Inactive"} color={c.isActive ? "#16A34A" : "#EF4444"} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <ActionBtn variant="edit" onClick={() => openEdit(c)}>Edit</ActionBtn>
+                      <ActionBtn
+                        variant={c.isActive ? "warn" : "green"}
+                        onClick={() => handleToggleActive(c)}
+                        disabled={busyId === c.id}
+                      >
+                        {c.isActive ? "Deactivate" : "Activate"}
+                      </ActionBtn>
+                      <ActionBtn variant="danger" onClick={() => setDeleteId(c.id)}>Delete</ActionBtn>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <EmptyRow cols={7} text="No categories found" />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   REVIEWS
+═══════════════════════════════════════════════════════════════════ */
+
+function ReviewsView({ reviews, onDelete }: { reviews: ReviewRow[]; onDelete: (id: string) => Promise<void> }) {
+  const [search,   setSearch]   = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [saving,   setSaving]   = useState(false);
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (err: any) { alert(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const filtered = reviews.filter(r =>
+    r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+    r.proName?.toLowerCase().includes(search.toLowerCase()) ||
+    r.comment?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const stars = (n: number) => "★".repeat(Math.max(0, Math.min(5, n))) + "☆".repeat(Math.max(0, 5 - Math.min(5, n)));
+
+  return (
+    <div className="space-y-4">
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete Review?"
+          body="This review will be permanently removed. The professional's rating may be affected."
+          confirmLabel="Yes, delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      <SearchBar value={search} onChange={setSearch} placeholder="Search reviews…" />
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.07]">
+                {["Customer", "Professional", "Rating", "Comment", "Date", "Action"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {filtered.map((r) => (
+                <tr key={r.id} className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3">
+                    <p className="text-white font-medium whitespace-nowrap">{r.customerName ?? "—"}</p>
+                    <p className="text-white/40 text-[10px] truncate">{r.customerEmail ?? ""}</p>
+                  </td>
+                  <td className="px-4 py-3 text-white/60 whitespace-nowrap">{r.proName ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-yellow-400 text-xs whitespace-nowrap">{stars(r.rating)}</span>
+                    <span className="text-white/40 text-[10px] ml-1">{r.rating}/5</span>
+                  </td>
+                  <td className="px-4 py-3 text-white/60 text-xs max-w-[240px]">
+                    <p className="truncate">{r.comment ?? "—"}</p>
+                  </td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                    {new Date(r.createdAt).toLocaleDateString("en-IN")}
+                  </td>
+                  <td className="px-4 py-3">
+                    <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <EmptyRow cols={6} text="No reviews found" />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANALYTICS
+═══════════════════════════════════════════════════════════════════ */
+
 function AnalyticsView({ stats }: { stats: DashboardStats | null }) {
   const items = [
-    { label: "Total Revenue",       value: stats ? fmt(stats.totalRevenue) : "—",   icon: DollarSign, color: "#5B3EF5" },
-    { label: "Total Bookings",      value: String(stats?.totalBookings ?? 0),        icon: BookOpen,   color: "#F59E0B" },
-    { label: "Active Bookings",     value: String(stats?.activeBookings ?? 0),       icon: Activity,   color: "#16A34A" },
-    { label: "Total Professionals", value: String(stats?.totalProfessionals ?? 0),   icon: Users,      color: "#DB2777" },
-    { label: "Total Customers",     value: String(stats?.totalCustomers ?? 0),       icon: UserCheck,  color: "#0EA5E9" },
+    { label: "Total Revenue",       value: stats ? fmt(stats.totalRevenue)      : "—", icon: DollarSign, color: "#5B3EF5" },
+    { label: "Total Bookings",      value: String(stats?.totalBookings    ?? 0),        icon: BookOpen,   color: "#F59E0B" },
+    { label: "Active Bookings",     value: String(stats?.activeBookings   ?? 0),        icon: Activity,   color: "#16A34A" },
+    { label: "Total Professionals", value: String(stats?.totalProfessionals ?? 0),      icon: Users,      color: "#DB2777" },
+    { label: "Total Customers",     value: String(stats?.totalCustomers   ?? 0),        icon: UserCheck,  color: "#0EA5E9" },
   ];
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {items.map((i) => {
         const Icon = i.icon;
         return (
-          <div key={i.label} className="rounded-2xl p-5 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
+          <div key={i.label} className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: i.color + "20" }}>
               <Icon size={18} color={i.color} />
             </div>
@@ -699,26 +1325,21 @@ function AnalyticsView({ stats }: { stats: DashboardStats | null }) {
   );
 }
 
-/* ── Settings ─────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════════════════════════════════ */
+
 function SettingsView({ user }: { user: AdminUser }) {
   return (
     <div className="max-w-lg space-y-4">
-      <div className="rounded-2xl p-5 border border-white/[0.07]" style={{ background: "rgba(255,255,255,0.04)" }}>
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
         <h3 className="text-white font-bold text-sm mb-4">Account Info</h3>
         <div className="space-y-4">
-          <div>
-            <p className="text-white/40 text-xs mb-0.5">Full Name</p>
-            <p className="text-white text-sm">{user.fullName}</p>
-          </div>
-          <div>
-            <p className="text-white/40 text-xs mb-0.5">Email</p>
-            <p className="text-white text-sm">{user.email}</p>
-          </div>
+          <div><p className="text-white/40 text-xs mb-0.5">Full Name</p><p className="text-white text-sm">{user.fullName}</p></div>
+          <div><p className="text-white/40 text-xs mb-0.5">Email</p><p className="text-white text-sm">{user.email}</p></div>
           <div>
             <p className="text-white/40 text-xs mb-0.5">Role</p>
-            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold" style={{ background: "#5B3EF520", color: "#5B3EF5" }}>
-              {user.role?.toUpperCase()}
-            </span>
+            <Badge label={user.role?.toUpperCase()} color="#5B3EF5" />
           </div>
         </div>
       </div>
@@ -727,14 +1348,14 @@ function SettingsView({ user }: { user: AdminUser }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   ROOT — handles auth session
+   ROOT
 ═══════════════════════════════════════════════════════════════════ */
 
 export default function App() {
-  const [user, setUser]               = useState<AdminUser | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [user,         setUser]         = useState<AdminUser | null>(null);
+  const [accessToken,  setAccessToken]  = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [checking, setChecking]       = useState(true);
+  const [checking,     setChecking]     = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -743,31 +1364,20 @@ export default function App() {
         try {
           const data = await authApi.refresh(storedRefresh);
           adminAuth.store(data.accessToken, data.refreshToken, data.user);
-          setUser(data.user);
-          setAccessToken(data.accessToken);
-          setRefreshToken(data.refreshToken);
-        } catch {
-          adminAuth.clear();
-        }
+          setUser(data.user); setAccessToken(data.accessToken); setRefreshToken(data.refreshToken);
+        } catch { adminAuth.clear(); }
       }
       setChecking(false);
     })();
   }, []);
 
   const handleLogin = (u: AdminUser, access: string, refresh: string) => {
-    setUser(u);
-    setAccessToken(access);
-    setRefreshToken(refresh);
+    setUser(u); setAccessToken(access); setRefreshToken(refresh);
   };
 
   const handleLogout = async () => {
-    if (refreshToken && accessToken) {
-      await authApi.logout(refreshToken, accessToken);
-    }
-    adminAuth.clear();
-    setUser(null);
-    setAccessToken(null);
-    setRefreshToken(null);
+    if (refreshToken && accessToken) await authApi.logout(refreshToken, accessToken);
+    adminAuth.clear(); setUser(null); setAccessToken(null); setRefreshToken(null);
   };
 
   if (checking) {
@@ -778,9 +1388,6 @@ export default function App() {
     );
   }
 
-  if (!user || !accessToken) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
+  if (!user || !accessToken) return <LoginPage onLogin={handleLogin} />;
   return <AdminPanel user={user} accessToken={accessToken} onLogout={handleLogout} />;
 }
