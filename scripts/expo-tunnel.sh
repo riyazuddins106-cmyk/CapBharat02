@@ -51,8 +51,8 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
 
   # Retry loop — exp.direct can transiently reject connections, especially
   # when both apps start near-simultaneously. Retry up to 5 times.
-  REPLIT_MAX_RETRIES=5
-  REPLIT_RETRY_DELAY=15
+  REPLIT_MAX_RETRIES=8
+  REPLIT_RETRY_DELAY=30
   for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
     echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
     yes | pnpm expo start --tunnel --port "$PORT" "$@"

@@ -66,12 +66,12 @@ outputType = "console"
 name = "Expo Partner App"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner --start-delay 25"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd apps/mobile-partner && bash ../../scripts/expo-tunnel.sh 8082 --authtoken-var NGROK_AUTHTOKEN_2 --config-home /tmp/ngrok-partner --start-delay 60"
 
 [[ports]]
 localPort = 5000
