@@ -10,3 +10,4 @@
 - [Metro + pnpm duplicate React](metro-pnpm-react-resolution.md) — pnpm's shared hoist folder can supply a wrong React version before Metro's extraNodeModules fallback ever runs; must force via resolveRequest instead.
 - [Bash exit-code after `|| true`](bash-exit-code-after-or-true.md) — `cmd || true; EXIT_CODE=$?` always yields 0, silently defeating retry loops; use `set +e`/`set -e` instead.
 - [Expo pnpm exec fix](expo-pnpm-exec.md) — `pnpm expo start` fails; must use `pnpm exec expo start` in ALL script branches (Replit-native and ngrok fallback).
+- [Expo notifications Expo Go import side-effect](expo-notifications-expo-go-side-effect.md) — must conditionally require('expo-notifications') on Android Expo Go, not just guard calls; import itself triggers console.error.

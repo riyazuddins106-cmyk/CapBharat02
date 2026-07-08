@@ -7,19 +7,41 @@ export class ApiError extends Error {
   }
 }
 
+// ── Token refresh interceptor ──────────────────────────────
+// AuthContext registers this after login/restore. When any request returns 401
+// the client calls this to get a fresh access token, then retries once.
+let _refreshHandler: (() => Promise<string | null>) | null = null;
+
+export function setRefreshHandler(fn: (() => Promise<string | null>) | null) {
+  _refreshHandler = fn;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit & { token?: string } = {},
 ): Promise<T> {
   const { token, ...init } = options;
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-  });
+
+  const doFetch = (t: string | undefined) =>
+    fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(t ? { Authorization: `Bearer ${t}` } : {}),
+        ...init.headers,
+      },
+    });
+
+  let res = await doFetch(token);
+
+  // On 401, try refreshing the token once and retrying
+  if (res.status === 401 && token && _refreshHandler) {
+    const newToken = await _refreshHandler().catch(() => null);
+    if (newToken) {
+      res = await doFetch(newToken);
+    }
+  }
+
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ApiError(res.status, json?.error?.message ?? 'Request failed');

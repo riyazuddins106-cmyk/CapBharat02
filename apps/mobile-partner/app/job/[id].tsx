@@ -84,14 +84,27 @@ export default function JobDetailScreen() {
     // The QR encodes a signed JWT token containing the booking ID
     const scannedToken = data.trim();
 
-    Alert.alert(
-      'Check In',
-      'QR scanned! Mark this job as in progress?',
-      [
-        { text: 'Cancel', style: 'cancel', onPress: resetScanLock },
-        { text: 'Check In', onPress: () => checkInMutation.mutate(scannedToken) },
-      ],
-    );
+    // Tear down the camera view (CameraView/CameraX surface) BEFORE presenting
+    // the Alert. Showing a native Alert while the camera surface is still
+    // actively capturing frames is a known crash trigger on several Android
+    // OEM camera stacks (the alert steals window focus while the camera
+    // surface is mid-teardown/reconfiguration). Closing the scanner first
+    // avoids that race entirely.
+    setShowScanner(false);
+
+    // Give the native camera surface a frame to fully unmount before the
+    // Alert takes over the window — avoids overlapping the camera teardown
+    // with the alert's window focus change on physical devices.
+    setTimeout(() => {
+      Alert.alert(
+        'Check In',
+        'QR scanned! Mark this job as in progress?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: resetScanLock },
+          { text: 'Check In', onPress: () => checkInMutation.mutate(scannedToken) },
+        ],
+      );
+    }, 250);
   };
 
   const closeScanner = () => {

@@ -111,6 +111,3 @@ run = ["node", "server/dist/index.js"]
 [userenv.shared]
 JWT_SECRET = "e8466fcc6f875fe10992ddf0fd84b2313de6e950f745e39ee7115c6247bf69a4"
 JWT_REFRESH_SECRET = "d96b75a3407ba94b9862eb32d348ba6f86af55196b2cfe67d94b8d95b4548afc"
-NGROK_AUTHTOKEN = "3G5PZwninwQ76ufwFl5zbpTuiHq_3xSAtQKSB1nfajWiiuxtH"
-NGROK_AUTHTOKEN_2 = "3G5eNenlmBGMQ5fuepvDHhhJN67_4QHwQ6XUN41F5jYRxYvVY"
-EXPO_PUBLIC_API_URL = "https://b7d707c8-f61f-41e2-9ab5-53bd5f73b2a8-00-3eo90w1jtqr1m.pike.replit.dev"

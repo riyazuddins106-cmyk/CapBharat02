@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { authApi, profileApi, type User } from '@/lib/api';
+import { authApi, profileApi, setRefreshHandler, type User } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 import { getExpoPushToken } from '@/lib/pushNotifications';
 
@@ -98,6 +98,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  // Register a refresh handler so the API client can silently refresh expired
+  // access tokens (15 min TTL) without the user seeing a 401 error.
+  const setupRefreshHandler = useCallback((initialRefreshToken: string) => {
+    // Keep a mutable ref so the closure always uses the latest refresh token
+    let latestRefreshToken = initialRefreshToken;
+    setRefreshHandler(async () => {
+      try {
+        const tokens = await authApi.refresh(latestRefreshToken);
+        latestRefreshToken = tokens.refreshToken;
+        await persistTokens(tokens.accessToken, tokens.refreshToken);
+        setAccessToken(tokens.accessToken);
+        return tokens.accessToken;
+      } catch {
+        return null;
+      }
+    });
+  }, []);
+
   const registerPushToken = useCallback((token: string) => {
     getExpoPushToken()
       .then((pushToken) => {
@@ -114,9 +132,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await persistTokens(data.accessToken, data.refreshToken);
     setAccessToken(data.accessToken);
     setUser(data.user);
+    setupRefreshHandler(data.refreshToken);
     queryClient.clear();
     registerPushToken(data.accessToken);
-  }, [registerPushToken]);
+  }, [registerPushToken, setupRefreshHandler]);
 
   const register = useCallback(async (payload: { fullName: string; email: string; password: string; phone?: string }) => {
     return authApi.register(payload);
