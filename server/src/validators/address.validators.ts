@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createAddressSchema = z.object({
   label: z.string().trim().min(1).max(64).default('Home'),
   line1: z.string().trim().min(3).max(255),
-  line2: z.string().trim().max(255).optional(),
+  line2: z.string().trim().max(255).nullish(),
   city: z.string().trim().min(1).max(128),
   state: z.string().trim().min(1).max(128),
   postalCode: z.string().trim().min(3).max(32),

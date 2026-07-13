@@ -4,12 +4,13 @@ import {
   BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
-  Shield, HelpCircle, Lock, MessageSquare, ExternalLink,
+  Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
+  PlatformPolicyRow, OfferRow, OfferInput,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -275,6 +276,12 @@ function fmt(n: number) { return `₹${n.toLocaleString("en-IN")}`; }
 function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessToken: string; onLogout: () => void }) {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
+  const [localUser,     setLocalUser]     = useState<AdminUser>(user);
+
+  const handleUserUpdate = (updated: AdminUser) => {
+    setLocalUser(updated);
+    adminAuth.patchUser(updated);
+  };
 
   const [stats,        setStats]        = useState<DashboardStats | null>(null);
   const [bookingList,  setBookingList]  = useState<BookingRow[]>([]);
@@ -422,11 +429,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           {sidebarOpen && (
             <div className="flex items-center gap-2 mb-2 px-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
-                {user.fullName?.charAt(0).toUpperCase()}
+                {localUser.fullName?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{user.fullName}</p>
-                <p className="text-white/30 text-[10px] truncate">{user.email}</p>
+                <p className="text-white text-xs font-semibold truncate">{localUser.fullName}</p>
+                <p className="text-white/30 text-[10px] truncate">{localUser.email}</p>
               </div>
             </div>
           )}
@@ -478,7 +485,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "audit-logs" ? (
             <AuditLogsView logs={auditLogs} />
           ) : activeSection === "privacy" ? (
-            <PrivacySecurityView user={user} accessToken={accessToken} />
+            <PrivacySecurityView user={localUser} accessToken={accessToken} onUserUpdate={handleUserUpdate} />
           ) : activeSection === "support" ? (
             <HelpSupportView accessToken={accessToken} />
           ) : (
@@ -1417,7 +1424,35 @@ function SettingsView({ user }: { user: AdminUser }) {
    PRIVACY & SECURITY
 ═══════════════════════════════════════════════════════════════════ */
 
-function PrivacySecurityView({ user, accessToken }: { user: AdminUser; accessToken: string }) {
+function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminUser; accessToken: string; onUserUpdate?: (u: AdminUser) => void }) {
+  const [profileForm, setProfileForm] = useState({ fullName: user.fullName ?? "", phone: user.phone ?? "" });
+
+  // Keep form in sync whenever the parent updates the user object
+  useEffect(() => {
+    setProfileForm({ fullName: user.fullName ?? "", phone: user.phone ?? "" });
+  }, [user.id, user.fullName, user.phone]);
+  const [profileMsg, setProfileMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  const handleUpdateProfile = async () => {
+    if (!profileForm.fullName.trim()) { setProfileMsg({ text: "Full name is required.", type: "error" }); return; }
+    setProfileLoading(true);
+    try {
+      const updated = await adminApi.updateProfile(
+        { fullName: profileForm.fullName.trim(), ...(profileForm.phone ? { phone: profileForm.phone.trim() } : {}) },
+        accessToken,
+      );
+      adminAuth.patchUser(updated as AdminUser);
+      onUserUpdate?.(updated as AdminUser);
+      setProfileMsg({ text: "Profile updated successfully.", type: "success" });
+    } catch (e: any) {
+      setProfileMsg({ text: e.message ?? "Failed to update profile.", type: "error" });
+    } finally {
+      setProfileLoading(false);
+      setTimeout(() => setProfileMsg(null), 4000);
+    }
+  };
+
   const [changePw, setChangePw] = useState({ current: "", next: "", confirm: "" });
   const [pwMsg, setPwMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
@@ -1441,6 +1476,58 @@ function PrivacySecurityView({ user, accessToken }: { user: AdminUser; accessTok
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* Update Profile */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(91,62,245,0.15)" }}>
+            <Shield size={16} color="#7C5BF8" />
+          </div>
+          <h3 className="text-white font-bold text-sm">Update Profile</h3>
+        </div>
+        {profileMsg && (
+          <div className="mb-4 px-3 py-2 rounded-lg text-xs font-medium border" style={{ background: profileMsg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: profileMsg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: profileMsg.type === "error" ? "#f87171" : "#4ade80" }}>
+            {profileMsg.text}
+          </div>
+        )}
+        <div className="space-y-3">
+          <div>
+            <label className="text-white/40 text-xs mb-1 block">Full Name</label>
+            <input
+              type="text"
+              value={profileForm.fullName}
+              onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+              placeholder="Your full name"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)" }}
+            />
+          </div>
+          <div>
+            <label className="text-white/40 text-xs mb-1 block">Phone (optional)</label>
+            <input
+              type="tel"
+              value={profileForm.phone}
+              onChange={(e) => setProfileForm((p) => ({ ...p, phone: e.target.value }))}
+              placeholder="+91 98765 43210"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)" }}
+            />
+          </div>
+          <div>
+            <label className="text-white/40 text-xs mb-1 block">Email</label>
+            <p className="px-3 py-2 rounded-xl text-sm text-white/50 border border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>{user.email}</p>
+            <p className="text-white/30 text-[10px] mt-1">Email cannot be changed here. Contact system administrator.</p>
+          </div>
+          <button
+            onClick={handleUpdateProfile}
+            disabled={profileLoading}
+            className="mt-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            {profileLoading ? "Saving…" : "Save Profile"}
+          </button>
+        </div>
+      </div>
+
       {/* Change Password */}
       <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
         <div className="flex items-center gap-2 mb-5">
@@ -1501,22 +1588,63 @@ function PrivacySecurityView({ user, accessToken }: { user: AdminUser; accessTok
         </div>
       </div>
 
-      {/* Policies */}
+      {/* Platform Policies — editable, synced to DB */}
       <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
-        <h3 className="text-white font-bold text-sm mb-4">Platform Policies</h3>
-        <div className="space-y-2">
-          {[
-            { label: "Privacy Policy",       url: "#" },
-            { label: "Terms of Service",     url: "#" },
-            { label: "Data Retention Policy",url: "#" },
-          ].map(({ label, url }) => (
-            <a key={label} href={url} target="_blank" rel="noreferrer"
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-white/[0.06] hover:border-violet-500/30 hover:bg-violet-500/5 transition-colors group">
-              <span className="text-white/70 text-sm group-hover:text-white transition-colors">{label}</span>
-              <ExternalLink size={14} color="rgba(255,255,255,0.3)" />
-            </a>
-          ))}
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(91,62,245,0.15)" }}>
+            <ExternalLink size={16} color="#7C5BF8" />
+          </div>
+          <h3 className="text-white font-bold text-sm">Platform Policies</h3>
+          <span className="ml-auto text-white/30 text-[10px]">Visible to customers in the mobile app</span>
         </div>
+
+        {polLoading ? (
+          <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-violet-500" /></div>
+        ) : (
+          <div className="space-y-5">
+            {policies.map((p) => {
+              const edit = polEdits[p.slug] ?? { title: p.title, content: p.content };
+              const isSaving = savingSlug === p.slug;
+              const msg = polMsg?.slug === p.slug ? polMsg : null;
+              return (
+                <div key={p.slug} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-white/60 text-xs font-semibold uppercase tracking-wide">{p.title}</label>
+                    <span className="text-white/20 text-[10px]">
+                      Last saved {new Date(p.updatedAt).toLocaleDateString("en-IN")}
+                    </span>
+                  </div>
+
+                  {msg && (
+                    <div className="px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ background: msg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: msg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: msg.type === "error" ? "#f87171" : "#4ade80" }}>
+                      {msg.text}
+                    </div>
+                  )}
+
+                  <textarea
+                    rows={6}
+                    value={edit.content}
+                    onChange={(e) => setPolEdits(prev => ({ ...prev, [p.slug]: { ...edit, content: e.target.value } }))}
+                    className="w-full px-3 py-2 rounded-xl text-sm text-white/80 outline-none border border-white/10 focus:border-violet-500 transition-colors resize-y leading-relaxed"
+                    style={{ background: "rgba(255,255,255,0.04)" }}
+                    placeholder="Enter policy content…"
+                  />
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => handleSavePolicy(p.slug)}
+                      disabled={isSaving}
+                      className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50"
+                      style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+                    >
+                      {isSaving ? "Saving…" : `Save ${p.title}`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1538,7 +1666,7 @@ function HelpSupportView({ accessToken }: { accessToken: string }) {
     setLoading(true);
     try {
       const data = await adminApi.getSupportTickets(accessToken);
-      setTickets(data.tickets);
+      setTickets(Array.isArray(data) ? data : []);
     } catch { /* ignore */ } finally { setLoading(false); }
   };
 

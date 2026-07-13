@@ -13,6 +13,8 @@ import adminRoutes from './admin.routes.js';
 import notificationRoutes from './notification.routes.js';
 import supportTicketRoutes from './supportTicket.routes.js';
 import pointsRoutes from './points.routes.js';
+import platformPolicyRoutes from './platformPolicy.routes.js';
+import offerRoutes from './offer.routes.js';
 
 const router = Router();
 
@@ -34,5 +36,7 @@ router.use('/admin', adminRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/support-tickets', supportTicketRoutes);
 router.use('/points', pointsRoutes);
+router.use('/platform-policies', platformPolicyRoutes);
+router.use('/offers', offerRoutes);
 
 export default router;

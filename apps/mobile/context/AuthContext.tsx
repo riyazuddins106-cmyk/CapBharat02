@@ -22,6 +22,7 @@ interface AuthActions {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   resendOtp: (email: string, purpose: string) => Promise<void>;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthState & AuthActions>({
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthState & AuthActions>({
   forgotPassword: async () => {},
   resetPassword: async () => {},
   resendOtp: async () => {},
+  updateUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -177,11 +179,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authApi.resendOtp({ email, purpose });
   }, []);
 
+  const updateUser = useCallback((updatedUser: User) => {
+    setUser(updatedUser);
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       user, accessToken, isLoading,
       isAuthenticated: !!user,
-      login, register, verifyOtp, logout, forgotPassword, resetPassword, resendOtp,
+      login, register, verifyOtp, logout, forgotPassword, resetPassword, resendOtp, updateUser,
     }}>
       {children}
     </AuthContext.Provider>

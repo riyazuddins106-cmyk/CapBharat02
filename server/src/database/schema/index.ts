@@ -13,3 +13,5 @@ export * from './payoutRequests';
 export * from './notifications';
 export * from './supportTickets';
 export * from './pointsLedger';
+export * from './platformPolicies';
+export * from './offers';

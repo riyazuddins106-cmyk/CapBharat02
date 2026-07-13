@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { adminController } from '../controllers/admin.controller.js';
+import { platformPolicyController } from '../controllers/platformPolicy.controller.js';
+import { offerController } from '../controllers/offer.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 
@@ -46,5 +48,15 @@ router.get('/audit-logs',             adminController.listAuditLogs);
 // Payouts
 router.get('/payouts',                adminController.listPayoutRequests);
 router.patch('/payouts/:id',          adminController.resolvePayoutRequest);
+
+// Platform Policies (admin CRUD)
+router.get('/platform-policies',       platformPolicyController.adminList);
+router.put('/platform-policies/:slug', platformPolicyController.adminUpdate);
+
+// Offers / Banners (admin CRUD)
+router.get('/offers',         offerController.adminList);
+router.post('/offers',        offerController.adminCreate);
+router.patch('/offers/:id',   offerController.adminUpdate);
+router.delete('/offers/:id',  offerController.adminDelete);
 
 export default router;

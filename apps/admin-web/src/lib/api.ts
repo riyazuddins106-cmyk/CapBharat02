@@ -20,16 +20,46 @@ export const adminAuth = {
     localStorage.removeItem(ADMIN_USER_KEY);
   },
   isLoggedIn: () => Boolean(localStorage.getItem(ADMIN_TOKEN_KEY)),
+  patchUser(user: AdminUser) {
+    localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+  },
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export interface AdminUser {
   id: string;
   email: string;
+  phone?: string | null;
   fullName: string;
   role: 'admin';
   avatarUrl?: string | null;
 }
+
+export interface PlatformPolicyRow {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  updatedAt: string;
+}
+
+export interface OfferRow {
+  id: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  discountText: string;
+  bgColor: string;
+  ctaText: string;
+  ctaRoute: string;
+  isActive: boolean;
+  sortOrder: number;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type OfferInput = Omit<OfferRow, 'id' | 'createdAt' | 'updatedAt'>;
 
 export interface BookingRow {
   id: string;
@@ -244,11 +274,31 @@ export const adminApi = {
 
   // Support Tickets
   getSupportTickets: (token: string) =>
-    request<{ tickets: SupportTicketRow[]; total: number }>('/support-tickets', { token }),
+    request<SupportTicketRow[]>('/support-tickets', { token }),
   updateSupportTicket: (id: string, data: { status: string; response?: string }, token: string) =>
     request<SupportTicketRow>(`/support-tickets/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
 
   // Admin: change own password
   changePassword: (currentPassword: string, newPassword: string, token: string) =>
     request<{ message: string }>('/profile/me/change-password', { method: 'POST', token, body: JSON.stringify({ currentPassword, newPassword }) }),
+
+  // Admin: update own profile details
+  updateProfile: (data: { fullName?: string; phone?: string }, token: string) =>
+    request<AdminUser>('/profile/me', { method: 'PATCH', token, body: JSON.stringify(data) }),
+
+  // Platform Policies
+  getPlatformPolicies: (token: string) =>
+    request<PlatformPolicyRow[]>('/admin/platform-policies', { token }),
+  updatePlatformPolicy: (slug: string, data: { title: string; content: string }, token: string) =>
+    request<PlatformPolicyRow>(`/admin/platform-policies/${slug}`, { method: 'PUT', token, body: JSON.stringify(data) }),
+
+  // Offers / Banners
+  getOffers: (token: string) =>
+    request<{ offers: OfferRow[]; total: number }>('/admin/offers', { token }),
+  createOffer: (data: OfferInput, token: string) =>
+    request<OfferRow>('/admin/offers', { method: 'POST', token, body: JSON.stringify(data) }),
+  updateOffer: (id: string, data: Partial<OfferInput>, token: string) =>
+    request<OfferRow>(`/admin/offers/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  deleteOffer: (id: string, token: string) =>
+    request<{ id: string }>(`/admin/offers/${id}`, { method: 'DELETE', token }),
 };

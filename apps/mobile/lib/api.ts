@@ -17,9 +17,6 @@ export class ApiError extends Error {
 }
 
 // ── Token refresh interceptor ──────────────────────────────
-// AuthContext registers this after login/restore. When any request returns 401
-// the client calls this to get a fresh access token, then retries once.
-// Returns null if refresh fails (caller will receive the original 401 error).
 let _refreshHandler: (() => Promise<string | null>) | null = null;
 
 export function setRefreshHandler(fn: (() => Promise<string | null>) | null) {
@@ -44,7 +41,6 @@ async function request<T>(
 
   let res = await doFetch(token);
 
-  // On 401, try refreshing the token once and retrying
   if (res.status === 401 && token && _refreshHandler) {
     const newToken = await _refreshHandler().catch(() => null);
     if (newToken) {
@@ -129,8 +125,21 @@ export interface Address {
   country: string;
   isDefault: boolean;
 }
+export interface Offer {
+  id: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  discountText: string;
+  bgColor: string;
+  ctaText: string;
+  ctaRoute: string;
+  isActive: boolean;
+  sortOrder: number;
+  expiresAt: string | null;
+}
 
-// ── Multipart upload (avatar) — no Content-Type header so browser sets boundary ──
+// ── Multipart upload (avatar) ──────────────────────────────
 async function uploadFile<T>(
   path: string,
   fieldName: string,
@@ -139,12 +148,10 @@ async function uploadFile<T>(
 ): Promise<T> {
   const formData = new FormData();
   if (typeof window !== 'undefined') {
-    // Web: uri is a blob URL → fetch the blob then append
     const blobRes = await fetch(uri);
     const blob = await blobRes.blob();
     formData.append(fieldName, blob, 'avatar.jpg');
   } else {
-    // Native: append file URI directly
     const name = uri.split('/').pop() ?? 'avatar.jpg';
     const ext = /\.(\w+)$/.exec(name)?.[1] ?? 'jpg';
     formData.append(fieldName, { uri, name, type: `image/${ext}` } as any);
@@ -221,6 +228,11 @@ export const professionalsApi = {
     return request<Professional[]>(`/api/professionals${qs ? `?${qs}` : ''}`);
   },
   get: (id: string) => request<Professional>(`/api/professionals/${id}`),
+};
+
+// ── Offers / Banners ───────────────────────────────────────
+export const offersApi = {
+  listActive: () => request<Offer[]>('/api/offers'),
 };
 
 // ── Notifications ──────────────────────────────────────────
@@ -311,7 +323,7 @@ export const reviewsApi = {
     request<void>(`/api/reviews/${id}`, { method: 'DELETE', token }),
 };
 
-// ── Profile ────────────────────────────────────────────────
+// ── Addresses ──────────────────────────────────────────────
 export const addressesApi = {
   list: (token: string) => request<Address[]>('/api/addresses', { token }),
   create: (data: Omit<Address, 'id' | 'line2'>, token: string) =>
@@ -320,4 +332,12 @@ export const addressesApi = {
     request<Address>(`/api/addresses/${id}`, { method: 'PATCH', body: JSON.stringify(data), token }),
   delete: (id: string, token: string) =>
     request<void>(`/api/addresses/${id}`, { method: 'DELETE', token }),
+};
+
+// ── Platform Policies (public) ──────────────────────────────
+export const platformApi = {
+  getPolicy: (slug: string) =>
+    request<{ id: string; slug: string; title: string; content: string; updatedAt: string }>(
+      `/api/platform-policies/${slug}`,
+    ),
 };

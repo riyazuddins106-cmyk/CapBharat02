@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { profileApi, pointsApi } from '@/lib/api';
+import { profileApi, pointsApi, bookingsApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 const MENU_ITEMS = [
@@ -43,13 +43,22 @@ async function handleRateApp() {
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, accessToken, isAuthenticated, logout } = useAuth();
+  const { user, accessToken, isAuthenticated, logout, updateUser } = useAuth();
 
   const { data: pointsSummary } = useQuery({
     queryKey: ['/api/points', accessToken],
     queryFn: () => pointsApi.getSummary(accessToken!),
     enabled: !!accessToken,
   });
+
+  const { data: bookings = [] } = useQuery({
+    queryKey: ['/api/bookings', accessToken],
+    queryFn: () => bookingsApi.list(accessToken!),
+    enabled: !!accessToken,
+  });
+
+  const bookingCount = bookings.length;
+  const reviewCount = bookings.filter((b) => b.reviewed).length;
   const [editModal,  setEditModal]  = useState(false);
   const [fullName,   setFullName]   = useState(user?.fullName ?? '');
   const [phone,      setPhone]      = useState(user?.phone ?? '');
@@ -60,9 +69,9 @@ export default function ProfileScreen() {
 
   const updateMutation = useMutation({
     mutationFn: () => profileApi.update({ fullName, phone: phone || undefined }, accessToken!),
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      queryClient.invalidateQueries({ queryKey: ['/api/profile'] });
+      updateUser(updatedUser);
       setEditModal(false);
     },
     onError: (e: any) => Alert.alert('Error', e.message),
@@ -154,7 +163,7 @@ export default function ProfileScreen() {
 
       {/* Stats */}
       <View style={[styles.stats, { backgroundColor: colors.card, borderBottomColor: colors.border, borderTopColor: colors.border }]}>
-        {[{ label: 'Bookings', value: '—' }, { label: 'Reviews', value: '—' }, { label: 'Points', value: String(pointsSummary?.balance ?? 0) }].map(({ label, value }) => (
+        {[{ label: 'Bookings', value: String(bookingCount) }, { label: 'Reviews', value: String(reviewCount) }, { label: 'Points', value: String(pointsSummary?.balance ?? 0) }].map(({ label, value }) => (
           <TouchableOpacity
             key={label}
             style={styles.stat}

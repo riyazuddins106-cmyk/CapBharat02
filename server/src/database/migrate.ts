@@ -278,6 +278,33 @@ async function migrate() {
   await run('index: points_ledger_user', `CREATE INDEX IF NOT EXISTS idx_points_ledger_user ON points_ledger(user_id)`);
   await run('index: points_ledger_booking', `CREATE INDEX IF NOT EXISTS idx_points_ledger_booking ON points_ledger(booking_id)`);
 
+  await run('table: platform_policies', `
+    CREATE TABLE IF NOT EXISTS platform_policies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug VARCHAR(64) NOT NULL UNIQUE,
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
+  await run('table: offers', `
+    CREATE TABLE IF NOT EXISTS offers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title VARCHAR(255) NOT NULL,
+      subtitle VARCHAR(255) NOT NULL DEFAULT '',
+      tag VARCHAR(64) NOT NULL DEFAULT 'LIMITED OFFER',
+      discount_text VARCHAR(64) NOT NULL DEFAULT '',
+      bg_color VARCHAR(16) NOT NULL DEFAULT '#5B3EF5',
+      cta_text VARCHAR(64) NOT NULL DEFAULT 'Book Now',
+      cta_route VARCHAR(128) NOT NULL DEFAULT '/(tabs)/services',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      expires_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: offers_active', `CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(is_active)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }
