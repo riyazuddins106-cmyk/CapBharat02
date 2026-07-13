@@ -73,13 +73,26 @@ export default function RootLayout() {
     ...Ionicons.font,
   });
 
+  // Safety net: on some networks/browsers, the useFonts() promise can stall
+  // indefinitely without ever resolving or rejecting (observed reliably over
+  // the public HTTPS tunnel, even though the same font requests succeed
+  // instantly via curl and the same code works fine on localhost) — leaving
+  // the app stuck on a blank white screen forever. Force the app to render
+  // with fallback fonts after a short timeout rather than hang forever.
+  const [fontTimedOut, setFontTimedOut] = React.useState(false);
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded || fontError) return;
+    const timer = setTimeout(() => setFontTimedOut(true), 300);
+    return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  useEffect(() => {
+    if (fontsLoaded || fontError || fontTimedOut) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError, fontTimedOut]);
+
+  if (!fontsLoaded && !fontError && !fontTimedOut) return null;
 
   return (
     <ErrorBoundary>

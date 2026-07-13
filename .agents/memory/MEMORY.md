@@ -12,3 +12,4 @@
 - [Expo pnpm exec fix](expo-pnpm-exec.md) — `pnpm expo start` fails; must use `pnpm exec expo start` in ALL script branches (Replit-native and ngrok fallback).
 - [Expo notifications Expo Go import side-effect](expo-notifications-expo-go-side-effect.md) — must conditionally require('expo-notifications') on Android Expo Go, not just guard calls; import itself triggers console.error.
 - [Points & Rewards design](points-rewards-design.md) — earn/redeem rules chosen when building the loyalty feature from scratch (1pt/₹10 earn, 1pt=₹1 redeem, min 100).
+- [Expo web useFonts hang over tunnel](expo-web-usefonts-hang.md) — useFonts() can hang forever specifically over the public HTTPS domain even though font requests succeed fine directly; always add a setTimeout fallback to force render.
