@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { otpRepository } from '../repositories/otp.repository.js';
+import { emailService } from './email.service.js';
 import type { OtpCode } from '../database/schema/otpCodes.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -10,6 +11,26 @@ const MAX_ATTEMPTS = 5;
 
 function generateCode(): string {
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+}
+
+const SUBJECTS: Record<OtpCode['purpose'], string> = {
+  signup: 'Verify your ServeNow account',
+  password_reset: 'Reset your ServeNow password',
+};
+
+function buildEmailHtml(purpose: OtpCode['purpose'], code: string): string {
+  const intro =
+    purpose === 'signup'
+      ? 'Use the code below to verify your email and finish creating your ServeNow account.'
+      : 'Use the code below to reset your ServeNow password.';
+  return `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2>ServeNow</h2>
+      <p>${intro}</p>
+      <p style="font-size:32px;font-weight:bold;letter-spacing:4px">${code}</p>
+      <p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>
+    </div>
+  `;
 }
 
 export const otpService = {
@@ -25,10 +46,16 @@ export const otpService = {
       expiresAt: new Date(Date.now() + OTP_TTL_MS),
     });
 
-    // No transactional email provider is configured yet. OTP is logged in
-    // development only so the flow is testable end-to-end. Wire up a real email
-    // provider (e.g. Supabase SMTP or Resend) before going to production.
-    if (process.env.NODE_ENV !== 'production') {
+    // Send via SMTP if configured (see email.service.ts for required env vars:
+    // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM). Falls back to
+    // logging the code in non-production so the flow stays testable until a
+    // provider is wired up.
+    let emailed = false;
+    if (emailService.isConfigured()) {
+      emailed = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
+    }
+
+    if (!emailed && process.env.NODE_ENV !== 'production') {
       logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);
     }
   },

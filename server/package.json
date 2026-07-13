@@ -25,6 +25,7 @@
     "jsonwebtoken": "9.0.2",
     "morgan": "1.10.0",
     "multer": "1.4.5-lts.1",
+    "nodemailer": "^9.0.3",
     "postgres": "3.4.5",
     "razorpay": "^2.9.6",
     "zod": "3.23.8"
@@ -37,6 +38,7 @@
     "@types/morgan": "1.9.9",
     "@types/multer": "1.4.12",
     "@types/node": "22.9.0",
+    "@types/nodemailer": "^8.0.1",
     "drizzle-kit": "0.31.10",
     "tsx": "4.19.2",
     "typescript": "5.6.3"

@@ -85,6 +85,23 @@ Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. No E
 | NGROK_AUTHTOKEN | Customer App ngrok (fallback outside Replit) |
 | NGROK_AUTHTOKEN_2 | Partner App ngrok (fallback outside Replit) |
 
+## Email delivery (OTP codes)
+Signup and password-reset codes are sent via a generic SMTP mailer (`server/src/services/email.service.ts`, using `nodemailer`) so any provider works — Resend, SendGrid, Gmail, Mailgun, etc. Set these secrets to activate it:
+
+| Secret | Purpose |
+|---|---|
+| SMTP_HOST | SMTP server host (e.g. `smtp.resend.com`) |
+| SMTP_PORT | SMTP port (defaults to 587) |
+| SMTP_SECURE | `"true"` for port 465, otherwise `"false"` |
+| SMTP_USER | SMTP username |
+| SMTP_PASS | SMTP password / API key |
+| EMAIL_FROM | From address, e.g. `ServeNow <no-reply@servenow.in>` |
+
+Until these are set, OTP codes are just logged to the server console (`[otp] Verification code for ...`) so the flow stays testable.
+
+## QA testing
+Full CRUD regression test log for customer/partner/admin flows is in `QA_TEST_REPORT.md` (auth, addresses, professionals, favorites, bookings incl. reschedule/cancel/QR, points, notifications, offers, policies, partner jobs/checkin/complete/earnings/payouts, admin stats/bookings/professionals/users/categories/offers/reviews/audit-logs/payouts, support tickets). All passed against live Supabase DB. No backend bugs found — the earlier "booking broken" report was caused by missing Supabase secrets in this environment, now resolved.
+
 ## User preferences
 - Use existing project structure and stack — no migration or restructure
 - Expo SDK 54 (latest: 54.0.35)

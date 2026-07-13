@@ -840,7 +840,10 @@ function BookingsView({
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.customerName ?? "—"}</td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.proName}</td>
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">{fmt(b.price)}</td>
-                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{new Date(b.scheduledAt).toLocaleDateString("en-IN")}</td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                    {new Date(b.scheduledAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                    {new Date(b.scheduledAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge label={b.status.replace("_", " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
                   </td>

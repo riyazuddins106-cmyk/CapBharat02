@@ -19,6 +19,12 @@ export const bookingService = {
     const pro = await professionalRepository.findById(input.professionalId);
     if (!pro || !pro.isActive) throw AppError.notFound('Professional not found or unavailable.');
 
+    const scheduledAt = new Date(input.scheduledAt);
+    const duplicate = await bookingRepository.findActiveDuplicate(customerId, pro.id, scheduledAt);
+    if (duplicate) {
+      throw AppError.conflict('Booking already done. You already have a booking with this professional at this date and time.');
+    }
+
     const booking = await bookingRepository.create({
       customerId,
       professionalId: pro.id,
@@ -26,7 +32,7 @@ export const bookingService = {
       addressId: input.addressId ?? null,
       serviceName: pro.title,
       proName: pro.name,
-      scheduledAt: new Date(input.scheduledAt),
+      scheduledAt,
       notes: input.notes ?? null,
       price: pro.basePrice,
       status: 'upcoming',

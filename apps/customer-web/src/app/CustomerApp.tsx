@@ -384,6 +384,7 @@ function BookingModal({ pro, onClose, onBooked }: {
     try {
       const scheduledAt = buildScheduledAt(selectedDate, selectedTime);
       const booking = await bookingsApi.create(pro.id, scheduledAt, notes || undefined);
+      setStep(3);
       onBooked(booking);
     } catch (e: any) {
       setError(e?.response?.data?.error?.message ?? "Booking failed. Please try again.");
@@ -1253,9 +1254,6 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
                 )}
                 {b.status === "completed" && (
                   <button className="flex-1 py-2 rounded-xl text-xs font-bold border border-black/[0.08]">Rate Service</button>
-                )}
-                {["pending", "upcoming"].includes(b.status) && (
-                  <button className="flex-1 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "#5B3EF5" }}>Track</button>
                 )}
               </div>
             </div>

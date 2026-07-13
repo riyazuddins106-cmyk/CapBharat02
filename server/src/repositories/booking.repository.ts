@@ -44,6 +44,21 @@ export const bookingRepository = {
     return booking;
   },
 
+  async findActiveDuplicate(customerId: string, professionalId: string, scheduledAt: Date): Promise<Booking | undefined> {
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(and(
+        eq(bookings.customerId, customerId),
+        eq(bookings.professionalId, professionalId),
+        eq(bookings.scheduledAt, scheduledAt),
+        isNull(bookings.deletedAt),
+        sql`${bookings.status} in ('pending', 'upcoming')`,
+      ))
+      .limit(1);
+    return booking;
+  },
+
   async countByProfessional(professionalId: string): Promise<number> {
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(bookings).where(eq(bookings.professionalId, professionalId));
     return count;
