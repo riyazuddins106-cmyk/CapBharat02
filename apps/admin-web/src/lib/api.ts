@@ -158,6 +158,17 @@ export interface PayoutRow {
   resolvedAt: string | null;
 }
 
+export interface NotificationRow {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  type: string;
+  isRead: boolean;
+  data: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export interface SupportTicketRow {
   id: string;
   userId: string | null;
@@ -289,8 +300,12 @@ export const adminApi = {
   // Platform Policies
   getPlatformPolicies: (token: string) =>
     request<PlatformPolicyRow[]>('/admin/platform-policies', { token }),
+  createPlatformPolicy: (data: { title: string; content: string; slug?: string }, token: string) =>
+    request<PlatformPolicyRow>('/admin/platform-policies', { method: 'POST', token, body: JSON.stringify(data) }),
   updatePlatformPolicy: (slug: string, data: { title: string; content: string }, token: string) =>
     request<PlatformPolicyRow>(`/admin/platform-policies/${slug}`, { method: 'PUT', token, body: JSON.stringify(data) }),
+  deletePlatformPolicy: (slug: string, token: string) =>
+    request<{ slug: string }>(`/admin/platform-policies/${slug}`, { method: 'DELETE', token }),
 
   // Offers / Banners
   getOffers: (token: string) =>
@@ -301,4 +316,16 @@ export const adminApi = {
     request<OfferRow>(`/admin/offers/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteOffer: (id: string, token: string) =>
     request<{ id: string }>(`/admin/offers/${id}`, { method: 'DELETE', token }),
+
+  // Notifications
+  getNotifications: (token: string) =>
+    request<NotificationRow[]>('/notifications', { token }),
+  getUnreadNotificationCount: (token: string) =>
+    request<{ count: number }>('/notifications/unread-count', { token }),
+  markNotificationRead: (id: string, token: string) =>
+    request<{ message: string }>(`/notifications/${id}/read`, { method: 'PATCH', token }),
+  markAllNotificationsRead: (token: string) =>
+    request<{ message: string }>('/notifications/read-all', { method: 'PATCH', token }),
+  deleteNotification: (id: string, token: string) =>
+    request<{ message: string }>(`/notifications/${id}`, { method: 'DELETE', token }),
 };

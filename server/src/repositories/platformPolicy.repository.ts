@@ -23,4 +23,20 @@ export const platformPolicyRepository = {
       .returning();
     return row;
   },
+
+  async create(slug: string, title: string, content: string): Promise<PlatformPolicy> {
+    const [row] = await db
+      .insert(platformPolicies)
+      .values({ slug, title, content, updatedAt: new Date() })
+      .returning();
+    return row;
+  },
+
+  async remove(slug: string): Promise<PlatformPolicy | undefined> {
+    const [row] = await db
+      .delete(platformPolicies)
+      .where(eq(platformPolicies.slug, slug))
+      .returning();
+    return row;
+  },
 };

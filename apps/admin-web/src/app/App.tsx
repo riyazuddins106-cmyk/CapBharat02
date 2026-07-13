@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock,
   BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
@@ -10,7 +10,7 @@ import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
-  PlatformPolicyRow, OfferRow, OfferInput,
+  PlatformPolicyRow, OfferRow, OfferInput, NotificationRow,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -328,6 +328,66 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
 
   useEffect(() => { load(); }, [load]);
 
+  /* ── Notifications ── */
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const [rows, unread] = await Promise.all([
+        adminApi.getNotifications(accessToken),
+        adminApi.getUnreadNotificationCount(accessToken),
+      ]);
+      setNotifications(rows);
+      setUnreadCount(unread.count);
+    } catch {
+      // silent — notification bell should not disrupt the rest of the panel
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notifOpen]);
+
+  const toggleNotifDropdown = async () => {
+    const next = !notifOpen;
+    setNotifOpen(next);
+    if (next) { setNotifLoading(true); await loadNotifications(); setNotifLoading(false); }
+  };
+
+  const handleMarkNotifRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    setUnreadCount(c => Math.max(0, c - 1));
+    try { await adminApi.markNotificationRead(id, accessToken); } catch { loadNotifications(); }
+  };
+
+  const handleMarkAllNotifRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    try { await adminApi.markAllNotificationsRead(accessToken); } catch { loadNotifications(); }
+  };
+
+  const handleDeleteNotif = async (id: string) => {
+    const wasUnread = notifications.find(n => n.id === id)?.isRead === false;
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    if (wasUnread) setUnreadCount(c => Math.max(0, c - 1));
+    try { await adminApi.deleteNotification(id, accessToken); } catch { loadNotifications(); }
+  };
+
   /* ── Booking handlers ── */
   const editBooking = async (id: string, patch: { status?: string; notes?: string; price?: number; scheduledAt?: string }) => {
     await adminApi.updateBooking(id, patch, accessToken);
@@ -475,9 +535,66 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <button onClick={load} className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors" title="Refresh">
               <RefreshCw size={14} color="rgba(255,255,255,0.5)" />
             </button>
-            <button className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors">
-              <Bell size={14} color="rgba(255,255,255,0.5)" />
-            </button>
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={toggleNotifDropdown}
+                className="relative w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors"
+                title="Notifications"
+              >
+                <Bell size={14} color="rgba(255,255,255,0.5)" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div
+                  className="absolute right-0 top-11 w-80 max-h-[420px] overflow-hidden rounded-2xl border border-white/10 shadow-2xl z-50 flex flex-col"
+                  style={{ background: "#181a24" }}
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] flex-shrink-0">
+                    <h4 className="text-white text-sm font-bold">Notifications</h4>
+                    {unreadCount > 0 && (
+                      <button onClick={handleMarkAllNotifRead} className="text-[11px] font-semibold text-violet-400 hover:text-violet-300">
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="overflow-y-auto flex-1">
+                    {notifLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-violet-500" /></div>
+                    ) : notifications.length === 0 ? (
+                      <p className="text-white/30 text-xs py-8 text-center">No notifications yet.</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => !n.isRead && handleMarkNotifRead(n.id)}
+                          className="px-4 py-3 border-b border-white/[0.05] last:border-b-0 cursor-pointer hover:bg-white/[0.03] transition-colors flex gap-2 items-start"
+                          style={{ background: n.isRead ? "transparent" : "rgba(91,62,245,0.06)" }}
+                        >
+                          {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 mt-1.5 flex-shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-xs font-semibold">{n.title}</p>
+                            <p className="text-white/50 text-[11px] mt-0.5 leading-relaxed">{n.body}</p>
+                            <p className="text-white/25 text-[10px] mt-1">{new Date(n.createdAt).toLocaleString("en-IN")}</p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteNotif(n.id); }}
+                            className="p-1 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                            title="Delete"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1684,13 +1801,25 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
   const [polLoading,  setPolLoading]  = useState(true);
   const [polEdits,    setPolEdits]    = useState<Record<string, { title: string; content: string }>>({});
   const [savingSlug,  setSavingSlug]  = useState<string | null>(null);
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const [polMsg,      setPolMsg]      = useState<{ slug: string; text: string; type: "success" | "error" } | null>(null);
 
-  useEffect(() => {
-    adminApi.getPlatformPolicies(accessToken)
+  // New policy (create) form
+  const [showNewPolicy, setShowNewPolicy] = useState(false);
+  const [newPolicy, setNewPolicy] = useState({ title: "", content: "" });
+  const [creatingPolicy, setCreatingPolicy] = useState(false);
+  const [createMsg, setCreateMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const loadPolicies = () => {
+    setPolLoading(true);
+    return adminApi.getPlatformPolicies(accessToken)
       .then(rows => setPolicies(rows))
       .catch(() => {})
       .finally(() => setPolLoading(false));
+  };
+
+  useEffect(() => {
+    loadPolicies();
   }, [accessToken]);
 
   const handleSavePolicy = async (slug: string) => {
@@ -1706,6 +1835,36 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
     } finally {
       setSavingSlug(null);
       setTimeout(() => setPolMsg(m => m?.slug === slug ? null : m), 4000);
+    }
+  };
+
+  const handleCreatePolicy = async () => {
+    if (!newPolicy.title.trim()) { setCreateMsg({ text: "Title is required.", type: "error" }); return; }
+    setCreatingPolicy(true);
+    try {
+      const created = await adminApi.createPlatformPolicy({ title: newPolicy.title.trim(), content: newPolicy.content }, accessToken);
+      setPolicies(prev => [...prev, created].sort((a, b) => a.slug.localeCompare(b.slug)));
+      setNewPolicy({ title: "", content: "" });
+      setShowNewPolicy(false);
+      setCreateMsg(null);
+    } catch (e: any) {
+      setCreateMsg({ text: e.message ?? "Failed to create policy.", type: "error" });
+    } finally {
+      setCreatingPolicy(false);
+    }
+  };
+
+  const handleDeletePolicy = async (slug: string) => {
+    if (!window.confirm("Delete this policy? This cannot be undone.")) return;
+    setDeletingSlug(slug);
+    try {
+      await adminApi.deletePlatformPolicy(slug, accessToken);
+      setPolicies(prev => prev.filter(p => p.slug !== slug));
+    } catch (e: any) {
+      setPolMsg({ slug, text: e.message ?? "Failed to delete.", type: "error" });
+      setTimeout(() => setPolMsg(m => m?.slug === slug ? null : m), 4000);
+    } finally {
+      setDeletingSlug(null);
     }
   };
 
@@ -1847,24 +2006,86 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
             <ExternalLink size={16} color="#7C5BF8" />
           </div>
           <h3 className="text-white font-bold text-sm">Platform Policies</h3>
-          <span className="ml-auto text-white/30 text-[10px]">Visible to customers in the mobile app</span>
+          <span className="ml-auto text-white/30 text-[10px] mr-3">Visible to customers in the mobile app</span>
+          <button
+            onClick={() => setShowNewPolicy(v => !v)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            <Plus size={13} /> New Policy
+          </button>
         </div>
+
+        {showNewPolicy && (
+          <div className="mb-5 p-4 rounded-xl border border-dashed border-violet-500/30 space-y-2" style={{ background: "rgba(91,62,245,0.06)" }}>
+            {createMsg && (
+              <div className="px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ background: createMsg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: createMsg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: createMsg.type === "error" ? "#f87171" : "#4ade80" }}>
+                {createMsg.text}
+              </div>
+            )}
+            <input
+              type="text"
+              value={newPolicy.title}
+              onChange={(e) => setNewPolicy(p => ({ ...p, title: e.target.value }))}
+              placeholder="Policy title (e.g. Refund Policy)"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)" }}
+            />
+            <textarea
+              rows={4}
+              value={newPolicy.content}
+              onChange={(e) => setNewPolicy(p => ({ ...p, content: e.target.value }))}
+              placeholder="Policy content…"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white/80 outline-none border border-white/10 focus:border-violet-500 transition-colors resize-y leading-relaxed"
+              style={{ background: "rgba(255,255,255,0.04)" }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setShowNewPolicy(false); setCreateMsg(null); setNewPolicy({ title: "", content: "" }); }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 border border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreatePolicy}
+                disabled={creatingPolicy}
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                {creatingPolicy ? "Creating…" : "Create Policy"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {polLoading ? (
           <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-violet-500" /></div>
+        ) : policies.length === 0 ? (
+          <p className="text-white/30 text-xs py-4 text-center">No policies yet. Click "New Policy" to add one.</p>
         ) : (
           <div className="space-y-5">
             {policies.map((p) => {
               const edit = polEdits[p.slug] ?? { title: p.title, content: p.content };
               const isSaving = savingSlug === p.slug;
+              const isDeleting = deletingSlug === p.slug;
               const msg = polMsg?.slug === p.slug ? polMsg : null;
               return (
-                <div key={p.slug} className="space-y-2">
+                <div key={p.slug} className="space-y-2 pb-4 border-b border-white/[0.05] last:border-b-0 last:pb-0">
                   <div className="flex items-center justify-between">
                     <label className="text-white/60 text-xs font-semibold uppercase tracking-wide">{p.title}</label>
-                    <span className="text-white/20 text-[10px]">
-                      Last saved {new Date(p.updatedAt).toLocaleDateString("en-IN")}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/20 text-[10px]">
+                        Last saved {new Date(p.updatedAt).toLocaleDateString("en-IN")}
+                      </span>
+                      <button
+                        onClick={() => handleDeletePolicy(p.slug)}
+                        disabled={isDeleting}
+                        title="Delete policy"
+                        className="p-1 rounded-md text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
 
                   {msg && (

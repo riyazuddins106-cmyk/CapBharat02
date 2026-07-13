@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { partnerApi, type Job } from '@/lib/api';
+import { partnerApi, notificationsApi, type Job } from '@/lib/api';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6' },
@@ -66,6 +66,14 @@ export default function DashboardScreen() {
     enabled: !!accessToken,
   });
 
+  const { data: unreadData } = useQuery({
+    queryKey: ['/api/notifications/unread-count', accessToken],
+    queryFn: () => notificationsApi.unreadCount(accessToken!),
+    enabled: !!accessToken,
+    refetchInterval: 30000,
+  });
+  const unreadNotifCount = unreadData?.count ?? 0;
+
   const todayJobs = (jobs ?? []).filter((j: Job) => {
     const d = new Date(j.scheduledAt);
     const now = new Date();
@@ -82,9 +90,23 @@ export default function DashboardScreen() {
           <Text style={styles.headerGreet}>Good {greeting()} 👋</Text>
           <Text style={styles.headerName}>{user?.fullName ?? 'Partner'}</Text>
         </View>
-        <View style={[styles.onlineBadge, { backgroundColor: '#dcfce7' }]}>
-          <View style={styles.onlineDot} />
-          <Text style={styles.onlineText}>Online</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.notifBtn}
+            onPress={() => router.push('/notifications')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={20} color="#fff" />
+            {unreadNotifCount > 0 && (
+              <View style={[styles.notifBadge, { borderColor: colors.primary }]}>
+                <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={[styles.onlineBadge, { backgroundColor: '#dcfce7' }]}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.onlineText}>Online</Text>
+          </View>
         </View>
       </View>
 
@@ -162,6 +184,10 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   headerGreet: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   headerName: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 2 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  notifBtn: { width: 34, height: 34, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
+  notifBadge: { position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: '#D4183D' },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   onlineBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#16a34a' },
   onlineText: { fontSize: 12, fontWeight: '700', color: '#16a34a' },

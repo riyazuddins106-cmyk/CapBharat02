@@ -105,7 +105,9 @@ export default function RootLayout() {
             <AuthProvider>
               <AuthGate />
               <StatusBar style="dark" />
-              <Stack screenOptions={{ headerShown: false }} />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
+              </Stack>
             </AuthProvider>
           </QueryClientProvider>
         </SafeAreaProvider>

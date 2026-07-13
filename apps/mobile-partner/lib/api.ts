@@ -211,3 +211,22 @@ export const partnerApi = {
   getEarnings: (token: string) =>
     request<Earnings>('/api/partner/earnings', { token }),
 };
+
+// ── Notifications ──────────────────────────────────────────
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  isRead: boolean;
+  data?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export const notificationsApi = {
+  list:        (token: string) => request<AppNotification[]>('/api/notifications', { token }),
+  markRead:    (id: string, token: string) => request<void>(`/api/notifications/${id}/read`, { method: 'PATCH', token }),
+  markAllRead: (token: string) => request<void>('/api/notifications/read-all', { method: 'PATCH', token }),
+  delete:      (id: string, token: string) => request<void>(`/api/notifications/${id}`, { method: 'DELETE', token }),
+  unreadCount: (token: string) => request<{ count: number }>('/api/notifications/unread-count', { token }),
+};

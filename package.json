@@ -15,7 +15,8 @@
     "db:studio": "pnpm --filter @servenow/server db:studio"
   },
   "devDependencies": {
-    "concurrently": "9.1.0"
+    "concurrently": "9.1.0",
+    "playwright-chromium": "^1.61.1"
   },
   "pnpm": {
     "overrides": {

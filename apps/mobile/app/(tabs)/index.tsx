@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, professionalsApi, offersApi, addressesApi, type Offer } from '@/lib/api';
+import { categoriesApi, professionalsApi, offersApi, addressesApi, notificationsApi, type Offer } from '@/lib/api';
 import { ProCard } from '@/components/ProCard';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { storage } from '@/lib/storage';
@@ -85,6 +85,14 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, accessToken } = useAuth();
+
+  const { data: unreadData } = useQuery({
+    queryKey: ['/api/notifications/unread-count', accessToken],
+    queryFn: () => notificationsApi.unreadCount(accessToken!),
+    enabled: !!accessToken,
+    refetchInterval: 30000,
+  });
+  const unreadNotifCount = unreadData?.count ?? 0;
 
   // ── Location state ─────────────────────────────────────
   const [locationLabel, setLocationLabel] = useState('Detecting…');
@@ -197,8 +205,17 @@ export default function HomeScreen() {
           </Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.muted }]}>
+          <TouchableOpacity
+            style={[styles.headerBtn, { backgroundColor: colors.muted }]}
+            onPress={() => { Haptics.selectionAsync(); router.push('/notifications'); }}
+            activeOpacity={0.7}
+          >
             <Ionicons name="notifications-outline" size={20} color={colors.foreground} />
+            {unreadNotifCount > 0 && (
+              <View style={[styles.notifBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
+                <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -410,6 +427,8 @@ const styles = StyleSheet.create({
   name:           { fontSize: 22, fontWeight: '700', marginTop: 1 },
   headerRight:    { flexDirection: 'row', gap: 8 },
   headerBtn:      { width: 38, height: 38, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
+  notifBadge:     { position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   locationBar:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
   locationText:   { flex: 1, fontSize: 13, fontWeight: '600' },
   // Banners

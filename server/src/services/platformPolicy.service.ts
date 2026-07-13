@@ -43,4 +43,14 @@ export const platformPolicyService = {
   async upsert(slug: string, title: string, content: string) {
     return platformPolicyRepository.upsert(slug, title, content);
   },
+
+  async create(slug: string, title: string, content: string) {
+    const existing = await platformPolicyRepository.getBySlug(slug);
+    if (existing) throw new Error('A policy with this slug already exists.');
+    return platformPolicyRepository.create(slug, title, content);
+  },
+
+  async remove(slug: string) {
+    return platformPolicyRepository.remove(slug);
+  },
 };

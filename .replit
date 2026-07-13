@@ -64,7 +64,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 pnpm exec expo start --web --port 8080 --host lan"
+args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -76,7 +76,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 pnpm exec expo start --web --port 8099 --host lan"
+args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
 waitForPort = 8099
 
 [[ports]]
@@ -118,6 +118,10 @@ externalPort = 4200
 [[ports]]
 localPort = 8099
 externalPort = 8099
+
+[[ports]]
+localPort = 8180
+externalPort = 5173
 
 [deployment]
 deploymentTarget = "autoscale"

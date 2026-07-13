@@ -50,8 +50,10 @@ router.get('/payouts',                adminController.listPayoutRequests);
 router.patch('/payouts/:id',          adminController.resolvePayoutRequest);
 
 // Platform Policies (admin CRUD)
-router.get('/platform-policies',       platformPolicyController.adminList);
-router.put('/platform-policies/:slug', platformPolicyController.adminUpdate);
+router.get('/platform-policies',          platformPolicyController.adminList);
+router.post('/platform-policies',         platformPolicyController.adminCreate);
+router.put('/platform-policies/:slug',    platformPolicyController.adminUpdate);
+router.delete('/platform-policies/:slug', platformPolicyController.adminDelete);
 
 // Offers / Banners (admin CRUD)
 router.get('/offers',         offerController.adminList);
