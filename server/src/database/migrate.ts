@@ -262,6 +262,22 @@ async function migrate() {
   await run('index: notifications_user', `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
   await run('index: notifications_created', `CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at)`);
 
+  await run('enum: points_entry_type',
+    `CREATE TYPE points_entry_type AS ENUM ('earn', 'redeem', 'adjust')`);
+
+  await run('table: points_ledger', `
+    CREATE TABLE IF NOT EXISTS points_ledger (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+      type points_entry_type NOT NULL,
+      points INTEGER NOT NULL,
+      description VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: points_ledger_user', `CREATE INDEX IF NOT EXISTS idx_points_ledger_user ON points_ledger(user_id)`);
+  await run('index: points_ledger_booking', `CREATE INDEX IF NOT EXISTS idx_points_ledger_booking ON points_ledger(booking_id)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

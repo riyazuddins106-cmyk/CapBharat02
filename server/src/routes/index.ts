@@ -12,6 +12,7 @@ import partnerRoutes from './partner.routes.js';
 import adminRoutes from './admin.routes.js';
 import notificationRoutes from './notification.routes.js';
 import supportTicketRoutes from './supportTicket.routes.js';
+import pointsRoutes from './points.routes.js';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/partner', partnerRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/support-tickets', supportTicketRoutes);
+router.use('/points', pointsRoutes);
 
 export default router;

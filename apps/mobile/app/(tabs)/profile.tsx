@@ -5,18 +5,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { profileApi } from '@/lib/api';
+import { profileApi, pointsApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 const MENU_ITEMS = [
   { icon: 'location-outline',          label: 'Saved Addresses',   route: '/addresses' },
   { icon: 'heart-outline',             label: 'Wishlist',           route: '/wishlist' },
+  { icon: 'gift-outline',              label: 'Points & Rewards',   route: '/points' },
   { icon: 'shield-checkmark-outline',  label: 'Privacy & Security', route: '/privacy-security' },
   { icon: 'notifications-outline',     label: 'Notifications',      route: '/notifications' },
   { icon: 'star-outline',              label: 'Rate the App',       route: null },
@@ -43,6 +44,12 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, accessToken, isAuthenticated, logout } = useAuth();
+
+  const { data: pointsSummary } = useQuery({
+    queryKey: ['/api/points', accessToken],
+    queryFn: () => pointsApi.getSummary(accessToken!),
+    enabled: !!accessToken,
+  });
   const [editModal,  setEditModal]  = useState(false);
   const [fullName,   setFullName]   = useState(user?.fullName ?? '');
   const [phone,      setPhone]      = useState(user?.phone ?? '');
@@ -147,11 +154,17 @@ export default function ProfileScreen() {
 
       {/* Stats */}
       <View style={[styles.stats, { backgroundColor: colors.card, borderBottomColor: colors.border, borderTopColor: colors.border }]}>
-        {[{ label: 'Bookings', value: '—' }, { label: 'Reviews', value: '—' }, { label: 'Points', value: '0' }].map(({ label, value }) => (
-          <View key={label} style={styles.stat}>
+        {[{ label: 'Bookings', value: '—' }, { label: 'Reviews', value: '—' }, { label: 'Points', value: String(pointsSummary?.balance ?? 0) }].map(({ label, value }) => (
+          <TouchableOpacity
+            key={label}
+            style={styles.stat}
+            activeOpacity={label === 'Points' ? 0.7 : 1}
+            disabled={label !== 'Points'}
+            onPress={() => router.push('/points')}
+          >
             <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
 

@@ -242,6 +242,29 @@ export const notificationsApi = {
   unreadCount:(token: string) => request<{ count: number }>('/api/notifications/unread-count', { token }),
 };
 
+// ── Points & Rewards ───────────────────────────────────────
+export interface PointsLedgerEntry {
+  id: string;
+  type: 'earn' | 'redeem' | 'adjust';
+  points: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface PointsSummary {
+  balance: number;
+  redeemableValue: number;
+  minRedeemPoints: number;
+  earnRate: string;
+  history: PointsLedgerEntry[];
+}
+
+export const pointsApi = {
+  getSummary: (token: string) => request<PointsSummary>('/api/points', { token }),
+  redeem: (points: number, token: string) =>
+    request<{ redeemedValue: number; balance: number }>('/api/points/redeem', { method: 'POST', body: JSON.stringify({ points }), token }),
+};
+
 // ── Support Tickets ────────────────────────────────────────
 export interface SupportTicket {
   id: string;
@@ -282,6 +305,10 @@ export const favoritesApi = {
 export const reviewsApi = {
   create: (data: { bookingId: string; rating: number; comment: string }, token: string) =>
     request<Review>('/api/reviews', { method: 'POST', body: JSON.stringify(data), token }),
+  update: (id: string, data: { rating?: number; comment?: string }, token: string) =>
+    request<Review>(`/api/reviews/${id}`, { method: 'PATCH', body: JSON.stringify(data), token }),
+  delete: (id: string, token: string) =>
+    request<void>(`/api/reviews/${id}`, { method: 'DELETE', token }),
 };
 
 // ── Profile ────────────────────────────────────────────────

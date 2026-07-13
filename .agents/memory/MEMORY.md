@@ -11,3 +11,4 @@
 - [Bash exit-code after `|| true`](bash-exit-code-after-or-true.md) — `cmd || true; EXIT_CODE=$?` always yields 0, silently defeating retry loops; use `set +e`/`set -e` instead.
 - [Expo pnpm exec fix](expo-pnpm-exec.md) — `pnpm expo start` fails; must use `pnpm exec expo start` in ALL script branches (Replit-native and ngrok fallback).
 - [Expo notifications Expo Go import side-effect](expo-notifications-expo-go-side-effect.md) — must conditionally require('expo-notifications') on Android Expo Go, not just guard calls; import itself triggers console.error.
+- [Points & Rewards design](points-rewards-design.md) — earn/redeem rules chosen when building the loyalty feature from scratch (1pt/₹10 earn, 1pt=₹1 redeem, min 100).

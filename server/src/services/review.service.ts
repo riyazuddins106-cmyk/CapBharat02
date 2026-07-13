@@ -2,7 +2,12 @@ import { AppError } from '../utils/AppError.js';
 import { reviewRepository } from '../repositories/review.repository.js';
 import { bookingRepository } from '../repositories/booking.repository.js';
 import { professionalRepository } from '../repositories/professional.repository.js';
-import type { CreateReviewInput } from '../validators/review.validators.js';
+import type { CreateReviewInput, UpdateReviewInput } from '../validators/review.validators.js';
+
+async function recomputeRating(professionalId: string) {
+  const { avg, count } = await reviewRepository.getAverageRating(professionalId);
+  await professionalRepository.updateRating(professionalId, Math.round(avg * 10) / 10, count);
+}
 
 export const reviewService = {
   async create(customerId: string, input: CreateReviewInput) {
@@ -22,10 +27,33 @@ export const reviewService = {
     });
 
     // Recompute and persist aggregated rating on professional
-    const { avg, count } = await reviewRepository.getAverageRating(booking.professionalId);
-    await professionalRepository.updateRating(booking.professionalId, Math.round(avg * 10) / 10, count);
+    await recomputeRating(booking.professionalId);
 
     return review;
+  },
+
+  async update(customerId: string, reviewId: string, input: UpdateReviewInput) {
+    const review = await reviewRepository.findByIdAndCustomer(reviewId, customerId);
+    if (!review) throw AppError.notFound('Review not found.');
+
+    const updated = await reviewRepository.update(reviewId, {
+      ...(input.rating !== undefined ? { rating: input.rating } : {}),
+      ...(input.comment !== undefined ? { comment: input.comment } : {}),
+    });
+
+    if (input.rating !== undefined) {
+      await recomputeRating(review.professionalId);
+    }
+
+    return updated;
+  },
+
+  async remove(customerId: string, reviewId: string) {
+    const review = await reviewRepository.findByIdAndCustomer(reviewId, customerId);
+    if (!review) throw AppError.notFound('Review not found.');
+
+    await reviewRepository.remove(reviewId);
+    await recomputeRating(review.professionalId);
   },
 
   async listForProfessional(professionalId: string) {

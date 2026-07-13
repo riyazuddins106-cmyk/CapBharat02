@@ -9,6 +9,16 @@ export const reviewController = {
     sendSuccess(res, review, 201);
   }),
 
+  update: asyncHandler(async (req: Request, res: Response) => {
+    const review = await reviewService.update(req.user!.userId, req.params.id, req.body);
+    sendSuccess(res, review);
+  }),
+
+  remove: asyncHandler(async (req: Request, res: Response) => {
+    await reviewService.remove(req.user!.userId, req.params.id);
+    sendSuccess(res, { message: 'Review deleted.' });
+  }),
+
   listForProfessional: asyncHandler(async (req: Request, res: Response) => {
     const reviews = await reviewService.listForProfessional(req.params.professionalId);
     sendSuccess(res, reviews);

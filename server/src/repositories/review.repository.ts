@@ -12,9 +12,31 @@ export const reviewRepository = {
     return review;
   },
 
+  async findByIdAndCustomer(id: string, customerId: string): Promise<Review | undefined> {
+    const [review] = await db
+      .select()
+      .from(reviews)
+      .where(and(eq(reviews.id, id), eq(reviews.customerId, customerId)))
+      .limit(1);
+    return review;
+  },
+
   async create(data: NewReview): Promise<Review> {
     const [review] = await db.insert(reviews).values(data).returning();
     return review;
+  },
+
+  async update(id: string, data: Partial<Pick<NewReview, 'rating' | 'comment'>>): Promise<Review> {
+    const [review] = await db
+      .update(reviews)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(reviews.id, id))
+      .returning();
+    return review;
+  },
+
+  async remove(id: string): Promise<void> {
+    await db.delete(reviews).where(eq(reviews.id, id));
   },
 
   async getAverageRating(professionalId: string): Promise<{ avg: number; count: number }> {

@@ -1,0 +1,310 @@
+
+# Complete Implementation and Bug Fix Request
+
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Senior React Native (Expo) Engineer, Senior Backend Engineer, Senior Database Architect, Senior Security Engineer, Senior QA Engineer, and Senior UI/UX Engineer.
+
+## IMPORTANT
+
+Before modifying any code:
+
+* Analyze the existing implementation of each feature listed below.
+* Identify the exact root cause.
+* Fix the issue completely.
+* Preserve the existing UI, UX, navigation, architecture, coding standards, and design system.
+* Do not use placeholder implementations.
+* If backend APIs, database tables, permissions, routes, or navigation are missing, create and integrate them.
+* Ensure all frontend, backend, APIs, database, authentication, and permissions work together correctly.
+* After fixing each feature, verify it works on a physical Android device (Expo) and the Admin Panel.
+
+---
+
+# CUSTOMER APP
+
+## Profile
+
+### Saved Address (Not Working)
+
+Implement:
+
+* Add Address
+* Edit Address
+* Delete Address
+* Set Default Address
+* Multiple Addresses
+* Database integration
+* API integration
+* Validation
+* Refresh immediately after changes
+
+---
+
+### Wishlist (Not Working)
+
+Implement:
+
+* Add to Wishlist
+* Remove from Wishlist
+* Prevent duplicates
+* Database integration
+* API integration
+* Refresh automatically
+* Empty state
+
+---
+
+### Privacy & Security (Not Working)
+
+Implement:
+
+* Change Password
+* Logout from All Devices
+* Session Management
+* Privacy Policy
+* Terms & Conditions
+* Delete Account (if supported)
+* Proper authentication and validation
+
+---
+
+### Notifications (Not Working)
+
+Implement:
+
+* Notification List
+* Mark Read
+* Mark All Read
+* Delete Notification
+* Database integration
+* API integration
+* Empty state
+
+---
+
+### Rate the App (Not Working)
+
+Implement:
+
+* Open Play Store/App Store rating page.
+* If app is unpublished, display an appropriate message instead of crashing.
+
+---
+
+### Help & Support (Not Working)
+
+Implement:
+
+* FAQ
+* Contact Support
+* Support Ticket
+* Feedback Form
+* Email Support
+* API and database integration
+
+---
+
+### Sign Out (Not Working)
+
+Fix logout completely.
+
+Requirements:
+
+* Clear JWT
+* Clear Refresh Token
+* Clear Secure Storage
+* Clear Cached User Data
+* Redirect to Login
+* Prevent access to protected screens
+
+---
+
+### Bookings (Not Tested)
+
+Audit and fix if required.
+
+Verify:
+
+* Booking Details
+* Booking Status
+* Cancellation
+* Reschedule
+* Empty States
+* API Integration
+
+---
+
+### Reviews (Not Tested)
+
+Verify and fix:
+
+* Add Review
+* Edit Review
+* Delete Review
+* Rating
+* Database consistency
+
+---
+
+### Points (Not Tested)
+
+Verify and fix:
+
+* Current Points
+* Rewards History
+* Earn Points
+* Redeem Points
+
+---
+
+# BOOKING PAGE
+
+## Upcoming
+
+Entire page is not working.
+
+Fix:
+
+* Fetch Upcoming Bookings
+* Loading State
+* Empty State
+* Pull to Refresh
+* Navigation
+* Error Handling
+
+---
+
+## Past
+
+Entire page is not working.
+
+Fix:
+
+* Booking History
+* Booking Details
+* Rebook
+* Invoice (if available)
+* Pagination
+* Empty State
+
+---
+
+# PARTNER APP
+
+## QR Scanner Camera
+
+Problem:
+
+The QR scanner preview is blurry even though the normal mobile camera is clear.
+
+Investigate and fix:
+
+* Camera resolution
+* Preview quality
+* Camera ratio
+* Autofocus
+* Continuous focus
+* Expo Camera configuration
+* Android camera optimization
+* QR detection speed
+
+Ensure the preview is sharp while maintaining fast QR scanning.
+
+---
+
+### Professional Info
+
+Currently cannot edit.
+
+Implement:
+
+* Edit
+* Validation
+* Save
+* API integration
+* Database update
+* Immediate refresh
+
+---
+
+### Account
+
+Currently cannot edit.
+
+Implement:
+
+* Name
+* Mobile
+* Email
+* Password
+* Address
+* Profile Photo
+* Validation
+* Secure API
+* Database update
+
+---
+
+# ADMIN PANEL
+
+The following modules do not exist.
+
+Create them from scratch and integrate them into the Admin Panel.
+
+## Privacy & Security
+
+Create a new page.
+
+Include:
+
+* Change Password
+* Account Security
+* Active Sessions (if supported)
+* Privacy Policy
+* Terms & Conditions
+
+Add it to the Settings/Administration menu.
+
+Implement frontend, backend, APIs, permissions, validation, and database integration where required.
+
+---
+
+## Help & Support
+
+Create a new page.
+
+Include:
+
+* FAQ
+* Contact Support
+* Support Ticket Management
+* Feedback Form
+* Company Contact Information
+
+Add it to the Admin Panel navigation.
+
+Implement complete frontend, backend, APIs, and database integration.
+
+---
+
+# FINAL REQUIREMENTS
+
+For every issue:
+
+* Find the root cause.
+* Fix the complete implementation.
+* Do not hardcode data.
+* Connect everything to the backend.
+* Preserve existing UI.
+* Remove console errors.
+* Fix TypeScript warnings.
+* Fix runtime errors.
+* Improve loading and error handling.
+
+Finally generate a report containing:
+
+* Issues fixed
+* Root causes
+* Files modified
+* APIs created or updated
+* Database changes
+* Remaining issues (if any)
+* Confirmation that the project builds successfully without errors.

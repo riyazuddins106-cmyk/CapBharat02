@@ -31,7 +31,17 @@ export const partnerService = {
       ...(data.fullName !== undefined && { fullName: data.fullName }),
       ...(data.phone    !== undefined && { phone: data.phone }),
     });
-    return updated;
+    if (!updated) throw AppError.notFound('User not found.');
+    return {
+      id: updated.id,
+      email: updated.email,
+      phone: updated.phone,
+      fullName: updated.fullName,
+      avatarUrl: updated.avatarUrl,
+      role: updated.role,
+      emailVerified: Boolean(updated.emailVerifiedAt),
+      createdAt: updated.createdAt,
+    };
   },
 
   async updateAvatar(userId: string, avatarUrl: string) {
@@ -110,6 +120,9 @@ export const partnerService = {
         `Your ${job.serviceName} booking with ${pro.name} is complete. Thanks for using ServeNow!`,
         { bookingId, type: 'booking_completed' },
       );
+
+      const { pointsService } = await import('./points.service.js');
+      void pointsService.earnForBooking(job.customerId, bookingId, job.price ?? 0);
     }
 
     return updated;

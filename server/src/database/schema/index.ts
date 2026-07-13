@@ -12,3 +12,4 @@ export * from './payments';
 export * from './payoutRequests';
 export * from './notifications';
 export * from './supportTickets';
+export * from './pointsLedger';
