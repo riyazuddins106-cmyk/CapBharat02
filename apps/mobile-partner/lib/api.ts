@@ -184,6 +184,15 @@ export const partnerApi = {
   getProfile: (token: string) =>
     request<PartnerProfile>('/api/partner/profile', { token }),
 
+  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge'>>, token: string) =>
+    request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
+
+  updateAccount: (data: { fullName?: string; phone?: string }, token: string) =>
+    request<{ message: string }>('/api/partner/account', { method: 'PATCH', body: JSON.stringify(data), token }),
+
+  changePassword: (currentPassword: string, newPassword: string, token: string) =>
+    request<{ message: string }>('/api/profile/me/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }), token }),
+
   uploadAvatar: (uri: string, token: string) =>
     uploadFile<PartnerProfile>('/api/partner/profile/avatar', 'avatar', uri, token),
 

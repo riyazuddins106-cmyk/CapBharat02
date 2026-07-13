@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
-  ScrollView, TextInput, Alert, Modal, Platform, ActivityIndicator,
+  ScrollView, TextInput, Alert, Modal, Platform, ActivityIndicator, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,13 +15,29 @@ import { profileApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 const MENU_ITEMS = [
-  { icon: 'location-outline',          label: 'Saved Addresses' },
-  { icon: 'heart-outline',             label: 'Wishlist' },
-  { icon: 'shield-checkmark-outline',  label: 'Privacy & Security' },
-  { icon: 'notifications-outline',     label: 'Notifications' },
-  { icon: 'star-outline',              label: 'Rate the App' },
-  { icon: 'help-circle-outline',       label: 'Help & Support' },
+  { icon: 'location-outline',          label: 'Saved Addresses',   route: '/addresses' },
+  { icon: 'heart-outline',             label: 'Wishlist',           route: '/wishlist' },
+  { icon: 'shield-checkmark-outline',  label: 'Privacy & Security', route: '/privacy-security' },
+  { icon: 'notifications-outline',     label: 'Notifications',      route: '/notifications' },
+  { icon: 'star-outline',              label: 'Rate the App',       route: null },
+  { icon: 'help-circle-outline',       label: 'Help & Support',     route: '/help-support' },
 ];
+
+async function handleRateApp() {
+  const iosUrl = 'itms-apps://itunes.apple.com/app/id0000000000';
+  const androidUrl = 'market://details?id=com.servenow.app';
+  const url = Platform.OS === 'ios' ? iosUrl : androidUrl;
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert('Coming Soon', 'ServeNow will be available on app stores soon. Thank you for your support! 🙏');
+    }
+  } catch {
+    Alert.alert('Coming Soon', 'ServeNow will be available on app stores soon. Thank you for your support! 🙏');
+  }
+}
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -141,9 +157,13 @@ export default function ProfileScreen() {
 
       {/* Menu */}
       <View style={[styles.menu, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius, marginHorizontal: 16, marginTop: 16 }]}>
-        {MENU_ITEMS.map(({ icon, label }, i) => (
+        {MENU_ITEMS.map(({ icon, label, route }, i) => (
           <React.Fragment key={label}>
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={() => route ? router.push(route as any) : handleRateApp()}
+            >
               <View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}>
                 <Ionicons name={icon as any} size={18} color={colors.primary} />
               </View>

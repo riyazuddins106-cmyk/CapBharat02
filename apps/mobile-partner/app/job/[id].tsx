@@ -32,10 +32,12 @@ export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [showScanner, setShowScanner] = useState(false);
   const [scanned, setScanned] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   // Ref-based lock: guards against rapid-fire barcode events on Android where
   // multiple scan callbacks can fire before the state re-render runs.
   const processingRef = useRef(false);
+  const cameraReadyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: job, refetch } = useQuery({
     queryKey: ['/api/partner/jobs', id, accessToken],
@@ -110,6 +112,8 @@ export default function JobDetailScreen() {
   const closeScanner = () => {
     setShowScanner(false);
     resetScanLock();
+    setCameraReady(false);
+    if (cameraReadyTimer.current) clearTimeout(cameraReadyTimer.current);
   };
 
   const openScanner = async () => {
@@ -121,7 +125,10 @@ export default function JobDetailScreen() {
       }
     }
     resetScanLock();
+    setCameraReady(false);
     setShowScanner(true);
+    if (cameraReadyTimer.current) clearTimeout(cameraReadyTimer.current);
+    cameraReadyTimer.current = setTimeout(() => setCameraReady(true), 1200);
   };
 
   const cfg = job ? (STATUS_CONFIG[job.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.upcoming) : STATUS_CONFIG.upcoming;
@@ -141,8 +148,10 @@ export default function JobDetailScreen() {
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <CameraView
           style={{ flex: 1 }}
+          facing="back"
+          zoom={0}
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          onBarcodeScanned={(!scanned && cameraReady) ? handleBarCodeScanned : undefined}
         >
           {/* Overlay */}
           <View style={styles.scanOverlay}>
@@ -295,7 +304,7 @@ const styles = StyleSheet.create({
   scanClose: { padding: 4 },
   scanTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
   scanFrame: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scanTarget: { width: 240, height: 240, position: 'relative' },
+  scanTarget: { width: 270, height: 270, position: 'relative' },
   corner: { position: 'absolute', width: 28, height: 28 },
   scanBottom: { backgroundColor: 'rgba(0,0,0,0.6)', padding: 24, alignItems: 'center' },
   scanHint: { color: 'rgba(255,255,255,0.85)', fontSize: 13, textAlign: 'center', lineHeight: 19 },

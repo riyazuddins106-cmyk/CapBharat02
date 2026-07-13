@@ -4,11 +4,12 @@ import {
   BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
+  Shield, HelpCircle, Lock, MessageSquare, ExternalLink,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
-  Category, ReviewRow, DashboardStats, AuditLogRow,
+  Category, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -255,8 +256,10 @@ const ADMIN_SIDEBAR = [
   { id: "categories", icon: Grid,       label: "Categories"    },
   { id: "reviews",    icon: Star,       label: "Reviews"       },
   { id: "analytics",  icon: BarChart2,  label: "Analytics"     },
-  { id: "audit-logs", icon: Activity,   label: "Audit Logs"    },
-  { id: "settings",   icon: Settings,   label: "Settings"      },
+  { id: "audit-logs", icon: Activity,   label: "Audit Logs"          },
+  { id: "privacy",    icon: Shield,     label: "Privacy & Security"  },
+  { id: "support",    icon: HelpCircle, label: "Help & Support"      },
+  { id: "settings",   icon: Settings,   label: "Settings"            },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -474,6 +477,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <AnalyticsView stats={stats} />
           ) : activeSection === "audit-logs" ? (
             <AuditLogsView logs={auditLogs} />
+          ) : activeSection === "privacy" ? (
+            <PrivacySecurityView user={user} accessToken={accessToken} />
+          ) : activeSection === "support" ? (
+            <HelpSupportView accessToken={accessToken} />
           ) : (
             <SettingsView user={user} />
           )}
@@ -1401,6 +1408,280 @@ function SettingsView({ user }: { user: AdminUser }) {
             <Badge label={user.role?.toUpperCase()} color="#5B3EF5" />
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRIVACY & SECURITY
+═══════════════════════════════════════════════════════════════════ */
+
+function PrivacySecurityView({ user, accessToken }: { user: AdminUser; accessToken: string }) {
+  const [changePw, setChangePw] = useState({ current: "", next: "", confirm: "" });
+  const [pwMsg, setPwMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleChangePw = async () => {
+    if (!changePw.current || !changePw.next || !changePw.confirm) { setPwMsg({ text: "All fields are required.", type: "error" }); return; }
+    if (changePw.next !== changePw.confirm) { setPwMsg({ text: "New passwords do not match.", type: "error" }); return; }
+    if (changePw.next.length < 8) { setPwMsg({ text: "Password must be at least 8 characters.", type: "error" }); return; }
+    setPwLoading(true);
+    try {
+      await adminApi.changePassword(changePw.current, changePw.next, accessToken);
+      setPwMsg({ text: "Password changed successfully.", type: "success" });
+      setChangePw({ current: "", next: "", confirm: "" });
+    } catch (e: any) {
+      setPwMsg({ text: e.message ?? "Failed to change password.", type: "error" });
+    } finally {
+      setPwLoading(false);
+      setTimeout(() => setPwMsg(null), 4000);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      {/* Change Password */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(91,62,245,0.15)" }}>
+            <Lock size={16} color="#7C5BF8" />
+          </div>
+          <h3 className="text-white font-bold text-sm">Change Password</h3>
+        </div>
+        {pwMsg && (
+          <div className="mb-4 px-3 py-2 rounded-lg text-xs font-medium border" style={{ background: pwMsg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: pwMsg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: pwMsg.type === "error" ? "#f87171" : "#4ade80" }}>
+            {pwMsg.text}
+          </div>
+        )}
+        <div className="space-y-3">
+          {[
+            { label: "Current Password", key: "current" as const },
+            { label: "New Password",     key: "next"    as const },
+            { label: "Confirm New Password", key: "confirm" as const },
+          ].map(({ label, key }) => (
+            <div key={key}>
+              <label className="text-white/40 text-xs mb-1 block">{label}</label>
+              <input
+                type="password"
+                value={changePw[key]}
+                onChange={(e) => setChangePw((p) => ({ ...p, [key]: e.target.value }))}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+                style={{ background: "rgba(255,255,255,0.05)" }}
+              />
+            </div>
+          ))}
+          <button
+            onClick={handleChangePw}
+            disabled={pwLoading}
+            className="mt-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            {pwLoading ? "Changing…" : "Update Password"}
+          </button>
+        </div>
+      </div>
+
+      {/* Account info */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(91,62,245,0.15)" }}>
+            <Shield size={16} color="#7C5BF8" />
+          </div>
+          <h3 className="text-white font-bold text-sm">Account Security</h3>
+        </div>
+        <div className="space-y-3">
+          <div><p className="text-white/40 text-xs mb-0.5">Admin Email</p><p className="text-white text-sm">{user.email}</p></div>
+          <div><p className="text-white/40 text-xs mb-0.5">Role</p><Badge label="ADMIN" color="#5B3EF5" /></div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-green-500/20" style={{ background: "rgba(22,163,74,0.08)" }}>
+            <div className="w-2 h-2 rounded-full bg-green-400" />
+            <span className="text-green-400 text-xs font-semibold">Session Active · JWT Auth</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Policies */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <h3 className="text-white font-bold text-sm mb-4">Platform Policies</h3>
+        <div className="space-y-2">
+          {[
+            { label: "Privacy Policy",       url: "#" },
+            { label: "Terms of Service",     url: "#" },
+            { label: "Data Retention Policy",url: "#" },
+          ].map(({ label, url }) => (
+            <a key={label} href={url} target="_blank" rel="noreferrer"
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-white/[0.06] hover:border-violet-500/30 hover:bg-violet-500/5 transition-colors group">
+              <span className="text-white/70 text-sm group-hover:text-white transition-colors">{label}</span>
+              <ExternalLink size={14} color="rgba(255,255,255,0.3)" />
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELP & SUPPORT
+═══════════════════════════════════════════════════════════════════ */
+
+function HelpSupportView({ accessToken }: { accessToken: string }) {
+  const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [responseText, setResponseText] = useState<Record<string, string>>({});
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const loadTickets = async () => {
+    setLoading(true);
+    try {
+      const data = await adminApi.getSupportTickets(accessToken);
+      setTickets(data.tickets);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadTickets(); }, []);
+
+  const showMsg = (text: string, type: "success" | "error") => {
+    setMsg({ text, type });
+    setTimeout(() => setMsg(null), 3000);
+  };
+
+  const handleUpdate = async (id: string, status: string) => {
+    setUpdatingId(id);
+    try {
+      await adminApi.updateSupportTicket(id, { status, response: responseText[id] || undefined }, accessToken);
+      showMsg("Ticket updated.", "success");
+      loadTickets();
+      setExpandedId(null);
+    } catch (e: any) {
+      showMsg(e.message ?? "Failed to update ticket.", "error");
+    } finally { setUpdatingId(null); }
+  };
+
+  const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+    open:        { bg: "rgba(239,68,68,0.12)",  color: "#f87171", label: "Open" },
+    in_progress: { bg: "rgba(245,158,11,0.12)", color: "#fbbf24", label: "In Progress" },
+    closed:      { bg: "rgba(22,163,74,0.12)",  color: "#4ade80", label: "Closed" },
+  };
+
+  return (
+    <div className="max-w-3xl space-y-5">
+      {msg && (
+        <div className="px-3 py-2 rounded-xl text-xs font-medium border" style={{ background: msg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: msg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: msg.type === "error" ? "#f87171" : "#4ade80" }}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* Contact */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(91,62,245,0.15)" }}>
+            <MessageSquare size={16} color="#7C5BF8" />
+          </div>
+          <h3 className="text-white font-bold text-sm">Contact & Resources</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { icon: "📧", label: "Email Support", value: "support@servenow.in" },
+            { icon: "📞", label: "Phone",         value: "+91 98765 43210" },
+            { icon: "🕐", label: "Hours",         value: "Mon–Sat, 9am–6pm IST" },
+            { icon: "📖", label: "Docs",          value: "docs.servenow.in" },
+          ].map(({ icon, label, value }) => (
+            <div key={label} className="px-4 py-3 rounded-xl border border-white/[0.06]" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <p className="text-white/40 text-xs mb-0.5">{icon} {label}</p>
+              <p className="text-white text-sm font-semibold">{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tickets */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(91,62,245,0.15)" }}>
+              <HelpCircle size={16} color="#7C5BF8" />
+            </div>
+            <h3 className="text-white font-bold text-sm">Support Tickets</h3>
+          </div>
+          <button onClick={loadTickets} className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/10 hover:bg-white/5 transition-colors">
+            <RefreshCw size={13} color="rgba(255,255,255,0.4)" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-violet-500" /></div>
+        ) : tickets.length === 0 ? (
+          <div className="text-center py-10">
+            <HelpCircle size={32} color="rgba(255,255,255,0.15)" className="mx-auto mb-2" />
+            <p className="text-white/30 text-sm">No support tickets yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {tickets.map((t) => {
+              const s = STATUS_STYLE[t.status] ?? STATUS_STYLE.open;
+              const expanded = expandedId === t.id;
+              return (
+                <div key={t.id} className="rounded-xl border border-white/[0.07] overflow-hidden" style={{ background: "rgba(255,255,255,0.02)" }}>
+                  <button
+                    onClick={() => setExpandedId(expanded ? null : t.id)}
+                    className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-white/[0.03] transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-white text-sm font-semibold truncate">{t.subject}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0" style={{ background: s.bg, color: s.color }}>{s.label}</span>
+                      </div>
+                      <p className="text-white/40 text-xs truncate">{t.name} · {t.email}</p>
+                    </div>
+                    <div className="flex-shrink-0 mt-0.5">{expanded ? <ChevronUp size={15} color="rgba(255,255,255,0.3)" /> : <ChevronDown size={15} color="rgba(255,255,255,0.3)" />}</div>
+                  </button>
+
+                  {expanded && (
+                    <div className="px-4 pb-4 border-t border-white/[0.07] pt-3 space-y-3">
+                      <p className="text-white/70 text-sm leading-relaxed">{t.message}</p>
+                      {t.response && (
+                        <div className="px-3 py-2 rounded-xl border border-violet-500/20" style={{ background: "rgba(91,62,245,0.08)" }}>
+                          <p className="text-white/40 text-xs mb-1">Previous Response</p>
+                          <p className="text-white/80 text-sm">{t.response}</p>
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-white/40 text-xs mb-1 block">Response (optional)</label>
+                        <textarea
+                          value={responseText[t.id] ?? ""}
+                          onChange={(e) => setResponseText((p) => ({ ...p, [t.id]: e.target.value }))}
+                          placeholder="Type a response to the user…"
+                          rows={3}
+                          className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors resize-none"
+                          style={{ background: "rgba(255,255,255,0.05)" }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {["in_progress", "closed"].map((st) => (
+                          <button
+                            key={st}
+                            onClick={() => handleUpdate(t.id, st)}
+                            disabled={updatingId === t.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                            style={st === "closed"
+                              ? { background: "rgba(22,163,74,0.15)", color: "#4ade80" }
+                              : { background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}
+                          >
+                            {updatingId === t.id ? "Saving…" : st === "closed" ? "Mark Closed" : "Mark In Progress"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

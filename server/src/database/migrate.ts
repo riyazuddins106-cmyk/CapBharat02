@@ -229,6 +229,39 @@ async function migrate() {
     )`);
   await run('index: payout_requests_professional', `CREATE INDEX IF NOT EXISTS idx_payout_requests_professional ON payout_requests(professional_id)`);
 
+  await run('enum: ticket_status',
+    `CREATE TYPE ticket_status AS ENUM ('open', 'in_progress', 'closed')`);
+
+  await run('table: support_tickets', `
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      name VARCHAR(128) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      subject VARCHAR(255) NOT NULL,
+      message TEXT NOT NULL,
+      status ticket_status NOT NULL DEFAULT 'open',
+      response TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: support_tickets_user', `CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id)`);
+  await run('index: support_tickets_status', `CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status)`);
+
+  await run('table: notifications', `
+    CREATE TABLE IF NOT EXISTS notifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      body VARCHAR(512) NOT NULL,
+      type VARCHAR(64) NOT NULL DEFAULT 'system',
+      is_read BOOLEAN NOT NULL DEFAULT false,
+      data JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: notifications_user', `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
+  await run('index: notifications_created', `CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

@@ -31,9 +31,9 @@ export const supportTicketController = {
 
   // Admin: update ticket status
   updateStatus: asyncHandler(async (req: Request, res: Response) => {
-    const { status } = req.body as { status: 'open' | 'in_progress' | 'closed' };
+    const { status, response } = req.body as { status: 'open' | 'in_progress' | 'closed'; response?: string };
     if (!['open', 'in_progress', 'closed'].includes(status)) throw AppError.badRequest('Invalid status.');
-    await supportTicketService.updateStatus(req.params.id, status);
+    await supportTicketService.updateStatus(req.params.id, status, response);
     sendSuccess(res, { message: 'Status updated.' });
   }),
 };

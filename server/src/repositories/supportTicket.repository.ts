@@ -16,7 +16,7 @@ export const supportTicketRepository = {
     return t;
   },
 
-  async updateStatus(id: string, status: 'open' | 'in_progress' | 'closed'): Promise<void> {
-    await db.update(supportTickets).set({ status, updatedAt: new Date() }).where(eq(supportTickets.id, id));
+  async updateStatus(id: string, status: 'open' | 'in_progress' | 'closed', response?: string): Promise<void> {
+    await db.update(supportTickets).set({ status, ...(response !== undefined ? { response } : {}), updatedAt: new Date() }).where(eq(supportTickets.id, id));
   },
 };

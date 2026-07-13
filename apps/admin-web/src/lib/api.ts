@@ -128,6 +128,19 @@ export interface PayoutRow {
   resolvedAt: string | null;
 }
 
+export interface SupportTicketRow {
+  id: string;
+  userId: string | null;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  status: 'open' | 'in_progress' | 'closed';
+  response: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ── Base request ─────────────────────────────────────────────────────────────
 async function request<T>(path: string, options: RequestInit & { token?: string } = {}): Promise<T> {
   const { token, ...init } = options;
@@ -228,4 +241,14 @@ export const adminApi = {
     request<{ payouts: PayoutRow[]; total: number }>('/admin/payouts?limit=100', { token }),
   resolvePayout: (id: string, status: 'paid' | 'rejected', token: string) =>
     request<PayoutRow>(`/admin/payouts/${id}`, { method: 'PATCH', token, body: JSON.stringify({ status }) }),
+
+  // Support Tickets
+  getSupportTickets: (token: string) =>
+    request<{ tickets: SupportTicketRow[]; total: number }>('/support-tickets', { token }),
+  updateSupportTicket: (id: string, data: { status: string; response?: string }, token: string) =>
+    request<SupportTicketRow>(`/support-tickets/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+
+  // Admin: change own password
+  changePassword: (currentPassword: string, newPassword: string, token: string) =>
+    request<{ message: string }>('/profile/me/change-password', { method: 'POST', token, body: JSON.stringify({ currentPassword, newPassword }) }),
 };

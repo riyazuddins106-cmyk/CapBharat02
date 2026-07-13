@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView,
   TouchableOpacity, Alert, Platform, ActivityIndicator,
+  Modal, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,11 +21,31 @@ export default function ProfileScreen() {
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const [uploading, setUploading] = useState(false);
 
+  const [proModal, setProModal]   = useState(false);
+  const [acctModal, setAcctModal] = useState(false);
+  const [pwModal,   setPwModal]   = useState(false);
+
+  const [proForm, setProForm] = useState({ title: '', bio: '', basePrice: '', priceUnit: '/visit', tags: '' });
+  const [acctForm, setAcctForm] = useState({ fullName: '', phone: '' });
+  const [pwForm, setPwForm]   = useState({ currentPw: '', newPw: '', confirmPw: '' });
+
   const { data: profile, refetch } = useQuery({
     queryKey: ['/api/partner/profile', accessToken],
     queryFn: () => partnerApi.getProfile(accessToken!),
     enabled: !!accessToken,
   });
+
+  useEffect(() => {
+    if (profile) {
+      setProForm({
+        title: profile.title ?? '',
+        bio: profile.bio ?? '',
+        basePrice: String(profile.basePrice ?? ''),
+        priceUnit: profile.priceUnit ?? '/visit',
+        tags: (profile.tags ?? []).join(', '),
+      });
+    }
+  }, [profile]);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -59,6 +80,70 @@ export default function ProfileScreen() {
     }
   };
 
+  const updateProMutation = useMutation({
+    mutationFn: () => partnerApi.updateProfile({
+      title: proForm.title,
+      bio: proForm.bio,
+      basePrice: Number(proForm.basePrice),
+      priceUnit: proForm.priceUnit,
+      tags: proForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
+    }, accessToken!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/profile'] });
+      refetch();
+      setProModal(false);
+    },
+    onError: (e: any) => Alert.alert('Error', e.message),
+  });
+
+  const updateAcctMutation = useMutation({
+    mutationFn: () => partnerApi.updateAccount({
+      fullName: acctForm.fullName || undefined,
+      phone: acctForm.phone || undefined,
+    }, accessToken!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Updated', 'Account details have been saved.');
+      setAcctModal(false);
+    },
+    onError: (e: any) => Alert.alert('Error', e.message),
+  });
+
+  const changePwMutation = useMutation({
+    mutationFn: () => partnerApi.changePassword(pwForm.currentPw, pwForm.newPw, accessToken!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Success', 'Your password has been changed.');
+      setPwModal(false);
+      setPwForm({ currentPw: '', newPw: '', confirmPw: '' });
+    },
+    onError: (e: any) => Alert.alert('Error', e.message),
+  });
+
+  const handleChangePw = () => {
+    if (!pwForm.currentPw || !pwForm.newPw || !pwForm.confirmPw) return Alert.alert('Error', 'All fields are required.');
+    if (pwForm.newPw !== pwForm.confirmPw) return Alert.alert('Error', 'New passwords do not match.');
+    if (pwForm.newPw.length < 8) return Alert.alert('Error', 'Password must be at least 8 characters.');
+    changePwMutation.mutate();
+  };
+
+  const openEditPro = () => {
+    setProForm({
+      title: profile?.title ?? '',
+      bio: profile?.bio ?? '',
+      basePrice: String(profile?.basePrice ?? ''),
+      priceUnit: profile?.priceUnit ?? '/visit',
+      tags: (profile?.tags ?? []).join(', '),
+    });
+    setProModal(true);
+  };
+
+  const openEditAcct = () => {
+    setAcctForm({ fullName: user?.fullName ?? '', phone: user?.phone ?? '' });
+    setAcctModal(true);
+  };
+
   const displayName = profile?.name ?? user?.fullName ?? 'Partner';
   const displayAvatar = profile?.avatarUrl;
 
@@ -67,7 +152,6 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         {/* Header */}
         <View style={[styles.headerBg, { paddingTop: topPadding + 12, backgroundColor: colors.primary }]}>
-          {/* Tappable avatar */}
           <TouchableOpacity onPress={pickAndUploadAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
             {displayAvatar ? (
               <Image source={{ uri: displayAvatar }} style={styles.avatarImg} />
@@ -78,7 +162,6 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             )}
-            {/* Camera badge */}
             <View style={styles.cameraBadge}>
               {uploading
                 ? <ActivityIndicator size={12} color="#fff" />
@@ -100,7 +183,13 @@ export default function ProfileScreen() {
           {/* Professional info */}
           {profile && (
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Professional Info</Text>
+              <View style={styles.cardHeader}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Professional Info</Text>
+                <TouchableOpacity onPress={openEditPro} style={[styles.editChip, { borderColor: colors.primary }]}>
+                  <Ionicons name="pencil-outline" size={12} color={colors.primary} />
+                  <Text style={[styles.editChipText, { color: colors.primary }]}>Edit</Text>
+                </TouchableOpacity>
+              </View>
               <InfoRow icon="briefcase-outline" label="Title" value={profile.title} colors={colors} />
               <InfoRow icon="pricetag-outline" label="Rate" value={`₹${profile.basePrice}${profile.priceUnit}`} colors={colors} />
               <InfoRow icon="star-outline" label="Rating" value={`${profile.rating.toFixed(1)} (${profile.reviewCount} reviews)`} colors={colors} />
@@ -124,10 +213,31 @@ export default function ProfileScreen() {
 
           {/* Account */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Account</Text>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Account</Text>
+              <TouchableOpacity onPress={openEditAcct} style={[styles.editChip, { borderColor: colors.primary }]}>
+                <Ionicons name="pencil-outline" size={12} color={colors.primary} />
+                <Text style={[styles.editChipText, { color: colors.primary }]}>Edit</Text>
+              </TouchableOpacity>
+            </View>
             <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} colors={colors} />
             {user?.phone ? <InfoRow icon="call-outline" label="Phone" value={user.phone} colors={colors} /> : null}
             <InfoRow icon="shield-checkmark-outline" label="Role" value="Partner" colors={colors} />
+          </View>
+
+          {/* Security */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Security</Text>
+            <TouchableOpacity onPress={() => { setPwForm({ currentPw: '', newPw: '', confirmPw: '' }); setPwModal(true); }} style={styles.securityRow} activeOpacity={0.7}>
+              <View style={[styles.securityIcon, { backgroundColor: colors.secondary }]}>
+                <Ionicons name="lock-closed-outline" size={16} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.securityLabel, { color: colors.foreground }]}>Change Password</Text>
+                <Text style={[styles.securitySub, { color: colors.mutedForeground }]}>Update your account password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
           </View>
 
           {/* Sign out */}
@@ -141,6 +251,122 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Edit Professional Info Modal */}
+      <Modal visible={proModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.backdrop}>
+          <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Edit Professional Info</Text>
+              <TouchableOpacity onPress={() => setProModal(false)}>
+                <Ionicons name="close" size={22} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <FormField label="Title" colors={colors}>
+                <TextInput value={proForm.title} onChangeText={(v) => setProForm((f) => ({ ...f, title: v }))}
+                  placeholder="e.g. Senior Plumber" placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              </FormField>
+              <FormField label="Bio" colors={colors}>
+                <TextInput value={proForm.bio} onChangeText={(v) => setProForm((f) => ({ ...f, bio: v }))}
+                  placeholder="Describe your expertise…" placeholderTextColor={colors.mutedForeground}
+                  multiline numberOfLines={3} textAlignVertical="top"
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius, minHeight: 72 }]} />
+              </FormField>
+              <FormField label="Base Price (₹)" colors={colors}>
+                <TextInput value={proForm.basePrice} onChangeText={(v) => setProForm((f) => ({ ...f, basePrice: v }))}
+                  placeholder="500" placeholderTextColor={colors.mutedForeground} keyboardType="numeric"
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              </FormField>
+              <FormField label="Price Unit" colors={colors}>
+                <TextInput value={proForm.priceUnit} onChangeText={(v) => setProForm((f) => ({ ...f, priceUnit: v }))}
+                  placeholder="/visit or /hr" placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              </FormField>
+              <FormField label="Skills / Tags (comma separated)" colors={colors}>
+                <TextInput value={proForm.tags} onChangeText={(v) => setProForm((f) => ({ ...f, tags: v }))}
+                  placeholder="e.g. Plumbing, AC Repair, Wiring" placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              </FormField>
+              <TouchableOpacity
+                onPress={() => updateProMutation.mutate()}
+                disabled={updateProMutation.isPending}
+                style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: updateProMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
+              >
+                <Text style={styles.saveBtnText}>{updateProMutation.isPending ? 'Saving…' : 'Save Changes'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Account Modal */}
+      <Modal visible={acctModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.backdrop}>
+          <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Edit Account</Text>
+              <TouchableOpacity onPress={() => setAcctModal(false)}>
+                <Ionicons name="close" size={22} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <FormField label="Full Name" colors={colors}>
+              <TextInput value={acctForm.fullName} onChangeText={(v) => setAcctForm((f) => ({ ...f, fullName: v }))}
+                placeholder="Your full name" placeholderTextColor={colors.mutedForeground}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+            </FormField>
+            <FormField label="Phone" colors={colors}>
+              <TextInput value={acctForm.phone} onChangeText={(v) => setAcctForm((f) => ({ ...f, phone: v }))}
+                placeholder="+91 99999 99999" placeholderTextColor={colors.mutedForeground} keyboardType="phone-pad"
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+            </FormField>
+            <TouchableOpacity
+              onPress={() => updateAcctMutation.mutate()}
+              disabled={updateAcctMutation.isPending}
+              style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: updateAcctMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
+            >
+              <Text style={styles.saveBtnText}>{updateAcctMutation.isPending ? 'Saving…' : 'Save Changes'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal visible={pwModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.backdrop}>
+          <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Change Password</Text>
+              <TouchableOpacity onPress={() => setPwModal(false)}>
+                <Ionicons name="close" size={22} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <FormField label="Current Password" colors={colors}>
+              <TextInput value={pwForm.currentPw} onChangeText={(v) => setPwForm((f) => ({ ...f, currentPw: v }))}
+                placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+            </FormField>
+            <FormField label="New Password" colors={colors}>
+              <TextInput value={pwForm.newPw} onChangeText={(v) => setPwForm((f) => ({ ...f, newPw: v }))}
+                placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+            </FormField>
+            <FormField label="Confirm New Password" colors={colors}>
+              <TextInput value={pwForm.confirmPw} onChangeText={(v) => setPwForm((f) => ({ ...f, confirmPw: v }))}
+                placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+            </FormField>
+            <TouchableOpacity
+              onPress={handleChangePw}
+              disabled={changePwMutation.isPending}
+              style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: changePwMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
+            >
+              <Text style={styles.saveBtnText}>{changePwMutation.isPending ? 'Changing…' : 'Change Password'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -150,33 +376,57 @@ function InfoRow({ icon, label, value, colors }: any) {
     <View style={styles.infoRow}>
       <Ionicons name={icon} size={16} color={colors.mutedForeground} />
       <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.infoValue, { color: colors.foreground }]} numberOfLines={1}>{value}</Text>
+      <Text style={[styles.infoValue, { color: colors.foreground }]} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
+function FormField({ label, colors, children }: any) {
+  return (
+    <View style={{ gap: 4, marginBottom: 12 }}>
+      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{label}</Text>
+      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerBg:     { paddingHorizontal: 20, paddingBottom: 28, alignItems: 'center', gap: 6 },
-  avatarWrap:   { position: 'relative', marginBottom: 4 },
-  avatar:       { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
-  avatarImg:    { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
-  avatarText:   { fontSize: 34, fontWeight: '800' },
-  cameraBadge:  { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  name:         { color: '#fff', fontSize: 22, fontWeight: '800' },
-  email:        { color: 'rgba(255,255,255,0.75)', fontSize: 13 },
-  ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  ratingText:   { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' },
-  card:         { padding: 16, borderWidth: 1, gap: 12 },
-  cardTitle:    { fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  infoRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoLabel:    { fontSize: 13, width: 60 },
-  infoValue:    { fontSize: 13, flex: 1 },
-  bioRow:       { gap: 4 },
-  bioLabel:     { fontSize: 12, fontWeight: '600' },
-  bioText:      { fontSize: 13, lineHeight: 19 },
-  tagsWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag:          { paddingHorizontal: 10, paddingVertical: 4 },
-  tagText:      { fontSize: 12, fontWeight: '600' },
-  logoutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-  logoutText:   { color: '#D4183D', fontSize: 15, fontWeight: '700' },
+  headerBg:      { paddingHorizontal: 20, paddingBottom: 28, alignItems: 'center', gap: 6 },
+  avatarWrap:    { position: 'relative', marginBottom: 4 },
+  avatar:        { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  avatarImg:     { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
+  avatarText:    { fontSize: 34, fontWeight: '800' },
+  cameraBadge:   { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  name:          { color: '#fff', fontSize: 22, fontWeight: '800' },
+  email:         { color: 'rgba(255,255,255,0.75)', fontSize: 13 },
+  ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  ratingText:    { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' },
+  card:          { padding: 16, borderWidth: 1, gap: 12 },
+  cardHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardTitle:     { fontSize: 14, fontWeight: '700' },
+  editChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100 },
+  editChipText:  { fontSize: 12, fontWeight: '600' },
+  infoRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  infoLabel:     { fontSize: 13, width: 60 },
+  infoValue:     { fontSize: 13, flex: 1 },
+  bioRow:        { gap: 4 },
+  bioLabel:      { fontSize: 12, fontWeight: '600' },
+  bioText:       { fontSize: 13, lineHeight: 19 },
+  tagsWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tag:           { paddingHorizontal: 10, paddingVertical: 4 },
+  tagText:       { fontSize: 12, fontWeight: '600' },
+  securityRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  securityIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  securityLabel: { fontSize: 14, fontWeight: '600' },
+  securitySub:   { fontSize: 12 },
+  logoutBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  logoutText:    { color: '#D4183D', fontSize: 15, fontWeight: '700' },
+  backdrop:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet:         { margin: 12, padding: 24, gap: 0, maxHeight: '90%' },
+  sheetHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sheetTitle:    { fontSize: 18, fontWeight: '700' },
+  fieldLabel:    { fontSize: 12, fontWeight: '600' },
+  input:         { padding: 12, fontSize: 14 },
+  saveBtn:       { paddingVertical: 14, alignItems: 'center' },
+  saveBtnText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

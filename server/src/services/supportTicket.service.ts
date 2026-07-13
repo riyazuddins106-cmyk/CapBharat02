@@ -14,7 +14,7 @@ export const supportTicketService = {
     return supportTicketRepository.create(data as NewSupportTicket);
   },
 
-  async updateStatus(id: string, status: 'open' | 'in_progress' | 'closed') {
-    await supportTicketRepository.updateStatus(id, status);
+  async updateStatus(id: string, status: 'open' | 'in_progress' | 'closed', response?: string) {
+    await supportTicketRepository.updateStatus(id, status, response);
   },
 };

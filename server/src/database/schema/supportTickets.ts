@@ -11,6 +11,7 @@ export const supportTickets = pgTable('support_tickets', {
   subject:   varchar('subject', { length: 255 }).notNull(),
   message:   text('message').notNull(),
   status:    ticketStatusEnum('status').notNull().default('open'),
+  response:  text('response'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
