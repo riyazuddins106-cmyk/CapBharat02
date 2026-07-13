@@ -250,17 +250,18 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
 ═══════════════════════════════════════════════════════════════════ */
 
 const ADMIN_SIDEBAR = [
-  { id: "dashboard",  icon: Home,       label: "Dashboard"     },
-  { id: "bookings",   icon: BookOpen,   label: "Bookings"      },
-  { id: "pros",       icon: Users,      label: "Professionals" },
-  { id: "users",      icon: UserCheck,  label: "Users"         },
-  { id: "categories", icon: Grid,       label: "Categories"    },
-  { id: "reviews",    icon: Star,       label: "Reviews"       },
-  { id: "analytics",  icon: BarChart2,  label: "Analytics"     },
-  { id: "audit-logs", icon: Activity,   label: "Audit Logs"          },
-  { id: "privacy",    icon: Shield,     label: "Privacy & Security"  },
-  { id: "support",    icon: HelpCircle, label: "Help & Support"      },
-  { id: "settings",   icon: Settings,   label: "Settings"            },
+  { id: "dashboard",  icon: Home,       label: "Dashboard"          },
+  { id: "bookings",   icon: BookOpen,   label: "Bookings"           },
+  { id: "pros",       icon: Users,      label: "Professionals"      },
+  { id: "users",      icon: UserCheck,  label: "Users"              },
+  { id: "categories", icon: Grid,       label: "Categories"         },
+  { id: "offers",     icon: Tag,        label: "Offers / Banners"   },
+  { id: "reviews",    icon: Star,       label: "Reviews"            },
+  { id: "analytics",  icon: BarChart2,  label: "Analytics"          },
+  { id: "audit-logs", icon: Activity,   label: "Audit Logs"         },
+  { id: "privacy",    icon: Shield,     label: "Privacy & Security" },
+  { id: "support",    icon: HelpCircle, label: "Help & Support"     },
+  { id: "settings",   icon: Settings,   label: "Settings"           },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -290,6 +291,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
   const [auditLogs,    setAuditLogs]    = useState<AuditLogRow[]>([]);
+  const [offerList,    setOfferList]    = useState<OfferRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -301,7 +303,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u, c, r, a] = await Promise.all([
+      const [s, b, p, u, c, r, a, o] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken),
@@ -309,6 +311,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         adminApi.getCategories(accessToken),
         adminApi.getReviews(accessToken),
         adminApi.getAuditLogs(accessToken),
+        adminApi.getOffers(accessToken),
       ]);
       setStats(s);
       setBookingList(b.bookings);
@@ -317,6 +320,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setCategoryList(c.categories);
       setReviewList(r.reviews);
       setAuditLogs(a.logs);
+      setOfferList(o.offers);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
@@ -386,6 +390,20 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const deleteReview = async (id: string) => {
     await adminApi.deleteReview(id, accessToken);
     showMsg("Review deleted"); load();
+  };
+
+  /* ── Offer handlers ── */
+  const createOffer = async (data: OfferInput) => {
+    await adminApi.createOffer(data, accessToken);
+    showMsg("Offer created"); load();
+  };
+  const editOffer = async (id: string, data: Partial<OfferInput>) => {
+    await adminApi.updateOffer(id, data, accessToken);
+    showMsg("Offer updated"); load();
+  };
+  const deleteOffer = async (id: string) => {
+    await adminApi.deleteOffer(id, accessToken);
+    showMsg("Offer deleted"); load();
   };
 
   return (
@@ -478,6 +496,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} />
+          ) : activeSection === "offers" ? (
+            <OffersView offers={offerList} onCreate={createOffer} onEdit={editOffer} onDelete={deleteOffer} />
           ) : activeSection === "reviews" ? (
             <ReviewsView reviews={reviewList} onDelete={deleteReview} />
           ) : activeSection === "analytics" ? (
@@ -1241,6 +1261,208 @@ function CategoriesView({
    REVIEWS
 ═══════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════
+   OFFERS / BANNERS
+═══════════════════════════════════════════════════════════════════ */
+
+const BLANK_OFFER: OfferInput = {
+  title: "", subtitle: "", tag: "LIMITED OFFER", discountText: "",
+  bgColor: "#ff6b35", ctaText: "Book Now", ctaRoute: "/(tabs)/services",
+  isActive: true, sortOrder: 0, expiresAt: null,
+};
+
+function OffersView({
+  offers, onCreate, onEdit, onDelete,
+}: {
+  offers: OfferRow[];
+  onCreate: (d: OfferInput) => Promise<void>;
+  onEdit: (id: string, d: Partial<OfferInput>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [showForm, setShowForm]   = useState(false);
+  const [editRow,  setEditRow]    = useState<OfferRow | null>(null);
+  const [form,     setForm]       = useState<OfferInput>(BLANK_OFFER);
+  const [saving,   setSaving]     = useState(false);
+  const [deleteId, setDeleteId]   = useState<string | null>(null);
+  const [formErr,  setFormErr]    = useState("");
+
+  function openCreate() { setForm(BLANK_OFFER); setEditRow(null); setFormErr(""); setShowForm(true); }
+  function openEdit(r: OfferRow) {
+    setForm({
+      title: r.title, subtitle: r.subtitle, tag: r.tag, discountText: r.discountText,
+      bgColor: r.bgColor, ctaText: r.ctaText, ctaRoute: r.ctaRoute,
+      isActive: r.isActive, sortOrder: r.sortOrder, expiresAt: r.expiresAt,
+    });
+    setEditRow(r); setFormErr(""); setShowForm(true);
+  }
+
+  const setF = (k: keyof OfferInput) => (v: string | boolean | number | null) =>
+    setForm(f => ({ ...f, [k]: v }));
+
+  async function handleSave() {
+    if (!form.title.trim()) { setFormErr("Title is required."); return; }
+    setSaving(true); setFormErr("");
+    try {
+      if (editRow) await onEdit(editRow.id, form);
+      else         await onCreate(form);
+      setShowForm(false);
+    } catch (e: any) { setFormErr(e.message ?? "Failed to save."); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="space-y-4">
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete Offer?"
+          body="This offer banner will be permanently removed from the app."
+          confirmLabel="Yes, delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      {showForm && (
+        <Modal title={editRow ? "Edit Offer" : "Create Offer"} onClose={() => setShowForm(false)}>
+          <div className="space-y-3">
+            {/* Preview */}
+            <div className="rounded-xl p-4 mb-2" style={{ background: form.bgColor || "#ff6b35" }}>
+              <p className="text-white/80 text-xs font-bold mb-0.5">{form.tag || "TAG"}</p>
+              <p className="text-white font-bold text-sm">{form.title || "Title"}</p>
+              {form.discountText && <p className="text-white/90 text-xs">{form.discountText}</p>}
+              {form.subtitle && <p className="text-white/70 text-xs mt-0.5">{form.subtitle}</p>}
+              <span className="inline-block mt-2 bg-white text-xs font-bold px-3 py-1 rounded-lg" style={{ color: form.bgColor || "#ff6b35" }}>{form.ctaText || "Book Now"}</span>
+            </div>
+
+            {[
+              { key: "title" as const,        label: "Title *",         ph: "e.g. Get 40% off your first booking!" },
+              { key: "subtitle" as const,     label: "Subtitle",        ph: "e.g. Valid for new users" },
+              { key: "tag" as const,          label: "Tag Label",       ph: "e.g. LIMITED OFFER" },
+              { key: "discountText" as const, label: "Discount Text",   ph: "e.g. 40% OFF" },
+              { key: "ctaText" as const,      label: "Button Text",     ph: "e.g. Claim Now" },
+              { key: "ctaRoute" as const,     label: "Button Route",    ph: "e.g. /(tabs)/services" },
+            ].map(({ key, label, ph }) => (
+              <Field key={key} label={label}>
+                <TextInput value={String(form[key] ?? "")} onChange={v => setF(key)(v)} placeholder={ph} />
+              </Field>
+            ))}
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Background Color">
+                <div className="flex gap-2 items-center">
+                  <input type="color" value={form.bgColor} onChange={e => setF("bgColor")(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
+                  <TextInput value={form.bgColor} onChange={v => setF("bgColor")(v)} placeholder="#ff6b35" />
+                </div>
+              </Field>
+              <Field label="Sort Order">
+                <TextInput value={String(form.sortOrder ?? 0)} onChange={v => setF("sortOrder")(Number(v) || 0)} placeholder="0" />
+              </Field>
+            </div>
+
+            <Field label="Expires At (optional)">
+              <input type="datetime-local"
+                value={form.expiresAt ? new Date(form.expiresAt).toISOString().slice(0,16) : ""}
+                onChange={e => setF("expiresAt")(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
+                style={{ background: "rgba(255,255,255,0.05)" }}
+              />
+            </Field>
+
+            <button onClick={() => setF("isActive")(!form.isActive)}
+              className="flex items-center gap-2 text-sm text-white/70 hover:text-white">
+              <div className="w-8 h-4 rounded-full transition-all relative" style={{ background: form.isActive ? "#16A34A" : "rgba(255,255,255,0.15)" }}>
+                <div className="absolute top-0.5 rounded-full bg-white transition-all" style={{ width: 12, height: 12, left: form.isActive ? "calc(100% - 14px)" : 2 }} />
+              </div>
+              Active (visible in app)
+            </button>
+
+            {formErr && <p className="text-red-400 text-xs">{formErr}</p>}
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+                {saving ? "Saving…" : editRow ? "Update Offer" : "Create Offer"}
+              </button>
+              <button onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold border border-white/10 text-white/60 hover:bg-white/5">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      <div className="flex items-center justify-between">
+        <p className="text-white/50 text-sm">{offers.length} offer{offers.length !== 1 ? "s" : ""} total</p>
+        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+          <Plus size={15} /> Create Offer
+        </button>
+      </div>
+
+      {offers.length === 0 ? (
+        <div className="rounded-2xl border border-white/[0.07] p-12 text-center" style={CARD}>
+          <Tag size={32} color="rgba(255,255,255,0.15)" className="mx-auto mb-3" />
+          <p className="text-white/30 text-sm">No offers yet. Create one to show banners in the customer app.</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.07]">
+                  {["Preview", "Title / Tag", "Discount", "Status", "Sort", "Expires", "Actions"].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {offers.map((r) => (
+                  <tr key={r.id} className="hover:bg-white/[0.02]">
+                    <td className="px-4 py-3">
+                      <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: r.bgColor }} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-white font-medium">{r.title}</p>
+                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-wide">{r.tag}</p>
+                    </td>
+                    <td className="px-4 py-3 text-white/60 whitespace-nowrap">{r.discountText || "—"}</td>
+                    <td className="px-4 py-3">
+                      <Badge label={r.isActive ? "Active" : "Inactive"} color={r.isActive ? "#16A34A" : "#6B7280"} />
+                    </td>
+                    <td className="px-4 py-3 text-white/60">{r.sortOrder}</td>
+                    <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                      {r.expiresAt ? new Date(r.expiresAt).toLocaleDateString("en-IN") : "Never"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1.5">
+                        <ActionBtn variant="edit"   onClick={() => openEdit(r)}>Edit</ActionBtn>
+                        <ActionBtn variant={r.isActive ? "warn" : "green"} onClick={() => onEdit(r.id, { isActive: !r.isActive })}>
+                          {r.isActive ? "Deactivate" : "Activate"}
+                        </ActionBtn>
+                        <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReviewsView({ reviews, onDelete }: { reviews: ReviewRow[]; onDelete: (id: string) => Promise<void> }) {
   const [search,   setSearch]   = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -1456,6 +1678,36 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
   const [changePw, setChangePw] = useState({ current: "", next: "", confirm: "" });
   const [pwMsg, setPwMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
+
+  // Platform Policies state
+  const [policies,    setPolicies]    = useState<PlatformPolicyRow[]>([]);
+  const [polLoading,  setPolLoading]  = useState(true);
+  const [polEdits,    setPolEdits]    = useState<Record<string, { title: string; content: string }>>({});
+  const [savingSlug,  setSavingSlug]  = useState<string | null>(null);
+  const [polMsg,      setPolMsg]      = useState<{ slug: string; text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    adminApi.getPlatformPolicies(accessToken)
+      .then(rows => setPolicies(rows))
+      .catch(() => {})
+      .finally(() => setPolLoading(false));
+  }, [accessToken]);
+
+  const handleSavePolicy = async (slug: string) => {
+    const edit = polEdits[slug];
+    if (!edit) return;
+    setSavingSlug(slug);
+    try {
+      await adminApi.updatePlatformPolicy(slug, { title: edit.title, content: edit.content }, accessToken);
+      setPolicies(prev => prev.map(p => p.slug === slug ? { ...p, ...edit, updatedAt: new Date().toISOString() } : p));
+      setPolMsg({ slug, text: "Saved successfully.", type: "success" });
+    } catch (e: any) {
+      setPolMsg({ slug, text: e.message ?? "Failed to save.", type: "error" });
+    } finally {
+      setSavingSlug(null);
+      setTimeout(() => setPolMsg(m => m?.slug === slug ? null : m), 4000);
+    }
+  };
 
   const handleChangePw = async () => {
     if (!changePw.current || !changePw.next || !changePw.confirm) { setPwMsg({ text: "All fields are required.", type: "error" }); return; }

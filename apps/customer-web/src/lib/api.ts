@@ -256,3 +256,26 @@ export const addressesApi = {
     await client.delete(`/addresses/${id}`);
   },
 };
+
+// ─── Offers API ───────────────────────────────────────────────────────────────
+export interface ApiOffer {
+  id: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  discountText: string;
+  bgColor: string;
+  ctaText: string;
+  ctaRoute: string;
+  isActive: boolean;
+  sortOrder: number;
+  expiresAt: string | null;
+}
+
+export const offersApi = {
+  async list() {
+    const { data } = await client.get('/offers');
+    return data.data as ApiOffer[];
+  },
+};
+

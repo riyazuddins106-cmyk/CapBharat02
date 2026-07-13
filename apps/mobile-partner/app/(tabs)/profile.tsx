@@ -14,20 +14,47 @@ import { useAuth } from '@/context/AuthContext';
 import { partnerApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
+// ── Web-safe helpers ────────────────────────────────────────────────────────
+const isWeb = Platform.OS === 'web';
+
+function webConfirm(message: string): boolean {
+  if (isWeb && typeof window !== 'undefined') return window.confirm(message);
+  return false;
+}
+
+function showAlert(title: string, message: string) {
+  if (isWeb && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const colors   = useColors();
+  const insets   = useSafeAreaInsets();
   const { user, logout, accessToken } = useAuth();
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const [uploading, setUploading] = useState(false);
 
-  const [proModal, setProModal]   = useState(false);
+  // Modal visibility
+  const [proModal,  setProModal]  = useState(false);
   const [acctModal, setAcctModal] = useState(false);
   const [pwModal,   setPwModal]   = useState(false);
 
-  const [proForm, setProForm] = useState({ title: '', bio: '', basePrice: '', priceUnit: '/visit', tags: '' });
+  // Form state
+  const [proForm,  setProForm]  = useState({ title: '', bio: '', basePrice: '', priceUnit: '/visit', tags: '' });
   const [acctForm, setAcctForm] = useState({ fullName: '', phone: '' });
-  const [pwForm, setPwForm]   = useState({ currentPw: '', newPw: '', confirmPw: '' });
+  const [pwForm,   setPwForm]   = useState({ currentPw: '', newPw: '', confirmPw: '' });
+
+  // Inline error / success messages per modal
+  const [proErr,   setProErr]   = useState('');
+  const [proOk,    setProOk]    = useState('');
+  const [acctErr,  setAcctErr]  = useState('');
+  const [acctOk,   setAcctOk]   = useState('');
+  const [pwErr,    setPwErr]    = useState('');
+  const [pwOk,     setPwOk]     = useState('');
 
   const { data: profile, refetch } = useQuery({
     queryKey: ['/api/partner/profile', accessToken],
@@ -38,27 +65,36 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (profile) {
       setProForm({
-        title: profile.title ?? '',
-        bio: profile.bio ?? '',
+        title:     profile.title ?? '',
+        bio:       profile.bio ?? '',
         basePrice: String(profile.basePrice ?? ''),
         priceUnit: profile.priceUnit ?? '/visit',
-        tags: (profile.tags ?? []).join(', '),
+        tags:      (profile.tags ?? []).join(', '),
       });
     }
   }, [profile]);
 
+  // ── Sign Out ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: logout },
-    ]);
+    if (isWeb) {
+      // Alert.alert button callbacks don't fire on Expo web — use window.confirm
+      if (webConfirm('Are you sure you want to sign out?')) {
+        logout();
+      }
+    } else {
+      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: logout },
+      ]);
+    }
   };
 
+  // ── Avatar upload ─────────────────────────────────────────────────────────
   const pickAndUploadAvatar = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow access to your photo library to update your profile photo.');
+        showAlert('Permission needed', 'Please allow access to your photo library to update your profile photo.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -74,83 +110,113 @@ export default function ProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/profile'] });
       refetch();
     } catch (e: any) {
-      Alert.alert('Upload failed', e.message ?? 'Could not update photo.');
+      showAlert('Upload failed', e.message ?? 'Could not update photo.');
     } finally {
       setUploading(false);
     }
   };
 
+  // ── Professional Info ─────────────────────────────────────────────────────
   const updateProMutation = useMutation({
     mutationFn: () => partnerApi.updateProfile({
-      title: proForm.title,
-      bio: proForm.bio,
+      title:     proForm.title.trim(),
+      bio:       proForm.bio.trim(),
       basePrice: Number(proForm.basePrice),
-      priceUnit: proForm.priceUnit,
-      tags: proForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      priceUnit: proForm.priceUnit.trim(),
+      tags:      proForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
     }, accessToken!),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['/api/partner/profile'] });
       refetch();
-      setProModal(false);
+      setProOk('Professional info saved successfully!');
+      setTimeout(() => { setProModal(false); setProOk(''); }, 1200);
     },
-    onError: (e: any) => Alert.alert('Error', e.message),
+    onError: (e: any) => setProErr(e.message ?? 'Failed to save. Please try again.'),
   });
 
+  const handleSavePro = () => {
+    setProErr(''); setProOk('');
+    if (!proForm.title.trim()) { setProErr('Title / role is required.'); return; }
+    if (!proForm.basePrice || isNaN(Number(proForm.basePrice)) || Number(proForm.basePrice) <= 0) {
+      setProErr('Please enter a valid base price (numbers only).'); return;
+    }
+    updateProMutation.mutate();
+  };
+
+  // ── Account ───────────────────────────────────────────────────────────────
   const updateAcctMutation = useMutation({
     mutationFn: () => partnerApi.updateAccount({
-      fullName: acctForm.fullName || undefined,
-      phone: acctForm.phone || undefined,
+      fullName: acctForm.fullName.trim() || undefined,
+      phone:    acctForm.phone.trim() || undefined,
     }, accessToken!),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Updated', 'Account details have been saved.');
-      setAcctModal(false);
+      setAcctOk('Account details saved successfully!');
+      setTimeout(() => { setAcctModal(false); setAcctOk(''); }, 1200);
     },
-    onError: (e: any) => Alert.alert('Error', e.message),
+    onError: (e: any) => setAcctErr(e.message ?? 'Failed to save. Please try again.'),
   });
 
+  const handleSaveAcct = () => {
+    setAcctErr(''); setAcctOk('');
+    if (!acctForm.fullName.trim()) { setAcctErr('Full name is required.'); return; }
+    updateAcctMutation.mutate();
+  };
+
+  // ── Change Password ───────────────────────────────────────────────────────
   const changePwMutation = useMutation({
     mutationFn: () => partnerApi.changePassword(pwForm.currentPw, pwForm.newPw, accessToken!),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', 'Your password has been changed.');
-      setPwModal(false);
-      setPwForm({ currentPw: '', newPw: '', confirmPw: '' });
+      setPwOk('Password changed successfully!');
+      setTimeout(() => { setPwModal(false); setPwForm({ currentPw: '', newPw: '', confirmPw: '' }); setPwOk(''); }, 1200);
     },
-    onError: (e: any) => Alert.alert('Error', e.message),
+    onError: (e: any) => setPwErr(e.message ?? 'Incorrect current password or server error.'),
   });
 
   const handleChangePw = () => {
-    if (!pwForm.currentPw || !pwForm.newPw || !pwForm.confirmPw) return Alert.alert('Error', 'All fields are required.');
-    if (pwForm.newPw !== pwForm.confirmPw) return Alert.alert('Error', 'New passwords do not match.');
-    if (pwForm.newPw.length < 8) return Alert.alert('Error', 'Password must be at least 8 characters.');
+    setPwErr(''); setPwOk('');
+    if (!pwForm.currentPw)          { setPwErr('Current password is required.'); return; }
+    if (!pwForm.newPw)              { setPwErr('New password is required.'); return; }
+    if (pwForm.newPw.length < 8)    { setPwErr('New password must be at least 8 characters.'); return; }
+    if (pwForm.newPw !== pwForm.confirmPw) { setPwErr('New passwords do not match.'); return; }
     changePwMutation.mutate();
   };
 
+  // ── Open modal helpers ────────────────────────────────────────────────────
   const openEditPro = () => {
     setProForm({
-      title: profile?.title ?? '',
-      bio: profile?.bio ?? '',
+      title:     profile?.title ?? '',
+      bio:       profile?.bio ?? '',
       basePrice: String(profile?.basePrice ?? ''),
       priceUnit: profile?.priceUnit ?? '/visit',
-      tags: (profile?.tags ?? []).join(', '),
+      tags:      (profile?.tags ?? []).join(', '),
     });
+    setProErr(''); setProOk('');
     setProModal(true);
   };
 
   const openEditAcct = () => {
     setAcctForm({ fullName: user?.fullName ?? '', phone: user?.phone ?? '' });
+    setAcctErr(''); setAcctOk('');
     setAcctModal(true);
   };
 
-  const displayName = profile?.name ?? user?.fullName ?? 'Partner';
+  const openChangePw = () => {
+    setPwForm({ currentPw: '', newPw: '', confirmPw: '' });
+    setPwErr(''); setPwOk('');
+    setPwModal(true);
+  };
+
+  const displayName   = profile?.name ?? user?.fullName ?? 'Partner';
   const displayAvatar = profile?.avatarUrl;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
-        {/* Header */}
+
+        {/* ── Header ── */}
         <View style={[styles.headerBg, { paddingTop: topPadding + 12, backgroundColor: colors.primary }]}>
           <TouchableOpacity onPress={pickAndUploadAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
             {displayAvatar ? (
@@ -180,7 +246,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={{ padding: 16, gap: 12 }}>
-          {/* Professional info */}
+
+          {/* ── Professional Info card ── */}
           {profile && (
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
               <View style={styles.cardHeader}>
@@ -190,9 +257,9 @@ export default function ProfileScreen() {
                   <Text style={[styles.editChipText, { color: colors.primary }]}>Edit</Text>
                 </TouchableOpacity>
               </View>
-              <InfoRow icon="briefcase-outline" label="Title" value={profile.title} colors={colors} />
-              <InfoRow icon="pricetag-outline" label="Rate" value={`₹${profile.basePrice}${profile.priceUnit}`} colors={colors} />
-              <InfoRow icon="star-outline" label="Rating" value={`${profile.rating.toFixed(1)} (${profile.reviewCount} reviews)`} colors={colors} />
+              <InfoRow icon="briefcase-outline" label="Title"  value={profile.title} colors={colors} />
+              <InfoRow icon="pricetag-outline"  label="Rate"   value={`₹${profile.basePrice}${profile.priceUnit}`} colors={colors} />
+              <InfoRow icon="star-outline"      label="Rating" value={`${profile.rating.toFixed(1)} (${profile.reviewCount} reviews)`} colors={colors} />
               {profile.bio ? (
                 <View style={styles.bioRow}>
                   <Text style={[styles.bioLabel, { color: colors.mutedForeground }]}>Bio</Text>
@@ -211,7 +278,7 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* Account */}
+          {/* ── Account card ── */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
             <View style={styles.cardHeader}>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Account</Text>
@@ -220,15 +287,15 @@ export default function ProfileScreen() {
                 <Text style={[styles.editChipText, { color: colors.primary }]}>Edit</Text>
               </TouchableOpacity>
             </View>
-            <InfoRow icon="mail-outline" label="Email" value={user?.email ?? ''} colors={colors} />
-            {user?.phone ? <InfoRow icon="call-outline" label="Phone" value={user.phone} colors={colors} /> : null}
+            <InfoRow icon="mail-outline"           label="Email" value={user?.email ?? ''} colors={colors} />
+            {user?.phone ? <InfoRow icon="call-outline" label="Phone" value={user.phone}  colors={colors} /> : null}
             <InfoRow icon="shield-checkmark-outline" label="Role" value="Partner" colors={colors} />
           </View>
 
-          {/* Security */}
+          {/* ── Security card ── */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Security</Text>
-            <TouchableOpacity onPress={() => { setPwForm({ currentPw: '', newPw: '', confirmPw: '' }); setPwModal(true); }} style={styles.securityRow} activeOpacity={0.7}>
+            <TouchableOpacity onPress={openChangePw} style={styles.securityRow} activeOpacity={0.7}>
               <View style={[styles.securityIcon, { backgroundColor: colors.secondary }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.primary} />
               </View>
@@ -240,7 +307,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Sign out */}
+          {/* ── Sign Out ── */}
           <TouchableOpacity
             onPress={handleLogout}
             style={[styles.logoutBtn, { backgroundColor: '#fee2e2', borderRadius: colors.radius }]}
@@ -252,7 +319,9 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* Edit Professional Info Modal */}
+      {/* ══════════════════════════════════════════════════════
+          MODAL: Edit Professional Info
+      ══════════════════════════════════════════════════════ */}
       <Modal visible={proModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.backdrop}>
           <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
@@ -262,35 +331,65 @@ export default function ProfileScreen() {
                 <Ionicons name="close" size={22} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
+
             <ScrollView showsVerticalScrollIndicator={false}>
-              <FormField label="Title" colors={colors}>
-                <TextInput value={proForm.title} onChangeText={(v) => setProForm((f) => ({ ...f, title: v }))}
-                  placeholder="e.g. Senior Plumber" placeholderTextColor={colors.mutedForeground}
-                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              <FormField label="Title / Role *" colors={colors}>
+                <TextInput
+                  value={proForm.title}
+                  onChangeText={(v) => { setProForm((f) => ({ ...f, title: v })); setProErr(''); }}
+                  placeholder="e.g. Senior Plumber"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
               </FormField>
+
               <FormField label="Bio" colors={colors}>
-                <TextInput value={proForm.bio} onChangeText={(v) => setProForm((f) => ({ ...f, bio: v }))}
-                  placeholder="Describe your expertise…" placeholderTextColor={colors.mutedForeground}
+                <TextInput
+                  value={proForm.bio}
+                  onChangeText={(v) => setProForm((f) => ({ ...f, bio: v }))}
+                  placeholder="Describe your expertise…"
+                  placeholderTextColor={colors.mutedForeground}
                   multiline numberOfLines={3} textAlignVertical="top"
-                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius, minHeight: 72 }]} />
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius, minHeight: 72 }]}
+                />
               </FormField>
-              <FormField label="Base Price (₹)" colors={colors}>
-                <TextInput value={proForm.basePrice} onChangeText={(v) => setProForm((f) => ({ ...f, basePrice: v }))}
-                  placeholder="500" placeholderTextColor={colors.mutedForeground} keyboardType="numeric"
-                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+
+              <FormField label="Base Price (₹) *" colors={colors}>
+                <TextInput
+                  value={proForm.basePrice}
+                  onChangeText={(v) => { setProForm((f) => ({ ...f, basePrice: v })); setProErr(''); }}
+                  placeholder="500"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numeric"
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
               </FormField>
+
               <FormField label="Price Unit" colors={colors}>
-                <TextInput value={proForm.priceUnit} onChangeText={(v) => setProForm((f) => ({ ...f, priceUnit: v }))}
-                  placeholder="/visit or /hr" placeholderTextColor={colors.mutedForeground}
-                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+                <TextInput
+                  value={proForm.priceUnit}
+                  onChangeText={(v) => setProForm((f) => ({ ...f, priceUnit: v }))}
+                  placeholder="/visit or /hr"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
               </FormField>
+
               <FormField label="Skills / Tags (comma separated)" colors={colors}>
-                <TextInput value={proForm.tags} onChangeText={(v) => setProForm((f) => ({ ...f, tags: v }))}
-                  placeholder="e.g. Plumbing, AC Repair, Wiring" placeholderTextColor={colors.mutedForeground}
-                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+                <TextInput
+                  value={proForm.tags}
+                  onChangeText={(v) => setProForm((f) => ({ ...f, tags: v }))}
+                  placeholder="e.g. Plumbing, AC Repair, Wiring"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
               </FormField>
+
+              {!!proErr && <Text style={styles.errorText}>{proErr}</Text>}
+              {!!proOk  && <Text style={styles.successText}>{proOk}</Text>}
+
               <TouchableOpacity
-                onPress={() => updateProMutation.mutate()}
+                onPress={handleSavePro}
                 disabled={updateProMutation.isPending}
                 style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: updateProMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
               >
@@ -301,7 +400,9 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Edit Account Modal */}
+      {/* ══════════════════════════════════════════════════════
+          MODAL: Edit Account
+      ══════════════════════════════════════════════════════ */}
       <Modal visible={acctModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.backdrop}>
           <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
@@ -311,18 +412,33 @@ export default function ProfileScreen() {
                 <Ionicons name="close" size={22} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
-            <FormField label="Full Name" colors={colors}>
-              <TextInput value={acctForm.fullName} onChangeText={(v) => setAcctForm((f) => ({ ...f, fullName: v }))}
-                placeholder="Your full name" placeholderTextColor={colors.mutedForeground}
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+
+            <FormField label="Full Name *" colors={colors}>
+              <TextInput
+                value={acctForm.fullName}
+                onChangeText={(v) => { setAcctForm((f) => ({ ...f, fullName: v })); setAcctErr(''); }}
+                placeholder="Your full name"
+                placeholderTextColor={colors.mutedForeground}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+              />
             </FormField>
+
             <FormField label="Phone" colors={colors}>
-              <TextInput value={acctForm.phone} onChangeText={(v) => setAcctForm((f) => ({ ...f, phone: v }))}
-                placeholder="+91 99999 99999" placeholderTextColor={colors.mutedForeground} keyboardType="phone-pad"
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              <TextInput
+                value={acctForm.phone}
+                onChangeText={(v) => setAcctForm((f) => ({ ...f, phone: v }))}
+                placeholder="+91 99999 99999"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="phone-pad"
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+              />
             </FormField>
+
+            {!!acctErr && <Text style={styles.errorText}>{acctErr}</Text>}
+            {!!acctOk  && <Text style={styles.successText}>{acctOk}</Text>}
+
             <TouchableOpacity
-              onPress={() => updateAcctMutation.mutate()}
+              onPress={handleSaveAcct}
               disabled={updateAcctMutation.isPending}
               style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: updateAcctMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
             >
@@ -332,7 +448,9 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Change Password Modal */}
+      {/* ══════════════════════════════════════════════════════
+          MODAL: Change Password
+      ══════════════════════════════════════════════════════ */}
       <Modal visible={pwModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.backdrop}>
           <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
@@ -342,21 +460,43 @@ export default function ProfileScreen() {
                 <Ionicons name="close" size={22} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
+
             <FormField label="Current Password" colors={colors}>
-              <TextInput value={pwForm.currentPw} onChangeText={(v) => setPwForm((f) => ({ ...f, currentPw: v }))}
-                placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              <TextInput
+                value={pwForm.currentPw}
+                onChangeText={(v) => { setPwForm((f) => ({ ...f, currentPw: v })); setPwErr(''); }}
+                placeholder="••••••••"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+              />
             </FormField>
+
             <FormField label="New Password" colors={colors}>
-              <TextInput value={pwForm.newPw} onChangeText={(v) => setPwForm((f) => ({ ...f, newPw: v }))}
-                placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              <TextInput
+                value={pwForm.newPw}
+                onChangeText={(v) => { setPwForm((f) => ({ ...f, newPw: v })); setPwErr(''); }}
+                placeholder="Min 8 characters"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+              />
             </FormField>
+
             <FormField label="Confirm New Password" colors={colors}>
-              <TextInput value={pwForm.confirmPw} onChangeText={(v) => setPwForm((f) => ({ ...f, confirmPw: v }))}
-                placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
-                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]} />
+              <TextInput
+                value={pwForm.confirmPw}
+                onChangeText={(v) => { setPwForm((f) => ({ ...f, confirmPw: v })); setPwErr(''); }}
+                placeholder="Re-enter new password"
+                placeholderTextColor={colors.mutedForeground}
+                secureTextEntry
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+              />
             </FormField>
+
+            {!!pwErr && <Text style={styles.errorText}>{pwErr}</Text>}
+            {!!pwOk  && <Text style={styles.successText}>{pwOk}</Text>}
+
             <TouchableOpacity
               onPress={handleChangePw}
               disabled={changePwMutation.isPending}
@@ -371,6 +511,7 @@ export default function ProfileScreen() {
   );
 }
 
+// ── Sub-components ──────────────────────────────────────────────────────────
 function InfoRow({ icon, label, value, colors }: any) {
   return (
     <View style={styles.infoRow}>
@@ -390,6 +531,7 @@ function FormField({ label, colors, children }: any) {
   );
 }
 
+// ── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   headerBg:      { paddingHorizontal: 20, paddingBottom: 28, alignItems: 'center', gap: 6 },
   avatarWrap:    { position: 'relative', marginBottom: 4 },
@@ -429,4 +571,6 @@ const styles = StyleSheet.create({
   input:         { padding: 12, fontSize: 14 },
   saveBtn:       { paddingVertical: 14, alignItems: 'center' },
   saveBtnText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
+  errorText:     { color: '#D4183D', fontSize: 13, fontWeight: '600', marginBottom: 10, textAlign: 'center' },
+  successText:   { color: '#16A34A', fontSize: 13, fontWeight: '600', marginBottom: 10, textAlign: 'center' },
 });

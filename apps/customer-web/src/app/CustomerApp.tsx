@@ -1,17 +1,29 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search, MapPin, Star, ChevronRight, Bell, Heart, Home, Grid, BookOpen,
   User, Clock, Shield, Sparkles, Wrench, Scissors, Zap, Droplets, Paintbrush,
-  Wind, ChevronLeft, X, Calendar, ArrowRight,
+  Wind, ChevronLeft, X, Calendar, ArrowRight, Plus, Trash2, Pencil,
+  Navigation, Check,
 } from "lucide-react";
 import {
   auth, authApi, categoriesApi, professionalsApi, bookingsApi, favoritesApi,
+  addressesApi, offersApi, profileApi,
   type ApiUser, type ApiCategory, type ApiProfessional, type ApiBooking,
+  type ApiAddress, type ApiOffer,
 } from "../lib/api";
 
 /* ─────────────────────────── Icon map ──────────────────────────── */
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   Sparkles, Wrench, Zap, Scissors, Paintbrush, Wind, Droplets, Grid,
+};
+
+/* ─────────────────────────── Address label config ───────────────── */
+const ADDR_LABELS = ["Home", "Work", "Other"] as const;
+type AddrLabel = typeof ADDR_LABELS[number];
+const LABEL_COLORS: Record<AddrLabel, { bg: string; color: string }> = {
+  Home:  { bg: "#EDE9FD", color: "#5B3EF5" },
+  Work:  { bg: "#DCFCE7", color: "#16A34A" },
+  Other: { bg: "#FEF3C7", color: "#D97706" },
 };
 
 /* ─────────────────────────── Helpers ───────────────────────────── */
@@ -73,6 +85,10 @@ function statusColors(status: ApiBooking["status"]): { bg: string; color: string
   }
 }
 
+function formatAddress(a: ApiAddress): string {
+  return [a.line1, a.line2, a.city, a.state, a.postalCode].filter(Boolean).join(", ");
+}
+
 /* ─────────────────────────── PhoneFrame ───────────────────────── */
 function PhoneFrame({ children, statusDark }: { children: React.ReactNode; statusDark: boolean }) {
   const textColor = statusDark ? "#0f1117" : "#ffffff";
@@ -95,11 +111,6 @@ function PhoneFrame({ children, statusDark }: { children: React.ReactNode; statu
 /* ═══════════════════════════════════════════════════════════════
    LOGIN / REGISTER SCREEN
 ═══════════════════════════════════════════════════════════════ */
-
-// Defined OUTSIDE LoginScreen so the component reference is stable across
-// re-renders. If defined inside, React sees a new component type on every
-// keystroke, unmounts the old <input>, and mounts a fresh one — losing focus
-// and making the field appear uneditable.
 function AuthInput({ placeholder, value, onChange, type = "text" }: {
   placeholder: string; value: string; onChange: (v: string) => void; type?: string;
 }) {
@@ -481,54 +492,535 @@ function BookingModal({ pro, onClose, onBooked }: {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   LOCATION PICKER MODAL
+═══════════════════════════════════════════════════════════════ */
+function LocationPickerModal({
+  current, addresses, onSelect, onClose,
+}: {
+  current: string;
+  addresses: ApiAddress[];
+  onSelect: (loc: string) => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(current === "Set your location" ? "" : current);
+  const [detecting, setDetecting] = useState(false);
+  const [error, setError] = useState("");
+
+  function detectLocation() {
+    if (!navigator.geolocation) { setError("Geolocation not supported."); return; }
+    setDetecting(true); setError("");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude: lat, longitude: lng } = pos.coords;
+          const resp = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+          );
+          const json = await resp.json();
+          const addr = json.address ?? {};
+          const city = addr.city ?? addr.town ?? addr.village ?? addr.county ?? "";
+          const state = addr.state ?? "";
+          const loc = [city, state].filter(Boolean).join(", ") || `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+          setText(loc);
+        } catch {
+          setError("Could not fetch location name.");
+        } finally { setDetecting(false); }
+      },
+      () => { setError("Location access denied."); setDetecting(false); }
+    );
+  }
+
+  function handleSave() {
+    const val = text.trim();
+    if (!val) return;
+    onSelect(val);
+  }
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="flex-1" onClick={onClose} />
+      <div className="bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: "75%" }}>
+        <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
+        <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06]">
+          <h3 className="text-base font-bold">Set your location</h3>
+          <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
+        </div>
+
+        <div className="px-5 pt-4 pb-6 overflow-y-auto flex flex-col gap-4" style={{ scrollbarWidth: "none" }}>
+          {/* Detect GPS */}
+          <button
+            onClick={detectLocation}
+            disabled={detecting}
+            className="flex items-center gap-3 w-full rounded-2xl border-2 px-4 py-3 transition-all"
+            style={{ borderColor: "#5B3EF5", background: "#EDE9FD" }}>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#5B3EF5" }}>
+              <Navigation size={16} color="white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold" style={{ color: "#5B3EF5" }}>{detecting ? "Detecting…" : "Use my current location"}</p>
+              <p className="text-xs text-gray-400">Automatically detect via GPS</p>
+            </div>
+          </button>
+
+          {/* Manual input */}
+          <div>
+            <p className="text-xs font-bold text-gray-500 mb-2">Or enter manually</p>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-gray-100 rounded-xl flex items-center gap-2 px-3 py-3">
+                <Search size={15} color="#9CA3AF" />
+                <input
+                  className="flex-1 bg-transparent text-sm outline-none"
+                  placeholder="City, State (e.g. Mumbai, Maharashtra)"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                />
+              </div>
+            </div>
+          </div>
+
+          {error && <p className="text-red-500 text-xs -mt-2">{error}</p>}
+
+          {/* Saved addresses as quick picks */}
+          {addresses.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-500 mb-2">Your saved addresses</p>
+              <div className="flex flex-col gap-2">
+                {addresses.map((a) => {
+                  const lbl = (a.label ?? "Other") as AddrLabel;
+                  const lc = LABEL_COLORS[lbl] ?? LABEL_COLORS.Other;
+                  return (
+                    <button key={a.id} onClick={() => onSelect([a.city, a.state].filter(Boolean).join(", ") || formatAddress(a))}
+                      className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border border-black/[0.06] text-left">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: lc.bg }}>
+                        <MapPin size={14} color={lc.color} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold">{a.label ?? "Other"}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{formatAddress(a)}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={!text.trim()}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-40 mt-1"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            Confirm Location
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADDRESS FORM MODAL
+═══════════════════════════════════════════════════════════════ */
+const BLANK_FORM = { label: "Home" as AddrLabel, line1: "", line2: "", city: "", state: "", postalCode: "", country: "India", isDefault: false };
+
+function AddressFormModal({
+  initial, onSave, onClose, saving,
+}: {
+  initial?: Partial<typeof BLANK_FORM>;
+  onSave: (data: typeof BLANK_FORM) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [form, setForm] = useState<typeof BLANK_FORM>({ ...BLANK_FORM, ...initial });
+  const [error, setError] = useState("");
+
+  function handleSubmit() {
+    if (!form.line1.trim()) { setError("Street address is required."); return; }
+    if (!form.city.trim()) { setError("City is required."); return; }
+    if (!form.state.trim()) { setError("State is required."); return; }
+    if (!form.postalCode.trim()) { setError("Pincode is required."); return; }
+    setError("");
+    onSave(form);
+  }
+
+  const set = (k: keyof typeof BLANK_FORM) => (v: string | boolean) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="flex-1" onClick={onClose} />
+      <div className="bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: "85%" }}>
+        <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
+        <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06]">
+          <h3 className="text-base font-bold">{initial?.line1 ? "Edit Address" : "Add New Address"}</h3>
+          <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
+        </div>
+        <div className="px-5 pt-4 pb-6 overflow-y-auto flex flex-col gap-4" style={{ scrollbarWidth: "none" }}>
+          {/* Label picker */}
+          <div>
+            <p className="text-xs font-bold text-gray-500 mb-2">Address Type</p>
+            <div className="flex gap-2">
+              {ADDR_LABELS.map((lbl) => {
+                const lc = LABEL_COLORS[lbl];
+                const active = form.label === lbl;
+                return (
+                  <button key={lbl} onClick={() => set("label")(lbl)}
+                    className="flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all"
+                    style={{
+                      borderColor: active ? lc.color : "rgba(0,0,0,0.08)",
+                      background: active ? lc.bg : "#fff",
+                      color: active ? lc.color : "#6B7280",
+                    }}>
+                    {lbl === "Home" ? "🏠 " : lbl === "Work" ? "💼 " : "📍 "}{lbl}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fields */}
+          {[
+            { key: "line1" as const, label: "Street / Flat No *", placeholder: "e.g. Flat 4B, Sunrise Apartments" },
+            { key: "line2" as const, label: "Area / Landmark", placeholder: "e.g. Near City Mall" },
+            { key: "city"  as const, label: "City *", placeholder: "e.g. Mumbai" },
+            { key: "state" as const, label: "State *", placeholder: "e.g. Maharashtra" },
+            { key: "postalCode" as const, label: "Pincode *", placeholder: "e.g. 400001" },
+          ].map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <p className="text-xs font-bold text-gray-500 mb-1.5">{label}</p>
+              <input
+                className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300"
+                placeholder={placeholder}
+                value={form[key]}
+                onChange={(e) => set(key)(e.target.value)}
+              />
+            </div>
+          ))}
+
+          {/* Set as default */}
+          <button onClick={() => set("isDefault")(!form.isDefault)} className="flex items-center gap-3">
+            <div className="w-5 h-5 rounded flex items-center justify-center border-2 flex-shrink-0 transition-all"
+              style={{ borderColor: form.isDefault ? "#5B3EF5" : "rgba(0,0,0,0.2)", background: form.isDefault ? "#5B3EF5" : "#fff" }}>
+              {form.isDefault && <Check size={12} color="white" />}
+            </div>
+            <span className="text-sm font-semibold text-gray-700">Set as default address</span>
+          </button>
+
+          {error && <p className="text-red-500 text-xs -mt-2">{error}</p>}
+
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 mt-1"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            {saving ? "Saving…" : "Save Address"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SAVED ADDRESSES SCREEN (Urban Clap style)
+═══════════════════════════════════════════════════════════════ */
+function SavedAddressesScreen({
+  addresses, onBack, onChange,
+}: {
+  addresses: ApiAddress[];
+  onBack: () => void;
+  onChange: (addrs: ApiAddress[]) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editAddr, setEditAddr] = useState<ApiAddress | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const MAX = 4;
+
+  async function handleSave(data: typeof BLANK_FORM) {
+    setSaving(true);
+    try {
+      if (editAddr) {
+        const updated = await addressesApi.update(editAddr.id, data);
+        onChange(addresses.map((a) => a.id === editAddr.id ? updated : a));
+      } else {
+        const created = await addressesApi.create(data);
+        onChange([...addresses, created]);
+      }
+      setShowForm(false); setEditAddr(null);
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message ?? "Failed to save address.");
+    } finally { setSaving(false); }
+  }
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    try {
+      await addressesApi.delete(id);
+      onChange(addresses.filter((a) => a.id !== id));
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message ?? "Failed to delete.");
+    } finally { setDeletingId(null); }
+  }
+
+  async function handleSetDefault(id: string) {
+    try {
+      const updated = await addressesApi.update(id, { isDefault: true });
+      // reload all to reflect server-side default toggle
+      const all = await addressesApi.list();
+      onChange(all);
+    } catch { /* ignore */ }
+  }
+
+  const canAdd = addresses.length < MAX;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-black/[0.06] bg-white">
+        <button onClick={onBack} className="p-1.5 rounded-xl" style={{ background: "#f3f4f6" }}>
+          <ChevronLeft size={18} />
+        </button>
+        <h2 className="text-base font-bold">Saved Addresses</h2>
+        <span className="ml-auto text-xs text-gray-400">{addresses.length}/{MAX}</span>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24" style={{ scrollbarWidth: "none" }}>
+        {addresses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 gap-3">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
+              <MapPin size={24} color="#5B3EF5" />
+            </div>
+            <p className="text-sm font-bold text-gray-700">No addresses saved yet</p>
+            <p className="text-xs text-gray-400 text-center">Add your home, work or other addresses for faster booking</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {addresses.map((a) => {
+              const lbl = (a.label ?? "Other") as AddrLabel;
+              const lc = LABEL_COLORS[lbl] ?? LABEL_COLORS.Other;
+              const isDeleting = deletingId === a.id;
+              return (
+                <div key={a.id} className="bg-white rounded-2xl border border-black/[0.08] shadow-sm overflow-hidden">
+                  <div className="flex items-start gap-3 p-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: lc.bg }}>
+                      <MapPin size={17} color={lc.color} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: lc.bg, color: lc.color }}>{a.label ?? "Other"}</span>
+                        {a.isDefault && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#DCFCE7", color: "#16A34A" }}>Default</span>
+                        )}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-800 leading-snug mt-1">{a.line1}</p>
+                      {a.line2 && <p className="text-xs text-gray-400">{a.line2}</p>}
+                      <p className="text-xs text-gray-500">{[a.city, a.state, a.postalCode].filter(Boolean).join(", ")}</p>
+                    </div>
+                  </div>
+                  <div className="flex border-t border-black/[0.06] divide-x divide-black/[0.06]">
+                    {!a.isDefault && (
+                      <button onClick={() => handleSetDefault(a.id)} className="flex-1 py-2.5 text-[11px] font-bold text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
+                        <Check size={11} /> Set Default
+                      </button>
+                    )}
+                    <button onClick={() => { setEditAddr(a); setShowForm(true); }} className="flex-1 py-2.5 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors" style={{ color: "#5B3EF5" }}>
+                      <Pencil size={11} /> Edit
+                    </button>
+                    <button onClick={() => handleDelete(a.id)} disabled={isDeleting}
+                      className="flex-1 py-2.5 text-[11px] font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center gap-1 disabled:opacity-40">
+                      <Trash2 size={11} /> {isDeleting ? "…" : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Add button */}
+      <div className="absolute bottom-0 left-0 right-0 px-4 py-4 bg-white border-t border-black/[0.06]">
+        {canAdd ? (
+          <button onClick={() => { setEditAddr(null); setShowForm(true); }}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            <Plus size={16} /> Add New Address
+          </button>
+        ) : (
+          <div className="w-full py-3.5 rounded-2xl text-sm font-bold text-center text-gray-400 border-2 border-dashed border-gray-200">
+            Maximum {MAX} addresses reached
+          </div>
+        )}
+      </div>
+
+      {/* Form modal */}
+      {showForm && (
+        <AddressFormModal
+          initial={editAddr ? { ...editAddr, label: (editAddr.label ?? "Other") as AddrLabel } : undefined}
+          onSave={handleSave}
+          onClose={() => { setShowForm(false); setEditAddr(null); }}
+          saving={saving}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROFILE EDIT MODAL
+═══════════════════════════════════════════════════════════════ */
+function ProfileEditModal({ user, onSave, onClose }: {
+  user: ApiUser;
+  onSave: (u: ApiUser) => void;
+  onClose: () => void;
+}) {
+  const [fullName, setFullName] = useState(user.fullName);
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSave() {
+    if (!fullName.trim()) { setError("Name is required."); return; }
+    setSaving(true);
+    try {
+      const updated = await profileApi.update({ fullName: fullName.trim(), phone: phone.trim() || undefined });
+      onSave(updated);
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? "Update failed.");
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="flex-1" onClick={onClose} />
+      <div className="bg-white rounded-t-3xl">
+        <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
+        <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06]">
+          <h3 className="text-base font-bold">Edit Profile</h3>
+          <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
+        </div>
+        <div className="px-5 pt-4 pb-6 flex flex-col gap-4">
+          <div>
+            <p className="text-xs font-bold text-gray-500 mb-1.5">Full Name</p>
+            <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your full name" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-500 mb-1.5">Phone</p>
+            <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" type="tel" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-500 mb-1.5">Email</p>
+            <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-400">{user.email}</div>
+          </div>
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+          <button onClick={handleSave} disabled={saving} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    HOME TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
-  user, categories, professionals, favoriteIds, onToggleFavorite, onBook, onCategoryFilter,
+  user, categories, professionals, favoriteIds, offers, location,
+  onToggleFavorite, onBook, onCategoryFilter, onLocationPress,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
   professionals: ApiProfessional[];
   favoriteIds: Set<string>;
+  offers: ApiOffer[];
+  location: string;
   onToggleFavorite: (id: string) => void;
   onBook: (pro: ApiProfessional) => void;
   onCategoryFilter: (name: string) => void;
+  onLocationPress: () => void;
 }) {
   const featured = professionals.slice(0, 3);
+  const [offerIdx, setOfferIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Greet based on hour
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning 🌅" : hour < 17 ? "Good afternoon ☀️" : "Good evening 👋";
+
   return (
     <div className="flex flex-col">
+      {/* Header */}
       <div className="px-5 pt-2 pb-4" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-white/70 text-xs font-medium mb-0.5">Good morning 👋</p>
+            <p className="text-white/70 text-xs font-medium mb-0.5">{greeting}</p>
             <h1 className="text-white text-xl font-bold">{user?.fullName ?? "Guest"}</h1>
           </div>
           <button className="relative w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
             <Bell size={18} color="white" />
           </button>
         </div>
-        <div className="flex items-center gap-1 mb-4">
-          <MapPin size={14} color="rgba(255,255,255,0.8)" />
-          <span className="text-white/80 text-xs font-medium">Mumbai, India</span>
-          <ChevronRight size={14} color="rgba(255,255,255,0.6)" />
-        </div>
+
+        {/* Location bar — clickable */}
+        <button onClick={onLocationPress} className="flex items-center gap-1.5 mb-4 group">
+          <MapPin size={14} color="rgba(255,255,255,0.9)" />
+          <span className="text-white text-xs font-semibold max-w-[220px] truncate">{location}</span>
+          <Pencil size={11} color="rgba(255,255,255,0.6)" className="ml-0.5" />
+        </button>
+
         <div className="bg-white rounded-2xl flex items-center gap-3 px-4 py-3 shadow-lg">
           <Search size={18} color="#9CA3AF" />
           <span className="text-sm text-gray-400">Search for a service...</span>
         </div>
       </div>
 
-      <div className="mx-5 mt-4 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(120deg,#ff6b35,#f7931e)" }}>
-        <div className="flex items-center justify-between px-5 py-4">
-          <div>
-            <p className="text-white/80 text-xs font-semibold mb-1">LIMITED OFFER</p>
-            <h3 className="text-white font-bold text-base leading-tight">Get 40% off your<br />first booking!</h3>
-            <button className="mt-2 bg-white rounded-lg px-3 py-1.5 text-xs font-bold" style={{ color: "#ff6b35" }}>Claim Now</button>
+      {/* Offers carousel — only if offers exist */}
+      {offers.length > 0 && (
+        <div className="mt-4 px-5">
+          <div
+            ref={scrollRef}
+            className="flex gap-3 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none" }}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              const idx = Math.round(el.scrollLeft / el.clientWidth);
+              setOfferIdx(idx);
+            }}
+          >
+            {offers.map((offer) => (
+              <div key={offer.id} className="flex-shrink-0 rounded-2xl overflow-hidden" style={{ width: "100%", background: offer.bgColor || "#ff6b35" }}>
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div>
+                    <p className="text-white/80 text-xs font-bold mb-1">{offer.tag}</p>
+                    <h3 className="text-white font-bold text-base leading-tight">
+                      {offer.title}{offer.discountText ? <><br />{offer.discountText}</> : null}
+                    </h3>
+                    {offer.subtitle && <p className="text-white/80 text-xs mt-0.5">{offer.subtitle}</p>}
+                    <button className="mt-2 bg-white rounded-lg px-3 py-1.5 text-xs font-bold" style={{ color: offer.bgColor || "#ff6b35" }}>
+                      {offer.ctaText || "Book Now"}
+                    </button>
+                  </div>
+                  <div className="text-5xl">🛁</div>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="text-5xl">🛁</div>
+          {/* Dots */}
+          {offers.length > 1 && (
+            <div className="flex justify-center gap-1.5 mt-2">
+              {offers.map((_, i) => (
+                <div key={i} className="rounded-full transition-all" style={{ width: i === offerIdx ? 16 : 6, height: 6, background: i === offerIdx ? "#5B3EF5" : "#d1d5db" }} />
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
+      {/* Services */}
       <div className="px-5 mt-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-foreground">Our Services</h2>
@@ -560,6 +1052,7 @@ function CustHome({
         )}
       </div>
 
+      {/* Featured professionals */}
       <div className="px-5 mt-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-foreground">Featured Professionals</h2>
@@ -577,10 +1070,15 @@ function CustHome({
         )}
       </div>
 
+      {/* Why us */}
       <div className="mx-5 mt-5 mb-6 rounded-2xl bg-white border border-black/[0.08] p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Why choose us?</h3>
         <div className="flex justify-between">
-          {[{ icon: Shield, label: "Verified Pros", sub: "Background checked" }, { icon: Clock, label: "On Time", sub: "Punctual service" }, { icon: Star, label: "5-Star Rated", sub: "Avg 4.8 rating" }].map((t) => {
+          {[
+            { icon: Shield, label: "Verified Pros", sub: "Background checked" },
+            { icon: Clock,  label: "On Time",       sub: "Punctual service"  },
+            { icon: Star,   label: "5-Star Rated",  sub: "Avg 4.8 rating"   },
+          ].map((t) => {
             const Icon = t.icon;
             return (
               <div key={t.label} className="flex flex-col items-center text-center gap-1">
@@ -778,47 +1276,74 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
 /* ═══════════════════════════════════════════════════════════════
    PROFILE TAB
 ═══════════════════════════════════════════════════════════════ */
-function CustProfile({ user, onLogout }: { user: ApiUser; onLogout: () => void }) {
+function CustProfile({
+  user, onLogout, onShowAddresses, onEditProfile,
+}: {
+  user: ApiUser;
+  onLogout: () => void;
+  onShowAddresses: () => void;
+  onEditProfile: (u: ApiUser) => void;
+}) {
+  const [showEdit, setShowEdit] = useState(false);
+
+  const menuItems = [
+    { icon: MapPin,  label: "Saved Addresses",    action: onShowAddresses },
+    { icon: Heart,   label: "Wishlist",            action: () => {} },
+    { icon: Shield,  label: "Privacy & Security",  action: () => {} },
+    { icon: Bell,    label: "Notifications",       action: () => {} },
+    { icon: Star,    label: "Rate the App",        action: () => {} },
+  ];
+
   return (
     <div className="flex flex-col">
-      <div className="px-5 pt-3 pb-6" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+      <div className="px-5 pt-3 pb-6 relative" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
         <div className="flex items-center gap-4">
           <img
             src={user.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&size=64&background=ffffff&color=5b3ef5`}
             alt={user.fullName}
             className="w-16 h-16 rounded-2xl object-cover border-2 border-white/40"
           />
-          <div>
-            <h2 className="text-white text-lg font-bold">{user.fullName}</h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-white text-lg font-bold truncate">{user.fullName}</h2>
             {user.phone && <p className="text-white/70 text-xs">{user.phone}</p>}
-            <p className="text-white/70 text-xs">{user.email}</p>
+            <p className="text-white/70 text-xs truncate">{user.email}</p>
           </div>
+          <button onClick={() => setShowEdit(true)} className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+            <Pencil size={14} color="white" />
+          </button>
         </div>
       </div>
+
       <div className="px-5 mt-4 flex flex-col gap-2">
-        {[
-          { icon: MapPin, label: "Saved Addresses" },
-          { icon: Heart, label: "Wishlist" },
-          { icon: Shield, label: "Privacy & Security" },
-          { icon: Bell, label: "Notifications" },
-          { icon: Star, label: "Rate the App" },
-        ].map((m) => {
+        {menuItems.map((m) => {
           const Icon = m.icon;
           return (
-            <button key={m.label} className="flex items-center justify-between bg-white rounded-2xl border border-black/[0.08] px-4 py-3.5 shadow-sm">
+            <button key={m.label} onClick={m.action} className="flex items-center justify-between bg-white rounded-2xl border border-black/[0.08] px-4 py-3.5 shadow-sm active:bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#EDE9FD" }}><Icon size={15} color="#5B3EF5" /></div>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#EDE9FD" }}>
+                  <Icon size={15} color="#5B3EF5" />
+                </div>
                 <span className="text-sm font-semibold">{m.label}</span>
               </div>
               <ChevronRight size={16} color="#9CA3AF" />
             </button>
           );
         })}
+
         <button onClick={onLogout} className="mt-2 py-3.5 rounded-2xl text-sm font-bold text-red-500 border-2 border-red-100 bg-red-50">
           Sign Out
         </button>
       </div>
+
       <div className="h-6" />
+
+      {showEdit && (
+        <ProfileEditModal
+          user={user}
+          onSave={(updated) => { onEditProfile(updated); setShowEdit(false); }}
+          onClose={() => setShowEdit(false)}
+        />
+      )}
     </div>
   );
 }
@@ -833,19 +1358,28 @@ const CUST_TABS = [
   { id: "profile",  icon: User,     label: "Profile"  },
 ];
 
+const LOC_KEY = "sn_location";
+
 export default function CustomerApp() {
-  // Auth state
+  // Auth
   const [user, setUser] = useState<ApiUser | null>(() => auth.getUser());
   const [isLoggedIn, setIsLoggedIn] = useState(() => auth.isLoggedIn());
 
   // Navigation
   const [activeTab, setActiveTab] = useState("home");
+  const [profileScreen, setProfileScreen] = useState<"main" | "addresses">("main");
 
   // Data
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [categories, setCategories]     = useState<ApiCategory[]>([]);
   const [professionals, setProfessionals] = useState<ApiProfessional[]>([]);
-  const [bookings, setBookings] = useState<ApiBooking[]>([]);
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [bookings, setBookings]           = useState<ApiBooking[]>([]);
+  const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
+  const [offers, setOffers]               = useState<ApiOffer[]>([]);
+  const [addresses, setAddresses]         = useState<ApiAddress[]>([]);
+
+  // Location
+  const [location, setLocation] = useState<string>(() => localStorage.getItem(LOC_KEY) ?? "Set your location");
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   // Booking modal
   const [bookingPro, setBookingPro] = useState<ApiProfessional | null>(null);
@@ -857,17 +1391,18 @@ export default function CustomerApp() {
       setProfessionals(data);
       setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
     }).catch(console.error);
+    offersApi.list().then(setOffers).catch(console.error);
   }, []);
 
   // Load auth-required data when logged in
   useEffect(() => {
     if (!isLoggedIn) return;
     bookingsApi.list().then(setBookings).catch(console.error);
-    // Refresh professionals with isFavorite set
     professionalsApi.list().then((data) => {
       setProfessionals(data);
       setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
     }).catch(console.error);
+    addressesApi.list().then(setAddresses).catch(console.error);
   }, [isLoggedIn]);
 
   const handleLogin = useCallback((u: ApiUser, accessToken: string, refreshToken: string) => {
@@ -884,7 +1419,9 @@ export default function CustomerApp() {
     setIsLoggedIn(false);
     setBookings([]);
     setFavoriteIds(new Set());
+    setAddresses([]);
     setActiveTab("home");
+    setProfileScreen("main");
   }, []);
 
   const handleToggleFavorite = useCallback(async (id: string) => {
@@ -901,7 +1438,7 @@ export default function CustomerApp() {
         isFavorite ? next.add(id) : next.delete(id);
         return next;
       });
-    } catch { /* revert optimistic update */
+    } catch {
       setFavoriteIds((prev) => {
         const next = new Set(prev);
         next.has(id) ? next.delete(id) : next.add(id);
@@ -917,11 +1454,8 @@ export default function CustomerApp() {
 
   const handleBooked = useCallback((booking: ApiBooking) => {
     setBookings((prev) => [booking, ...prev]);
-    if (bookingPro) {
-      // After a short delay, close modal (step 3 is shown inside BookingModal)
-      setTimeout(() => setBookingPro(null), 3000);
-    }
-  }, [bookingPro]);
+    setTimeout(() => setBookingPro(null), 4000);
+  }, []);
 
   const handleCancelBooking = useCallback((id: string) => {
     setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" as const } : b));
@@ -936,13 +1470,34 @@ export default function CustomerApp() {
     bookingsApi.list().then(setBookings).catch(console.error);
   }, [isLoggedIn]);
 
-  // Show login screen when accessing auth-required tabs while logged out
+  const handleSelectLocation = useCallback((loc: string) => {
+    setLocation(loc);
+    localStorage.setItem(LOC_KEY, loc);
+    setShowLocationPicker(false);
+  }, []);
+
+  // Show login when accessing auth-required tabs while logged out
   if (!isLoggedIn && (activeTab === "bookings" || activeTab === "profile")) {
     return (
       <div className="flex flex-col items-center">
         <LoginScreen onLogin={handleLogin} />
         <button onClick={() => setActiveTab("home")} className="mt-3 text-white/60 text-xs font-semibold">← Back to home</button>
       </div>
+    );
+  }
+
+  // Profile: addresses sub-screen
+  if (activeTab === "profile" && profileScreen === "addresses" && user) {
+    return (
+      <PhoneFrame statusDark>
+        <div className="flex-1 overflow-y-auto relative" style={{ scrollbarWidth: "none" }}>
+          <SavedAddressesScreen
+            addresses={addresses}
+            onBack={() => setProfileScreen("main")}
+            onChange={setAddresses}
+          />
+        </div>
+      </PhoneFrame>
     );
   }
 
@@ -955,9 +1510,12 @@ export default function CustomerApp() {
             categories={categories}
             professionals={professionals}
             favoriteIds={favoriteIds}
+            offers={offers}
+            location={location}
             onToggleFavorite={handleToggleFavorite}
             onBook={handleBook}
             onCategoryFilter={handleCategoryFilter}
+            onLocationPress={() => setShowLocationPicker(true)}
           />
         )}
         {activeTab === "services" && (
@@ -977,7 +1535,15 @@ export default function CustomerApp() {
           />
         )}
         {activeTab === "profile" && user && (
-          <CustProfile user={user} onLogout={handleLogout} />
+          <CustProfile
+            user={user}
+            onLogout={handleLogout}
+            onShowAddresses={() => setProfileScreen("addresses")}
+            onEditProfile={(updated) => {
+              setUser(updated);
+              auth.store(auth.getToken()!, auth.getRefreshToken()!, updated);
+            }}
+          />
         )}
       </div>
 
@@ -987,7 +1553,7 @@ export default function CustomerApp() {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="flex flex-col items-center gap-0.5 px-4 py-1">
+            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setProfileScreen("main"); }} className="flex flex-col items-center gap-0.5 px-4 py-1">
               <div className="p-1.5 rounded-xl" style={{ background: active ? "#EDE9FD" : "transparent" }}>
                 <Icon size={20} color={active ? "#5B3EF5" : "#9CA3AF"} strokeWidth={active ? 2.5 : 2} />
               </div>
@@ -997,16 +1563,22 @@ export default function CustomerApp() {
         })}
       </div>
 
+      {/* Location picker modal */}
+      {showLocationPicker && (
+        <LocationPickerModal
+          current={location}
+          addresses={addresses}
+          onSelect={handleSelectLocation}
+          onClose={() => setShowLocationPicker(false)}
+        />
+      )}
+
       {/* Booking modal */}
       {bookingPro && (
         <BookingModal
           pro={bookingPro}
           onClose={() => setBookingPro(null)}
-          onBooked={(booking) => {
-            handleBooked(booking);
-            // show success step then auto-close
-            setTimeout(() => setBookingPro(null), 4000);
-          }}
+          onBooked={handleBooked}
         />
       )}
     </PhoneFrame>
