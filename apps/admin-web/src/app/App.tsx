@@ -994,10 +994,14 @@ function UsersView({
                 <tr key={u.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ background: ROLE_COLOR[u.role] ?? "#5B3EF5" }}>
-                        {u.fullName?.charAt(0).toUpperCase()}
-                      </div>
+                      {u.avatarUrl ? (
+                        <img src={u.avatarUrl} alt={u.fullName} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          style={{ background: ROLE_COLOR[u.role] ?? "#5B3EF5" }}>
+                          {u.fullName?.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <span className="text-white font-semibold whitespace-nowrap">{u.fullName}</span>
                     </div>
                   </td>

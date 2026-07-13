@@ -22,6 +22,12 @@ See delegation and design skills for some background information.
 
 **You must use the design subagent for every react-vite first build -- no exceptions.** This applies regardless of app size, complexity, or whether a backend is needed. "No backend" means skip OpenAPI/codegen, not skip the design subagent. "Simple app" means the subagent gets a simpler brief, not that you build the frontend yourself. Never build the frontend yourself to save time -- the design subagent is the fast path.
 
+### Step 0: Consume the design system first (only if the project has one)
+
+If the project already contains a `design-system` artifact, or the user selected a design system for this build, wire the new app onto it **before** authoring any UI so the design subagent builds directly on the design system — its themed components and tokens are the single source of truth, replacing the scaffold's own `src/components/ui/`. Read the design system's `docs/AGENTS.md` and follow its consumption steps right after `createArtifact`, before launching the design subagent. Then brief the design subagent to import every component, `cn`, and toast hook from the design system package rather than the local `@/components/ui/*`.
+
+If the project has no design system, skip this step and build on the scaffold as usual.
+
 ### Step 1: Classify the app
 
 Before building, classify the app to decide how you and the DESIGN subagent split work. **The design subagent is always used** -- the question is how much it owns.

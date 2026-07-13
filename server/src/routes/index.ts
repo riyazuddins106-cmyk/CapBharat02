@@ -10,6 +10,8 @@ import favoriteRoutes from './favorite.routes.js';
 import seedRoutes from './seed.routes.js';
 import partnerRoutes from './partner.routes.js';
 import adminRoutes from './admin.routes.js';
+import notificationRoutes from './notification.routes.js';
+import supportTicketRoutes from './supportTicket.routes.js';
 
 const router = Router();
 
@@ -28,5 +30,7 @@ router.use('/favorites', favoriteRoutes);
 router.use('/seed', seedRoutes);
 router.use('/partner', partnerRoutes);
 router.use('/admin', adminRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/support-tickets', supportTicketRoutes);
 
 export default router;

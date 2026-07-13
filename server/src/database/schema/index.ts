@@ -10,3 +10,5 @@ export * from './favorites';
 export * from './auditLogs';
 export * from './payments';
 export * from './payoutRequests';
+export * from './notifications';
+export * from './supportTickets';

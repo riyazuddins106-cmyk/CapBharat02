@@ -119,6 +119,33 @@ export interface Earnings {
   weekly: { date: string; amount: number }[];
 }
 
+// ── Multipart upload (avatar) — no Content-Type header so browser sets boundary ──
+async function uploadFile<T>(
+  path: string,
+  fieldName: string,
+  uri: string,
+  token: string,
+): Promise<T> {
+  const formData = new FormData();
+  if (typeof window !== 'undefined') {
+    const blobRes = await fetch(uri);
+    const blob = await blobRes.blob();
+    formData.append(fieldName, blob, 'avatar.jpg');
+  } else {
+    const name = uri.split('/').pop() ?? 'avatar.jpg';
+    const ext = /\.(\w+)$/.exec(name)?.[1] ?? 'jpg';
+    formData.append(fieldName, { uri, name, type: `image/${ext}` } as any);
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, json?.error?.message ?? 'Upload failed');
+  return json.data as T;
+}
+
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   login: (data: { email: string; password: string }) =>
@@ -156,6 +183,9 @@ export const authApi = {
 export const partnerApi = {
   getProfile: (token: string) =>
     request<PartnerProfile>('/api/partner/profile', { token }),
+
+  uploadAvatar: (uri: string, token: string) =>
+    uploadFile<PartnerProfile>('/api/partner/profile/avatar', 'avatar', uri, token),
 
   listJobs: (token: string) =>
     request<Job[]>('/api/partner/jobs', { token }),

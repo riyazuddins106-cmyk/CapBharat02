@@ -90,7 +90,12 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="auth" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-                <Stack.Screen name="professional/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="professional/[id]" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="wishlist" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="privacy-security" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="help-support" options={{ animation: 'slide_from_right' }} />
               </Stack>
             </AuthProvider>
           </QueryClientProvider>

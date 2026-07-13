@@ -25,6 +25,21 @@ export const profileController = {
     sendSuccess(res, profile);
   }),
 
+  changePassword: asyncHandler(async (req: Request, res: Response) => {
+    const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+    if (!currentPassword || !newPassword) throw AppError.badRequest('currentPassword and newPassword are required.');
+    if (newPassword.length < 8) throw AppError.badRequest('New password must be at least 8 characters.');
+    await userService.changePassword(req.user!.userId, currentPassword, newPassword);
+    sendSuccess(res, { message: 'Password changed successfully.' });
+  }),
+
+  deleteAccount: asyncHandler(async (req: Request, res: Response) => {
+    const { password } = req.body as { password?: string };
+    if (!password) throw AppError.badRequest('password is required to confirm account deletion.');
+    await userService.deleteAccount(req.user!.userId, password);
+    sendSuccess(res, { message: 'Account deleted.' });
+  }),
+
   registerPushToken: asyncHandler(async (req: Request, res: Response) => {
     const { pushToken } = req.body as { pushToken?: string };
     if (!pushToken || typeof pushToken !== 'string') {

@@ -68,6 +68,8 @@ Ask one detail per turn: ask one question, wait for the answer, then ask the nex
 
 This section is about *what* to match, not *when* to start. The order of operations for new decks lives in `<first_build>` -- follow that sequence. Do not begin writing slide files from this section; the Content Outline Review still has to happen first.
 
+The picker also offers the user's own saved workspace templates alongside the built-in catalog. If the user picks one, the response identifies it by `workspace_template_slug` -- call `useArtifactTemplate` with that slug to materialize it and follow the returned instructions instead of steps 1-2 below (steps 3-4 still apply, using the materialized template as the reference).
+
 1. **Study the template preview** -- For a selected template, a preview image is injected into your context after the user picks one. This is your primary visual target -- match it as closely as possible.
 2. **Read the reference file** -- Read `templates/<template-id>.md` (relative to the skill file) for exact hex codes, font choices, layout details, source code for all 4 slides, and design patterns.
 3. **Plan Slide 1 fidelity first** -- When you do build (after the Content Outline Review in `<first_build>` step 3), write Slide 1 first to match the reference image as closely as possible. Take a screenshot and compare against the reference image to verify fidelity before extending the patterns to the remaining slides.

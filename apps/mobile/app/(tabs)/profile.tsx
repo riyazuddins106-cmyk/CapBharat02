@@ -1,31 +1,37 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal, Platform } from 'react-native';
+import {
+  View, Text, Image, TouchableOpacity, StyleSheet,
+  ScrollView, TextInput, Alert, Modal, Platform, ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 const MENU_ITEMS = [
-  { icon: 'location-outline', label: 'Saved Addresses', onPress: (colors: any) => {} },
-  { icon: 'heart-outline', label: 'Wishlist', onPress: (colors: any) => {} },
-  { icon: 'shield-checkmark-outline', label: 'Privacy & Security', onPress: (colors: any) => {} },
-  { icon: 'notifications-outline', label: 'Notifications', onPress: (colors: any) => {} },
-  { icon: 'star-outline', label: 'Rate the App', onPress: (colors: any) => {} },
-  { icon: 'help-circle-outline', label: 'Help & Support', onPress: (colors: any) => {} },
+  { icon: 'location-outline',          label: 'Saved Addresses' },
+  { icon: 'heart-outline',             label: 'Wishlist' },
+  { icon: 'shield-checkmark-outline',  label: 'Privacy & Security' },
+  { icon: 'notifications-outline',     label: 'Notifications' },
+  { icon: 'star-outline',              label: 'Rate the App' },
+  { icon: 'help-circle-outline',       label: 'Help & Support' },
 ];
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, accessToken, isAuthenticated, logout } = useAuth();
-  const [editModal, setEditModal] = useState(false);
-  const [fullName, setFullName] = useState(user?.fullName ?? '');
-  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [editModal,  setEditModal]  = useState(false);
+  const [fullName,   setFullName]   = useState(user?.fullName ?? '');
+  const [phone,      setPhone]      = useState(user?.phone ?? '');
+  const [localAvatar, setLocalAvatar] = useState<string | null>(user?.avatarUrl ?? null);
+  const [uploading,  setUploading]  = useState(false);
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
@@ -38,6 +44,32 @@ export default function ProfileScreen() {
     },
     onError: (e: any) => Alert.alert('Error', e.message),
   });
+
+  const pickAndUploadAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library to update your profile photo.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      const uri = result.assets[0].uri;
+      setUploading(true);
+      const updated = await profileApi.uploadAvatar(uri, accessToken!);
+      setLocalAvatar(updated.avatarUrl);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Upload failed', e.message ?? 'Could not update photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -58,21 +90,31 @@ export default function ProfileScreen() {
     );
   }
 
+  const displayAvatar = localAvatar ?? user?.avatarUrl;
   const initials = (user?.fullName ?? '')
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || '?';
+    .split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={[styles.profileHeader, { paddingTop: topPadding + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={[styles.avatarLg, { backgroundColor: colors.secondary }]}>
-          <Text style={[styles.avatarText, { color: colors.primary }]}>{initials}</Text>
-        </View>
+        {/* Tappable avatar */}
+        <TouchableOpacity onPress={pickAndUploadAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
+          {displayAvatar ? (
+            <Image source={{ uri: displayAvatar }} style={styles.avatarImg} />
+          ) : (
+            <View style={[styles.avatarLg, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.avatarText, { color: colors.primary }]}>{initials}</Text>
+            </View>
+          )}
+          {/* Camera badge */}
+          <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
+            {uploading
+              ? <ActivityIndicator size={12} color="#fff" />
+              : <Ionicons name="camera" size={12} color="#fff" />}
+          </View>
+        </TouchableOpacity>
+
         <Text style={[styles.profileName, { color: colors.foreground }]}>{user?.fullName ?? ''}</Text>
         <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>{user?.email ?? ''}</Text>
         {user?.phone && <Text style={[styles.profilePhone, { color: colors.mutedForeground }]}>{user.phone}</Text>}
@@ -89,11 +131,7 @@ export default function ProfileScreen() {
 
       {/* Stats */}
       <View style={[styles.stats, { backgroundColor: colors.card, borderBottomColor: colors.border, borderTopColor: colors.border }]}>
-        {[
-          { label: 'Bookings', value: '—' },
-          { label: 'Reviews', value: '—' },
-          { label: 'Points', value: '0' },
-        ].map(({ label, value }) => (
+        {[{ label: 'Bookings', value: '—' }, { label: 'Reviews', value: '—' }, { label: 'Points', value: '0' }].map(({ label, value }) => (
           <View key={label} style={styles.stat}>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
@@ -142,15 +180,12 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Full Name</Text>
             <TextInput
-              value={fullName}
-              onChangeText={setFullName}
+              value={fullName} onChangeText={setFullName}
               style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
             />
             <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Phone</Text>
             <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
+              value={phone} onChangeText={setPhone} keyboardType="phone-pad"
               style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
             />
             <TouchableOpacity
@@ -169,36 +204,39 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-  avatarLg: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 32, fontWeight: '700' },
-  profileHeader: { alignItems: 'center', paddingBottom: 20, paddingHorizontal: 16, borderBottomWidth: 1, gap: 6 },
-  profileName: { fontSize: 22, fontWeight: '700', marginTop: 8 },
-  profileEmail: { fontSize: 13 },
-  profilePhone: { fontSize: 13 },
-  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 7, marginTop: 8 },
-  editBtnText: { fontSize: 13, fontWeight: '600' },
-  stats: { flexDirection: 'row', justifyContent: 'space-around', padding: 16, borderTopWidth: 1, borderBottomWidth: 1 },
-  stat: { alignItems: 'center', gap: 4 },
-  statValue: { fontSize: 20, fontWeight: '700' },
-  statLabel: { fontSize: 12 },
-  menu: { borderWidth: 1, overflow: 'hidden' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  menuIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { flex: 1, fontSize: 14, fontWeight: '500' },
-  menuDivider: { height: 1, marginLeft: 60 },
-  signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, paddingVertical: 14 },
-  signOutText: { fontSize: 15, fontWeight: '700' },
-  guestTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  guestText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  signInBtn: { paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
-  signInBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  editSheet: { margin: 16, padding: 24, gap: 12 },
-  editSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  editSheetTitle: { fontSize: 18, fontWeight: '700' },
-  fieldLabel: { fontSize: 13, fontWeight: '600', marginBottom: -4 },
-  input: { padding: 12, fontSize: 14 },
-  saveBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  center:           { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  avatarWrap:       { position: 'relative', marginBottom: 4 },
+  avatarLg:         { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
+  avatarImg:        { width: 88, height: 88, borderRadius: 44 },
+  avatarText:       { fontSize: 32, fontWeight: '700' },
+  cameraBadge:      { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  profileHeader:    { alignItems: 'center', paddingBottom: 20, paddingHorizontal: 16, borderBottomWidth: 1, gap: 6 },
+  profileName:      { fontSize: 22, fontWeight: '700', marginTop: 4 },
+  profileEmail:     { fontSize: 13 },
+  profilePhone:     { fontSize: 13 },
+  editBtn:          { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 7, marginTop: 8 },
+  editBtnText:      { fontSize: 13, fontWeight: '600' },
+  stats:            { flexDirection: 'row', justifyContent: 'space-around', padding: 16, borderTopWidth: 1, borderBottomWidth: 1 },
+  stat:             { alignItems: 'center', gap: 4 },
+  statValue:        { fontSize: 20, fontWeight: '700' },
+  statLabel:        { fontSize: 12 },
+  menu:             { borderWidth: 1, overflow: 'hidden' },
+  menuItem:         { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  menuIcon:         { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:        { flex: 1, fontSize: 14, fontWeight: '500' },
+  menuDivider:      { height: 1, marginLeft: 60 },
+  signOutBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, paddingVertical: 14 },
+  signOutText:      { fontSize: 15, fontWeight: '700' },
+  guestTitle:       { fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  guestText:        { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  signInBtn:        { paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
+  signInBtnText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
+  modalBackdrop:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  editSheet:        { margin: 16, padding: 24, gap: 12 },
+  editSheetHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  editSheetTitle:   { fontSize: 18, fontWeight: '700' },
+  fieldLabel:       { fontSize: 13, fontWeight: '600', marginBottom: -4 },
+  input:            { padding: 12, fontSize: 14 },
+  saveBtn:          { paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  saveBtnText:      { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

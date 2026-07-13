@@ -130,6 +130,35 @@ export interface Address {
   isDefault: boolean;
 }
 
+// ── Multipart upload (avatar) — no Content-Type header so browser sets boundary ──
+async function uploadFile<T>(
+  path: string,
+  fieldName: string,
+  uri: string,
+  token: string,
+): Promise<T> {
+  const formData = new FormData();
+  if (typeof window !== 'undefined') {
+    // Web: uri is a blob URL → fetch the blob then append
+    const blobRes = await fetch(uri);
+    const blob = await blobRes.blob();
+    formData.append(fieldName, blob, 'avatar.jpg');
+  } else {
+    // Native: append file URI directly
+    const name = uri.split('/').pop() ?? 'avatar.jpg';
+    const ext = /\.(\w+)$/.exec(name)?.[1] ?? 'jpg';
+    formData.append(fieldName, { uri, name, type: `image/${ext}` } as any);
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, json?.error?.message ?? 'Upload failed');
+  return json.data as T;
+}
+
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   register: (data: { fullName: string; email: string; password: string; phone?: string }) =>
@@ -164,6 +193,14 @@ export const profileApi = {
   me: (token: string) => request<User>('/api/profile/me', { token }),
   update: (data: Partial<Pick<User, 'fullName' | 'phone'>>, token: string) =>
     request<User>('/api/profile/me', { method: 'PATCH', body: JSON.stringify(data), token }),
+  uploadAvatar: (uri: string, token: string) =>
+    uploadFile<User>('/api/profile/me/avatar', 'avatar', uri, token),
+  changePassword: (currentPassword: string, newPassword: string, token: string) =>
+    request<{ message: string }>('/api/profile/me/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }), token }),
+  logoutAll: (token: string) =>
+    request<void>('/api/auth/logout-all', { method: 'POST', token }),
+  deleteAccount: (password: string, token: string) =>
+    request<void>('/api/profile/me', { method: 'DELETE', body: JSON.stringify({ password }), token }),
   registerPushToken: (pushToken: string, token: string) =>
     request<{ message: string }>('/api/profile/me/push-token', {
       method: 'PATCH',
@@ -184,6 +221,40 @@ export const professionalsApi = {
     return request<Professional[]>(`/api/professionals${qs ? `?${qs}` : ''}`);
   },
   get: (id: string) => request<Professional>(`/api/professionals/${id}`),
+};
+
+// ── Notifications ──────────────────────────────────────────
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  isRead: boolean;
+  data?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export const notificationsApi = {
+  list:       (token: string) => request<AppNotification[]>('/api/notifications', { token }),
+  markRead:   (id: string, token: string) => request<void>(`/api/notifications/${id}/read`, { method: 'PATCH', token }),
+  markAllRead:(token: string) => request<void>('/api/notifications/read-all', { method: 'PATCH', token }),
+  delete:     (id: string, token: string) => request<void>(`/api/notifications/${id}`, { method: 'DELETE', token }),
+  unreadCount:(token: string) => request<{ count: number }>('/api/notifications/unread-count', { token }),
+};
+
+// ── Support Tickets ────────────────────────────────────────
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: 'open' | 'in_progress' | 'closed';
+  createdAt: string;
+}
+
+export const supportApi = {
+  createTicket: (data: { name: string; email: string; subject: string; message: string }, token?: string | null) =>
+    request<SupportTicket>('/api/support-tickets', { method: 'POST', body: JSON.stringify(data), ...(token ? { token } : {}) }),
+  listMine: (token: string) => request<SupportTicket[]>('/api/support-tickets/mine', { token }),
 };
 
 // ── Bookings ───────────────────────────────────────────────
@@ -213,7 +284,7 @@ export const reviewsApi = {
     request<Review>('/api/reviews', { method: 'POST', body: JSON.stringify(data), token }),
 };
 
-// ── Addresses ──────────────────────────────────────────────
+// ── Profile ────────────────────────────────────────────────
 export const addressesApi = {
   list: (token: string) => request<Address[]>('/api/addresses', { token }),
   create: (data: Omit<Address, 'id' | 'line2'>, token: string) =>

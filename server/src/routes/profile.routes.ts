@@ -19,6 +19,8 @@ router.use(authenticate);
 router.get('/me', profileController.getProfile);
 router.patch('/me', validate({ body: updateProfileSchema }), profileController.updateProfile);
 router.post('/me/avatar', upload.single('avatar'), profileController.uploadAvatar);
+router.post('/me/change-password', profileController.changePassword);
 router.patch('/me/push-token', profileController.registerPushToken);
+router.delete('/me', profileController.deleteAccount);
 
 export default router;

@@ -1,12 +1,44 @@
 import { AppError } from '../utils/AppError.js';
 import { partnerRepository } from '../repositories/partner.repository.js';
+import { professionalRepository } from '../repositories/professional.repository.js';
+import { storageService } from './storage.service.js';
 import { notificationService } from './notification.service.js';
+import type { Express } from 'express';
 
 export const partnerService = {
   async getProfile(userId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found. Contact support to set up your professional account.');
     return pro;
+  },
+
+  async updateProfile(userId: string, data: { title?: string; bio?: string; basePrice?: number; priceUnit?: string; tags?: string[] }) {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    const updated = await professionalRepository.update(pro.id, {
+      ...(data.title     !== undefined && { title: data.title }),
+      ...(data.bio       !== undefined && { bio: data.bio }),
+      ...(data.basePrice !== undefined && { basePrice: data.basePrice }),
+      ...(data.priceUnit !== undefined && { priceUnit: data.priceUnit }),
+      ...(data.tags      !== undefined && { tags: data.tags }),
+    });
+    return updated;
+  },
+
+  async updateAccount(userId: string, data: { fullName?: string; phone?: string }) {
+    const { userRepository } = await import('../repositories/user.repository.js');
+    const updated = await userRepository.update(userId, {
+      ...(data.fullName !== undefined && { fullName: data.fullName }),
+      ...(data.phone    !== undefined && { phone: data.phone }),
+    });
+    return updated;
+  },
+
+  async updateAvatar(userId: string, avatarUrl: string) {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    const updated = await professionalRepository.update(pro.id, { avatarUrl });
+    return updated;
   },
 
   async listJobs(userId: string) {
