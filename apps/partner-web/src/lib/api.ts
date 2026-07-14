@@ -1,10 +1,6 @@
-function getApiBase(): string {
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
-  }
-  return 'http://localhost:8000';
-}
-const API_BASE = getApiBase();
+// Use relative URLs so the API works in both dev (vite proxy → :8000)
+// and production (Express serves everything on one port).
+const API_BASE = '';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

@@ -1,8 +1,12 @@
 import rateLimit from 'express-rate-limit';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
+// In development the limits are relaxed so automated tests can run without
+// hitting windows. Production values are enforced on deployment.
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: isDev ? 500 : 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -13,7 +17,7 @@ export const authRateLimiter = rateLimit({
 
 export const otpRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 3,
+  limit: isDev ? 100 : 3,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -24,14 +28,14 @@ export const otpRateLimiter = rateLimit({
 
 export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 120,
+  limit: isDev ? 1000 : 120,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 export const refreshRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 60,
+  limit: isDev ? 500 : 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

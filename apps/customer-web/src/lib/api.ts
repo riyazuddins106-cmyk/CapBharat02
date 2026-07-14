@@ -127,7 +127,7 @@ export interface ApiAddress {
 export const authApi = {
   async register(fullName: string, email: string, password: string, phone?: string) {
     const { data } = await client.post('/auth/register', { fullName, email, password, phone });
-    return data.data as { userId: string; email: string };
+    return data.data as { userId: string; email: string; devCode?: string };
   },
 
   async verifyOtp(email: string, code: string, purpose: 'signup' | 'login' | 'password_reset') {
@@ -136,7 +136,8 @@ export const authApi = {
   },
 
   async resendOtp(email: string, purpose: 'signup' | 'login' | 'password_reset') {
-    await client.post('/auth/resend-otp', { email, purpose });
+    const { data } = await client.post('/auth/resend-otp', { email, purpose });
+    return data.data as { devCode?: string };
   },
 
   async login(email: string, password: string) {
@@ -149,7 +150,8 @@ export const authApi = {
   },
 
   async forgotPassword(email: string) {
-    await client.post('/auth/forgot-password', { email });
+    const { data } = await client.post('/auth/forgot-password', { email });
+    return data.data as { devCode?: string };
   },
 
   async resetPassword(email: string, code: string, newPassword: string) {

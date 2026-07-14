@@ -57,9 +57,9 @@ export const authService = {
       passwordHash,
     });
 
-    await otpService.issue(user.email, 'signup', user.id);
+    const code = await otpService.issue(user.email, 'signup', user.id);
 
-    return { userId: user.id, email: user.email };
+    return { userId: user.id, email: user.email, devCode: code };
   },
 
   async verifySignupOtp(email: string, code: string) {
@@ -82,7 +82,8 @@ export const authService = {
     if (!user) {
       throw AppError.notFound('Account not found.');
     }
-    await otpService.issue(email, purpose, user.id);
+    const code = await otpService.issue(email, purpose, user.id);
+    return { devCode: code };
   },
 
   async login(input: LoginInput) {
@@ -158,9 +159,10 @@ export const authService = {
     const user = await userRepository.findByEmail(email);
     if (!user) {
       // Do not reveal whether the account exists.
-      return;
+      return {};
     }
-    await otpService.issue(email, 'password_reset', user.id);
+    const code = await otpService.issue(email, 'password_reset', user.id);
+    return { devCode: code };
   },
 
   async resetPassword(input: ResetPasswordInput) {

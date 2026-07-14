@@ -2,11 +2,21 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/response.js';
 import { authService } from '../services/auth.service.js';
+import { isProduction } from '../config/env.js';
+
+// Strip devCode before sending in production so OTPs are never leaked to clients.
+function sanitize<T extends { devCode?: string }>(data: T): Omit<T, 'devCode'> | T {
+  if (isProduction) {
+    const { devCode: _drop, ...rest } = data;
+    return rest as Omit<T, 'devCode'>;
+  }
+  return data;
+}
 
 export const authController = {
   register: asyncHandler(async (req: Request, res: Response) => {
     const result = await authService.register(req.body);
-    sendSuccess(res, result, 201);
+    sendSuccess(res, sanitize(result), 201);
   }),
 
   verifyOtp: asyncHandler(async (req: Request, res: Response) => {
@@ -19,8 +29,8 @@ export const authController = {
   }),
 
   resendOtp: asyncHandler(async (req: Request, res: Response) => {
-    await authService.resendOtp(req.body.email, req.body.purpose);
-    sendSuccess(res, { message: 'Verification code sent.' });
+    const result = await authService.resendOtp(req.body.email, req.body.purpose);
+    sendSuccess(res, sanitize({ message: 'Verification code sent.', ...result }));
   }),
 
   login: asyncHandler(async (req: Request, res: Response) => {
@@ -44,8 +54,8 @@ export const authController = {
   }),
 
   forgotPassword: asyncHandler(async (req: Request, res: Response) => {
-    await authService.forgotPassword(req.body.email);
-    sendSuccess(res, { message: 'If an account exists, a reset code has been sent.' });
+    const result = await authService.forgotPassword(req.body.email);
+    sendSuccess(res, sanitize({ message: 'If an account exists, a reset code has been sent.', ...(result ?? {}) }));
   }),
 
   resetPassword: asyncHandler(async (req: Request, res: Response) => {

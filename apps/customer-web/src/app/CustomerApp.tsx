@@ -158,6 +158,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
+  const [devCode, setDevCode] = useState<string | undefined>(undefined);
 
   async function handleLogin() {
     setError(""); setLoading(true);
@@ -172,8 +173,10 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
   async function handleRegister() {
     setError(""); setLoading(true);
     try {
-      await authApi.register(fullName, email, password, phone || undefined);
+      const res = await authApi.register(fullName, email, password, phone || undefined);
       setOtpPurpose("signup");
+      setDevCode(res.devCode);
+      if (res.devCode) setOtp(res.devCode);
       setScreen("verify-otp");
     } catch (e: any) {
       setError(e?.response?.data?.error?.message ?? "Registration failed.");
@@ -197,9 +200,11 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
   async function handleForgot() {
     setError(""); setLoading(true);
     try {
-      await authApi.forgotPassword(email);
+      const res = await authApi.forgotPassword(email);
       setOtpPurpose("password_reset");
-      setSuccess("Reset code sent to your email.");
+      setDevCode(res?.devCode);
+      if (res?.devCode) setOtp(res.devCode);
+      setSuccess("Reset code sent.");
       setScreen("verify-otp");
     } catch (e: any) {
       setError(e?.response?.data?.error?.message ?? "Failed to send reset code.");
@@ -260,11 +265,27 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
         {screen === "verify-otp" && <>
           <h2 className="text-xl font-bold mb-1">Verify your email</h2>
           <p className="text-gray-400 text-xs mb-5">Enter the 6-digit code sent to <span className="font-bold text-gray-600">{email}</span></p>
+          {devCode && (
+            <div
+              className="mb-4 rounded-xl px-4 py-3 text-xs flex items-center gap-2 cursor-pointer select-none"
+              style={{ background: "#f0edff", color: "#5b3ef5" }}
+              onClick={() => setOtp(devCode)}
+            >
+              <span className="text-base">🔑</span>
+              <span><strong>Dev mode:</strong> Code auto-filled — <strong>{devCode}</strong></span>
+            </div>
+          )}
           {success && <p className="text-green-600 text-xs mb-3">{success}</p>}
           <AuthInput placeholder="Enter 6-digit OTP" value={otp} onChange={setOtp} />
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
           <div className="mt-5"><AuthBtn label="Verify OTP" onClick={handleVerifyOtp} loading={loading} /></div>
-          <button onClick={async () => { setError(""); await authApi.resendOtp(email, otpPurpose); setSuccess("Code resent!"); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
+          <button onClick={async () => {
+            setError("");
+            const res = await authApi.resendOtp(email, otpPurpose);
+            setDevCode(res?.devCode);
+            if (res?.devCode) setOtp(res.devCode);
+            setSuccess("Code resent!");
+          }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
             Didn't receive it? <span style={{ color: "#5B3EF5" }}>Resend code</span>
           </button>
         </>}

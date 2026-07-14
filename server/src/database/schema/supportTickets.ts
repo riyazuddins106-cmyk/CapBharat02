@@ -1,5 +1,5 @@
 import { pgTable, uuid, varchar, text, timestamp, pgEnum } from 'drizzle-orm/pg-core';
-import { users } from './users';
+import { users } from './users.js';
 
 export const ticketStatusEnum = pgEnum('ticket_status', ['open', 'in_progress', 'closed']);
 

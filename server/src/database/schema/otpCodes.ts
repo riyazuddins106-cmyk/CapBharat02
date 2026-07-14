@@ -1,5 +1,5 @@
 import { pgTable, uuid, varchar, timestamp, pgEnum } from 'drizzle-orm/pg-core';
-import { users } from './users';
+import { users } from './users.js';
 
 export const otpPurposeEnum = pgEnum('otp_purpose', ['signup', 'login', 'password_reset']);
 

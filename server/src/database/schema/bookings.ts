@@ -1,8 +1,8 @@
 import { pgTable, uuid, varchar, timestamp, integer, text, pgEnum } from 'drizzle-orm/pg-core';
-import { users } from './users';
-import { professionals } from './professionals';
-import { serviceCategories } from './serviceCategories';
-import { addresses } from './addresses';
+import { users } from './users.js';
+import { professionals } from './professionals.js';
+import { serviceCategories } from './serviceCategories.js';
+import { addresses } from './addresses.js';
 
 export const bookingStatusEnum = pgEnum('booking_status', [
   'pending',

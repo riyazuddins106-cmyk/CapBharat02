@@ -1,6 +1,6 @@
 import { pgTable, uuid, integer, varchar, text, timestamp, pgEnum } from 'drizzle-orm/pg-core';
-import { users } from './users';
-import { bookings } from './bookings';
+import { users } from './users.js';
+import { bookings } from './bookings.js';
 
 export const pointsEntryTypeEnum = pgEnum('points_entry_type', ['earn', 'redeem', 'adjust']);
 

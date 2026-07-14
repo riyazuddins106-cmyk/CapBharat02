@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, timestamp, integer, pgEnum } from 'drizzle-orm/pg-core';
-import { bookings } from './bookings';
-import { users } from './users';
+import { bookings } from './bookings.js';
+import { users } from './users.js';
 
 export const paymentStatusEnum = pgEnum('payment_status', [
   'created',

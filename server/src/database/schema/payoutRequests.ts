@@ -1,5 +1,5 @@
 import { pgTable, uuid, integer, timestamp, pgEnum, varchar } from 'drizzle-orm/pg-core';
-import { professionals } from './professionals';
+import { professionals } from './professionals.js';
 
 export const payoutStatusEnum = pgEnum('payout_status', ['pending', 'paid', 'rejected']);
 

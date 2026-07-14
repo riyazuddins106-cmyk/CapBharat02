@@ -38,4 +38,9 @@ export const userRepository = {
   async markEmailVerified(id: string): Promise<void> {
     await db.update(users).set({ emailVerifiedAt: new Date(), updatedAt: new Date() }).where(eq(users.id, id));
   },
+
+  async delete(id: string): Promise<void> {
+    // Soft-delete: set deletedAt so existing queries (which filter isNull(deletedAt)) exclude the row.
+    await db.update(users).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(users.id, id));
+  },
 };

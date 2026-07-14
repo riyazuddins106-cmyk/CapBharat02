@@ -1,6 +1,6 @@
 import { pgTable, uuid, timestamp, unique } from 'drizzle-orm/pg-core';
-import { users } from './users';
-import { professionals } from './professionals';
+import { users } from './users.js';
+import { professionals } from './professionals.js';
 
 export const favorites = pgTable(
   'favorites',

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
@@ -15,6 +16,7 @@ function generateCode(): string {
 
 const SUBJECTS: Record<OtpCode['purpose'], string> = {
   signup: 'Verify your ServeNow account',
+  login: 'Your ServeNow login code',
   password_reset: 'Reset your ServeNow password',
 };
 
@@ -34,7 +36,7 @@ function buildEmailHtml(purpose: OtpCode['purpose'], code: string): string {
 }
 
 export const otpService = {
-  async issue(email: string, purpose: OtpCode['purpose'], userId?: string): Promise<void> {
+  async issue(email: string, purpose: OtpCode['purpose'], userId?: string): Promise<string> {
     const code = generateCode();
     const codeHash = await bcrypt.hash(code, 10);
 
@@ -57,7 +59,13 @@ export const otpService = {
 
     if (!emailed && process.env.NODE_ENV !== 'production') {
       logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);
+      // Also append to a temp file so test scripts can pick up OTPs without SMTP
+      try {
+        fs.appendFileSync('/tmp/otp-dev.log', `${email} ${purpose} ${code}\n`);
+      } catch { /* ignore */ }
     }
+
+    return code;
   },
 
   async verify(email: string, purpose: OtpCode['purpose'], code: string): Promise<void> {
