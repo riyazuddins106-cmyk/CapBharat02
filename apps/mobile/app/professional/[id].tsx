@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Platform, FlatList } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Platform, FlatList, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -116,7 +116,9 @@ export default function ProfessionalScreen() {
               <View style={styles.nameRow}>
                 <Text style={[styles.name, { color: colors.foreground }]}>{pro.name}</Text>
                 {pro.badge && (
-                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                  <View style={[styles.badge, {
+                    backgroundColor: pro.badge === 'Top Rated' ? '#5B3EF5' : pro.badge === 'New' ? '#16A34A' : colors.primary,
+                  }]}>
                     <Text style={styles.badgeText}>{pro.badge}</Text>
                   </View>
                 )}
@@ -278,6 +280,16 @@ export default function ProfessionalScreen() {
                   ))}
                 </View>
 
+                <TextInput
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Add notes for the professional (optional)"
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                  numberOfLines={2}
+                  style={[styles.notesInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
+
                 <View style={styles.confirmActions}>
                   <TouchableOpacity onPress={() => setStep(1)} style={[styles.backBtn, { borderColor: colors.border, borderRadius: colors.radius }]}>
                     <Text style={[styles.backBtnText, { color: colors.foreground }]}>Back</Text>
@@ -375,6 +387,7 @@ const styles = StyleSheet.create({
   confirmRow: { flexDirection: 'row', justifyContent: 'space-between' },
   confirmLabel: { fontSize: 13 },
   confirmValue: { fontSize: 14, fontWeight: '600' },
+  notesInput: { padding: 12, fontSize: 14, textAlignVertical: 'top', minHeight: 70 },
   confirmActions: { flexDirection: 'row', gap: 10 },
   backBtn: { flex: 1, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center' },
   backBtnText: { fontSize: 15, fontWeight: '600' },

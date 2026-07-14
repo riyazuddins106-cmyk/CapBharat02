@@ -28,7 +28,9 @@ export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, co
           </View>
         )}
         {pro.badge && (
-          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+          <View style={[styles.badge, {
+            backgroundColor: pro.badge === 'Top Rated' ? '#5B3EF5' : pro.badge === 'New' ? '#16A34A' : colors.primary,
+          }]}>
             <Text style={styles.badgeText}>{pro.badge}</Text>
           </View>
         )}

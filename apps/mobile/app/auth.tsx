@@ -33,7 +33,7 @@ export default function AuthScreen() {
     try {
       await login(email.trim(), password);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      router.replace('/');
     } catch (e: any) {
       Alert.alert('Login Failed', e.message);
     } finally {
@@ -62,7 +62,7 @@ export default function AuthScreen() {
       const purpose = mode === 'verify-otp' ? 'signup' : 'password_reset';
       await verifyOtp(pendingEmail, otp, purpose);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      router.replace('/');
     } catch (e: any) {
       Alert.alert('Invalid Code', e.message);
     } finally {
@@ -91,7 +91,7 @@ export default function AuthScreen() {
       await resetPassword(pendingEmail, otp, newPassword);
       await login(pendingEmail, newPassword);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      router.replace('/');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {

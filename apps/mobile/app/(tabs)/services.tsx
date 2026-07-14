@@ -1,20 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { categoriesApi, professionalsApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { categoriesApi, professionalsApi, favoritesApi } from '@/lib/api';
 import { ProCard } from '@/components/ProCard';
 import { CategoryPill } from '@/components/CategoryPill';
 import { ProCardShimmer, CategoryShimmer } from '@/components/Shimmer';
+import { queryClient } from '@/lib/queryClient';
 
 export default function ServicesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ categoryId?: string; categoryName?: string }>();
+  const { accessToken } = useAuth();
 
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string | null>(params.categoryId ?? null);
@@ -31,6 +34,18 @@ export default function ServicesScreen() {
       ...(search.trim() ? { search: search.trim() } : {}),
     }),
     staleTime: 10_000,
+  });
+
+  const { data: favorites } = useQuery({
+    queryKey: ['/api/favorites', accessToken],
+    queryFn: () => favoritesApi.list(accessToken!),
+    enabled: !!accessToken,
+  });
+  const favoriteIds = new Set((favorites ?? []).map((f: any) => f.professionalId ?? f.id));
+
+  const favMutation = useMutation({
+    mutationFn: (proId: string) => favoritesApi.toggle(proId, accessToken!),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/favorites'] }),
   });
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
@@ -103,6 +118,8 @@ export default function ServicesScreen() {
             pro={item}
             onPress={() => router.push({ pathname: '/professional/[id]', params: { id: item.id } })}
             onBook={() => router.push({ pathname: '/professional/[id]', params: { id: item.id, openBook: '1' } })}
+            isFavorite={favoriteIds.has(item.id)}
+            onToggleFavorite={accessToken ? () => { Haptics.selectionAsync(); favMutation.mutate(item.id); } : undefined}
           />
         )}
       />

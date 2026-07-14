@@ -11,7 +11,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen is native-only — calling it on web shows a white overlay
+// that never gets removed, leaving a permanently blank page.
+if (Platform.OS !== 'web') SplashScreen.preventAutoHideAsync();
 
 // ── Error boundary: prevents a single render error from crashing the whole app ──
 class ErrorBoundary extends Component<
@@ -88,7 +90,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError || fontTimedOut) {
-      SplashScreen.hideAsync();
+      if (Platform.OS !== 'web') SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError, fontTimedOut]);
 
@@ -108,6 +110,7 @@ export default function RootLayout() {
                 <Stack.Screen name="professional/[id]" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="wishlist" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="points" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="privacy-security" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="help-support" options={{ animation: 'slide_from_right' }} />

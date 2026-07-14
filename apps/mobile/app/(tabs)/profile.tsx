@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet,
+  View, Text, Image, TouchableOpacity, Pressable, StyleSheet,
   ScrollView, TextInput, Alert, Modal, Platform, ActivityIndicator, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -178,23 +178,38 @@ export default function ProfileScreen() {
       </View>
 
       {/* Menu */}
-      <View style={[styles.menu, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius, marginHorizontal: 16, marginTop: 16 }]}>
-        {MENU_ITEMS.map(({ icon, label, route }, i) => (
-          <React.Fragment key={label}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              activeOpacity={0.7}
-              onPress={() => route ? router.push(route as any) : handleRateApp()}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}>
-                <Ionicons name={icon as any} size={18} color={colors.primary} />
-              </View>
-              <Text style={[styles.menuLabel, { color: colors.foreground }]}>{label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            {i < MENU_ITEMS.length - 1 && <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />}
-          </React.Fragment>
-        ))}
+      <View style={[styles.menu, { borderColor: colors.border, borderRadius: colors.radius, marginHorizontal: 16, marginTop: 16 }]}>
+        {MENU_ITEMS.map(({ icon, label, route }, i) => {
+          const isFirst = i === 0;
+          const isLast  = i === MENU_ITEMS.length - 1;
+          const radius = {
+            borderTopLeftRadius:     isFirst ? colors.radius : 0,
+            borderTopRightRadius:    isFirst ? colors.radius : 0,
+            borderBottomLeftRadius:  isLast  ? colors.radius : 0,
+            borderBottomRightRadius: isLast  ? colors.radius : 0,
+          };
+          return (
+            <React.Fragment key={label}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  radius,
+                  { backgroundColor: pressed ? colors.muted : colors.card },
+                ]}
+                onPress={() => route ? router.push(route as any) : handleRateApp()}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name={icon as any} size={18} color={colors.primary} />
+                </View>
+                <Text style={[styles.menuLabel, { color: colors.foreground }]}>{label}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+              </Pressable>
+              {i < MENU_ITEMS.length - 1 && (
+                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+              )}
+            </React.Fragment>
+          );
+        })}
       </View>
 
       {/* Sign out */}
@@ -262,7 +277,7 @@ const styles = StyleSheet.create({
   stat:             { alignItems: 'center', gap: 4 },
   statValue:        { fontSize: 20, fontWeight: '700' },
   statLabel:        { fontSize: 12 },
-  menu:             { borderWidth: 1, overflow: 'hidden' },
+  menu:             { borderWidth: 1 },
   menuItem:         { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   menuIcon:         { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   menuLabel:        { flex: 1, fontSize: 14, fontWeight: '500' },
