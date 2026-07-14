@@ -14,3 +14,5 @@
 - [Points & Rewards design](points-rewards-design.md) — earn/redeem rules chosen when building the loyalty feature from scratch (1pt/₹10 earn, 1pt=₹1 redeem, min 100).
 - [CRUD test field names](crud-field-names.md) — exact API field names differ from obvious guesses; verified from validators/controllers.
 - [Expo web useFonts hang over tunnel](expo-web-usefonts-hang.md) — useFonts() can hang forever specifically over the public HTTPS domain even though font requests succeed fine directly; always add a setTimeout fallback to force render.
+- [worklets-src-redirect](worklets-src-redirect.md) — react-native-worklets "react-native" field resolves to src/TS; redirect to lib/module in resolveRequest.
+- [hermesc-jsc-workaround](hermesc-jsc-workaround.md) — pnpm RN 0.81 ships hermesc 0.12 (no private class fields); set jsEngine:jsc in app.json to skip hermesc for EAS Update.

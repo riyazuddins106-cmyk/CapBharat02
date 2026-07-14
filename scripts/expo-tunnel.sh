@@ -49,13 +49,13 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   echo "=== Replit: skipping ngrok, using Expo tunnel service (exp.direct) ==="
   echo "Starting Expo on port $PORT…"
 
-  # The dev domain changes every time the workspace restarts. Always derive
-  # EXPO_PUBLIC_API_URL from the current REPLIT_DEV_DOMAIN instead of relying
-  # on a value baked into .replit, which goes stale across sessions.
-  if [[ -n "$REPLIT_DEV_DOMAIN" ]]; then
+  # Only fall back to the dev domain if no API URL was explicitly passed in.
+  # When EXPO_PUBLIC_API_URL is already set (e.g. to the production URL for UAT),
+  # preserve it rather than overwriting with the ephemeral dev domain.
+  if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
     export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
-    echo "Using EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL"
   fi
+  echo "Using EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL"
 
   # Retry loop — exp.direct can transiently reject connections, especially
   # when both apps start near-simultaneously. Retry up to 5 times.

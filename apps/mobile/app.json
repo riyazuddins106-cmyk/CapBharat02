@@ -8,6 +8,7 @@
     "scheme": "servenow",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "jsEngine": "jsc",
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -35,8 +36,20 @@
       "expo-font",
       "expo-notifications"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/a290a039-c096-4437-aa82-0f43b13e08b1"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a290a039-c096-4437-aa82-0f43b13e08b1"
+      }
+    },
+    "owner": "riyazuddinss-team"
   }
 }

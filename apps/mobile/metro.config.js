@@ -54,10 +54,26 @@ const FORCED_MODULES = {
 
 config.resolver.extraNodeModules = { ...FORCED_MODULES };
 
+// react-native-worklets ships "react-native": "./src/index" in its package.json.
+// Metro's Expo resolver prioritises that field, which loads raw TypeScript files;
+// the worklets Babel plugin then crashes when it encounters its own source.
+// Redirect to the pre-compiled lib/module entry to avoid this.
+const COMPILED_OVERRIDES = {
+  'react-native-worklets': path.resolve(
+    workspaceRoot,
+    'node_modules/.pnpm',
+    fs.readdirSync(path.join(workspaceRoot, 'node_modules/.pnpm')).find(d => d.startsWith('react-native-worklets@')),
+    'node_modules/react-native-worklets/lib/module/index.js',
+  ),
+};
+
 const defaultResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (Object.prototype.hasOwnProperty.call(FORCED_MODULES, moduleName)) {
     return { type: 'sourceFile', filePath: FORCED_MODULES[moduleName] };
+  }
+  if (Object.prototype.hasOwnProperty.call(COMPILED_OVERRIDES, moduleName)) {
+    return { type: 'sourceFile', filePath: COMPILED_OVERRIDES[moduleName] };
   }
   return defaultResolveRequest
     ? defaultResolveRequest(context, moduleName, platform)

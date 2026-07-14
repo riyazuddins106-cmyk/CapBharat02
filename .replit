@@ -68,7 +68,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN"
+args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://cap-bharat-02--jeleye1636.replit.app ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -80,7 +80,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN:8000 ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
+args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://cap-bharat-02--jeleye1636.replit.app ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
 waitForPort = 8099
 
 [[workflows.workflow]]

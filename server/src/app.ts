@@ -40,7 +40,7 @@ export function createApp() {
   //   admin-web    → /admin-panel/ (apps/admin-web/dist)
   //   partner-web  → /partner/   (apps/partner-web/dist)
   if (isProduction) {
-    const root = path.resolve(__dirname, '..', '..', '..'); // workspace root
+    const root = path.resolve(__dirname, '..', '..'); // workspace root (server/dist → server → workspace root)
 
     const adminDist   = path.join(root, 'apps', 'admin-web', 'dist');
     const partnerDist = path.join(root, 'apps', 'partner-web', 'dist');
