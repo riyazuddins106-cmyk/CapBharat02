@@ -2,6 +2,10 @@
 
 Follow this guide when building or optimizing a React + Vite web app for search engine visibility.
 
+## Resolving `yourdomain.com`
+
+The examples below use `https://yourdomain.com` as a placeholder for the app's production URL. To fill it in, call `getDeploymentInfo()` (see the deployment skill) and use `primaryUrl`. Never substitute the `.replit.dev` development domain, a URL assembled from `$REPLIT_DOMAINS` in the shell, or a guessed `.replit.app` name. If the app is not deployed yet (`isDeployed: false`), keep absolute URLs behind a single configurable base (env var or constant) and tell the user to publish first — do not bake in a fabricated URL.
+
 ## Critical SEO Foundations
 
 ### Title & Meta Description

@@ -65,7 +65,14 @@ export default function HelpSupportScreen() {
         <View style={styles.quickRow}>
           <QuickCard icon="ticket-outline" label="Submit Ticket" color={colors.primary} onPress={() => setTicketModal(true)} colors={colors} />
           <QuickCard icon="mail-outline" label="Email Us" color="#16A34A" onPress={() => Linking.openURL('mailto:support@servenow.in')} colors={colors} />
-          <QuickCard icon="chatbubble-outline" label="WhatsApp" color="#25D366" onPress={() => Linking.openURL('https://wa.me/919999999999')} colors={colors} />
+          <QuickCard icon="chatbubble-outline" label="WhatsApp" color="#25D366" onPress={async () => {
+            const waDeep = 'whatsapp://send?phone=919999999999';
+            const waWeb  = 'https://wa.me/919999999999';
+            try {
+              const ok = await Linking.canOpenURL(waDeep);
+              await Linking.openURL(ok ? waDeep : waWeb);
+            } catch { await Linking.openURL(waWeb); }
+          }} colors={colors} />
         </View>
 
         {/* FAQ */}

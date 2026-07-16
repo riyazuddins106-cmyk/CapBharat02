@@ -1,6 +1,6 @@
 ---
 name: media-generation
-description: "Generate AI images. Use this skill for visual content creation. For AI video clips, read `media-generation/video-generation.md`; for 3D model assets, read `media-generation/reference/3d-model-generation.md`; for music, sound effects, and text-to-speech audio, read `media-generation/audio-generation.md`"
+description: "Generate AI images. Use this skill for visual content creation. For AI video clips, read `media-generation/video-generation.md`; for 3D model assets, read `media-generation/reference/3d-model-generation.md`; for music, sound effects, and text-to-speech audio, read `media-generation/audio-generation.md`; for vector SVG icons, logo marks, and illustrations, read `.local/skills/external-apis/references/quiver-ai.md`"
 ---
 
 # Media Generation Skill
@@ -87,6 +87,10 @@ for (const img of images) {
 - Specific visual concepts or designs
 - Placeholder images for development
 - Creative or artistic content
+
+### Vector SVG assets
+
+For scalable vector SVGs (icons, logo marks, simple illustrations), generate real SVG markup with the `externalApi__quiver_ai` callback instead of raster images or hand-coded paths — read `.local/skills/external-apis/references/quiver-ai.md`.
 
 ## Aspect Ratio Guidelines
 

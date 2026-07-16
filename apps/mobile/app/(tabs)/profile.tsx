@@ -95,6 +95,7 @@ export default function ProfileScreen() {
       setUploading(true);
       const updated = await profileApi.uploadAvatar(uri, accessToken!);
       setLocalAvatar(updated.avatarUrl);
+      updateUser(updated);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
       Alert.alert('Upload failed', e.message ?? 'Could not update photo.');

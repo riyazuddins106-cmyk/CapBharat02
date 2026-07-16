@@ -1,11 +1,18 @@
+import { Platform } from 'react-native';
+
 // On web, call the Express server on port 8000 directly using the same
 // hostname the browser is already on. Port 8000 is exposed by Replit's proxy
 // and Express has CORS open (origin: true), so this works from any port.
+// On native (iOS/Android), always use the baked-in env var or the production URL —
+// never use window.location which exists on RN via expo-router's URL polyfill but
+// gives the wrong hostname/port for native fetch calls.
 function getApiBase(): string {
-  if (typeof window !== 'undefined' && window.location?.hostname) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
     return `${window.location.protocol}//${window.location.hostname}:8000`;
   }
-  return (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+  // EXPO_PUBLIC_API_URL is baked-in at export time (eas update).
+  // Fall back to the production server so device builds always work without env vars.
+  return (process.env.EXPO_PUBLIC_API_URL ?? 'https://cap-bharat-02--jeleye1636.replit.app').replace(/\/$/, '');
 }
 const API_BASE = getApiBase();
 
@@ -127,11 +134,13 @@ async function uploadFile<T>(
   token: string,
 ): Promise<T> {
   const formData = new FormData();
-  if (typeof window !== 'undefined') {
+  if (Platform.OS === 'web') {
+    // Web: fetch the local object URL as a Blob and append it
     const blobRes = await fetch(uri);
     const blob = await blobRes.blob();
     formData.append(fieldName, blob, 'avatar.jpg');
   } else {
+    // Native: pass the file URI directly — React Native's FormData handles it
     const name = uri.split('/').pop() ?? 'avatar.jpg';
     const ext = /\.(\w+)$/.exec(name)?.[1] ?? 'jpg';
     formData.append(fieldName, { uri, name, type: `image/${ext}` } as any);

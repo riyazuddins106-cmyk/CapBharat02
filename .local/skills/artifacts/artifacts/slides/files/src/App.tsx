@@ -37,8 +37,60 @@ function SlideEditor() {
   useEffect(() => {
     if (currentIndex === -1) return;
 
+    const INTERACTIVE =
+      'a,button,video,audio,input,select,textarea,details,summary,iframe,svg,canvas,' +
+      '[role="button"],[contenteditable]:not([contenteditable="false"])';
+
+    const isInteractive = (target: EventTarget | null) =>
+      (target as HTMLElement | null)?.closest?.(INTERACTIVE);
+
+    const ARROW_KEY_CONSUMERS =
+      'input:not([type="button"]):not([type="submit"]):not([type="reset"]),' +
+      'select,textarea,audio,video';
+
+    const consumesArrowKeys = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      return (
+        target.isContentEditable || !!target.closest(ARROW_KEY_CONSUMERS)
+      );
+    };
+
+    const postNav = (type: 'advanceSlide' | 'retreatSlide') => {
+      window.parent.postMessage({ type, source: 'keyboard' }, '*');
+    };
+
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (navigationDisabledRef.current) return;
+      if (navigationDisabledRef.current) {
+        if (event.defaultPrevented) return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+          return;
+        }
+        if (event.key === ' ') {
+          const focused = isInteractive(event.target);
+          const role = focused?.getAttribute('role');
+          const isPlainLink =
+            !!focused &&
+            focused.tagName === 'A' &&
+            (!role ||
+              role === 'link' ||
+              role === 'none' ||
+              role === 'presentation');
+          if (focused && !isPlainLink) return;
+          event.preventDefault();
+          postNav('advanceSlide');
+          return;
+        }
+        if (consumesArrowKeys(event.target)) return;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          postNav('retreatSlide');
+        }
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          postNav('advanceSlide');
+        }
+        return;
+      }
       if (event.key === ' ') {
         event.preventDefault();
       }
@@ -57,13 +109,6 @@ function SlideEditor() {
         navigate(`/slide${slides[currentIndex + 1].position}`);
       }
     };
-
-    const INTERACTIVE =
-      'a,button,video,audio,input,select,textarea,details,summary,iframe,svg,canvas,' +
-      '[role="button"],[contenteditable="true"]';
-
-    const isInteractive = (target: EventTarget | null) =>
-      (target as HTMLElement | null)?.closest?.(INTERACTIVE);
 
     const touchHandledRef = touchHandledRefStable;
 

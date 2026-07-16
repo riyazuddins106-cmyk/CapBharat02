@@ -13,6 +13,13 @@ interface Props {
   compact?: boolean;
 }
 
+const AVATAR_COLORS = ['#5B3EF5','#0F766E','#D97706','#16A34A','#2563EB','#9333EA','#DB2777','#EA580C'];
+function avatarBg(name: string): string {
+  let n = 0;
+  for (let i = 0; i < name.length; i++) n += name.charCodeAt(i);
+  return AVATAR_COLORS[n % AVATAR_COLORS.length];
+}
+
 export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, compact }: Props) {
   const colors = useColors();
 
@@ -23,8 +30,8 @@ export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, co
         {pro.avatarUrl ? (
           <Image source={{ uri: pro.avatarUrl }} style={[styles.avatar, { borderRadius: colors.radius }]} />
         ) : (
-          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.secondary, borderRadius: colors.radius }]}>
-            <Text style={[styles.avatarInitial, { color: colors.primary }]}>{pro.name[0]}</Text>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: avatarBg(pro.name), borderRadius: colors.radius }]}>
+            <Text style={styles.avatarInitial}>{pro.name[0].toUpperCase()}</Text>
           </View>
         )}
         {pro.badge && (
@@ -86,7 +93,7 @@ const styles = StyleSheet.create({
   avatarWrap: { position: 'relative' },
   avatar: { width: 80, height: 80 },
   avatarPlaceholder: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 28, fontWeight: '700' },
+  avatarInitial: { fontSize: 28, fontWeight: '700', color: '#fff' },
   badge: { position: 'absolute', bottom: 4, left: 0, right: 0, paddingVertical: 2, borderRadius: 4, alignItems: 'center' },
   badgeText: { color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
   info: { flex: 1, gap: 4 },
