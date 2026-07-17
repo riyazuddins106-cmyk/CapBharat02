@@ -65,6 +65,40 @@ export const partnerService = {
     return job;
   },
 
+  async acceptJob(userId: string, bookingId: string) {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    if (!job) throw AppError.notFound('Job not found or not assigned to you.');
+    if (job.status !== 'pending') throw AppError.badRequest(`Cannot accept a booking with status "${job.status}".`);
+    const updated = await partnerRepository.updateStatus(bookingId, 'upcoming');
+    if (job.customerId) {
+      const title = 'Booking confirmed!';
+      const body = `${pro.name} has accepted your ${job.serviceName} booking.`;
+      void notificationService.sendToUser(job.customerId, title, body, { bookingId, type: 'booking_accepted' });
+      const { notificationDbService } = await import('./notificationDb.service.js');
+      void notificationDbService.create({ userId: job.customerId, title, body, type: 'booking', data: { bookingId } });
+    }
+    return updated;
+  },
+
+  async rejectJob(userId: string, bookingId: string) {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    if (!job) throw AppError.notFound('Job not found or not assigned to you.');
+    if (job.status !== 'pending') throw AppError.badRequest(`Cannot reject a booking with status "${job.status}".`);
+    const updated = await partnerRepository.updateStatus(bookingId, 'cancelled');
+    if (job.customerId) {
+      const title = 'Booking declined';
+      const body = `Your ${job.serviceName} booking was declined by the partner. Please book another professional.`;
+      void notificationService.sendToUser(job.customerId, title, body, { bookingId, type: 'booking_rejected' });
+      const { notificationDbService } = await import('./notificationDb.service.js');
+      void notificationDbService.create({ userId: job.customerId, title, body, type: 'booking', data: { bookingId } });
+    }
+    return updated;
+  },
+
   async checkIn(userId: string, bookingId: string, qrToken: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
@@ -90,12 +124,11 @@ export const partnerService = {
     const updated = await partnerRepository.updateStatus(bookingId, 'in_progress');
 
     if (job.customerId) {
-      void notificationService.sendToUser(
-        job.customerId,
-        'Your service partner has arrived',
-        `${pro.name} has checked in for your ${job.serviceName} booking.`,
-        { bookingId, type: 'booking_in_progress' },
-      );
+      const title = 'Your service partner has arrived';
+      const body = `${pro.name} has checked in for your ${job.serviceName} booking.`;
+      void notificationService.sendToUser(job.customerId, title, body, { bookingId, type: 'booking_in_progress' });
+      const { notificationDbService } = await import('./notificationDb.service.js');
+      void notificationDbService.create({ userId: job.customerId, title, body, type: 'booking', data: { bookingId } });
     }
 
     return updated;
@@ -114,12 +147,11 @@ export const partnerService = {
     const updated = await partnerRepository.updateStatus(bookingId, 'completed');
 
     if (job.customerId) {
-      void notificationService.sendToUser(
-        job.customerId,
-        'Service completed',
-        `Your ${job.serviceName} booking with ${pro.name} is complete. Thanks for using ServeNow!`,
-        { bookingId, type: 'booking_completed' },
-      );
+      const title = 'Service completed';
+      const body = `Your ${job.serviceName} booking with ${pro.name} is complete. Thanks for using ServeNow!`;
+      void notificationService.sendToUser(job.customerId, title, body, { bookingId, type: 'booking_completed' });
+      const { notificationDbService } = await import('./notificationDb.service.js');
+      void notificationDbService.create({ userId: job.customerId, title, body, type: 'booking', data: { bookingId } });
 
       const { pointsService } = await import('./points.service.js');
       void pointsService.earnForBooking(job.customerId, bookingId, job.price ?? 0);

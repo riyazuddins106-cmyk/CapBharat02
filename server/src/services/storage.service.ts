@@ -1,5 +1,5 @@
 import { AppError } from '../utils/AppError.js';
-import { supabaseAdmin, AVATAR_BUCKET } from '../config/supabase.js';
+import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET } from '../config/supabase.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -35,6 +35,29 @@ function detectImageType(buf: Buffer): { mime: string; ext: string } | null {
 }
 
 export const storageService = {
+  async uploadCategoryImage(key: string, file: Express.Multer.File): Promise<string> {
+    if (file.size > MAX_FILE_SIZE) throw AppError.badRequest('Image must be smaller than 5MB.');
+    const detected = detectImageType(file.buffer);
+    if (!detected) throw AppError.badRequest('Image must be PNG, JPEG, or WebP.');
+    const path = `${key}-${Date.now()}.${detected.ext}`;
+    const { error } = await supabaseAdmin.storage.from(CATEGORY_BUCKET).upload(path, file.buffer, { contentType: detected.mime, upsert: true });
+    if (error) throw AppError.internal(`Upload failed: ${error.message}`);
+    return supabaseAdmin.storage.from(CATEGORY_BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+
+  async uploadReelVideo(key: string, file: Express.Multer.File): Promise<string> {
+    const MAX_VIDEO = 100 * 1024 * 1024;
+    if (file.size > MAX_VIDEO) throw AppError.badRequest('Video must be smaller than 100MB.');
+    const allowed = ['video/mp4', 'video/quicktime', 'video/webm'];
+    const mime = file.mimetype;
+    if (!allowed.includes(mime)) throw AppError.badRequest('Video must be MP4, MOV, or WebM.');
+    const ext = mime === 'video/quicktime' ? 'mov' : mime === 'video/webm' ? 'webm' : 'mp4';
+    const path = `${key}-${Date.now()}.${ext}`;
+    const { error } = await supabaseAdmin.storage.from(REELS_BUCKET).upload(path, file.buffer, { contentType: mime, upsert: true });
+    if (error) throw AppError.internal(`Upload failed: ${error.message}`);
+    return supabaseAdmin.storage.from(REELS_BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
     if (file.size > MAX_FILE_SIZE) {
       throw AppError.badRequest('Avatar must be smaller than 5MB.');

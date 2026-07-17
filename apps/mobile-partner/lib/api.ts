@@ -211,6 +211,12 @@ export const partnerApi = {
   getJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}`, { token }),
 
+  acceptJob: (id: string, token: string) =>
+    request<Job>(`/api/partner/jobs/${id}/accept`, { method: 'PATCH', token }),
+
+  rejectJob: (id: string, token: string) =>
+    request<Job>(`/api/partner/jobs/${id}/reject`, { method: 'PATCH', token }),
+
   checkIn: (id: string, qrToken: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', body: JSON.stringify({ qrToken }), token }),
 

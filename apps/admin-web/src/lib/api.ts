@@ -110,9 +110,44 @@ export interface Category {
   iconName: string;
   color: string;
   iconColor: string;
+  imageUrl?: string | null;
   serviceCount: number;
   sortOrder: number;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReelRow {
+  id: string;
+  title: string;
+  description?: string | null;
+  videoUrl: string;
+  platform: string;
+  thumbnailUrl?: string | null;
+  customThumbnailUrl?: string | null;
+  effectiveThumbnail?: string | null;
+  category?: string | null;
+  serviceCategoryId?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+  publishDate?: string | null;
+  expiryDate?: string | null;
+  clickCount: number;
+  viewCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -266,6 +301,52 @@ export const adminApi = {
     request<Category>(`/admin/categories/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteCategory: (id: string, token: string) =>
     request<{ id: string }>(`/admin/categories/${id}`, { method: 'DELETE', token }),
+  uploadCategoryImage: (id: string, file: File, token: string) => {
+    const fd = new FormData(); fd.append('image', file);
+    return fetch(`/api/admin/categories/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as Category; }));
+  },
+
+  // Subcategories
+  getSubcategories: (categoryId: string, token: string) =>
+    request<{ subcategories: SubCategory[]; total: number }>(`/admin/categories/${categoryId}/subcategories`, { token }),
+  createSubcategory: (categoryId: string, data: { name: string; description?: string; sortOrder?: number }, token: string) =>
+    request<SubCategory>(`/admin/categories/${categoryId}/subcategories`, { method: 'POST', token, body: JSON.stringify(data) }),
+  updateSubcategory: (id: string, data: { name?: string; description?: string; sortOrder?: number; isActive?: boolean }, token: string) =>
+    request<SubCategory>(`/admin/subcategories/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  deleteSubcategory: (id: string, token: string) =>
+    request<{ id: string }>(`/admin/subcategories/${id}`, { method: 'DELETE', token }),
+  uploadSubcategoryImage: (id: string, file: File, token: string) => {
+    const fd = new FormData(); fd.append('image', file);
+    return fetch(`/api/admin/subcategories/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as SubCategory; }));
+  },
+
+  // Reels
+  getReels: (token: string) =>
+    request<{ reels: ReelRow[]; total: number }>('/admin/reels', { token }),
+  detectReelPlatform: (url: string, token: string) =>
+    request<{ valid: boolean; platform: string; autoThumbnail: string | null }>(`/admin/reels/detect-platform?url=${encodeURIComponent(url)}`, { token }),
+  createReel: (data: {
+    title: string; description?: string; videoUrl: string;
+    category?: string; serviceCategoryId?: string; sortOrder?: number;
+    featured?: boolean; publishDate?: string | null; expiryDate?: string | null;
+  }, token: string) =>
+    request<ReelRow>('/admin/reels', { method: 'POST', token, body: JSON.stringify(data) }),
+  updateReel: (id: string, data: Partial<{
+    title: string; description: string; videoUrl: string;
+    category: string; serviceCategoryId: string | null;
+    sortOrder: number; isActive: boolean; featured: boolean;
+    publishDate: string | null; expiryDate: string | null;
+  }>, token: string) =>
+    request<ReelRow>(`/admin/reels/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  deleteReel: (id: string, token: string) =>
+    request<{ id: string }>(`/admin/reels/${id}`, { method: 'DELETE', token }),
+  uploadReelThumbnail: (id: string, file: File, token: string) => {
+    const fd = new FormData(); fd.append('image', file);
+    return fetch(`/api/admin/reels/${id}/thumbnail`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ReelRow; }));
+  },
 
   // Reviews
   getReviews: (token: string) =>

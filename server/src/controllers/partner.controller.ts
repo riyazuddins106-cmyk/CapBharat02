@@ -20,6 +20,16 @@ export const partnerController = {
     res.json({ success: true, data });
   }),
 
+  acceptJob: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.acceptJob(req.user!.userId, req.params.id);
+    res.json({ success: true, data });
+  }),
+
+  rejectJob: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.rejectJob(req.user!.userId, req.params.id);
+    res.json({ success: true, data });
+  }),
+
   checkIn: asyncHandler(async (req: Request, res: Response) => {
     const { qrToken } = req.body as { qrToken?: string };
     if (!qrToken) throw new (await import('../utils/AppError.js')).AppError('qrToken is required in request body', 400);

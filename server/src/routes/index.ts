@@ -15,6 +15,7 @@ import supportTicketRoutes from './supportTicket.routes.js';
 import pointsRoutes from './points.routes.js';
 import platformPolicyRoutes from './platformPolicy.routes.js';
 import offerRoutes from './offer.routes.js';
+import reelRoutes from './reel.routes.js';
 
 const router = Router();
 
@@ -38,5 +39,6 @@ router.use('/support-tickets', supportTicketRoutes);
 router.use('/points', pointsRoutes);
 router.use('/platform-policies', platformPolicyRoutes);
 router.use('/offers', offerRoutes);
+router.use('/reels', reelRoutes);
 
 export default router;

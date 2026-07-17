@@ -6,6 +6,7 @@ import { eq, desc, count, sum, ne, isNull, and, avg } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
+import { storageService } from '../services/storage.service.js';
 
 export const adminController = {
   /* ───────────────────────── Dashboard ───────────────────────── */
@@ -482,6 +483,16 @@ export const adminController = {
       .returning();
     if (!row) throw AppError.notFound('Category not found');
     await auditLogService.record(req.user!.userId, 'category.update', 'category', id, patch);
+    res.json({ success: true, data: row });
+  }),
+
+  uploadCategoryImage: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!req.file) throw AppError.badRequest('No file uploaded. Use the "image" field.');
+    const [existing] = await db.select({ id: serviceCategories.id }).from(serviceCategories).where(eq(serviceCategories.id, id));
+    if (!existing) throw AppError.notFound('Category not found');
+    const imageUrl = await storageService.uploadCategoryImage(`category-${id}`, req.file);
+    const [row] = await db.update(serviceCategories).set({ imageUrl, updatedAt: new Date() } as any).where(eq(serviceCategories.id, id)).returning();
     res.json({ success: true, data: row });
   }),
 

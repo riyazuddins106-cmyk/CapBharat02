@@ -1,6 +1,11 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// Allow DATABASE_URL as an alias for SUPABASE_DATABASE_URL
+if (!process.env.SUPABASE_DATABASE_URL && process.env.DATABASE_URL) {
+  process.env.SUPABASE_DATABASE_URL = process.env.DATABASE_URL;
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('8000'),

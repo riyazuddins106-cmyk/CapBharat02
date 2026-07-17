@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, professionalsApi, offersApi, addressesApi, notificationsApi, type Offer } from '@/lib/api';
+import { categoriesApi, professionalsApi, offersApi, addressesApi, notificationsApi, reelsApi, type Offer, type Reel } from '@/lib/api';
 import { ProCard } from '@/components/ProCard';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { storage } from '@/lib/storage';
@@ -160,6 +160,12 @@ export default function HomeScreen() {
     queryKey: ['/api/addresses', accessToken],
     queryFn: () => addressesApi.list(accessToken!),
     enabled: !!accessToken,
+  });
+
+  const { data: reels = [] } = useQuery({
+    queryKey: ['/api/reels'],
+    queryFn: reelsApi.listActive,
+    staleTime: 5 * 60 * 1000,
   });
 
   // ── Offers carousel ────────────────────────────────────
@@ -334,6 +340,37 @@ export default function HomeScreen() {
         )}
       </View>
 
+      {/* Reels */}
+      {reels.length > 0 && (
+        <View style={[styles.section, { marginTop: 24 }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reels</Text>
+          </View>
+          <FlatList
+            data={reels}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(r) => r.id}
+            contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+            renderItem={({ item: r }) => (
+              <View style={[styles.reelCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+                <View style={[styles.reelThumb, { borderRadius: colors.radius, overflow: 'hidden' }]}>
+                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: r.thumbnailUrl ? '#111' : colors.muted }]} />
+                  {r.thumbnailUrl ? (
+                    <Ionicons name="play-circle" size={40} color="rgba(255,255,255,0.85)" />
+                  ) : (
+                    <Ionicons name="videocam-outline" size={36} color={colors.mutedForeground} />
+                  )}
+                </View>
+                <View style={styles.reelInfo}>
+                  <Text style={[styles.reelTitle, { color: colors.foreground }]} numberOfLines={2}>{r.title}</Text>
+                </View>
+              </View>
+            )}
+          />
+        </View>
+      )}
+
       {/* Trust badges */}
       <View style={[styles.trust, { backgroundColor: colors.card, marginHorizontal: 16, borderRadius: colors.radius, borderColor: colors.border }]}>
         {[
@@ -453,6 +490,11 @@ const styles = StyleSheet.create({
   catIcon:              { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   catLabel:             { fontSize: 11, fontWeight: '600', textAlign: 'center' },
   catLabelPlaceholder:  { width: '70%', height: 10, borderRadius: 4 },
+  // Reels
+  reelCard:  { width: 140, borderWidth: 1, overflow: 'hidden' },
+  reelThumb: { width: 140, height: 100, alignItems: 'center', justifyContent: 'center' },
+  reelInfo:  { padding: 8 },
+  reelTitle: { fontSize: 11, fontWeight: '600', lineHeight: 15 },
   // Trust
   trust:      { flexDirection: 'row', justifyContent: 'space-around', padding: 16, marginTop: 24, borderWidth: 1 },
   trustItem:  { alignItems: 'center', gap: 6 },

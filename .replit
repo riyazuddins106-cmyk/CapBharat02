@@ -147,6 +147,14 @@ externalPort = 6000
 localPort = 8180
 externalPort = 5173
 
+[[ports]]
+localPort = 9123
+externalPort = 5000
+
+[[ports]]
+localPort = 9124
+externalPort = 6800
+
 [deployment]
 deploymentTarget = "autoscale"
 build = ["pnpm", "build"]

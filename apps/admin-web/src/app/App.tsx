@@ -5,11 +5,12 @@ import {
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
+  Film, ChevronRight, Image, Upload,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
-  Category, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
+  Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow,
 } from "@/lib/api";
 
@@ -255,6 +256,7 @@ const ADMIN_SIDEBAR = [
   { id: "pros",       icon: Users,      label: "Professionals"      },
   { id: "users",      icon: UserCheck,  label: "Users"              },
   { id: "categories", icon: Grid,       label: "Categories"         },
+  { id: "reels",      icon: Film,       label: "Reels"              },
   { id: "offers",     icon: Tag,        label: "Offers / Banners"   },
   { id: "reviews",    icon: Star,       label: "Reviews"            },
   { id: "analytics",  icon: BarChart2,  label: "Analytics"          },
@@ -292,6 +294,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
   const [auditLogs,    setAuditLogs]    = useState<AuditLogRow[]>([]);
   const [offerList,    setOfferList]    = useState<OfferRow[]>([]);
+  const [reelList,     setReelList]     = useState<ReelRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -303,7 +306,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u, c, r, a, o] = await Promise.all([
+      const [s, b, p, u, c, r, a, o, rl] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken),
@@ -312,6 +315,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         adminApi.getReviews(accessToken),
         adminApi.getAuditLogs(accessToken),
         adminApi.getOffers(accessToken),
+        adminApi.getReels(accessToken),
       ]);
       setStats(s);
       setBookingList(b.bookings);
@@ -321,6 +325,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setReviewList(r.reviews);
       setAuditLogs(a.logs);
       setOfferList(o.offers);
+      setReelList(rl.reels);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
@@ -464,6 +469,20 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const deleteOffer = async (id: string) => {
     await adminApi.deleteOffer(id, accessToken);
     showMsg("Offer deleted"); load();
+  };
+
+  /* ── Reel handlers ── */
+  const createReel = async (data: { title: string; description?: string; videoUrl: string; thumbnailUrl?: string; sortOrder?: number }) => {
+    await adminApi.createReel(data, accessToken);
+    showMsg("Reel created"); load();
+  };
+  const editReel = async (id: string, data: Partial<{ title: string; description: string; videoUrl: string; thumbnailUrl: string; sortOrder: number; isActive: boolean }>) => {
+    await adminApi.updateReel(id, data, accessToken);
+    showMsg("Reel updated"); load();
+  };
+  const deleteReel = async (id: string) => {
+    await adminApi.deleteReel(id, accessToken);
+    showMsg("Reel deleted"); load();
   };
 
   return (
@@ -612,7 +631,9 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "users" ? (
             <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
           ) : activeSection === "categories" ? (
-            <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} />
+            <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
+          ) : activeSection === "reels" ? (
+            <ReelsView reels={reelList} onCreate={createReel} onEdit={editReel} onDelete={deleteReel} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "offers" ? (
             <OffersView offers={offerList} onCreate={createOffer} onEdit={editOffer} onDelete={deleteOffer} />
           ) : activeSection === "reviews" ? (
@@ -1201,21 +1222,48 @@ function UsersView({
 type CatForm = { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean };
 const EMPTY_CAT: CatForm = { name: "", description: "", iconName: "Grid", color: "#F3F4F6", iconColor: "#6B7280", sortOrder: 0, isActive: true };
 
+function ImageUploadButton({ label, onUpload, currentUrl, disabled }: { label: string; onUpload: (f: File) => Promise<void>; currentUrl?: string | null; disabled?: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    setBusy(true);
+    try { await onUpload(f); } catch (err: any) { alert(err.message); }
+    finally { setBusy(false); if (ref.current) ref.current.value = ""; }
+  };
+  return (
+    <div className="flex items-center gap-3">
+      {currentUrl && <img src={currentUrl} alt="preview" className="w-12 h-12 rounded-lg object-cover border border-white/10" />}
+      <button
+        type="button" onClick={() => ref.current?.click()} disabled={disabled || busy}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-white/70 border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-50"
+      >
+        {busy ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+        {busy ? "Uploading…" : label}
+      </button>
+      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handle} />
+    </div>
+  );
+}
+
 function CategoriesView({
-  categories, onCreate, onEdit, onDelete,
+  categories, onCreate, onEdit, onDelete, accessToken, onRefresh,
 }: {
   categories: Category[];
   onCreate: (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number }) => Promise<void>;
   onEdit: (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  accessToken: string;
+  onRefresh: () => void;
 }) {
-  const [search,     setSearch]     = useState("");
-  const [editTarget, setEditTarget] = useState<Category | null>(null);
-  const [creating,   setCreating]   = useState(false);
-  const [deleteId,   setDeleteId]   = useState<string | null>(null);
-  const [form,       setForm]       = useState<CatForm>(EMPTY_CAT);
-  const [saving,     setSaving]     = useState(false);
-  const [busyId,     setBusyId]     = useState<string | null>(null);
+  const [search,        setSearch]        = useState("");
+  const [editTarget,    setEditTarget]    = useState<Category | null>(null);
+  const [creating,      setCreating]      = useState(false);
+  const [deleteId,      setDeleteId]      = useState<string | null>(null);
+  const [form,          setForm]          = useState<CatForm>(EMPTY_CAT);
+  const [saving,        setSaving]        = useState(false);
+  const [busyId,        setBusyId]        = useState<string | null>(null);
+  const [subCatTarget,  setSubCatTarget]  = useState<Category | null>(null);
 
   const openCreate = () => { setForm(EMPTY_CAT); setCreating(true); };
   const openEdit   = (c: Category) => {
@@ -1280,6 +1328,16 @@ function CategoriesView({
 
   const filtered = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 
+  if (subCatTarget) {
+    return (
+      <SubCategoriesView
+        category={subCatTarget}
+        accessToken={accessToken}
+        onBack={() => { setSubCatTarget(null); onRefresh(); }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       {creating && (
@@ -1292,6 +1350,20 @@ function CategoriesView({
       {editTarget && (
         <Modal title="Edit Category" onClose={() => setEditTarget(null)}>
           <CatFormFields />
+          {editTarget.id && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-white/40 text-xs mb-2">Category image</p>
+              <ImageUploadButton
+                label="Upload image"
+                currentUrl={editTarget.imageUrl}
+                onUpload={async (f) => {
+                  const updated = await adminApi.uploadCategoryImage(editTarget.id, f, accessToken);
+                  setEditTarget(updated);
+                  onRefresh();
+                }}
+              />
+            </div>
+          )}
           <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
         </Modal>
       )}
@@ -1325,7 +1397,7 @@ function CategoriesView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Category", "Description", "Icon", "Colors", "Order", "Status", "Actions"].map(h => (
+                {["Category", "Image", "Description", "Colors", "Order", "Status", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1341,8 +1413,12 @@ function CategoriesView({
                       <span className="text-white font-semibold whitespace-nowrap">{c.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-white/50 text-xs max-w-[200px] truncate">{c.description ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/60 text-xs whitespace-nowrap">{c.iconName}</td>
+                  <td className="px-4 py-3">
+                    {c.imageUrl
+                      ? <img src={c.imageUrl} alt={c.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                      : <span className="text-white/30 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-white/50 text-xs max-w-[160px] truncate">{c.description ?? "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <span className="w-4 h-4 rounded-sm border border-white/20 flex-shrink-0" style={{ background: c.color }} />
@@ -1354,8 +1430,14 @@ function CategoriesView({
                     <Badge label={c.isActive ? "Active" : "Inactive"} color={c.isActive ? "#16A34A" : "#EF4444"} />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <ActionBtn variant="edit" onClick={() => openEdit(c)}>Edit</ActionBtn>
+                      <button
+                        onClick={() => setSubCatTarget(c)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-300 border border-violet-500/30 hover:bg-violet-500/10 transition-colors"
+                      >
+                        Sub-cats <ChevronRight size={11} />
+                      </button>
                       <ActionBtn
                         variant={c.isActive ? "warn" : "green"}
                         onClick={() => handleToggleActive(c)}
@@ -1378,12 +1460,331 @@ function CategoriesView({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   SUB-CATEGORIES
+═══════════════════════════════════════════════════════════════════ */
+
+type SubCatForm = { name: string; description: string; sortOrder: number; isActive: boolean };
+const EMPTY_SUB: SubCatForm = { name: "", description: "", sortOrder: 0, isActive: true };
+
+function SubCategoriesView({ category, accessToken, onBack }: { category: Category; accessToken: string; onBack: () => void }) {
+  const [subs,       setSubs]       = useState<SubCategory[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [creating,   setCreating]   = useState(false);
+  const [editTarget, setEditTarget] = useState<SubCategory | null>(null);
+  const [deleteId,   setDeleteId]   = useState<string | null>(null);
+  const [form,       setForm]       = useState<SubCatForm>(EMPTY_SUB);
+  const [saving,     setSaving]     = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { const d = await adminApi.getSubcategories(category.id, accessToken); setSubs(d.subcategories); }
+    catch (e: any) { alert(e.message); }
+    finally { setLoading(false); }
+  }, [category.id, accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    setSaving(true);
+    try { await adminApi.createSubcategory(category.id, { name: form.name, description: form.description, sortOrder: form.sortOrder }, accessToken); load(); setCreating(false); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try { await adminApi.updateSubcategory(editTarget.id, form, accessToken); load(); setEditTarget(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await adminApi.deleteSubcategory(deleteId, accessToken); load(); setDeleteId(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const SubForm = () => (
+    <div className="space-y-4">
+      <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Bathroom Cleaning" /></Field>
+      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Short description…" rows={2} /></Field>
+      <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {creating && (
+        <Modal title={`New Sub-category under "${category.name}"`} onClose={() => setCreating(false)}>
+          <SubForm />
+          <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create" />
+        </Modal>
+      )}
+      {editTarget && (
+        <Modal title="Edit Sub-category" onClose={() => setEditTarget(null)}>
+          <SubForm />
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-white/40 text-xs mb-2">Sub-category image</p>
+            <ImageUploadButton
+              label="Upload image"
+              currentUrl={editTarget.imageUrl}
+              onUpload={async (f) => {
+                const updated = await adminApi.uploadSubcategoryImage(editTarget.id, f, accessToken);
+                setEditTarget(updated);
+                load();
+              }}
+            />
+          </div>
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
+      {deleteId && (
+        <ConfirmDialog title="Delete Sub-category?" body="This sub-category will be permanently deleted." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+      )}
+
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-white/50 hover:text-white text-sm font-semibold transition-colors">
+          ← Back
+        </button>
+        <div className="w-px h-4 bg-white/10" />
+        <span className="text-white font-bold">{category.name}</span>
+        <span className="text-white/30 text-sm">/ Sub-categories</span>
+        <div className="flex-1" />
+        <button
+          onClick={() => { setForm(EMPTY_SUB); setCreating(true); }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white"
+          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+        >
+          <Plus size={14} /> Add Sub-category
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        {loading ? (
+          <div className="flex items-center justify-center h-32"><Loader2 size={24} className="animate-spin text-violet-500" /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.07]">
+                  {["Sub-category", "Image", "Description", "Order", "Status", "Actions"].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {subs.map((s) => (
+                  <tr key={s.id} className="hover:bg-white/[0.02]">
+                    <td className="px-4 py-3 text-white font-semibold whitespace-nowrap">{s.name}</td>
+                    <td className="px-4 py-3">
+                      {s.imageUrl
+                        ? <img src={s.imageUrl} alt={s.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                        : <span className="text-white/30 text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-white/50 text-xs max-w-[200px] truncate">{s.description ?? "—"}</td>
+                    <td className="px-4 py-3 text-white/60 text-xs">{s.sortOrder}</td>
+                    <td className="px-4 py-3"><Badge label={s.isActive ? "Active" : "Inactive"} color={s.isActive ? "#16A34A" : "#EF4444"} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <ActionBtn variant="edit" onClick={() => { setForm({ name: s.name, description: s.description ?? "", sortOrder: s.sortOrder, isActive: s.isActive }); setEditTarget(s); }}>Edit</ActionBtn>
+                        <ActionBtn variant={s.isActive ? "warn" : "green"} onClick={async () => { await adminApi.updateSubcategory(s.id, { isActive: !s.isActive }, accessToken); load(); }}>
+                          {s.isActive ? "Deactivate" : "Activate"}
+                        </ActionBtn>
+                        <ActionBtn variant="danger" onClick={() => setDeleteId(s.id)}>Delete</ActionBtn>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {subs.length === 0 && <EmptyRow cols={6} text="No sub-categories yet" />}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    REVIEWS
 ═══════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════
    OFFERS / BANNERS
 ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   REELS
+═══════════════════════════════════════════════════════════════════ */
+
+type ReelForm = { title: string; description: string; videoUrl: string; thumbnailUrl: string; sortOrder: number; isActive: boolean };
+const EMPTY_REEL: ReelForm = { title: "", description: "", videoUrl: "", thumbnailUrl: "", sortOrder: 0, isActive: true };
+
+function ReelsView({
+  reels, onCreate, onEdit, onDelete, accessToken, onRefresh,
+}: {
+  reels: ReelRow[];
+  onCreate: (d: { title: string; description?: string; videoUrl: string; thumbnailUrl?: string; sortOrder?: number }) => Promise<void>;
+  onEdit: (id: string, d: Partial<{ title: string; description: string; videoUrl: string; thumbnailUrl: string; sortOrder: number; isActive: boolean }>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  accessToken: string;
+  onRefresh: () => void;
+}) {
+  const [creating,   setCreating]   = useState(false);
+  const [editTarget, setEditTarget] = useState<ReelRow | null>(null);
+  const [deleteId,   setDeleteId]   = useState<string | null>(null);
+  const [form,       setForm]       = useState<ReelForm>(EMPTY_REEL);
+  const [saving,     setSaving]     = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  const handleCreate = async () => {
+    setSaving(true);
+    try { await onCreate({ title: form.title, description: form.description, videoUrl: form.videoUrl, thumbnailUrl: form.thumbnailUrl || undefined, sortOrder: form.sortOrder }); setCreating(false); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try { await onEdit(editTarget.id, form); setEditTarget(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleVideoUpload = async (id: string, file: File) => {
+    setUploadingId(id);
+    try { await adminApi.uploadReelVideo(id, file, accessToken); onRefresh(); }
+    catch (e: any) { alert(e.message); }
+    finally { setUploadingId(null); }
+  };
+
+  const handleThumbUpload = async (reel: ReelRow, file: File) => {
+    setUploadingId(reel.id + '-thumb');
+    try {
+      const updated = await adminApi.uploadReelThumbnail(reel.id, file, accessToken);
+      if (editTarget?.id === reel.id) setEditTarget(updated);
+      onRefresh();
+    }
+    catch (e: any) { alert(e.message); }
+    finally { setUploadingId(null); }
+  };
+
+  const ReelFormFields = (r: ReelRow | null) => (
+    <div className="space-y-4">
+      <Field label="Title *"><TextInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Quick Kitchen Cleaning" /></Field>
+      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} rows={2} /></Field>
+      <Field label="Video URL *">
+        <TextInput value={form.videoUrl} onChange={v => setForm(f => ({ ...f, videoUrl: v }))} placeholder="https://…" />
+        {r && (
+          <div className="mt-2">
+            <ImageUploadButton
+              label="Or upload video file (MP4/MOV/WebM, max 100MB)"
+              currentUrl={undefined}
+              onUpload={(file) => handleVideoUpload(r.id, file)}
+              disabled={uploadingId === r.id}
+            />
+          </div>
+        )}
+      </Field>
+      <Field label="Thumbnail URL">
+        <TextInput value={form.thumbnailUrl} onChange={v => setForm(f => ({ ...f, thumbnailUrl: v }))} placeholder="https://… (or upload below)" />
+        {r && (
+          <div className="mt-2">
+            <ImageUploadButton
+              label="Upload thumbnail"
+              currentUrl={r.thumbnailUrl}
+              onUpload={(file) => handleThumbUpload(r, file)}
+              disabled={uploadingId === r.id + '-thumb'}
+            />
+          </div>
+        )}
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {creating && (
+        <Modal title="New Reel" onClose={() => setCreating(false)}>
+          {ReelFormFields(null)}
+          <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create Reel" />
+        </Modal>
+      )}
+      {editTarget && (
+        <Modal title="Edit Reel" onClose={() => setEditTarget(null)}>
+          {ReelFormFields(editTarget)}
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
+      {deleteId && (
+        <ConfirmDialog title="Delete Reel?" body="This reel will be removed from the Customer App." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+      )}
+
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-white font-bold text-lg">Reels</h3>
+          <p className="text-white/40 text-sm">Short video clips shown on the customer home screen</p>
+        </div>
+        <button
+          onClick={() => { setForm(EMPTY_REEL); setCreating(true); }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white"
+          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+        >
+          <Plus size={14} /> New Reel
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {reels.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+            <div className="relative aspect-video bg-black/40">
+              {r.thumbnailUrl
+                ? <img src={r.thumbnailUrl} alt={r.title} className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center"><Film size={36} className="text-white/20" /></div>
+              }
+              <div className="absolute top-2 right-2">
+                <Badge label={r.isActive ? "Active" : "Inactive"} color={r.isActive ? "#16A34A" : "#EF4444"} />
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-white font-semibold mb-1">{r.title}</p>
+              {r.description && <p className="text-white/40 text-xs mb-2 line-clamp-2">{r.description}</p>}
+              <p className="text-white/30 text-[10px] mb-3 truncate">{r.videoUrl}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <ActionBtn variant="edit" onClick={() => { setForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl, thumbnailUrl: r.thumbnailUrl ?? "", sortOrder: r.sortOrder, isActive: r.isActive }); setEditTarget(r); }}>Edit</ActionBtn>
+                <ActionBtn variant={r.isActive ? "warn" : "green"} onClick={async () => { await onEdit(r.id, { isActive: !r.isActive }); }}>
+                  {r.isActive ? "Deactivate" : "Activate"}
+                </ActionBtn>
+                <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+              </div>
+            </div>
+          </div>
+        ))}
+        {reels.length === 0 && (
+          <div className="col-span-3 py-16 flex flex-col items-center gap-3 text-white/30">
+            <Film size={40} />
+            <p className="text-sm">No reels yet. Create one to get started.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const BLANK_OFFER: OfferInput = {
   title: "", subtitle: "", tag: "LIMITED OFFER", discountText: "",

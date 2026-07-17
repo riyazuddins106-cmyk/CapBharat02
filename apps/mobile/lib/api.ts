@@ -350,3 +350,18 @@ export const platformApi = {
       `/api/platform-policies/${slug}`,
     ),
 };
+
+// ── Reels ──────────────────────────────────────────────────
+export interface Reel {
+  id: string;
+  title: string;
+  description?: string | null;
+  videoUrl: string;
+  thumbnailUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export const reelsApi = {
+  listActive: () => request<Reel[]>('/api/reels'),
+};

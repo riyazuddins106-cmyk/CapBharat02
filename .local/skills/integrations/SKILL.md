@@ -153,7 +153,7 @@ if (!result.success && result.requiresConfirmation) {
 
 ---
 
-### ProposeIntegration({ integrationId })
+### ProposeIntegration({ proposal })
 
 Propose a connector to the user. This is a **model tool**, not a code execution callback. It exits the agent loop immediately and waits for the user to complete OAuth or confirm setup. Nothing after this call will execute in the current loop.
 
@@ -166,7 +166,7 @@ Propose a connector to the user. This is a **model tool**, not a code execution 
 - Connections with `status: added` if runtime fails with "not connected" (re-binds / refreshes)
 - Blueprints where `addIntegration` returns `requiresConfirmation: True`
 
-Always explain to the user what is about to happen, then call the `ProposeIntegration` tool with `{ integrationId: "connector:ccfg_google-sheet_E42A9F6CA62546F68A1FECA0E8" }`.
+Always explain to the user what is about to happen, then call the `ProposeIntegration` tool with `{ proposal: [{ integrationId: "connector:ccfg_google-sheet_E42A9F6CA62546F68A1FECA0E8" }] }`.
 
 **Notes:**
 

@@ -2,6 +2,7 @@ import { AppError } from '../utils/AppError.js';
 import { bookingRepository } from '../repositories/booking.repository.js';
 import { professionalRepository } from '../repositories/professional.repository.js';
 import { notificationService } from './notification.service.js';
+import { notificationDbService } from './notificationDb.service.js';
 import type { CreateBookingInput, RescheduleBookingInput } from '../validators/booking.validators.js';
 
 export const bookingService = {
@@ -39,12 +40,10 @@ export const bookingService = {
     });
 
     if (pro.userId) {
-      void notificationService.sendToUser(
-        pro.userId,
-        'New booking request',
-        `You have a new booking for ${pro.title}.`,
-        { bookingId: booking.id, type: 'booking_created' },
-      );
+      const title = 'New booking request';
+      const body = `You have a new booking for ${pro.title}.`;
+      void notificationService.sendToUser(pro.userId, title, body, { bookingId: booking.id, type: 'booking_created' });
+      void notificationDbService.create({ userId: pro.userId, title, body, type: 'booking', data: { bookingId: booking.id } });
     }
 
     return booking;
@@ -60,13 +59,15 @@ export const bookingService = {
 
     const pro = await professionalRepository.findById(booking.professionalId);
     if (pro?.userId) {
-      void notificationService.sendToUser(
-        pro.userId,
-        'Booking cancelled',
-        `A booking for ${booking.serviceName} was cancelled by the customer.`,
-        { bookingId, type: 'booking_cancelled' },
-      );
+      const title = 'Booking cancelled';
+      const body = `A booking for ${booking.serviceName} was cancelled by the customer.`;
+      void notificationService.sendToUser(pro.userId, title, body, { bookingId, type: 'booking_cancelled' });
+      void notificationDbService.create({ userId: pro.userId, title, body, type: 'booking', data: { bookingId } });
     }
+    // Notify customer too
+    const cancelTitle = 'Booking cancelled';
+    const cancelBody = `Your booking for ${booking.serviceName} has been cancelled.`;
+    void notificationDbService.create({ userId: customerId, title: cancelTitle, body: cancelBody, type: 'booking', data: { bookingId } });
 
     return updated;
   },

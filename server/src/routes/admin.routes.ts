@@ -1,9 +1,14 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { adminController } from '../controllers/admin.controller.js';
 import { platformPolicyController } from '../controllers/platformPolicy.controller.js';
 import { offerController } from '../controllers/offer.controller.js';
+import { subCategoryController } from '../controllers/subCategory.controller.js';
+import { reelController } from '../controllers/reel.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -33,10 +38,26 @@ router.patch('/users/:id/suspend',    adminController.suspendUser);
 router.patch('/users/:id/activate',   adminController.activateUser);
 
 // Service categories
-router.get('/categories',             adminController.listCategories);
-router.post('/categories',            adminController.createCategory);
-router.patch('/categories/:id',       adminController.updateCategory);
-router.delete('/categories/:id',      adminController.deleteCategory);
+router.get('/categories',                           adminController.listCategories);
+router.post('/categories',                          adminController.createCategory);
+router.patch('/categories/:id',                     adminController.updateCategory);
+router.delete('/categories/:id',                    adminController.deleteCategory);
+router.post('/categories/:id/image',                upload.single('image'), adminController.uploadCategoryImage);
+
+// Sub-categories
+router.get('/categories/:categoryId/subcategories',  subCategoryController.list);
+router.post('/categories/:categoryId/subcategories', subCategoryController.create);
+router.patch('/subcategories/:id',                   subCategoryController.update);
+router.delete('/subcategories/:id',                  subCategoryController.delete);
+router.post('/subcategories/:id/image',              upload.single('image'), subCategoryController.uploadImage);
+
+// Reels
+router.get('/reels/detect-platform',  reelController.detectPlatformEndpoint);
+router.get('/reels',                  reelController.adminList);
+router.post('/reels',                 reelController.adminCreate);
+router.patch('/reels/:id',            reelController.adminUpdate);
+router.delete('/reels/:id',           reelController.adminDelete);
+router.post('/reels/:id/thumbnail',   upload.single('image'), reelController.uploadThumbnail);
 
 // Reviews (moderation)
 router.get('/reviews',                adminController.listReviews);

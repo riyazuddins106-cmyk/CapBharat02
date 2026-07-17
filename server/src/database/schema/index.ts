@@ -15,3 +15,5 @@ export * from './supportTickets.js';
 export * from './pointsLedger.js';
 export * from './platformPolicies.js';
 export * from './offers.js';
+export * from './subServiceCategories.js';
+export * from './reels.js';

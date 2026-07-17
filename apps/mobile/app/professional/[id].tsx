@@ -11,13 +11,29 @@ import { professionalsApi, bookingsApi, favoritesApi } from '@/lib/api';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { queryClient } from '@/lib/queryClient';
 
-// Generate next 14 days
+// Generate today + next 13 days (14 total)
 function getDates() {
   return Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() + i + 1);
+    d.setDate(d.getDate() + i);
     return d;
   });
+}
+
+function isToday(d: Date) {
+  const now = new Date();
+  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+function isPastSlot(slot: string, date: Date) {
+  if (!isToday(date)) return false;
+  const now = new Date();
+  const [h, rest] = slot.split(':');
+  const [min, period] = rest.split(' ');
+  let hour = parseInt(h);
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + parseInt(min) <= now.getHours() * 60 + now.getMinutes();
 }
 
 const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'];
@@ -240,13 +256,15 @@ export default function ProfessionalScreen() {
                 <View style={styles.timeGrid}>
                   {TIME_SLOTS.map((t) => {
                     const sel = selectedTime === t;
+                    const past = isPastSlot(t, selectedDate);
                     return (
                       <TouchableOpacity
                         key={t}
-                        onPress={() => { setSelectedTime(t); Haptics.selectionAsync(); }}
-                        style={[styles.timeChip, { backgroundColor: sel ? colors.primary : colors.muted, borderRadius: colors.radius - 2 }]}
+                        disabled={past}
+                        onPress={() => { if (!past) { setSelectedTime(t); Haptics.selectionAsync(); } }}
+                        style={[styles.timeChip, { backgroundColor: past ? colors.border : sel ? colors.primary : colors.muted, borderRadius: colors.radius - 2, opacity: past ? 0.45 : 1 }]}
                       >
-                        <Text style={[styles.timeText, { color: sel ? '#fff' : colors.foreground }]}>{t}</Text>
+                        <Text style={[styles.timeText, { color: past ? colors.mutedForeground : sel ? '#fff' : colors.foreground }]}>{t}</Text>
                       </TouchableOpacity>
                     );
                   })}

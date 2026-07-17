@@ -8,6 +8,7 @@ export const serviceCategories = pgTable('service_categories', {
   color: varchar('color', { length: 16 }).notNull().default('#F3F4F6'),
   iconColor: varchar('icon_color', { length: 16 }).notNull().default('#6B7280'),
   serviceCount: integer('service_count').notNull().default(0),
+  imageUrl:  varchar('image_url', { length: 512 }),
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

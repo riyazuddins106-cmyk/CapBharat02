@@ -76,6 +76,26 @@ export default function JobDetailScreen() {
     onError: (e: any) => Alert.alert('Error', e.message),
   });
 
+  const acceptMutation = useMutation({
+    mutationFn: () => partnerApi.acceptJob(id!, accessToken!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
+      refetch();
+    },
+    onError: (e: any) => Alert.alert('Error', e.message),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: () => partnerApi.rejectJob(id!, accessToken!),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
+      refetch();
+    },
+    onError: (e: any) => Alert.alert('Error', e.message),
+  });
+
   const handleBarCodeScanned = ({ data }: { data: string }) => {
     // Double-guard: state check (for UI) + ref check (prevents rapid Android callbacks
     // that fire before the state re-render flushes).
@@ -224,7 +244,15 @@ export default function JobDetailScreen() {
         </View>
 
         {/* Workflow guide */}
-        {(job.status === 'upcoming' || job.status === 'pending') && (
+        {job.status === 'pending' && (
+          <View style={[styles.infoBox, { backgroundColor: '#FEF3C7', borderRadius: colors.radius }]}>
+            <Ionicons name="time-outline" size={18} color="#D97706" />
+            <Text style={[styles.infoText, { color: '#D97706' }]}>
+              New booking request! Accept to confirm or reject to decline.
+            </Text>
+          </View>
+        )}
+        {job.status === 'upcoming' && (
           <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderRadius: colors.radius }]}>
             <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
             <Text style={[styles.infoText, { color: colors.primary }]}>
@@ -234,8 +262,35 @@ export default function JobDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Action button */}
-      {(job.status === 'upcoming' || job.status === 'pending') && (
+      {/* Accept / Reject for pending */}
+      {job.status === 'pending' && (
+        <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.card, borderTopColor: colors.border, flexDirection: 'row', gap: 12 }]}>
+          <TouchableOpacity
+            onPress={() => Alert.alert('Reject Booking', 'Are you sure you want to reject this booking?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Reject', style: 'destructive', onPress: () => rejectMutation.mutate() },
+            ])}
+            disabled={rejectMutation.isPending || acceptMutation.isPending}
+            style={[styles.actionBtn, { flex: 1, backgroundColor: '#EF4444', borderRadius: colors.radius, opacity: rejectMutation.isPending ? 0.7 : 1 }]}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="close-circle-outline" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>{rejectMutation.isPending ? 'Rejecting…' : 'Reject'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => acceptMutation.mutate()}
+            disabled={acceptMutation.isPending || rejectMutation.isPending}
+            style={[styles.actionBtn, { flex: 1, backgroundColor: '#16A34A', borderRadius: colors.radius, opacity: acceptMutation.isPending ? 0.7 : 1 }]}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>{acceptMutation.isPending ? 'Accepting…' : 'Accept'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Scan QR for upcoming */}
+      {job.status === 'upcoming' && (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.card, borderTopColor: colors.border }]}>
           <TouchableOpacity
             onPress={openScanner}

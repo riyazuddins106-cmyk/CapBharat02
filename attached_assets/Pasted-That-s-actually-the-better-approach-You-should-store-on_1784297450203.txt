@@ -1,0 +1,215 @@
+That's actually the better approach. You should **store only the video links**, not upload the video files. This saves storage, bandwidth, and avoids copyright issues.
+
+Here's an improved prompt specifically for a **link-based Reels section**.
+
+---
+
+# Feature: Link-Based Reels & Promotional Videos
+
+You are a Principal Software Architect, Senior Full Stack Engineer, Senior Mobile Engineer, UI/UX Designer, Backend Engineer, Database Architect, Security Engineer, and QA Engineer.
+
+## Objective
+
+Create a **Link-Based Reels & Promotional Videos** module for the Customer App. The app **must not store or upload video files**. Instead, the Admin will paste video links from supported platforms, and the app will display them as attractive promotional cards.
+
+---
+
+## Supported Platforms
+
+Support only these platforms:
+
+* Instagram Reels
+* Instagram Posts (Video)
+* YouTube Videos
+* YouTube Shorts
+* Facebook Videos
+
+The system should be designed so more platforms can be added later.
+
+---
+
+## Admin Panel
+
+Create a complete **Reels Management** module.
+
+Admin can:
+
+* Add Reel
+* Edit Reel
+* Delete Reel
+* Enable/Disable Reel
+* Pin Featured Reel
+* Change Display Order
+* Search
+* Filter
+* Schedule Publish Date
+* Schedule Expiry Date
+
+Fields:
+
+* Title
+* Description
+* Video Link (Required)
+* Platform (Auto Detect)
+* Thumbnail
+* Category
+* Service Category
+* Display Order
+* Status
+* Publish Date
+* Expiry Date
+
+---
+
+## Auto Detect Platform
+
+When the admin pastes a URL, automatically detect whether it is:
+
+* Instagram
+* YouTube
+* YouTube Shorts
+* Facebook
+
+No manual platform selection required.
+
+---
+
+## Thumbnail
+
+The app should **never upload or store video files**.
+
+Instead:
+
+### For YouTube
+
+Automatically generate the thumbnail from the video ID.
+
+### For Instagram/Facebook
+
+If a preview image can legally be obtained, display it.
+
+Otherwise:
+
+* Allow the admin to upload a custom thumbnail image.
+* Or use a branded placeholder image.
+
+The feed should always display an attractive thumbnail.
+
+---
+
+## Customer App UI
+
+Create a premium horizontal carousel.
+
+Each card should display:
+
+* Large thumbnail
+* Platform icon
+* Title
+* Short description
+* "Watch Now" button
+* "New" badge (optional)
+* "Featured" badge (optional)
+
+No video should autoplay in the feed.
+
+---
+
+## When User Clicks
+
+When a user taps a reel:
+
+Open a bottom sheet showing:
+
+* Large thumbnail
+* Title
+* Description
+* Platform
+* Watch Video button
+
+Then:
+
+### YouTube
+
+If embedding is supported, play inside the app using the YouTube embedded player.
+
+### Instagram/Facebook
+
+Open directly in the official app if installed, otherwise open in the browser.
+
+Do not attempt to download, cache, or copy videos.
+
+---
+
+## Database
+
+Create a table:
+
+```text
+id
+title
+description
+video_url
+platform
+thumbnail_url
+custom_thumbnail
+category
+service_category
+display_order
+status
+featured
+publish_date
+expiry_date
+click_count
+view_count
+created_at
+updated_at
+```
+
+The database should **store only metadata and URLs**, never the video files.
+
+---
+
+## Analytics
+
+Track:
+
+* Thumbnail impressions
+* Card clicks
+* Watch button clicks
+* Platform
+* Date
+* Most viewed videos
+* Featured video performance
+
+---
+
+## Performance
+
+* Lazy-load thumbnails
+* Cache images
+* Paginate results
+* Load only visible cards
+* Never preload video content
+* Never download video files
+
+---
+
+## Security
+
+Validate URLs and allow only:
+
+* instagram.com
+* youtube.com
+* youtu.be
+* facebook.com
+
+Reject unsupported or invalid links.
+
+---
+
+## Architecture
+
+Implement using reusable components and clean architecture so this module can be integrated into the existing Customer App, Partner App, Admin Panel, backend, authentication, and analytics without breaking existing functionality.
+
+**Important:** This feature is **link-based only**. The system must never upload, store, or stream video files from the application's own server. It should only save the external URL, display a thumbnail/preview, and redirect or embed the content where permitted by the platform.
