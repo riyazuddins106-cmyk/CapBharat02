@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { partnerApi } from '@/lib/api';
+import { partnerApi, categoriesApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 // ── Web-safe helpers ────────────────────────────────────────────────────────
@@ -61,6 +61,12 @@ export default function ProfileScreen() {
     queryFn: () => partnerApi.getProfile(accessToken!),
     enabled: !!accessToken,
   });
+
+  const { data: categories } = useQuery({
+    queryKey: ['/api/categories'],
+    queryFn: () => categoriesApi.list(),
+  });
+  const categoryName = categories?.find((c) => c.id === profile?.categoryId)?.name;
 
   useEffect(() => {
     if (profile) {
@@ -257,7 +263,8 @@ export default function ProfileScreen() {
                   <Text style={[styles.editChipText, { color: colors.primary }]}>Edit</Text>
                 </TouchableOpacity>
               </View>
-              <InfoRow icon="briefcase-outline" label="Title"  value={profile.title} colors={colors} />
+              <InfoRow icon="briefcase-outline" label="Title"    value={profile.title} colors={colors} />
+              {categoryName ? <InfoRow icon="grid-outline" label="Category" value={categoryName} colors={colors} /> : null}
               <InfoRow icon="pricetag-outline"  label="Rate"   value={`₹${profile.basePrice}${profile.priceUnit}`} colors={colors} />
               <InfoRow icon="star-outline"      label="Rating" value={`${profile.rating.toFixed(1)} (${profile.reviewCount} reviews)`} colors={colors} />
               {profile.bio ? (

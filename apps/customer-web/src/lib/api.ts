@@ -180,6 +180,24 @@ export const categoriesApi = {
   },
 };
 
+export interface ApiSubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+}
+
+export const subcategoriesApi = {
+  async listByCategory(categoryId: string) {
+    const { data } = await client.get(`/categories/${categoryId}/subcategories`);
+    return data.data as ApiSubCategory[];
+  },
+};
+
 // ─── Professionals API ────────────────────────────────────────────────────────
 export const professionalsApi = {
   async list(params?: { categoryId?: string; search?: string; sort?: string; limit?: number; offset?: number }) {
@@ -278,6 +296,24 @@ export const offersApi = {
   async list() {
     const { data } = await client.get('/offers');
     return data.data as ApiOffer[];
+  },
+};
+
+// ─── Reels API ────────────────────────────────────────────────────────────────
+export interface ApiReel {
+  id: string;
+  title: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  isActive: boolean;
+  professionalId?: string;
+  createdAt: string;
+}
+
+export const reelsApi = {
+  async listActive() {
+    const { data } = await client.get('/reels');
+    return data.data as ApiReel[];
   },
 };
 

@@ -68,6 +68,37 @@ export interface AppNotification {
   isRead: boolean; createdAt: string;
 }
 
+// ── Categories ─────────────────────────────────────────────
+export interface Category {
+  id: string;
+  name: string;
+  description?: string | null;
+  iconName: string;
+  color: string;
+  iconColor: string;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+}
+
+export interface SubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+}
+
+export const categoriesApi = {
+  list: () => request<Category[]>('/api/categories'),
+  getSubcategories: (categoryId: string) =>
+    request<SubCategory[]>(`/api/categories/${categoryId}/subcategories`),
+};
+
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>

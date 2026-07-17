@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, professionalsApi, favoritesApi } from '@/lib/api';
+import { categoriesApi, subcategoriesApi, professionalsApi, favoritesApi } from '@/lib/api';
 import { ProCard } from '@/components/ProCard';
 import { CategoryPill } from '@/components/CategoryPill';
 import { ProCardShimmer, CategoryShimmer } from '@/components/Shimmer';
@@ -21,10 +21,17 @@ export default function ServicesScreen() {
 
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string | null>(params.categoryId ?? null);
+  const [selectedSubCat, setSelectedSubCat] = useState<string | null>(null);
 
   const { data: categories } = useQuery({
     queryKey: ['/api/categories'],
     queryFn: categoriesApi.list,
+  });
+
+  const { data: subcategories } = useQuery({
+    queryKey: ['/api/subcategories', selectedCat],
+    queryFn: () => selectedCat ? subcategoriesApi.listByCategory(selectedCat) : Promise.resolve([]),
+    enabled: !!selectedCat,
   });
 
   const { data: professionals, isLoading } = useQuery({
@@ -89,12 +96,39 @@ export default function ServicesScreen() {
                 onPress={() => {
                   Haptics.selectionAsync();
                   setSelectedCat(item.id);
+                  setSelectedSubCat(null);
                 }}
               />
             )}
           />
         )}
       </View>
+
+      {/* Subcategory chips — shown when a category is selected */}
+      {selectedCat && (subcategories?.length ?? 0) > 0 && (
+        <View style={[styles.subCatWrap, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <FlatList
+            horizontal
+            data={[{ id: null, name: 'All' } as any, ...(subcategories ?? [])]}
+            keyExtractor={(item) => item.id ?? 'sub-all'}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => { setSelectedSubCat(item.id); Haptics.selectionAsync(); }}
+                style={[styles.subCatChip, {
+                  backgroundColor: selectedSubCat === item.id ? colors.primary : colors.muted,
+                  borderRadius: (colors.radius ?? 8) - 2,
+                }]}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '600', color: selectedSubCat === item.id ? '#fff' : colors.mutedForeground }}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
 
       {/* Results */}
       <FlatList
@@ -133,6 +167,8 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   catWrap: { borderBottomWidth: 1 },
+  subCatWrap: { borderBottomWidth: 1 },
+  subCatChip: { paddingHorizontal: 12, paddingVertical: 6 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
   emptyText: { fontSize: 13 },

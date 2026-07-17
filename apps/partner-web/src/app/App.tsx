@@ -6,8 +6,8 @@ import {
   AlertCircle, Pencil, Lock,
 } from 'lucide-react';
 import {
-  authApi, partnerApi, notificationsApi, setRefreshHandler,
-  type Job, type JobStatus, type Earnings, type PartnerProfile,
+  authApi, partnerApi, notificationsApi, categoriesApi, setRefreshHandler,
+  type Job, type JobStatus, type Earnings, type PartnerProfile, type Category,
   type AppNotification, type AuthTokens,
 } from '@/lib/api';
 
@@ -387,6 +387,11 @@ function Profile({ token, profile, setProfile }: {
   const [editPwd, setEditPwd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    categoriesApi.list().then(setCategories).catch(() => {});
+  }, []);
 
   // Edit profile fields
   const [title, setTitle] = useState(profile?.title ?? '');
@@ -439,6 +444,7 @@ function Profile({ token, profile, setProfile }: {
             {[
               ['Base Price', `${fmt(profile.basePrice)}/${profile.priceUnit}`],
               ['Status', profile.isActive ? 'Active' : 'Inactive'],
+              ['Category', categories.find(c => c.id === profile.categoryId)?.name ?? '—'],
             ].map(([k, v]) => (
               <div key={k} className="rounded-xl p-3 border border-white/5" style={CARD}>
                 <p className="text-white/40 text-xs mb-1">{k}</p>

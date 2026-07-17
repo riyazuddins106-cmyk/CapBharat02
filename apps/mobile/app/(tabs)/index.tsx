@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList,
-  RefreshControl, Platform, Modal, ActivityIndicator, Dimensions,
+  RefreshControl, Platform, Modal, ActivityIndicator, Dimensions, Image, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ import { categoriesApi, professionalsApi, offersApi, addressesApi, notifications
 import { ProCard } from '@/components/ProCard';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { storage } from '@/lib/storage';
+import { WebView } from 'react-native-webview';
 
 const CAT_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Cleaning: 'broom',
@@ -170,6 +171,18 @@ export default function HomeScreen() {
 
   // ── Offers carousel ────────────────────────────────────
   const [activeOffer, setActiveOffer] = useState(0);
+  const [activeReel, setActiveReel] = useState<Reel | null>(null);
+
+  function getYouTubeEmbedUrl(url: string): string {
+    try {
+      const u = new URL(url);
+      let id = '';
+      if (u.hostname === 'youtu.be') id = u.pathname.slice(1);
+      else if (u.pathname.startsWith('/shorts/')) id = u.pathname.split('/shorts/')[1].split('/')[0];
+      else id = u.searchParams.get('v') ?? '';
+      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1` : url;
+    } catch { return url; }
+  }
   const offersRef = useRef<FlatList<Offer>>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -351,25 +364,63 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(r) => r.id}
-            contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+            contentContainerStyle={{ gap: 10, paddingRight: 16 }}
             renderItem={({ item: r }) => (
-              <View style={[styles.reelCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-                <View style={[styles.reelThumb, { borderRadius: colors.radius, overflow: 'hidden' }]}>
-                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: r.thumbnailUrl ? '#111' : colors.muted }]} />
-                  {r.thumbnailUrl ? (
-                    <Ionicons name="play-circle" size={40} color="rgba(255,255,255,0.85)" />
-                  ) : (
-                    <Ionicons name="videocam-outline" size={36} color={colors.mutedForeground} />
-                  )}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.reelCard, { borderRadius: 12, overflow: 'hidden' }]}
+                onPress={() => setActiveReel(r)}
+              >
+                {r.thumbnailUrl ? (
+                  <Image
+                    source={{ uri: r.thumbnailUrl }}
+                    style={styles.reelThumb}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.reelThumb, { backgroundColor: '#1a1a2e', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="videocam-outline" size={36} color="rgba(255,255,255,0.5)" />
+                  </View>
+                )}
+                {/* Dark gradient overlay */}
+                <View style={styles.reelOverlay} />
+                {/* Circular play button */}
+                <View style={styles.reelPlayBtn}>
+                  <View style={styles.reelPlayCircle}>
+                    <Ionicons name="play" size={18} color="#222" style={{ marginLeft: 2 }} />
+                  </View>
                 </View>
-                <View style={styles.reelInfo}>
-                  <Text style={[styles.reelTitle, { color: colors.foreground }]} numberOfLines={2}>{r.title}</Text>
-                </View>
-              </View>
+              </TouchableOpacity>
             )}
           />
         </View>
       )}
+
+      {/* In-app Reel Player */}
+      <Modal visible={!!activeReel} animationType="slide" statusBarTranslucent onRequestClose={() => setActiveReel(null)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          {activeReel && (
+            <WebView
+              source={{ uri: getYouTubeEmbedUrl(activeReel.videoUrl) }}
+              style={{ flex: 1 }}
+              allowsFullscreenVideo
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled
+            />
+          )}
+          <TouchableOpacity
+            onPress={() => setActiveReel(null)}
+            style={{ position: 'absolute', top: 50, right: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+          {activeReel && (
+            <View style={{ position: 'absolute', bottom: 40, left: 16, right: 52 }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{activeReel.title}</Text>
+            </View>
+          )}
+        </View>
+      </Modal>
 
       {/* Trust badges */}
       <View style={[styles.trust, { backgroundColor: colors.card, marginHorizontal: 16, borderRadius: colors.radius, borderColor: colors.border }]}>
@@ -491,10 +542,19 @@ const styles = StyleSheet.create({
   catLabel:             { fontSize: 11, fontWeight: '600', textAlign: 'center' },
   catLabelPlaceholder:  { width: '70%', height: 10, borderRadius: 4 },
   // Reels
-  reelCard:  { width: 140, borderWidth: 1, overflow: 'hidden' },
-  reelThumb: { width: 140, height: 100, alignItems: 'center', justifyContent: 'center' },
-  reelInfo:  { padding: 8 },
-  reelTitle: { fontSize: 11, fontWeight: '600', lineHeight: 15 },
+  reelCard:    { width: 130, height: 190 },
+  reelThumb:   { width: 130, height: 190 },
+  reelOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
+  reelPlayBtn: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  reelPlayCircle: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
+  },
   // Trust
   trust:      { flexDirection: 'row', justifyContent: 'space-around', padding: 16, marginTop: 24, borderWidth: 1 },
   trustItem:  { alignItems: 'center', gap: 6 },

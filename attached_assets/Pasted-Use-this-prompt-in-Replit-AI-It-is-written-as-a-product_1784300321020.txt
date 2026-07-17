@@ -1,0 +1,396 @@
+Use this prompt in Replit AI. It is written as a production-level feature request so it updates the **Admin Panel, Customer App, Partner App, Backend, and Database** consistently.
+
+---
+
+# Feature: Service Categories, Subcategories & Icons (Complete System Integration)
+
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Senior Mobile Engineer, Senior Backend Engineer, Senior Database Architect, Senior UI/UX Engineer, Security Engineer, and QA Engineer.
+
+## Objective
+
+Implement a **fully dynamic Category & Subcategory Management System** across the entire application. Categories and Subcategories must be managed only from the Admin Panel, and all apps (Customer App, Partner App, Admin Panel) must automatically reflect changes without requiring code changes.
+
+The system must be scalable to support hundreds of categories and thousands of subcategories.
+
+---
+
+# 1. Admin Panel – Category Management
+
+Create a complete **Service Category Management** module.
+
+Admin can:
+
+* Add Category
+* Edit Category
+* Delete Category (soft delete)
+* Enable/Disable Category
+* Search Categories
+* Filter Categories
+* Change Display Order
+* Upload Category Icon
+* Upload Category Banner (optional)
+* Set Category Color (optional)
+* Set Featured Category
+* View Total Partners
+* View Total Services
+* View Total Bookings
+* View Active/Inactive Status
+
+Each Category contains:
+
+* Category Name
+* Category Description
+* Category Icon
+* Category Banner (optional)
+* Display Order
+* Active Status
+* Featured Status
+* Created Date
+* Updated Date
+
+Example:
+
+* Cleaning
+* Beauty
+* Plumbing
+* Electrical
+* AC Repair
+* Painting
+* Pest Control
+* Appliance Repair
+* Car Wash
+
+---
+
+# 2. Admin Panel – Subcategory Management
+
+Each Category can contain unlimited Subcategories.
+
+Example:
+
+Cleaning
+
+* Home Cleaning
+* Kitchen Cleaning
+* Bathroom Cleaning
+* Sofa Cleaning
+* Carpet Cleaning
+* Mattress Cleaning
+* Window Cleaning
+* Utensil Cleaning
+* Vehicle Cleaning
+* Office Cleaning
+
+Beauty
+
+* Haircut
+* Hair Spa
+* Facial
+* Waxing
+
+Electrical
+
+* Fan Repair
+* Switch Repair
+* Wiring
+* MCB Installation
+
+Admin can:
+
+* Add Subcategory
+* Edit Subcategory
+* Delete Subcategory
+* Enable/Disable
+* Upload Subcategory Icon
+* Set Display Order
+* Search
+* Filter
+* Move to another Category
+* Bulk Import (Future Ready)
+
+Each Subcategory contains:
+
+* Parent Category
+* Subcategory Name
+* Description
+* Icon
+* Display Order
+* Active Status
+* Featured Status
+
+---
+
+# 3. Icons
+
+Both Categories and Subcategories must support icons.
+
+Admin can:
+
+* Upload PNG
+* Upload SVG
+* Upload WEBP
+
+The system should automatically:
+
+* Resize
+* Compress
+* Optimize
+* Generate thumbnails
+
+Icons should be cached for faster loading.
+
+---
+
+# 4. Database Design
+
+Create proper relational tables.
+
+## Service Categories
+
+```text
+id
+name
+description
+icon_url
+banner_url
+display_order
+featured
+status
+created_at
+updated_at
+```
+
+## Service Subcategories
+
+```text
+id
+category_id
+name
+description
+icon_url
+display_order
+featured
+status
+created_at
+updated_at
+```
+
+Use proper foreign keys, indexing, and cascading rules.
+
+---
+
+# 5. Customer App
+
+The Customer App must fetch Categories and Subcategories dynamically from the backend.
+
+Display:
+
+Category Card
+
+* Icon
+* Name
+
+After selecting a Category:
+
+Display only its related Subcategories.
+
+Example:
+
+Cleaning
+
+↓
+
+* Home Cleaning
+* Kitchen Cleaning
+* Bathroom Cleaning
+* Sofa Cleaning
+* Vehicle Cleaning
+* Utensil Cleaning
+
+Each Subcategory should display:
+
+* Icon
+* Name
+
+No hardcoded data.
+
+---
+
+# 6. Partner Registration
+
+Update Partner Registration.
+
+Step 1
+
+Select Category
+
+Dropdown
+
+Example:
+
+Cleaning
+
+Beauty
+
+Electrical
+
+Plumbing
+
+Painting
+
+Step 2
+
+After selecting Category
+
+Automatically load only related Subcategories.
+
+Example:
+
+Category
+
+Cleaning
+
+↓
+
+Subcategory dropdown
+
+* Home Cleaning
+* Kitchen Cleaning
+* Sofa Cleaning
+* Vehicle Cleaning
+* Utensil Cleaning
+
+The Subcategory dropdown must remain disabled until a Category is selected.
+
+Partners can only select active Categories and active Subcategories.
+
+---
+
+# 7. Partner Profile
+
+Partners can:
+
+* View Category
+* View Subcategory
+* Request Category Change (optional)
+* Request Additional Subcategories (future-ready)
+
+Admin must approve these requests.
+
+---
+
+# 8. Booking Flow
+
+Customer
+
+↓
+
+Select Category
+
+↓
+
+Select Subcategory
+
+↓
+
+Only Partners registered under that Category and Subcategory should be eligible for booking.
+
+Never assign a partner from an unrelated service.
+
+---
+
+# 9. Search & Filtering
+
+Everywhere in the application, support filtering by:
+
+* Category
+* Subcategory
+* Status
+* Featured
+* Active/Inactive
+
+---
+
+# 10. APIs
+
+Create production-ready APIs.
+
+Categories
+
+* GET /categories
+* GET /categories/:id
+* POST /categories
+* PUT /categories/:id
+* DELETE /categories/:id
+
+Subcategories
+
+* GET /subcategories
+* GET /subcategories/:id
+* GET /categories/:id/subcategories
+* POST /subcategories
+* PUT /subcategories/:id
+* DELETE /subcategories/:id
+
+Support:
+
+* Pagination
+* Search
+* Filtering
+* Sorting
+* Caching
+
+---
+
+# 11. Validation
+
+Do not allow:
+
+* Duplicate Category names
+* Duplicate Subcategory names within the same Category
+* Empty names
+* Invalid icons
+* Broken image URLs
+
+Prevent deleting a Category if active Subcategories or linked Partners exist. Instead, implement soft delete or require reassignment.
+
+---
+
+# 12. UI/UX
+
+Modern Material Design.
+
+Use:
+
+* Rounded cards
+* Responsive layouts
+* Lazy loading
+* Image caching
+* Skeleton loaders
+* Smooth animations
+* Drag-and-drop reordering in the Admin Panel
+* Search with instant filtering
+
+---
+
+# 13. Future Scalability
+
+Design the architecture so Categories and Subcategories can later support:
+
+* Multiple subcategory selection for partners
+* Service packages
+* Pricing by subcategory
+* Skill certifications
+* Required equipment
+* City-specific availability
+* Commission rates by category/subcategory
+* Featured services
+* Service attributes and custom fields
+
+---
+
+# 14. Integration Requirements
+
+Review the **entire project** (Admin Panel, Customer App, Partner App, Backend, Database, APIs, authentication, booking flow, search, analytics, notifications, reports, and dashboards) and replace any hardcoded category/subcategory values with this centralized management system.
+
+Ensure that every screen using service categories or subcategories automatically uses the dynamic data from the database, maintains referential integrity, and updates without code changes when the Admin adds, edits, enables, disables, or reorders categories and subcategories. The implementation must be production-ready, optimized, secure, and must not break any existing functionality.

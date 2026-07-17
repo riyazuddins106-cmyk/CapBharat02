@@ -6,10 +6,10 @@ import {
   Navigation, Check,
 } from "lucide-react";
 import {
-  auth, authApi, categoriesApi, professionalsApi, bookingsApi, favoritesApi,
-  addressesApi, offersApi, profileApi,
-  type ApiUser, type ApiCategory, type ApiProfessional, type ApiBooking,
-  type ApiAddress, type ApiOffer,
+  auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
+  addressesApi, offersApi, profileApi, reelsApi,
+  type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
+  type ApiAddress, type ApiOffer, type ApiReel,
 } from "../lib/api";
 
 /* ─────────────────────────── Icon map ──────────────────────────── */
@@ -378,14 +378,30 @@ function ProCard({ pro, wishlisted, onWishlist, onBook }: {
 /* ═══════════════════════════════════════════════════════════════
    BOOKING MODAL
 ═══════════════════════════════════════════════════════════════ */
+function isPastTimeSlot(timeLabel: string, dateLabel: string): boolean {
+  if (dateLabel !== "Today") return false;
+  const now = new Date();
+  const [time, ampm] = timeLabel.split(" ");
+  let [h, m] = time.split(":").map(Number);
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  const slotMinutes = h * 60 + m;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return slotMinutes <= nowMinutes;
+}
+
 function BookingModal({ pro, onClose, onBooked }: {
   pro: ApiProfessional;
   onClose: () => void;
   onBooked: (booking: ApiBooking) => void;
 }) {
+  const times = ["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM", "7:00 PM"];
+
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState("Today");
-  const [selectedTime, setSelectedTime] = useState("3:00 PM");
+  const [selectedTime, setSelectedTime] = useState(
+    () => times.find((t) => !isPastTimeSlot(t, "Today")) ?? times[0]
+  );
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -398,7 +414,13 @@ function BookingModal({ pro, onClose, onBooked }: {
     if (i === 1) return "Tomorrow";
     return d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
   });
-  const times = ["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM", "7:00 PM"];
+
+  function handleDateChange(d: string) {
+    setSelectedDate(d);
+    // reset time to first available slot for the new date
+    const first = times.find((t) => !isPastTimeSlot(t, d)) ?? times[0];
+    setSelectedTime(first);
+  }
 
   async function confirmBooking() {
     setError(""); setLoading(true);
@@ -443,7 +465,7 @@ function BookingModal({ pro, onClose, onBooked }: {
             <p className="text-xs font-bold mb-2.5">Select Date</p>
             <div className="flex gap-2 mb-5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               {dates.map((d) => (
-                <button key={d} onClick={() => setSelectedDate(d)}
+                <button key={d} onClick={() => handleDateChange(d)}
                   className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all"
                   style={{ background: selectedDate === d ? "#5B3EF5" : "#fff", color: selectedDate === d ? "#fff" : "#6B7280", borderColor: selectedDate === d ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
                   {d}
@@ -452,13 +474,25 @@ function BookingModal({ pro, onClose, onBooked }: {
             </div>
             <p className="text-xs font-bold mb-2.5">Select Time</p>
             <div className="grid grid-cols-3 gap-2 mb-5">
-              {times.map((t) => (
-                <button key={t} onClick={() => setSelectedTime(t)}
-                  className="py-2.5 rounded-xl text-xs font-bold border transition-all"
-                  style={{ background: selectedTime === t ? "#5B3EF5" : "#fff", color: selectedTime === t ? "#fff" : "#6B7280", borderColor: selectedTime === t ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
-                  {t}
-                </button>
-              ))}
+              {times.map((t) => {
+                const past = isPastTimeSlot(t, selectedDate);
+                const sel = selectedTime === t;
+                return (
+                  <button key={t}
+                    onClick={() => { if (!past) setSelectedTime(t); }}
+                    disabled={past}
+                    className="py-2.5 rounded-xl text-xs font-bold border transition-all"
+                    style={{
+                      background: past ? "#F3F4F6" : sel ? "#5B3EF5" : "#fff",
+                      color: past ? "#D1D5DB" : sel ? "#fff" : "#6B7280",
+                      borderColor: past ? "#E5E7EB" : sel ? "#5B3EF5" : "rgba(0,0,0,0.1)",
+                      cursor: past ? "not-allowed" : "pointer",
+                      opacity: past ? 0.6 : 1,
+                    }}>
+                    {t}
+                  </button>
+                );
+              })}
             </div>
             <button onClick={() => setStep(2)} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
               Continue <ArrowRight size={16} />
@@ -951,23 +985,36 @@ function ProfileEditModal({ user, onSave, onClose }: {
    HOME TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
-  user, categories, professionals, favoriteIds, offers, location,
-  onToggleFavorite, onBook, onCategoryFilter, onLocationPress,
+  user, categories, professionals, favoriteIds, offers, reels, location,
+  onToggleFavorite, onBook, onCategorySelect, onLocationPress,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
   professionals: ApiProfessional[];
   favoriteIds: Set<string>;
   offers: ApiOffer[];
+  reels: ApiReel[];
   location: string;
   onToggleFavorite: (id: string) => void;
   onBook: (pro: ApiProfessional) => void;
-  onCategoryFilter: (name: string) => void;
+  onCategorySelect: (id: string) => void;
   onLocationPress: () => void;
 }) {
   const featured = professionals.slice(0, 3);
   const [offerIdx, setOfferIdx] = useState(0);
+  const [activeReel, setActiveReel] = useState<ApiReel | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  function getYouTubeEmbedUrl(url: string): string {
+    try {
+      const u = new URL(url);
+      let id = '';
+      if (u.hostname === 'youtu.be') id = u.pathname.slice(1);
+      else if (u.pathname.startsWith('/shorts/')) id = u.pathname.split('/shorts/')[1].split('/')[0];
+      else id = u.searchParams.get('v') ?? '';
+      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : url;
+    } catch { return url; }
+  }
 
   // Greet based on hour
   const hour = new Date().getHours();
@@ -1062,7 +1109,7 @@ function CustHome({
             {categories.map((cat) => {
               const Icon = ICON_MAP[cat.iconName] ?? Grid;
               return (
-                <button key={cat.id} onClick={() => onCategoryFilter(cat.name)} className="flex flex-col items-center gap-1.5 group">
+                <button key={cat.id} onClick={() => onCategorySelect(cat.id)} className="flex flex-col items-center gap-1.5 group">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cat.color }}>
                     <Icon size={22} color={cat.iconColor} />
                   </div>
@@ -1073,6 +1120,70 @@ function CustHome({
           </div>
         )}
       </div>
+
+      {/* Reels */}
+      {reels.length > 0 && (
+        <div className="px-5 mt-6">
+          <h2 className="text-base font-bold text-foreground mb-3">Reels</h2>
+          <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {reels.map((r) => (
+              <button
+                key={r.id}
+                className="relative flex-shrink-0 rounded-xl overflow-hidden"
+                style={{ width: 120, height: 176 }}
+                onClick={() => setActiveReel(r)}
+              >
+                {r.thumbnailUrl ? (
+                  <img src={r.thumbnailUrl} alt={r.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ background: "#1a1a2e" }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"><path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.362a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                  </div>
+                )}
+                <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.22)" }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.9)" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#222" style={{ marginLeft: 2 }}><path d="M5 3l14 9-14 9V3z"/></svg>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reel player modal */}
+      {activeReel && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.85)" }}
+          onClick={() => setActiveReel(null)}
+        >
+          <div
+            className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden"
+            style={{ aspectRatio: "9/16", background: "#000" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <iframe
+              src={getYouTubeEmbedUrl(activeReel.videoUrl)}
+              className="w-full h-full"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+              style={{ border: "none" }}
+            />
+            <button
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(0,0,0,0.6)" }}
+              onClick={() => setActiveReel(null)}
+            >
+              <X size={16} color="#fff" />
+            </button>
+            <div className="absolute bottom-0 left-0 right-0 px-4 py-3" style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>
+              <p className="text-white text-sm font-semibold">{activeReel.title}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Featured professionals */}
       <div className="px-5 mt-6">
@@ -1120,22 +1231,40 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, professionals, favoriteIds, onToggleFavorite, onBook,
+  categories, professionals, favoriteIds, onToggleFavorite, onBook, initialCategoryId,
 }: {
   categories: ApiCategory[];
   professionals: ApiProfessional[];
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   onBook: (pro: ApiProfessional) => void;
+  initialCategoryId?: string | null;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
+  const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
+  const [subs, setSubs] = useState<ApiSubCategory[]>([]);
   const [search, setSearch] = useState("");
 
+  // Sync when home tab navigates here with a category pre-selected
+  useEffect(() => {
+    setSelectedCatId(initialCategoryId ?? null);
+    setSelectedSubId(null);
+  }, [initialCategoryId]);
+
+  // Fetch subcategories when selected category changes
+  useEffect(() => {
+    if (!selectedCatId) { setSubs([]); return; }
+    subcategoriesApi.listByCategory(selectedCatId).then(setSubs).catch(() => setSubs([]));
+  }, [selectedCatId]);
+
   const filtered = professionals.filter((p) => {
-    const matchesCat = !selected || categories.find((c) => c.id === p.categoryId)?.name === selected;
+    const matchesCat = !selectedCatId || p.categoryId === selectedCatId;
     const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.title.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
   });
+
+  const selectedCatName = selectedCatId ? (categories.find((c) => c.id === selectedCatId)?.name ?? null) : null;
+  const selectedSubName = selectedSubId ? (subs.find((s) => s.id === selectedSubId)?.name ?? null) : null;
 
   return (
     <div className="flex flex-col">
@@ -1153,31 +1282,54 @@ function CustServices({
       </div>
 
       <div className="px-5 mt-4">
+        {/* Category pills */}
         <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
           <button
-            onClick={() => setSelected(null)}
+            onClick={() => { setSelectedCatId(null); setSelectedSubId(null); }}
             className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all"
-            style={{ background: !selected ? "#5B3EF5" : "#fff", color: !selected ? "#fff" : "#6B7280", borderColor: !selected ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
+            style={{ background: !selectedCatId ? "#5B3EF5" : "#fff", color: !selectedCatId ? "#fff" : "#6B7280", borderColor: !selectedCatId ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
             All
           </button>
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelected(selected === cat.name ? null : cat.name)}
+              onClick={() => { setSelectedCatId(selectedCatId === cat.id ? null : cat.id); setSelectedSubId(null); }}
               className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all"
-              style={{ background: selected === cat.name ? "#5B3EF5" : "#fff", color: selected === cat.name ? "#fff" : "#6B7280", borderColor: selected === cat.name ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
+              style={{ background: selectedCatId === cat.id ? "#5B3EF5" : "#fff", color: selectedCatId === cat.id ? "#fff" : "#6B7280", borderColor: selectedCatId === cat.id ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
               {cat.name}
             </button>
           ))}
         </div>
 
+        {/* Subcategory chips — appear when a category is selected and has subcategories */}
+        {selectedCatId && subs.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 mt-2" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setSelectedSubId(null)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+              style={{ background: !selectedSubId ? "#EDE9FE" : "#fff", color: !selectedSubId ? "#5B3EF5" : "#9CA3AF", borderColor: !selectedSubId ? "#5B3EF5" : "rgba(0,0,0,0.08)" }}>
+              All {selectedCatName}
+            </button>
+            {subs.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedSubId(selectedSubId === s.id ? null : s.id)}
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                style={{ background: selectedSubId === s.id ? "#5B3EF5" : "#fff", color: selectedSubId === s.id ? "#fff" : "#6B7280", borderColor: selectedSubId === s.id ? "#5B3EF5" : "rgba(0,0,0,0.08)" }}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Category grid */}
         <div className="grid grid-cols-4 gap-3 mt-4">
           {categories.map((cat) => {
             const Icon = ICON_MAP[cat.iconName] ?? Grid;
             return (
-              <button key={cat.id} onClick={() => setSelected(selected === cat.name ? null : cat.name)} className="flex flex-col items-center gap-1.5">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: selected === cat.name ? "#5B3EF5" : cat.color }}>
-                  <Icon size={22} color={selected === cat.name ? "#fff" : cat.iconColor} />
+              <button key={cat.id} onClick={() => { setSelectedCatId(selectedCatId === cat.id ? null : cat.id); setSelectedSubId(null); }} className="flex flex-col items-center gap-1.5">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: selectedCatId === cat.id ? "#5B3EF5" : cat.color }}>
+                  <Icon size={22} color={selectedCatId === cat.id ? "#fff" : cat.iconColor} />
                 </div>
                 <span className="text-[11px] font-semibold text-center leading-tight">{cat.name}</span>
               </button>
@@ -1187,7 +1339,9 @@ function CustServices({
 
         <div className="mt-5">
           <h3 className="text-sm font-bold mb-3">
-            {selected ? `${selected} Professionals` : "All Professionals"}
+            {selectedCatName
+              ? `${selectedCatName}${selectedSubName ? ` › ${selectedSubName}` : ""} Professionals`
+              : "All Professionals"}
             <span className="text-gray-400 font-normal ml-1">({filtered.length})</span>
           </h3>
           {filtered.length === 0 ? (
@@ -1389,11 +1543,13 @@ export default function CustomerApp() {
   const [profileScreen, setProfileScreen] = useState<"main" | "addresses">("main");
 
   // Data
-  const [categories, setCategories]     = useState<ApiCategory[]>([]);
+  const [categories, setCategories]       = useState<ApiCategory[]>([]);
+  const [servicesInitCatId, setServicesInitCatId] = useState<string | null>(null);
   const [professionals, setProfessionals] = useState<ApiProfessional[]>([]);
   const [bookings, setBookings]           = useState<ApiBooking[]>([]);
   const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
   const [offers, setOffers]               = useState<ApiOffer[]>([]);
+  const [reels, setReels]                 = useState<ApiReel[]>([]);
   const [addresses, setAddresses]         = useState<ApiAddress[]>([]);
 
   // Location
@@ -1411,6 +1567,7 @@ export default function CustomerApp() {
       setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
     }).catch(console.error);
     offersApi.list().then(setOffers).catch(console.error);
+    reelsApi.listActive().then(setReels).catch(console.error);
   }, []);
 
   // Load auth-required data when logged in
@@ -1480,7 +1637,8 @@ export default function CustomerApp() {
     setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" as const } : b));
   }, []);
 
-  const handleCategoryFilter = useCallback((_name: string) => {
+  const handleCategorySelect = useCallback((id: string) => {
+    setServicesInitCatId(id);
     setActiveTab("services");
   }, []);
 
@@ -1530,10 +1688,11 @@ export default function CustomerApp() {
             professionals={professionals}
             favoriteIds={favoriteIds}
             offers={offers}
+            reels={reels}
             location={location}
             onToggleFavorite={handleToggleFavorite}
             onBook={handleBook}
-            onCategoryFilter={handleCategoryFilter}
+            onCategorySelect={handleCategorySelect}
             onLocationPress={() => setShowLocationPicker(true)}
           />
         )}
@@ -1544,6 +1703,7 @@ export default function CustomerApp() {
             favoriteIds={favoriteIds}
             onToggleFavorite={handleToggleFavorite}
             onBook={handleBook}
+            initialCategoryId={servicesInitCatId}
           />
         )}
         {activeTab === "bookings" && (

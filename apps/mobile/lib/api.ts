@@ -230,6 +230,22 @@ export const categoriesApi = {
   list: () => request<Category[]>('/api/categories'),
 };
 
+export interface SubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+}
+
+export const subcategoriesApi = {
+  listByCategory: (categoryId: string) =>
+    request<SubCategory[]>(`/api/categories/${categoryId}/subcategories`),
+};
+
 // ── Professionals ──────────────────────────────────────────
 export const professionalsApi = {
   list: (params?: { categoryId?: string; search?: string }) => {

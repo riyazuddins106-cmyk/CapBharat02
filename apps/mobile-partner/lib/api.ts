@@ -155,6 +155,24 @@ async function uploadFile<T>(
   return json.data as T;
 }
 
+// ── Categories ─────────────────────────────────────────────
+export interface Category {
+  id: string;
+  name: string;
+  description?: string | null;
+  iconName: string;
+  color: string;
+  iconColor: string;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+}
+
+export const categoriesApi = {
+  list: () => request<Category[]>('/api/categories'),
+};
+
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   login: (data: { email: string; password: string }) =>
