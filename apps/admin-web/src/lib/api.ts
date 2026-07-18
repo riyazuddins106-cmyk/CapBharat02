@@ -126,8 +126,12 @@ export interface SubCategory {
   categoryId: string;
   name: string;
   description?: string | null;
+  iconName: string;
+  color: string;
+  iconColor: string;
   imageUrl?: string | null;
   sortOrder: number;
+  featured: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -313,9 +317,9 @@ export const adminApi = {
   // Subcategories
   getSubcategories: (categoryId: string, token: string) =>
     request<{ subcategories: SubCategory[]; total: number }>(`/admin/categories/${categoryId}/subcategories`, { token }),
-  createSubcategory: (categoryId: string, data: { name: string; description?: string; sortOrder?: number }, token: string) =>
+  createSubcategory: (categoryId: string, data: { name: string; description?: string; iconName?: string; color?: string; iconColor?: string; sortOrder?: number }, token: string) =>
     request<SubCategory>(`/admin/categories/${categoryId}/subcategories`, { method: 'POST', token, body: JSON.stringify(data) }),
-  updateSubcategory: (id: string, data: { name?: string; description?: string; sortOrder?: number; isActive?: boolean }, token: string) =>
+  updateSubcategory: (id: string, data: { name?: string; description?: string; iconName?: string; color?: string; iconColor?: string; sortOrder?: number; isActive?: boolean }, token: string) =>
     request<SubCategory>(`/admin/subcategories/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteSubcategory: (id: string, token: string) =>
     request<{ id: string }>(`/admin/subcategories/${id}`, { method: 'DELETE', token }),
@@ -348,6 +352,11 @@ export const adminApi = {
   uploadReelThumbnail: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('image', file);
     return fetch(`/api/admin/reels/${id}/thumbnail`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ReelRow; }));
+  },
+  uploadReelVideo: (id: string, file: File, token: string) => {
+    const fd = new FormData(); fd.append('video', file);
+    return fetch(`/api/admin/reels/${id}/video`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
       .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ReelRow; }));
   },
 

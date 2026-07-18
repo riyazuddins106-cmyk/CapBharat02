@@ -21,7 +21,9 @@ export const subCategoryController = {
 
   create: asyncHandler(async (req: Request, res: Response) => {
     const { categoryId } = req.params;
-    const { name, description, sortOrder } = req.body as { name: string; description?: string; sortOrder?: number };
+    const { name, description, iconName, color, iconColor, sortOrder } = req.body as {
+      name: string; description?: string; iconName?: string; color?: string; iconColor?: string; sortOrder?: number;
+    };
     if (!name || String(name).trim().length === 0) throw AppError.badRequest('Name is required');
     const [cat] = await db.select({ id: serviceCategories.id }).from(serviceCategories).where(eq(serviceCategories.id, categoryId));
     if (!cat) throw AppError.notFound('Category not found');
@@ -29,6 +31,9 @@ export const subCategoryController = {
       categoryId,
       name: String(name).trim(),
       description: description || null,
+      iconName: iconName || 'tag-outline',
+      color: color || '#5B3EF5',
+      iconColor: iconColor || '#ffffff',
       sortOrder: Number(sortOrder ?? 0),
       isActive: true,
     }).returning();
@@ -37,14 +42,18 @@ export const subCategoryController = {
 
   update: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, description, sortOrder, isActive } = req.body as {
-      name?: string; description?: string; sortOrder?: number; isActive?: boolean;
+    const { name, description, iconName, color, iconColor, sortOrder, isActive } = req.body as {
+      name?: string; description?: string; iconName?: string; color?: string; iconColor?: string;
+      sortOrder?: number; isActive?: boolean;
     };
     const [existing] = await db.select().from(subServiceCategories).where(eq(subServiceCategories.id, id));
     if (!existing) throw AppError.notFound('Subcategory not found');
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (name        !== undefined) patch.name        = String(name).trim();
     if (description !== undefined) patch.description = description;
+    if (iconName    !== undefined) patch.iconName    = iconName;
+    if (color       !== undefined) patch.color       = color;
+    if (iconColor   !== undefined) patch.iconColor   = iconColor;
     if (sortOrder   !== undefined) patch.sortOrder   = Number(sortOrder);
     if (isActive    !== undefined) patch.isActive    = Boolean(isActive);
     const [row] = await db.update(subServiceCategories).set(patch as any).where(eq(subServiceCategories.id, id)).returning();

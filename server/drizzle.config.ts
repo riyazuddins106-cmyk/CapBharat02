@@ -1,9 +1,11 @@
 import { defineConfig } from 'drizzle-kit';
 import 'dotenv/config';
 
-const databaseUrl = process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL;
+// Prefer SUPABASE_DATABASE_URL — it uses the pooler (prepare:false) which matches the server.
+// Falling back to DATABASE_URL pushes to the direct connection, a different DB endpoint.
+const databaseUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
 if (!databaseUrl) {
-  throw new Error('DATABASE_URL is not set. Add it to Replit Secrets.');
+  throw new Error('SUPABASE_DATABASE_URL is not set. Add it to Replit Secrets.');
 }
 
 export default defineConfig({

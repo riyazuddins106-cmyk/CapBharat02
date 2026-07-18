@@ -58,6 +58,7 @@ router.post('/reels',                 reelController.adminCreate);
 router.patch('/reels/:id',            reelController.adminUpdate);
 router.delete('/reels/:id',           reelController.adminDelete);
 router.post('/reels/:id/thumbnail',   upload.single('image'), reelController.uploadThumbnail);
+router.post('/reels/:id/video',       upload.single('video'),  reelController.uploadVideo);
 
 // Reviews (moderation)
 router.get('/reviews',                adminController.listReviews);

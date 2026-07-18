@@ -185,6 +185,9 @@ export interface ApiSubCategory {
   categoryId: string;
   name: string;
   description?: string | null;
+  iconName: string;
+  color: string;
+  iconColor: string;
   imageUrl?: string | null;
   sortOrder: number;
   isActive: boolean;
@@ -200,7 +203,7 @@ export const subcategoriesApi = {
 
 // ─── Professionals API ────────────────────────────────────────────────────────
 export const professionalsApi = {
-  async list(params?: { categoryId?: string; search?: string; sort?: string; limit?: number; offset?: number }) {
+  async list(params?: { categoryId?: string; subCategoryId?: string; search?: string; sort?: string; limit?: number; offset?: number }) {
     const { data } = await client.get('/professionals', { params });
     return data.data as ApiProfessional[];
   },

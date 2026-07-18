@@ -158,15 +158,17 @@ export default function SubcategoriesScreen() {
               </View>
             );
           }
-          const accent = ACCENTS[index % ACCENTS.length];
+          const accent = item.color || ACCENTS[index % ACCENTS.length];
+          const iconName = (item.iconName && item.iconName !== 'tag-outline' ? item.iconName : getIcon(item.name)) as keyof typeof MaterialCommunityIcons.glyphMap;
+          const iconColor = item.iconColor || '#ffffff';
           return (
             <TouchableOpacity
               style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}
               activeOpacity={0.8}
               onPress={() => handleSelect(item)}
             >
-              <View style={[styles.iconWrap, { backgroundColor: accent + '18' }]}>
-                <MaterialCommunityIcons name={getIcon(item.name)} size={30} color={accent} />
+              <View style={[styles.iconWrap, { backgroundColor: accent }]}>
+                <MaterialCommunityIcons name={iconName} size={30} color={iconColor} />
               </View>
               <Text style={[styles.cardName, { color: colors.foreground }]} numberOfLines={2}>{item.name}</Text>
               {item.description ? (
@@ -175,7 +177,7 @@ export default function SubcategoriesScreen() {
                 </Text>
               ) : null}
               <View style={styles.arrowRow}>
-                <Ionicons name="arrow-forward-circle" size={20} color={accent} />
+                <Ionicons name="arrow-forward-circle" size={20} color={item.color || accent} />
               </View>
             </TouchableOpacity>
           );

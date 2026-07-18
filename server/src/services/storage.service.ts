@@ -4,15 +4,27 @@ import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET } from '../
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 /**
- * Detect the actual image type from the file's magic bytes.
+ * Detect the actual image type from the file's magic bytes / content.
  * Returns { mime, ext } if recognised, null otherwise.
  *
  * Signatures:
+ *   SVG  — starts with '<svg' or '<?xml' (text-based, no binary magic)
  *   PNG  — 89 50 4E 47 0D 0A 1A 0A
- *   JPEG — FF D8 FF
  *   WebP — 52 49 46 46 ?? ?? ?? ?? 57 45 42 50  (RIFF....WEBP)
+ *   JPEG — FF D8 FF  (legacy support — not advertised for categories)
  */
 function detectImageType(buf: Buffer): { mime: string; ext: string } | null {
+  if (buf.length < 4) return null;
+
+  // SVG — text-based; check the first 256 bytes for the characteristic tags
+  const head = buf.slice(0, 256).toString('utf8').trimStart().toLowerCase();
+  if (head.startsWith('<svg') || head.startsWith('<?xml')) {
+    // Confirm it's actually SVG (<?xml files might be other XML formats)
+    if (head.startsWith('<svg') || head.includes('<svg')) {
+      return { mime: 'image/svg+xml', ext: 'svg' };
+    }
+  }
+
   if (buf.length < 12) return null;
 
   // PNG
@@ -21,15 +33,15 @@ function detectImageType(buf: Buffer): { mime: string; ext: string } | null {
     buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
   ) return { mime: 'image/png', ext: 'png' };
 
-  // JPEG
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
-    return { mime: 'image/jpeg', ext: 'jpg' };
-
   // WebP
   if (
     buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
     buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
   ) return { mime: 'image/webp', ext: 'webp' };
+
+  // JPEG (legacy — accepted but not advertised)
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
+    return { mime: 'image/jpeg', ext: 'jpg' };
 
   return null;
 }
@@ -38,7 +50,7 @@ export const storageService = {
   async uploadCategoryImage(key: string, file: Express.Multer.File): Promise<string> {
     if (file.size > MAX_FILE_SIZE) throw AppError.badRequest('Image must be smaller than 5MB.');
     const detected = detectImageType(file.buffer);
-    if (!detected) throw AppError.badRequest('Image must be PNG, JPEG, or WebP.');
+    if (!detected) throw AppError.badRequest('Image must be SVG, WebP, or PNG.');
     const path = `${key}-${Date.now()}.${detected.ext}`;
     const { error } = await supabaseAdmin.storage.from(CATEGORY_BUCKET).upload(path, file.buffer, { contentType: detected.mime, upsert: true });
     if (error) throw AppError.internal(`Upload failed: ${error.message}`);

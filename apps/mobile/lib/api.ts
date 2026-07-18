@@ -226,6 +226,9 @@ export interface SubCategory {
   categoryId: string;
   name: string;
   description?: string | null;
+  iconName: string;
+  color: string;
+  iconColor: string;
   imageUrl?: string | null;
   sortOrder: number;
   isActive: boolean;

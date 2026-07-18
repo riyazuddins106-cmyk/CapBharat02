@@ -1231,10 +1231,9 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, professionals, favoriteIds, onToggleFavorite, onBook, initialCategoryId,
+  categories, favoriteIds, onToggleFavorite, onBook, initialCategoryId,
 }: {
   categories: ApiCategory[];
-  professionals: ApiProfessional[];
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   onBook: (pro: ApiProfessional) => void;
@@ -1243,6 +1242,8 @@ function CustServices({
   const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subs, setSubs] = useState<ApiSubCategory[]>([]);
+  const [pros, setPros] = useState<ApiProfessional[]>([]);
+  const [prosLoading, setProsLoading] = useState(false);
   const [search, setSearch] = useState("");
 
   // Sync when home tab navigates here with a category pre-selected
@@ -1257,19 +1258,47 @@ function CustServices({
     subcategoriesApi.listByCategory(selectedCatId).then(setSubs).catch(() => setSubs([]));
   }, [selectedCatId]);
 
-  const filtered = professionals.filter((p) => {
-    const matchesCat = !selectedCatId || p.categoryId === selectedCatId;
-    const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.title.toLowerCase().includes(search.toLowerCase());
-    return matchesCat && matchesSearch;
-  });
+  // Fetch professionals when filters change
+  useEffect(() => {
+    setProsLoading(true);
+    const params: { categoryId?: string; subCategoryId?: string } = {};
+    if (selectedCatId) params.categoryId = selectedCatId;
+    if (selectedSubId) params.subCategoryId = selectedSubId;
+    professionalsApi.list(params)
+      .then(setPros)
+      .catch(() => setPros([]))
+      .finally(() => setProsLoading(false));
+  }, [selectedCatId, selectedSubId]);
 
-  const selectedCatName = selectedCatId ? (categories.find((c) => c.id === selectedCatId)?.name ?? null) : null;
-  const selectedSubName = selectedSubId ? (subs.find((s) => s.id === selectedSubId)?.name ?? null) : null;
+  const filtered = pros.filter((p) =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedCat = selectedCatId ? categories.find((c) => c.id === selectedCatId) : null;
+  const selectedSub = selectedSubId ? subs.find((s) => s.id === selectedSubId) : null;
+
+  // True when a category has subcategories and none is picked yet — show prompt instead of pros
+  const awaitingSubSelection = !!selectedCatId && subs.length > 0 && !selectedSubId;
 
   return (
     <div className="flex flex-col">
+      {/* Header + search */}
       <div className="px-5 pt-3 pb-4 bg-white border-b border-black/[0.08]">
-        <h2 className="text-lg font-bold mb-3">All Services</h2>
+        <div className="flex items-center gap-3 mb-3">
+          {selectedCat && (
+            <button
+              onClick={() => { setSelectedCatId(null); setSelectedSubId(null); setSubs([]); }}
+              className="w-8 h-8 rounded-full flex items-center justify-center border border-black/10"
+            >
+              <ChevronLeft size={16} color="#6B7280" />
+            </button>
+          )}
+          <h2 className="text-lg font-bold">
+            {selectedCat
+              ? selectedSub ? `${selectedSub.name}` : `${selectedCat.name}`
+              : "All Services"}
+          </h2>
+        </div>
         <div className="bg-gray-100 rounded-xl flex items-center gap-3 px-4 py-2.5">
           <Search size={16} color="#9CA3AF" />
           <input
@@ -1281,83 +1310,112 @@ function CustServices({
         </div>
       </div>
 
-      <div className="px-5 mt-4">
-        {/* Category pills */}
-        <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-          <button
-            onClick={() => { setSelectedCatId(null); setSelectedSubId(null); }}
-            className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all"
-            style={{ background: !selectedCatId ? "#5B3EF5" : "#fff", color: !selectedCatId ? "#fff" : "#6B7280", borderColor: !selectedCatId ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
-            All
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => { setSelectedCatId(selectedCatId === cat.id ? null : cat.id); setSelectedSubId(null); }}
-              className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all"
-              style={{ background: selectedCatId === cat.id ? "#5B3EF5" : "#fff", color: selectedCatId === cat.id ? "#fff" : "#6B7280", borderColor: selectedCatId === cat.id ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
-              {cat.name}
-            </button>
-          ))}
-        </div>
+      <div className="px-5 mt-5">
 
-        {/* Subcategory chips — appear when a category is selected and has subcategories */}
-        {selectedCatId && subs.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 mt-2" style={{ scrollbarWidth: "none" }}>
-            <button
-              onClick={() => setSelectedSubId(null)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
-              style={{ background: !selectedSubId ? "#EDE9FE" : "#fff", color: !selectedSubId ? "#5B3EF5" : "#9CA3AF", borderColor: !selectedSubId ? "#5B3EF5" : "rgba(0,0,0,0.08)" }}>
-              All {selectedCatName}
-            </button>
-            {subs.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedSubId(selectedSubId === s.id ? null : s.id)}
-                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
-                style={{ background: selectedSubId === s.id ? "#5B3EF5" : "#fff", color: selectedSubId === s.id ? "#fff" : "#6B7280", borderColor: selectedSubId === s.id ? "#5B3EF5" : "rgba(0,0,0,0.08)" }}>
-                {s.name}
-              </button>
-            ))}
-          </div>
+        {/* ── No category selected: show category icon grid ── */}
+        {!selectedCatId && (
+          <>
+            <h3 className="text-sm font-bold mb-3">Browse by Category</h3>
+            <div className="grid grid-cols-4 gap-3">
+              {categories.map((cat) => {
+                const Icon = ICON_MAP[cat.iconName] ?? Grid;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setSelectedCatId(cat.id); setSelectedSubId(null); }}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cat.color }}>
+                      <Icon size={22} color={cat.iconColor} />
+                    </div>
+                    <span className="text-[11px] font-semibold text-center leading-tight">{cat.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-6">
+              <h3 className="text-sm font-bold mb-3">All Professionals <span className="text-gray-400 font-normal">({filtered.length})</span></h3>
+              {prosLoading ? (
+                <div className="flex flex-col gap-4">{Array(3).fill(0).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-gray-100 animate-pulse" />)}</div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-12"><div className="text-4xl mb-3">🔍</div><p className="text-sm font-bold">No professionals found</p></div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {filtered.map((pro) => <ProCard key={pro.id} pro={pro} wishlisted={favoriteIds.has(pro.id)} onWishlist={() => onToggleFavorite(pro.id)} onBook={() => onBook(pro)} />)}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
-        {/* Category grid */}
-        <div className="grid grid-cols-4 gap-3 mt-4">
-          {categories.map((cat) => {
-            const Icon = ICON_MAP[cat.iconName] ?? Grid;
-            return (
-              <button key={cat.id} onClick={() => { setSelectedCatId(selectedCatId === cat.id ? null : cat.id); setSelectedSubId(null); }} className="flex flex-col items-center gap-1.5">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: selectedCatId === cat.id ? "#5B3EF5" : cat.color }}>
-                  <Icon size={22} color={selectedCatId === cat.id ? "#fff" : cat.iconColor} />
-                </div>
-                <span className="text-[11px] font-semibold text-center leading-tight">{cat.name}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* ── Category selected: show subcategory grid ── */}
+        {selectedCatId && subs.length > 0 && (
+          <>
+            <h3 className="text-sm font-bold mb-3">
+              {selectedCat?.name} — Pick a Service Type
+            </h3>
+            <div className="grid grid-cols-4 gap-3">
+              {subs.map((s) => {
+                const isSelected = selectedSubId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSubId(isSelected ? null : s.id)}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all"
+                      style={{ background: isSelected ? "#5B3EF5" : (s.color || "#5B3EF5") }}
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={s.iconColor || "#fff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                      </svg>
+                    </div>
+                    <span
+                      className="text-[11px] font-semibold text-center leading-tight"
+                      style={{ color: isSelected ? "#5B3EF5" : undefined }}
+                    >{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
-        <div className="mt-5">
-          <h3 className="text-sm font-bold mb-3">
-            {selectedCatName
-              ? `${selectedCatName}${selectedSubName ? ` › ${selectedSubName}` : ""} Professionals`
-              : "All Professionals"}
-            <span className="text-gray-400 font-normal ml-1">({filtered.length})</span>
-          </h3>
-          {filtered.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-3">🔍</div>
-              <p className="text-sm font-bold">No professionals found</p>
-              <p className="text-xs text-gray-400 mt-1">Try a different search or category</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {filtered.map((pro) => (
-                <ProCard key={pro.id} pro={pro} wishlisted={favoriteIds.has(pro.id)} onWishlist={() => onToggleFavorite(pro.id)} onBook={() => onBook(pro)} />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* ── Category selected, no subcategories: skip the grid ── */}
+
+        {/* ── Professionals section ── */}
+        {selectedCatId && (
+          <div className="mt-6">
+            {awaitingSubSelection ? (
+              <div className="text-center py-10">
+                <div className="text-3xl mb-3">☝️</div>
+                <p className="text-sm font-bold text-gray-700">Select a service type above</p>
+                <p className="text-xs text-gray-400 mt-1">Tap any category icon to see professionals</p>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-sm font-bold mb-3">
+                  {selectedSub ? selectedSub.name : selectedCat?.name} Professionals
+                  <span className="text-gray-400 font-normal ml-1">({filtered.length})</span>
+                </h3>
+                {prosLoading ? (
+                  <div className="flex flex-col gap-4">{Array(3).fill(0).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-gray-100 animate-pulse" />)}</div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-4xl mb-3">🔍</div>
+                    <p className="text-sm font-bold">No professionals found</p>
+                    <p className="text-xs text-gray-400 mt-1">Try a different category or search</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {filtered.map((pro) => <ProCard key={pro.id} pro={pro} wishlisted={favoriteIds.has(pro.id)} onWishlist={() => onToggleFavorite(pro.id)} onBook={() => onBook(pro)} />)}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
       <div className="h-6" />
     </div>
@@ -1699,7 +1757,6 @@ export default function CustomerApp() {
         {activeTab === "services" && (
           <CustServices
             categories={categories}
-            professionals={professionals}
             favoriteIds={favoriteIds}
             onToggleFavorite={handleToggleFavorite}
             onBook={handleBook}

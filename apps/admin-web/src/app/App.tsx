@@ -1268,26 +1268,110 @@ function UsersView({
 type CatForm = { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean; featured: boolean };
 const EMPTY_CAT: CatForm = { name: "", description: "", iconName: "Grid", color: "#F3F4F6", iconColor: "#6B7280", sortOrder: 0, isActive: true, featured: false };
 
+const IMAGE_ACCEPT = "image/svg+xml,image/webp,image/png";
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
 function ImageUploadButton({ label, onUpload, currentUrl, disabled }: { label: string; onUpload: (f: File) => Promise<void>; currentUrl?: string | null; disabled?: boolean }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [sizeErr, setSizeErr] = useState(false);
+
   const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setSizeErr(false);
+    if (f.size > IMAGE_MAX_BYTES) {
+      setSizeErr(true);
+      if (ref.current) ref.current.value = "";
+      return;
+    }
     setBusy(true);
     try { await onUpload(f); } catch (err: any) { alert(err.message); }
     finally { setBusy(false); if (ref.current) ref.current.value = ""; }
   };
+
   return (
-    <div className="flex items-center gap-3">
-      {currentUrl && <img src={currentUrl} alt="preview" className="w-12 h-12 rounded-lg object-cover border border-white/10" />}
-      <button
-        type="button" onClick={() => ref.current?.click()} disabled={disabled || busy}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-white/70 border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-50"
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        {currentUrl && (
+          <div className="w-12 h-12 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
+            <img src={currentUrl} alt="preview" className="w-full h-full object-contain" />
+          </div>
+        )}
+        <button
+          type="button" onClick={() => { setSizeErr(false); ref.current?.click(); }} disabled={disabled || busy}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-white/70 border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-50"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+          {busy ? "Uploading…" : label}
+        </button>
+      </div>
+
+      {/* Format hint */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-white/30 uppercase tracking-wide">Accepted formats</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/20">
+            ★ SVG
+          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-white/40 border border-white/10">
+            WebP
+          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-white/40 border border-white/10">
+            PNG
+          </span>
+          <span className="text-white/20 text-[10px]">·</span>
+          <span className="text-[10px] text-white/30">Max 5 MB</span>
+        </div>
+        <p className="text-[10px] text-white/25 leading-snug">
+          SVG recommended — stays crisp at any size and resolution.
+        </p>
+        {sizeErr && (
+          <p className="text-[10px] text-red-400 font-semibold mt-0.5">
+            File exceeds 5 MB. Please choose a smaller image.
+          </p>
+        )}
+      </div>
+
+      <input ref={ref} type="file" accept={IMAGE_ACCEPT} className="hidden" onChange={handle} />
+    </div>
+  );
+}
+
+function CatFormFields({ form, setForm }: { form: CatForm; setForm: React.Dispatch<React.SetStateAction<CatForm>> }) {
+  return (
+    <div className="space-y-4">
+      <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Home Cleaning" /></Field>
+      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Short description…" rows={2} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Icon Name"><TextInput value={form.iconName} onChange={v => setForm(f => ({ ...f, iconName: v }))} placeholder="Grid" /></Field>
+        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Card Color">
+          <div className="flex gap-2 items-center">
+            <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+            <TextInput value={form.color} onChange={v => setForm(f => ({ ...f, color: v }))} />
+          </div>
+        </Field>
+        <Field label="Icon Color">
+          <div className="flex gap-2 items-center">
+            <input type="color" value={form.iconColor} onChange={e => setForm(f => ({ ...f, iconColor: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+            <TextInput value={form.iconColor} onChange={v => setForm(f => ({ ...f, iconColor: v }))} />
+          </div>
+        </Field>
+      </div>
+      <div
+        className="flex items-center gap-3 cursor-pointer"
+        onClick={() => setForm(f => ({ ...f, featured: !f.featured }))}
       >
-        {busy ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-        {busy ? "Uploading…" : label}
-      </button>
-      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handle} />
+        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.featured ? "bg-violet-600" : "bg-white/10"}`}>
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.featured ? "translate-x-5" : ""}`} />
+        </div>
+        <span className="text-white/60 text-xs">Mark as featured category</span>
+      </div>
     </div>
   );
 }
@@ -1363,40 +1447,6 @@ function CategoriesView({
     finally { setBusyId(null); }
   };
 
-  const CatFormFields = () => (
-    <div className="space-y-4">
-      <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Home Cleaning" /></Field>
-      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Short description…" rows={2} /></Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Icon Name"><TextInput value={form.iconName} onChange={v => setForm(f => ({ ...f, iconName: v }))} placeholder="Grid" /></Field>
-        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Card Color">
-          <div className="flex gap-2 items-center">
-            <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
-            <TextInput value={form.color} onChange={v => setForm(f => ({ ...f, color: v }))} />
-          </div>
-        </Field>
-        <Field label="Icon Color">
-          <div className="flex gap-2 items-center">
-            <input type="color" value={form.iconColor} onChange={e => setForm(f => ({ ...f, iconColor: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
-            <TextInput value={form.iconColor} onChange={v => setForm(f => ({ ...f, iconColor: v }))} />
-          </div>
-        </Field>
-      </div>
-      <div
-        className="flex items-center gap-3 cursor-pointer"
-        onClick={() => setForm(f => ({ ...f, featured: !f.featured }))}
-      >
-        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.featured ? "bg-violet-600" : "bg-white/10"}`}>
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.featured ? "translate-x-5" : ""}`} />
-        </div>
-        <span className="text-white/60 text-xs">Mark as featured category</span>
-      </div>
-    </div>
-  );
-
   const filtered = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 
   if (subCatTarget) {
@@ -1414,13 +1464,13 @@ function CategoriesView({
       {/* Modals */}
       {creating && (
         <Modal title="New Category" onClose={() => setCreating(false)}>
-          <CatFormFields />
+          <CatFormFields form={form} setForm={setForm} />
           <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create category" />
         </Modal>
       )}
       {editTarget && (
         <Modal title="Edit Category" onClose={() => setEditTarget(null)}>
-          <CatFormFields />
+          <CatFormFields form={form} setForm={setForm} />
           {editTarget.id && (
             <div className="mt-4 pt-4 border-t border-white/10">
               <p className="text-white/40 text-xs mb-2">Category image</p>
@@ -1566,8 +1616,44 @@ function CategoriesView({
    SUB-CATEGORIES
 ═══════════════════════════════════════════════════════════════════ */
 
-type SubCatForm = { name: string; description: string; sortOrder: number; isActive: boolean };
-const EMPTY_SUB: SubCatForm = { name: "", description: "", sortOrder: 0, isActive: true };
+type SubCatForm = { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean; featured: boolean };
+const EMPTY_SUB: SubCatForm = { name: "", description: "", iconName: "tag-outline", color: "#5B3EF5", iconColor: "#ffffff", sortOrder: 0, isActive: true, featured: false };
+
+function SubForm({ form, setForm }: { form: SubCatForm; setForm: React.Dispatch<React.SetStateAction<SubCatForm>> }) {
+  return (
+    <div className="space-y-4">
+      <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Bathroom Cleaning" /></Field>
+      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Short description…" rows={2} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Icon Name"><TextInput value={form.iconName} onChange={v => setForm(f => ({ ...f, iconName: v }))} placeholder="tag-outline" /></Field>
+        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Card Color">
+          <div className="flex gap-2 items-center">
+            <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+            <TextInput value={form.color} onChange={v => setForm(f => ({ ...f, color: v }))} />
+          </div>
+        </Field>
+        <Field label="Icon Color">
+          <div className="flex gap-2 items-center">
+            <input type="color" value={form.iconColor} onChange={e => setForm(f => ({ ...f, iconColor: e.target.value }))} className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+            <TextInput value={form.iconColor} onChange={v => setForm(f => ({ ...f, iconColor: v }))} />
+          </div>
+        </Field>
+      </div>
+      <div
+        className="flex items-center gap-3 cursor-pointer"
+        onClick={() => setForm(f => ({ ...f, featured: !f.featured }))}
+      >
+        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.featured ? "bg-violet-600" : "bg-white/10"}`}>
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.featured ? "translate-x-5" : ""}`} />
+        </div>
+        <span className="text-white/60 text-xs">Mark as featured sub-category</span>
+      </div>
+    </div>
+  );
+}
 
 function SubCategoriesView({ category, accessToken, onBack }: { category: Category; accessToken: string; onBack: () => void }) {
   const [subs,       setSubs]       = useState<SubCategory[]>([]);
@@ -1591,7 +1677,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
 
   const handleCreate = async () => {
     setSaving(true);
-    try { await adminApi.createSubcategory(category.id, { name: form.name, description: form.description, sortOrder: form.sortOrder }, accessToken); load(); setCreating(false); }
+    try { await adminApi.createSubcategory(category.id, { name: form.name, description: form.description, iconName: form.iconName, color: form.color, iconColor: form.iconColor, sortOrder: form.sortOrder }, accessToken); load(); setCreating(false); }
     catch (e: any) { alert(e.message); }
     finally { setSaving(false); }
   };
@@ -1619,14 +1705,6 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
     finally { setBusyId(null); }
   };
 
-  const SubForm = () => (
-    <div className="space-y-4">
-      <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Bathroom Cleaning" /></Field>
-      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="Short description…" rows={2} /></Field>
-      <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
-    </div>
-  );
-
   const filtered = subs.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -1634,13 +1712,13 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
       {/* Modals */}
       {creating && (
         <Modal title={`New Sub-category — ${category.name}`} onClose={() => setCreating(false)}>
-          <SubForm />
+          <SubForm form={form} setForm={setForm} />
           <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create sub-category" />
         </Modal>
       )}
       {editTarget && (
         <Modal title="Edit Sub-category" onClose={() => setEditTarget(null)}>
-          <SubForm />
+          <SubForm form={form} setForm={setForm} />
           <div className="mt-4 pt-4 border-t border-white/10">
             <p className="text-white/40 text-xs mb-2">Sub-category image</p>
             <ImageUploadButton
@@ -1733,14 +1811,21 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
               className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col hover:border-violet-500/20 transition-all duration-200"
               style={CARD}
             >
-              {/* Image banner or coloured placeholder */}
+              {/* Image banner or icon placeholder */}
               <div
-                className="h-[88px] w-full flex items-center justify-center flex-shrink-0 overflow-hidden"
-                style={{ background: s.imageUrl ? undefined : category.color + "55" }}
+                className="h-[88px] w-full flex items-center justify-center flex-shrink-0 overflow-hidden relative"
+                style={{ background: s.imageUrl ? undefined : (s.color ?? category.color) + "33" }}
               >
                 {s.imageUrl
                   ? <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover" />
-                  : <Tag size={28} color={category.iconColor} className="opacity-50" />}
+                  : (
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: s.color ?? category.color }}>
+                      <Grid size={22} color={s.iconColor ?? category.iconColor} />
+                    </div>
+                  )}
+                {s.featured && (
+                  <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: "#F59E0B22", color: "#F59E0B" }}>Featured</span>
+                )}
               </div>
 
               {/* Body */}
@@ -1764,7 +1849,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
               <div className="flex items-center gap-2 px-4 py-3 border-t border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
                 <ActionBtn
                   variant="edit"
-                  onClick={() => { setForm({ name: s.name, description: s.description ?? "", sortOrder: s.sortOrder, isActive: s.isActive }); setEditTarget(s); }}
+                  onClick={() => { setForm({ name: s.name, description: s.description ?? "", iconName: s.iconName ?? "tag-outline", color: s.color ?? "#5B3EF5", iconColor: s.iconColor ?? "#ffffff", sortOrder: s.sortOrder, isActive: s.isActive, featured: s.featured ?? false }); setEditTarget(s); }}
                 >
                   Edit
                 </ActionBtn>
@@ -1800,6 +1885,53 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
 
 type ReelForm = { title: string; description: string; videoUrl: string; thumbnailUrl: string; sortOrder: number; isActive: boolean };
 const EMPTY_REEL: ReelForm = { title: "", description: "", videoUrl: "", thumbnailUrl: "", sortOrder: 0, isActive: true };
+
+function ReelFormFields({
+  form, setForm, reel, onVideoUpload, onThumbUpload, uploadingId,
+}: {
+  form: ReelForm;
+  setForm: React.Dispatch<React.SetStateAction<ReelForm>>;
+  reel: ReelRow | null;
+  onVideoUpload: (id: string, file: File) => Promise<void>;
+  onThumbUpload: (reel: ReelRow, file: File) => Promise<void>;
+  uploadingId: string | null;
+}) {
+  return (
+    <div className="space-y-4">
+      <Field label="Title *"><TextInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Quick Kitchen Cleaning" /></Field>
+      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} rows={2} /></Field>
+      <Field label="Video URL *">
+        <TextInput value={form.videoUrl} onChange={v => setForm(f => ({ ...f, videoUrl: v }))} placeholder="https://…" />
+        {reel && (
+          <div className="mt-2">
+            <ImageUploadButton
+              label="Or upload video file (MP4/MOV/WebM, max 100MB)"
+              currentUrl={undefined}
+              onUpload={(file) => onVideoUpload(reel.id, file)}
+              disabled={uploadingId === reel.id}
+            />
+          </div>
+        )}
+      </Field>
+      <Field label="Thumbnail URL">
+        <TextInput value={form.thumbnailUrl} onChange={v => setForm(f => ({ ...f, thumbnailUrl: v }))} placeholder="https://… (or upload below)" />
+        {reel && (
+          <div className="mt-2">
+            <ImageUploadButton
+              label="Upload thumbnail"
+              currentUrl={reel.thumbnailUrl}
+              onUpload={(file) => onThumbUpload(reel, file)}
+              disabled={uploadingId === reel.id + '-thumb'}
+            />
+          </div>
+        )}
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
+      </div>
+    </div>
+  );
+}
 
 function ReelsView({
   reels, onCreate, onEdit, onDelete, accessToken, onRefresh,
@@ -1859,53 +1991,17 @@ function ReelsView({
     finally { setUploadingId(null); }
   };
 
-  const ReelFormFields = (r: ReelRow | null) => (
-    <div className="space-y-4">
-      <Field label="Title *"><TextInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Quick Kitchen Cleaning" /></Field>
-      <Field label="Description"><TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} rows={2} /></Field>
-      <Field label="Video URL *">
-        <TextInput value={form.videoUrl} onChange={v => setForm(f => ({ ...f, videoUrl: v }))} placeholder="https://…" />
-        {r && (
-          <div className="mt-2">
-            <ImageUploadButton
-              label="Or upload video file (MP4/MOV/WebM, max 100MB)"
-              currentUrl={undefined}
-              onUpload={(file) => handleVideoUpload(r.id, file)}
-              disabled={uploadingId === r.id}
-            />
-          </div>
-        )}
-      </Field>
-      <Field label="Thumbnail URL">
-        <TextInput value={form.thumbnailUrl} onChange={v => setForm(f => ({ ...f, thumbnailUrl: v }))} placeholder="https://… (or upload below)" />
-        {r && (
-          <div className="mt-2">
-            <ImageUploadButton
-              label="Upload thumbnail"
-              currentUrl={r.thumbnailUrl}
-              onUpload={(file) => handleThumbUpload(r, file)}
-              disabled={uploadingId === r.id + '-thumb'}
-            />
-          </div>
-        )}
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Sort Order"><TextInput type="number" value={String(form.sortOrder)} onChange={v => setForm(f => ({ ...f, sortOrder: Number(v) }))} /></Field>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       {creating && (
         <Modal title="New Reel" onClose={() => setCreating(false)}>
-          {ReelFormFields(null)}
+          <ReelFormFields form={form} setForm={setForm} reel={null} onVideoUpload={handleVideoUpload} onThumbUpload={handleThumbUpload} uploadingId={uploadingId} />
           <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create Reel" />
         </Modal>
       )}
       {editTarget && (
         <Modal title="Edit Reel" onClose={() => setEditTarget(null)}>
-          {ReelFormFields(editTarget)}
+          <ReelFormFields form={form} setForm={setForm} reel={editTarget} onVideoUpload={handleVideoUpload} onThumbUpload={handleThumbUpload} uploadingId={uploadingId} />
           <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
         </Modal>
       )}

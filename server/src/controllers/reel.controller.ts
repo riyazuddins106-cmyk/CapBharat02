@@ -167,6 +167,19 @@ export const reelController = {
     res.json({ success: true, data: { ...row, effectiveThumbnail: buildEffectiveThumbnail(row) } });
   }),
 
+  uploadVideo: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!req.file) throw AppError.badRequest('No file uploaded');
+    const [existing] = await db.select({ id: reels.id }).from(reels).where(eq(reels.id, id));
+    if (!existing) throw AppError.notFound('Reel not found');
+    const videoUrl = await storageService.uploadReelVideo(`reel-video-${id}`, req.file);
+    const [row] = await db.update(reels)
+      .set({ videoUrl, updatedAt: new Date() })
+      .where(eq(reels.id, id))
+      .returning();
+    res.json({ success: true, data: { ...row, effectiveThumbnail: buildEffectiveThumbnail(row) } });
+  }),
+
   // Detect platform from a URL (used by admin UI before saving)
   detectPlatformEndpoint: asyncHandler(async (req: Request, res: Response) => {
     const { url } = req.query as { url?: string };

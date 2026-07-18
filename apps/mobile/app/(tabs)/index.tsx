@@ -302,7 +302,7 @@ export default function HomeScreen() {
         {catsLoading ? (
           <View style={styles.catGrid}>
             {Array(8).fill(0).map((_, i) => (
-              <View key={i} style={[styles.catItem, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
+              <View key={i} style={[styles.catItem]}>
                 <View style={[styles.catIcon, { backgroundColor: colors.border }]} />
                 <View style={[styles.catLabelPlaceholder, { backgroundColor: colors.border }]} />
               </View>
@@ -313,7 +313,7 @@ export default function HomeScreen() {
             {(categories ?? []).map((cat) => (
               <TouchableOpacity
                 key={cat.id}
-                style={[styles.catItem, { backgroundColor: colors.card, borderRadius: colors.radius, borderColor: colors.border }]}
+                style={[styles.catItem]}
                 activeOpacity={0.8}
                 onPress={() => {
                   Haptics.selectionAsync();
@@ -520,10 +520,10 @@ const styles = StyleSheet.create({
   locationBar:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
   locationText:   { flex: 1, fontSize: 13, fontWeight: '600' },
   // Banners
-  banner:         { padding: 20, overflow: 'hidden', flexDirection: 'row', minHeight: 128 },
-  bannerContent:  { flex: 1, gap: 6 },
+  banner:         { padding: 16, overflow: 'hidden', flexDirection: 'row', minHeight: 100 },
+  bannerContent:  { flex: 1, gap: 4 },
   bannerTag:      { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
-  bannerTitle:    { color: '#fff', fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  bannerTitle:    { color: '#fff', fontSize: 17, fontWeight: '700', lineHeight: 22 },
   bannerSubtitle: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
   bannerBtn:      { backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, alignSelf: 'flex-start', marginTop: 6 },
   bannerBtnText:  { fontSize: 13, fontWeight: '700' },
@@ -536,9 +536,9 @@ const styles = StyleSheet.create({
   sectionHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sectionTitle:         { fontSize: 18, fontWeight: '700' },
   seeAll:               { fontSize: 13, fontWeight: '600' },
-  catGrid:              { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  catItem:              { width: '22%', aspectRatio: 0.9, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1 },
-  catIcon:              { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  catGrid:              { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  catItem:              { width: '22%', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  catIcon:              { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   catLabel:             { fontSize: 11, fontWeight: '600', textAlign: 'center' },
   catLabelPlaceholder:  { width: '70%', height: 10, borderRadius: 4 },
   // Reels
