@@ -107,6 +107,7 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="auth" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                <Stack.Screen name="subcategories/[categoryId]" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="professional/[id]" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="wishlist" options={{ animation: 'slide_from_right' }} />

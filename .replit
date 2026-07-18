@@ -68,7 +68,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://cap-bharat-02--jeleye1636.replit.app ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN"
+args = "cd apps/mobile && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -80,7 +80,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://cap-bharat-02--jeleye1636.replit.app ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
+args = "cd apps/mobile-partner && EXPO_PUBLIC_API_URL=https://$REPLIT_DEV_DOMAIN ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
 waitForPort = 8099
 
 [[workflows.workflow]]
@@ -163,11 +163,12 @@ run = ["node", "server/dist/index.js"]
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "e8466fcc6f875fe10992ddf0fd84b2313de6e950f745e39ee7115c6247bf69a4"
-JWT_REFRESH_SECRET = "d96b75a3407ba94b9862eb32d348ba6f86af55196b2cfe67d94b8d95b4548afc"
+JWT_SECRET = "ServeNow_JWT_9mK2xLpQ7vRwH3sT8nY5cZ1aV6bX4dEfP0gLw"
+JWT_REFRESH_SECRET = "ServeNow_REFRESH_8qW3nVmR5tYkP2hLsX9zDfJ6cBaE7uNg"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_SECURE = "false"
+EXPO_PUBLIC_API_URL = "https://0540f7cc-b092-43e3-b0aa-abd464d24143-00-amdtopyd3qxn.sisko.replit.dev"
 
 [userenv.production]
 NODE_ENV = "production"

@@ -51,6 +51,7 @@ export interface PartnerProfile {
   rating: number; reviewCount: number; basePrice: number; priceUnit: string;
   badge: string | null; avatarUrl: string | null; tags: string[]; isActive: boolean;
   categoryId: string;
+  subCategoryId: string | null;
 }
 export type JobStatus = 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
 export interface Job {
@@ -112,7 +113,7 @@ export const authApi = {
 // ── Partner ────────────────────────────────────────────────
 export const partnerApi = {
   getProfile: (token: string) => request<PartnerProfile>('/api/partner/profile', { token }),
-  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge'>>, token: string) =>
+  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge' | 'categoryId' | 'subCategoryId'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
   updateAccount: (data: { fullName?: string; phone?: string }, token: string) =>
     request<{ message: string }>('/api/partner/account', { method: 'PATCH', body: JSON.stringify(data), token }),

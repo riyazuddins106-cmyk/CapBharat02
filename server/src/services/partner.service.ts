@@ -12,15 +12,43 @@ export const partnerService = {
     return pro;
   },
 
-  async updateProfile(userId: string, data: { title?: string; bio?: string; basePrice?: number; priceUnit?: string; tags?: string[] }) {
+  async updateProfile(userId: string, data: { title?: string; bio?: string; basePrice?: number; priceUnit?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    // Validate categoryId — must be active
+    if (data.categoryId !== undefined) {
+      const { db } = await import('../config/database.js');
+      const { serviceCategories } = await import('../database/schema/serviceCategories.js');
+      const { eq } = await import('drizzle-orm');
+      const [cat] = await db.select({ id: serviceCategories.id, isActive: serviceCategories.isActive })
+        .from(serviceCategories).where(eq(serviceCategories.id, data.categoryId)).limit(1);
+      if (!cat) throw AppError.badRequest('Category not found');
+      if (!cat.isActive) throw AppError.badRequest('Selected category is not active');
+    }
+
+    // Validate subCategoryId — must be active and belong to the effective category
+    if (data.subCategoryId !== undefined && data.subCategoryId !== null) {
+      const { db } = await import('../config/database.js');
+      const { subServiceCategories } = await import('../database/schema/subServiceCategories.js');
+      const { eq } = await import('drizzle-orm');
+      const [sub] = await db.select({ id: subServiceCategories.id, categoryId: subServiceCategories.categoryId, isActive: subServiceCategories.isActive })
+        .from(subServiceCategories).where(eq(subServiceCategories.id, data.subCategoryId)).limit(1);
+      if (!sub) throw AppError.badRequest('Sub-category not found');
+      if (!sub.isActive) throw AppError.badRequest('Selected sub-category is not active');
+      const effectiveCategoryId = data.categoryId ?? pro.categoryId;
+      if (effectiveCategoryId && sub.categoryId !== effectiveCategoryId)
+        throw AppError.badRequest('Sub-category does not belong to the selected category');
+    }
+
     const updated = await professionalRepository.update(pro.id, {
-      ...(data.title     !== undefined && { title: data.title }),
-      ...(data.bio       !== undefined && { bio: data.bio }),
-      ...(data.basePrice !== undefined && { basePrice: data.basePrice }),
-      ...(data.priceUnit !== undefined && { priceUnit: data.priceUnit }),
-      ...(data.tags      !== undefined && { tags: data.tags }),
+      ...(data.title         !== undefined && { title: data.title }),
+      ...(data.bio           !== undefined && { bio: data.bio }),
+      ...(data.basePrice     !== undefined && { basePrice: data.basePrice }),
+      ...(data.priceUnit     !== undefined && { priceUnit: data.priceUnit }),
+      ...(data.tags          !== undefined && { tags: data.tags }),
+      ...(data.categoryId    !== undefined && { categoryId: data.categoryId }),
+      ...(data.subCategoryId !== undefined && { subCategoryId: data.subCategoryId }),
     });
     return updated;
   },

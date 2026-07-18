@@ -89,6 +89,8 @@ export interface ProfessionalRow {
   avatarUrl?: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
+  subCategoryId?: string | null;
+  subCategoryName?: string | null;
   createdAt: string;
 }
 
@@ -113,6 +115,7 @@ export interface Category {
   imageUrl?: string | null;
   serviceCount: number;
   sortOrder: number;
+  featured: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -297,7 +300,7 @@ export const adminApi = {
     request<{ categories: Category[]; total: number }>('/admin/categories', { token }),
   createCategory: (data: { name: string; description?: string; iconName?: string; color?: string; iconColor?: string; sortOrder?: number }, token: string) =>
     request<Category>('/admin/categories', { method: 'POST', token, body: JSON.stringify(data) }),
-  updateCategory: (id: string, data: { name?: string; description?: string; iconName?: string; color?: string; iconColor?: string; sortOrder?: number; isActive?: boolean }, token: string) =>
+  updateCategory: (id: string, data: { name?: string; description?: string; iconName?: string; color?: string; iconColor?: string; sortOrder?: number; isActive?: boolean; featured?: boolean }, token: string) =>
     request<Category>(`/admin/categories/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteCategory: (id: string, token: string) =>
     request<{ id: string }>(`/admin/categories/${id}`, { method: 'DELETE', token }),

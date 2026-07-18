@@ -16,12 +16,23 @@ import { queryClient } from '@/lib/queryClient';
 export default function ServicesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ categoryId?: string; categoryName?: string }>();
+  const params = useLocalSearchParams<{
+    categoryId?: string;
+    categoryName?: string;
+    subCategoryId?: string;
+    subCategoryName?: string;
+  }>();
   const { accessToken } = useAuth();
 
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string | null>(params.categoryId ?? null);
-  const [selectedSubCat, setSelectedSubCat] = useState<string | null>(null);
+  const [selectedSubCat, setSelectedSubCat] = useState<string | null>(params.subCategoryId ?? null);
+
+  // Keep selectedSubCat in sync when navigating back here with new params
+  React.useEffect(() => {
+    setSelectedCat(params.categoryId ?? null);
+    setSelectedSubCat(params.subCategoryId ?? null);
+  }, [params.categoryId, params.subCategoryId]);
 
   const { data: categories } = useQuery({
     queryKey: ['/api/categories'],
@@ -34,12 +45,18 @@ export default function ServicesScreen() {
     enabled: !!selectedCat,
   });
 
+  // Gate: if a category is selected but no subcategory yet, don't fetch professionals.
+  // Exception: if the user is free-text searching (no category selected), fetch freely.
+  const canFetchPros = !selectedCat || !!selectedSubCat || !!search.trim();
+
   const { data: professionals, isLoading } = useQuery({
-    queryKey: ['/api/professionals', selectedCat, search],
+    queryKey: ['/api/professionals', selectedCat, selectedSubCat, search],
     queryFn: () => professionalsApi.list({
       ...(selectedCat ? { categoryId: selectedCat } : {}),
+      ...(selectedSubCat ? { subCategoryId: selectedSubCat } : {}),
       ...(search.trim() ? { search: search.trim() } : {}),
     }),
+    enabled: canFetchPros,
     staleTime: 10_000,
   });
 
@@ -61,7 +78,9 @@ export default function ServicesScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Search header */}
       <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Find Services</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>
+          {params.subCategoryName ? params.subCategoryName : 'Find Services'}
+        </Text>
         <View style={[styles.searchBar, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
           <Ionicons name="search-outline" size={18} color={colors.mutedForeground} />
           <TextInput
@@ -104,24 +123,40 @@ export default function ServicesScreen() {
         )}
       </View>
 
-      {/* Subcategory chips — shown when a category is selected */}
-      {selectedCat && (subcategories?.length ?? 0) > 0 && (
+      {/* Breadcrumb: category › sub-category */}
+      {selectedCat && params.subCategoryName && (
+        <View style={[styles.breadcrumb, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <Text style={[styles.breadcrumbText, { color: colors.mutedForeground }]}>
+            {params.categoryName}
+          </Text>
+          <Ionicons name="chevron-forward" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.breadcrumbText, { color: colors.foreground, fontWeight: '700' }]}>
+            {params.subCategoryName}
+          </Text>
+        </View>
+      )}
+
+      {/* Subcategory chips — shown when category is selected via pill but no subcat picked yet */}
+      {selectedCat && !selectedSubCat && (subcategories?.length ?? 0) > 0 && (
         <View style={[styles.subCatWrap, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <FlatList
             horizontal
-            data={[{ id: null, name: 'All' } as any, ...(subcategories ?? [])]}
-            keyExtractor={(item) => item.id ?? 'sub-all'}
+            data={subcategories ?? []}
+            keyExtractor={(item) => item.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => { setSelectedSubCat(item.id); Haptics.selectionAsync(); }}
                 style={[styles.subCatChip, {
-                  backgroundColor: selectedSubCat === item.id ? colors.primary : colors.muted,
+                  backgroundColor: colors.primary,
                   borderRadius: (colors.radius ?? 8) - 2,
                 }]}
               >
-                <Text style={{ fontSize: 11, fontWeight: '600', color: selectedSubCat === item.id ? '#fff' : colors.mutedForeground }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#fff' }}>
                   {item.name}
                 </Text>
               </TouchableOpacity>
@@ -130,33 +165,51 @@ export default function ServicesScreen() {
         </View>
       )}
 
-      {/* Results */}
-      <FlatList
-        data={isLoading ? [] : (professionals ?? [])}
-        keyExtractor={(p) => p.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          isLoading ? (
-            <>{[0, 1, 2, 3].map((i) => <ProCardShimmer key={i} />)}</>
-          ) : (
-            <View style={styles.empty}>
-              <Ionicons name="search-outline" size={40} color={colors.mutedForeground} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No professionals found</Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search or category</Text>
-            </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <ProCard
-            pro={item}
-            onPress={() => router.push({ pathname: '/professional/[id]', params: { id: item.id } })}
-            onBook={() => router.push({ pathname: '/professional/[id]', params: { id: item.id, openBook: '1' } })}
-            isFavorite={favoriteIds.has(item.id)}
-            onToggleFavorite={accessToken ? () => { Haptics.selectionAsync(); favMutation.mutate(item.id); } : undefined}
-          />
-        )}
-      />
+      {/* Prompt: category selected but no sub-category chosen yet */}
+      {selectedCat && !selectedSubCat && !search.trim() ? (
+        <View style={styles.pickSubCatPrompt}>
+          <Ionicons name="grid-outline" size={44} color={colors.mutedForeground} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Choose a service type</Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+            Select a sub-category above to see professionals
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.backToCatBtn, { backgroundColor: colors.primary + '18', borderRadius: colors.radius }]}
+          >
+            <Ionicons name="arrow-back" size={14} color={colors.primary} />
+            <Text style={[styles.backToCatText, { color: colors.primary }]}>Back to categories</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        /* Results */
+        <FlatList
+          data={isLoading ? [] : (professionals ?? [])}
+          keyExtractor={(p) => p.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            isLoading ? (
+              <>{[0, 1, 2, 3].map((i) => <ProCardShimmer key={i} />)}</>
+            ) : (
+              <View style={styles.empty}>
+                <Ionicons name="search-outline" size={40} color={colors.mutedForeground} />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No professionals found</Text>
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search or category</Text>
+              </View>
+            )
+          }
+          renderItem={({ item }) => (
+            <ProCard
+              pro={item}
+              onPress={() => router.push({ pathname: '/professional/[id]', params: { id: item.id } })}
+              onBook={() => router.push({ pathname: '/professional/[id]', params: { id: item.id, openBook: '1' } })}
+              isFavorite={favoriteIds.has(item.id)}
+              onToggleFavorite={accessToken ? () => { Haptics.selectionAsync(); favMutation.mutate(item.id); } : undefined}
+            />
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -169,7 +222,19 @@ const styles = StyleSheet.create({
   catWrap: { borderBottomWidth: 1 },
   subCatWrap: { borderBottomWidth: 1 },
   subCatChip: { paddingHorizontal: 12, paddingVertical: 6 },
+  breadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    gap: 6,
+  },
+  breadcrumbText: { fontSize: 12 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
   emptyText: { fontSize: 13 },
+  pickSubCatPrompt: { alignItems: 'center', paddingTop: 60, gap: 10, paddingHorizontal: 32 },
+  backToCatBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, marginTop: 8 },
+  backToCatText: { fontSize: 13, fontWeight: '600' },
 });

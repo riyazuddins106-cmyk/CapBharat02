@@ -1,11 +1,13 @@
 import { pgTable, uuid, varchar, integer, doublePrecision, boolean, timestamp, text, json } from 'drizzle-orm/pg-core';
 import { serviceCategories } from './serviceCategories.js';
+import { subServiceCategories } from './subServiceCategories.js';
 import { users } from './users.js';
 
 export const professionals = pgTable('professionals', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').unique().references(() => users.id, { onDelete: 'set null' }),
   categoryId: uuid('category_id').notNull().references(() => serviceCategories.id, { onDelete: 'restrict' }),
+  subCategoryId: uuid('sub_category_id').references(() => subServiceCategories.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 255 }).notNull(),
   title: varchar('title', { length: 255 }).notNull(),
   bio: text('bio'),

@@ -317,7 +317,7 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  router.push({ pathname: '/(tabs)/services', params: { categoryId: cat.id, categoryName: cat.name } });
+                  router.push({ pathname: '/subcategories/[categoryId]', params: { categoryId: cat.id, categoryName: cat.name } });
                 }}
               >
                 <View style={[styles.catIcon, { backgroundColor: cat.color }]}>

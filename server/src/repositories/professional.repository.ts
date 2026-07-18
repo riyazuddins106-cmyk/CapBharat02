@@ -4,6 +4,7 @@ import { professionals, type Professional, type NewProfessional } from '../datab
 
 export interface ProfessionalFilters {
   categoryId?: string;
+  subCategoryId?: string;
   search?: string;
   sort?: 'rating' | 'price_asc' | 'price_desc' | 'reviews';
   limit?: number;
@@ -12,10 +13,11 @@ export interface ProfessionalFilters {
 
 export const professionalRepository = {
   async findAll(filters: ProfessionalFilters = {}): Promise<{ data: Professional[]; total: number }> {
-    const { categoryId, search, sort = 'rating', limit = 20, offset = 0 } = filters;
+    const { categoryId, subCategoryId, search, sort = 'rating', limit = 20, offset = 0 } = filters;
 
     const conditions = [isNull(professionals.deletedAt), eq(professionals.isActive, true)];
     if (categoryId) conditions.push(eq(professionals.categoryId, categoryId));
+    if (subCategoryId) conditions.push(eq(professionals.subCategoryId, subCategoryId));
     if (search) conditions.push(ilike(professionals.name, `%${search}%`));
 
     const where = and(...conditions);

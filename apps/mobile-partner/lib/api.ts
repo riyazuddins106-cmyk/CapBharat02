@@ -1,18 +1,9 @@
-import { Platform } from 'react-native';
-
-// On web, call the Express server on port 8000 directly using the same
-// hostname the browser is already on. Port 8000 is exposed by Replit's proxy
-// and Express has CORS open (origin: true), so this works from any port.
-// On native (iOS/Android), always use the baked-in env var or the production URL —
-// never use window.location which exists on RN via expo-router's URL polyfill but
-// gives the wrong hostname/port for native fetch calls.
+// EXPO_PUBLIC_API_URL is set by the workflow to the current Replit dev domain
+// (e.g. https://<repl-id>.sisko.replit.dev). That domain's port-5000 vite server
+// already proxies /api → the Express server on port 8000, so we never need to
+// hard-code a port number. This works on both native (Expo Go) and Expo web.
 function getApiBase(): string {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
-  }
-  // EXPO_PUBLIC_API_URL is baked-in at export time (eas update).
-  // Fall back to the production server so device builds always work without env vars.
-  return (process.env.EXPO_PUBLIC_API_URL ?? 'https://cap-bharat-02--jeleye1636.replit.app').replace(/\/$/, '');
+  return (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 }
 const API_BASE = getApiBase();
 

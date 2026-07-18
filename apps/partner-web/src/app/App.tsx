@@ -388,9 +388,11 @@ function Profile({ token, profile, setProfile }: {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subCats, setSubCats] = useState<SubCategory[]>([]);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
 
   useEffect(() => {
-    categoriesApi.list().then(setCategories).catch(() => {});
+    categoriesApi.list().then(cats => setCategories(cats.filter(c => c.isActive))).catch(() => {});
   }, []);
 
   // Edit profile fields
@@ -398,6 +400,24 @@ function Profile({ token, profile, setProfile }: {
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [price, setPrice] = useState(String(profile?.basePrice ?? ''));
   const [tags, setTags] = useState((profile?.tags ?? []).join(', '));
+  const [editCategoryId, setEditCategoryId] = useState(profile?.categoryId ?? '');
+  const [editSubCategoryId, setEditSubCategoryId] = useState(profile?.subCategoryId ?? '');
+
+  const loadSubCats = async (categoryId: string) => {
+    if (!categoryId) { setSubCats([]); return; }
+    setSubCatsLoading(true);
+    try {
+      const subs = await categoriesApi.getSubcategories(categoryId);
+      setSubCats(subs.filter(s => s.isActive));
+    } catch { setSubCats([]); }
+    finally { setSubCatsLoading(false); }
+  };
+
+  const handleEditCategoryChange = (catId: string) => {
+    setEditCategoryId(catId);
+    setEditSubCategoryId('');
+    loadSubCats(catId);
+  };
 
   // Password fields
   const [curPwd, setCurPwd] = useState('');
@@ -406,7 +426,12 @@ function Profile({ token, profile, setProfile }: {
   async function saveProfile() {
     setSaving(true); setMsg('');
     try {
-      const updated = await partnerApi.updateProfile({ title, bio, basePrice: Number(price), tags: tags.split(',').map(t => t.trim()).filter(Boolean) }, token);
+      const updated = await partnerApi.updateProfile({
+        title, bio, basePrice: Number(price),
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        categoryId: editCategoryId || undefined,
+        subCategoryId: editSubCategoryId || null,
+      }, token);
       setProfile(updated); setMsg('Profile updated'); setEditProf(false);
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   }
@@ -445,6 +470,7 @@ function Profile({ token, profile, setProfile }: {
               ['Base Price', `${fmt(profile.basePrice)}/${profile.priceUnit}`],
               ['Status', profile.isActive ? 'Active' : 'Inactive'],
               ['Category', categories.find(c => c.id === profile.categoryId)?.name ?? '—'],
+              ['Sub-category', subCats.find(s => s.id === profile.subCategoryId)?.name ?? (profile.subCategoryId ? '…' : '—')],
             ].map(([k, v]) => (
               <div key={k} className="rounded-xl p-3 border border-white/5" style={CARD}>
                 <p className="text-white/40 text-xs mb-1">{k}</p>
@@ -464,7 +490,15 @@ function Profile({ token, profile, setProfile }: {
           )}
 
           <div className="flex gap-3">
-            <Btn onClick={() => { setTitle(profile.title); setBio(profile.bio); setPrice(String(profile.basePrice)); setTags(profile.tags.join(', ')); setEditProf(true); }}>
+            <Btn onClick={() => {
+              setTitle(profile.title); setBio(profile.bio);
+              setPrice(String(profile.basePrice)); setTags(profile.tags.join(', '));
+              const catId = profile.categoryId ?? '';
+              setEditCategoryId(catId);
+              setEditSubCategoryId(profile.subCategoryId ?? '');
+              if (catId) loadSubCats(catId);
+              setEditProf(true);
+            }}>
               <Pencil size={14}/> Edit Profile
             </Btn>
             <Btn variant="ghost" onClick={() => setEditPwd(true)}>
@@ -484,6 +518,31 @@ function Profile({ token, profile, setProfile }: {
                 style={INPUT_STYLE}/>
             </Field>
             <Field label="Base Price (₹)"><TextInput value={price} onChange={setPrice} type="number" placeholder="500"/></Field>
+            <Field label="Category">
+              <select
+                value={editCategoryId}
+                onChange={e => handleEditCategoryChange(e.target.value)}
+                className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+                style={INPUT_STYLE}
+              >
+                <option value="">— Select category —</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Sub-category">
+              <select
+                value={editSubCategoryId}
+                onChange={e => setEditSubCategoryId(e.target.value)}
+                disabled={!editCategoryId || subCatsLoading}
+                className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors disabled:opacity-40"
+                style={INPUT_STYLE}
+              >
+                <option value="">
+                  {!editCategoryId ? 'Select a category first' : subCatsLoading ? 'Loading…' : subCats.length === 0 ? 'No sub-categories available' : '— None —'}
+                </option>
+                {subCats.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </Field>
             <Field label="Tags (comma-separated)"><TextInput value={tags} onChange={setTags} placeholder="plumbing, repair, installation"/></Field>
             <div className="flex gap-3 pt-1">
               <Btn loading={saving} onClick={saveProfile} className="flex-1 justify-center"><Check size={14}/> Save</Btn>

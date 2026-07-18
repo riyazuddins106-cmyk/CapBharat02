@@ -1,0 +1,229 @@
+Use this additional prompt for the **Admin Panel** so it follows the same hierarchical flow as the Customer App.
+
+---
+
+# Refactor Admin Panel – Category & Subcategory Navigation (Same UX Pattern)
+
+You are acting as a Principal Software Architect, Senior UI/UX Engineer, Senior Full Stack Engineer, Senior Backend Engineer, Senior Database Architect, and Senior QA Engineer.
+
+## Objective
+
+Refactor the **Admin Panel** so that **Service Categories** and **Service Subcategories** follow the same navigation pattern as the Customer App.
+
+The UI should be intuitive, hierarchical, and scalable.
+
+---
+
+# Current Problem
+
+The current implementation displays Categories and Subcategories together (or in tabs/lists), making management confusing.
+
+This is **not** the desired behavior.
+
+---
+
+# Required Navigation
+
+```text
+Admin Dashboard
+        ↓
+Service Categories
+        ↓
+Click "Cleaning"
+        ↓
+Navigate to a NEW PAGE
+        ↓
+Cleaning Subcategories
+        ↓
+Click "Home Cleaning"
+        ↓
+View/Edit Details
+```
+
+Do **NOT** use:
+
+* Tabs
+* Expandable rows
+* Accordions
+* Nested tables on the same page
+* Dropdowns for navigation
+
+Each Category should open its own dedicated Subcategory Management page.
+
+---
+
+# Categories Page
+
+Display Categories in the same modern card/grid layout used in the Customer App where appropriate (or cards with management actions if desktop layout is used).
+
+Each Category card should show:
+
+* Category Icon
+* Category Name
+* Number of Subcategories
+* Number of Active Partners
+* Status (Active/Inactive)
+* Featured Badge (if applicable)
+
+Actions:
+
+* Open
+* Edit
+* Delete
+* Enable/Disable
+* Reorder
+
+When the admin clicks a Category, navigate to its dedicated Subcategory page.
+
+---
+
+# Subcategory Management Page
+
+Example:
+
+```text
+← Cleaning
+
+Home Cleaning
+Kitchen Cleaning
+Bathroom Cleaning
+Sofa Cleaning
+Window Cleaning
+Vehicle Cleaning
+Utensil Cleaning
+Office Cleaning
+```
+
+Display Subcategories using the same card style and spacing as Categories.
+
+Each card should display:
+
+* Subcategory Icon
+* Subcategory Name
+* Status
+* Number of Partners
+* Number of Services
+
+Actions:
+
+* Edit
+* Delete
+* Enable/Disable
+* Reorder
+
+---
+
+# Add Buttons
+
+On the Categories page:
+
+**+ Add Category**
+
+On each Subcategory page:
+
+**+ Add Subcategory**
+
+The "Add Subcategory" form must automatically associate the new Subcategory with the currently opened Category.
+
+The admin should not need to select the parent Category again.
+
+Example:
+
+Current Page:
+
+```text
+Cleaning
+```
+
+Click:
+
+**+ Add Subcategory**
+
+The new Subcategory is automatically created under **Cleaning**.
+
+---
+
+# Breadcrumb Navigation
+
+Display breadcrumbs for clarity:
+
+```text
+Dashboard
+>
+Services
+>
+Cleaning
+```
+
+---
+
+# Search
+
+Categories page:
+
+Search Categories only.
+
+Subcategory page:
+
+Search only within the current Category's Subcategories.
+
+Example:
+
+If viewing **Cleaning**, searching should only return:
+
+* Home Cleaning
+* Kitchen Cleaning
+* Sofa Cleaning
+
+It should not return subcategories from Beauty or Plumbing.
+
+---
+
+# Database & APIs
+
+Use the existing Category → Subcategory relationship.
+
+Fetch only the selected Category's Subcategories.
+
+Example:
+
+```text
+GET /categories
+
+GET /categories/{categoryId}
+
+GET /categories/{categoryId}/subcategories
+```
+
+Do not load every Subcategory in the system.
+
+---
+
+# UI Consistency
+
+Maintain the application's existing design system.
+
+Reuse existing:
+
+* Cards
+* Icons
+* Colors
+* Buttons
+* Typography
+* Animations
+* Grid spacing
+* Dialogs
+
+Do not introduce a different design language.
+
+---
+
+# Integration Requirements
+
+Review the entire Admin Panel and replace any implementation that displays Categories and Subcategories together, in tabs, or in a single management screen.
+
+Implement a hierarchical navigation:
+
+**Dashboard → Categories → Selected Category → Subcategories**
+
+Ensure that all modules using Categories or Subcategories (Partner Management, Services, Booking Configuration, Pricing, Reports, Filters, Search, and Analytics) use this centralized structure. The implementation must be production-ready, scalable, maintainable, and must not break any existing functionality.

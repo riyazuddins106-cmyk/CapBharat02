@@ -101,13 +101,14 @@ function TextArea({ value, onChange, placeholder, rows = 3 }: {
   );
 }
 
-function SelectInput({ value, onChange, children }: {
-  value: string; onChange: (v: string) => void; children: React.ReactNode;
+function SelectInput({ value, onChange, children, disabled }: {
+  value: string; onChange: (v: string) => void; children: React.ReactNode; disabled?: boolean;
 }) {
   return (
     <select
       value={value} onChange={e => onChange(e.target.value)}
-      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+      disabled={disabled}
+      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors disabled:opacity-40"
       style={{ background: "#1a2035" }}
     >
       {children}
@@ -408,7 +409,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
 
   /* ── Professional handlers ── */
-  const editPro = async (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[] }) => {
+  const editPro = async (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => {
     await adminApi.updateProfessional(id, patch, accessToken);
     showMsg("Professional updated"); load();
   };
@@ -438,11 +439,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
 
   /* ── Category handlers ── */
-  const createCategory = async (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number }) => {
+  const createCategory = async (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; featured: boolean }) => {
     await adminApi.createCategory(data, accessToken);
     showMsg("Category created"); load();
   };
-  const editCategory = async (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean }) => {
+  const editCategory = async (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean; featured: boolean }) => {
     await adminApi.updateCategory(id, data, accessToken);
     showMsg("Category updated"); load();
   };
@@ -627,7 +628,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} />
           ) : activeSection === "users" ? (
             <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
           ) : activeSection === "categories" ? (
@@ -894,30 +895,53 @@ function BookingsView({
    PROFESSIONALS
 ═══════════════════════════════════════════════════════════════════ */
 
-type ProPatch = { name: string; title: string; bio: string; basePrice: number; priceUnit: string; badge: string; tags: string };
+type ProPatch = { name: string; title: string; bio: string; basePrice: number; priceUnit: string; badge: string; tags: string; categoryId: string; subCategoryId: string };
 
 function ProsView({
-  pros, onEdit, onToggle, onDelete,
+  pros, onEdit, onToggle, onDelete, categories, accessToken,
 }: {
   pros: ProfessionalRow[];
-  onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[] }) => Promise<void>;
+  onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => Promise<void>;
   onToggle: (id: string, active: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  categories: Category[];
+  accessToken: string;
 }) {
-  const [search,     setSearch]     = useState("");
-  const [editTarget, setEditTarget] = useState<ProfessionalRow | null>(null);
-  const [deleteId,   setDeleteId]   = useState<string | null>(null);
-  const [form,       setForm]       = useState<ProPatch>({ name: "", title: "", bio: "", basePrice: 0, priceUnit: "/visit", badge: "", tags: "" });
-  const [saving,     setSaving]     = useState(false);
-  const [busyId,     setBusyId]     = useState<string | null>(null);
+  const [search,      setSearch]      = useState("");
+  const [editTarget,  setEditTarget]  = useState<ProfessionalRow | null>(null);
+  const [deleteId,    setDeleteId]    = useState<string | null>(null);
+  const [form,        setForm]        = useState<ProPatch>({ name: "", title: "", bio: "", basePrice: 0, priceUnit: "/visit", badge: "", tags: "", categoryId: "", subCategoryId: "" });
+  const [saving,      setSaving]      = useState(false);
+  const [busyId,      setBusyId]      = useState<string | null>(null);
+  const [subCats,     setSubCats]     = useState<SubCategory[]>([]);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
+
+  const loadSubCats = async (categoryId: string) => {
+    if (!categoryId) { setSubCats([]); return; }
+    setSubCatsLoading(true);
+    try {
+      const res = await adminApi.getSubcategories(categoryId, accessToken);
+      setSubCats((res.subcategories ?? []).filter(s => s.isActive));
+    } catch { setSubCats([]); }
+    finally { setSubCatsLoading(false); }
+  };
 
   const openEdit = (p: ProfessionalRow) => {
+    const catId = p.categoryId ?? "";
     setForm({
       name: p.name, title: p.title, bio: p.bio ?? "",
       basePrice: p.basePrice, priceUnit: p.priceUnit,
       badge: p.badge ?? "", tags: (p.tags ?? []).join(", "),
+      categoryId: catId, subCategoryId: p.subCategoryId ?? "",
     });
+    setSubCats([]);
+    if (catId) loadSubCats(catId);
     setEditTarget(p);
+  };
+
+  const handleCategoryChange = (catId: string) => {
+    setForm(f => ({ ...f, categoryId: catId, subCategoryId: "" }));
+    loadSubCats(catId);
   };
 
   const handleSave = async () => {
@@ -929,6 +953,8 @@ function ProsView({
         basePrice: Number(form.basePrice), priceUnit: form.priceUnit,
         badge: form.badge,
         tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+        categoryId: form.categoryId || undefined,
+        subCategoryId: form.subCategoryId || null,
       });
       setEditTarget(null);
     } catch (err: any) { alert(err.message); }
@@ -972,6 +998,26 @@ function ProsView({
                 </SelectInput>
               </Field>
             </div>
+            <Field label="Category">
+              <SelectInput value={form.categoryId} onChange={handleCategoryChange}>
+                <option value="">— Select category —</option>
+                {categories.filter(c => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Sub-category">
+              <SelectInput
+                value={form.subCategoryId}
+                onChange={v => setForm(f => ({ ...f, subCategoryId: v }))}
+                disabled={!form.categoryId || subCatsLoading}
+              >
+                <option value="">{!form.categoryId ? "Select a category first" : subCatsLoading ? "Loading…" : subCats.length === 0 ? "No sub-categories available" : "— None —"}</option>
+                {subCats.sort((a, b) => a.sortOrder - b.sortOrder).map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </SelectInput>
+            </Field>
             <Field label="Badge (optional)"><TextInput value={form.badge} onChange={v => setForm(f => ({ ...f, badge: v }))} placeholder="e.g. Top Rated" /></Field>
             <Field label="Tags (comma-separated)"><TextInput value={form.tags} onChange={v => setForm(f => ({ ...f, tags: v }))} placeholder="cleaning, deep clean, …" /></Field>
           </div>
@@ -1219,8 +1265,8 @@ function UsersView({
    CATEGORIES
 ═══════════════════════════════════════════════════════════════════ */
 
-type CatForm = { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean };
-const EMPTY_CAT: CatForm = { name: "", description: "", iconName: "Grid", color: "#F3F4F6", iconColor: "#6B7280", sortOrder: 0, isActive: true };
+type CatForm = { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean; featured: boolean };
+const EMPTY_CAT: CatForm = { name: "", description: "", iconName: "Grid", color: "#F3F4F6", iconColor: "#6B7280", sortOrder: 0, isActive: true, featured: false };
 
 function ImageUploadButton({ label, onUpload, currentUrl, disabled }: { label: string; onUpload: (f: File) => Promise<void>; currentUrl?: string | null; disabled?: boolean }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -1250,30 +1296,46 @@ function CategoriesView({
   categories, onCreate, onEdit, onDelete, accessToken, onRefresh,
 }: {
   categories: Category[];
-  onCreate: (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number }) => Promise<void>;
-  onEdit: (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean }) => Promise<void>;
+  onCreate: (data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; featured: boolean }) => Promise<void>;
+  onEdit: (id: string, data: { name: string; description: string; iconName: string; color: string; iconColor: string; sortOrder: number; isActive: boolean; featured: boolean }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   accessToken: string;
   onRefresh: () => void;
 }) {
-  const [search,        setSearch]        = useState("");
-  const [editTarget,    setEditTarget]    = useState<Category | null>(null);
-  const [creating,      setCreating]      = useState(false);
-  const [deleteId,      setDeleteId]      = useState<string | null>(null);
-  const [form,          setForm]          = useState<CatForm>(EMPTY_CAT);
-  const [saving,        setSaving]        = useState(false);
-  const [busyId,        setBusyId]        = useState<string | null>(null);
-  const [subCatTarget,  setSubCatTarget]  = useState<Category | null>(null);
+  const [search,       setSearch]       = useState("");
+  const [editTarget,   setEditTarget]   = useState<Category | null>(null);
+  const [creating,     setCreating]     = useState(false);
+  const [deleteId,     setDeleteId]     = useState<string | null>(null);
+  const [form,         setForm]         = useState<CatForm>(EMPTY_CAT);
+  const [saving,       setSaving]       = useState(false);
+  const [busyId,       setBusyId]       = useState<string | null>(null);
+  const [subCatTarget, setSubCatTarget] = useState<Category | null>(null);
+  const [subCounts,    setSubCounts]    = useState<Record<string, number>>({});
+
+  /* Fetch subcategory counts in parallel for all real categories */
+  useEffect(() => {
+    if (!categories.length) return;
+    Promise.allSettled(
+      categories.map(c =>
+        adminApi.getSubcategories(c.id, accessToken)
+          .then(r => ({ id: c.id, count: r.total ?? r.subcategories.length }))
+      )
+    ).then(results => {
+      const map: Record<string, number> = {};
+      results.forEach(r => { if (r.status === "fulfilled") map[r.value.id] = r.value.count; });
+      setSubCounts(map);
+    });
+  }, [categories, accessToken]);
 
   const openCreate = () => { setForm(EMPTY_CAT); setCreating(true); };
   const openEdit   = (c: Category) => {
-    setForm({ name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: c.isActive });
+    setForm({ name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: c.isActive, featured: c.featured ?? false });
     setEditTarget(c);
   };
 
   const handleCreate = async () => {
     setSaving(true);
-    try { await onCreate({ name: form.name, description: form.description, iconName: form.iconName, color: form.color, iconColor: form.iconColor, sortOrder: form.sortOrder }); setCreating(false); }
+    try { await onCreate({ name: form.name, description: form.description, iconName: form.iconName, color: form.color, iconColor: form.iconColor, sortOrder: form.sortOrder, featured: form.featured }); setCreating(false); }
     catch (err: any) { alert(err.message); }
     finally { setSaving(false); }
   };
@@ -1296,7 +1358,7 @@ function CategoriesView({
 
   const handleToggleActive = async (c: Category) => {
     setBusyId(c.id);
-    try { await onEdit(c.id, { name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: !c.isActive }); }
+    try { await onEdit(c.id, { name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: !c.isActive, featured: c.featured ?? false }); }
     catch (err: any) { alert(err.message); }
     finally { setBusyId(null); }
   };
@@ -1323,6 +1385,15 @@ function CategoriesView({
           </div>
         </Field>
       </div>
+      <div
+        className="flex items-center gap-3 cursor-pointer"
+        onClick={() => setForm(f => ({ ...f, featured: !f.featured }))}
+      >
+        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.featured ? "bg-violet-600" : "bg-white/10"}`}>
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.featured ? "translate-x-5" : ""}`} />
+        </div>
+        <span className="text-white/60 text-xs">Mark as featured category</span>
+      </div>
     </div>
   );
 
@@ -1339,14 +1410,14 @@ function CategoriesView({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Modals */}
       {creating && (
         <Modal title="New Category" onClose={() => setCreating(false)}>
           <CatFormFields />
           <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create category" />
         </Modal>
       )}
-
       {editTarget && (
         <Modal title="Edit Category" onClose={() => setEditTarget(null)}>
           <CatFormFields />
@@ -1367,94 +1438,126 @@ function CategoriesView({
           <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
         </Modal>
       )}
-
       {deleteId && (
         <ConfirmDialog
-          title="Deactivate Category?"
-          body="This will hide the category from the Customer App. Existing professionals and bookings are not affected."
-          confirmLabel="Deactivate"
+          title="Delete Category?"
+          body="This will remove the category. Existing professionals and bookings are not affected."
+          confirmLabel="Delete"
           saving={saving}
           onConfirm={handleDelete}
           onCancel={() => setDeleteId(null)}
         />
       )}
 
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search categories…" />
+      {/* Header */}
+      <div className="flex flex-col gap-3">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-xs text-white/30">
+          <span>Dashboard</span>
+          <ChevronRight size={12} />
+          <span className="text-white/60 font-semibold">Services</span>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap"
-          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
-        >
-          <Plus size={14} /> New Category
-        </button>
+        {/* Title row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div>
+            <h2 className="text-white font-bold text-xl">Service Categories</h2>
+            <p className="text-white/35 text-xs mt-0.5">{filtered.length} {filtered.length === 1 ? "category" : "categories"}</p>
+          </div>
+          <div className="flex-1 min-w-0" />
+          <div className="w-60 flex-shrink-0">
+            <SearchBar value={search} onChange={setSearch} placeholder="Search categories…" />
+          </div>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            <Plus size={14} /> Add Category
+          </button>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.07]">
-                {["Category", "Image", "Description", "Colors", "Order", "Status", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-white/[0.02]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: c.color }}>
-                        <Grid size={14} color={c.iconColor} />
-                      </div>
-                      <span className="text-white font-semibold whitespace-nowrap">{c.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {c.imageUrl
-                      ? <img src={c.imageUrl} alt={c.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
-                      : <span className="text-white/30 text-xs">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-white/50 text-xs max-w-[160px] truncate">{c.description ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-sm border border-white/20 flex-shrink-0" style={{ background: c.color }} />
-                      <span className="w-4 h-4 rounded-sm border border-white/20 flex-shrink-0" style={{ background: c.iconColor }} />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-white/60 text-xs whitespace-nowrap">{c.sortOrder}</td>
-                  <td className="px-4 py-3">
-                    <Badge label={c.isActive ? "Active" : "Inactive"} color={c.isActive ? "#16A34A" : "#EF4444"} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <ActionBtn variant="edit" onClick={() => openEdit(c)}>Edit</ActionBtn>
-                      <button
-                        onClick={() => setSubCatTarget(c)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-300 border border-violet-500/30 hover:bg-violet-500/10 transition-colors"
-                      >
-                        Sub-cats <ChevronRight size={11} />
-                      </button>
-                      <ActionBtn
-                        variant={c.isActive ? "warn" : "green"}
-                        onClick={() => handleToggleActive(c)}
-                        disabled={busyId === c.id}
-                      >
-                        {c.isActive ? "Deactivate" : "Activate"}
-                      </ActionBtn>
-                      <ActionBtn variant="danger" onClick={() => setDeleteId(c.id)}>Delete</ActionBtn>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && <EmptyRow cols={7} text="No categories found" />}
-            </tbody>
-          </table>
+      {/* Cards */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-white/20">
+          <Grid size={44} className="mb-3" />
+          <p className="text-sm">No categories found</p>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col group hover:border-violet-500/30 transition-all duration-200"
+              style={CARD}
+            >
+              {/* Clickable card body → drill into sub-categories */}
+              <button
+                className="flex-1 p-5 text-left w-full hover:bg-white/[0.02] transition-colors"
+                onClick={() => setSubCatTarget(c)}
+              >
+                {/* Icon + badges */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: c.color }}>
+                    {c.imageUrl
+                      ? <img src={c.imageUrl} alt={c.name} className="w-12 h-12 object-cover" />
+                      : <Grid size={20} color={c.iconColor} />}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 ml-2">
+                    {c.featured && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: "#F59E0B22", color: "#F59E0B" }}>
+                        <Star size={9} fill="currentColor" /> Featured
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: c.isActive ? "#16A34A22" : "#EF444422", color: c.isActive ? "#16A34A" : "#EF4444" }}>
+                      {c.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Name + description */}
+                <h3 className="text-white font-bold text-sm leading-snug group-hover:text-violet-300 transition-colors mb-1">{c.name}</h3>
+                {c.description
+                  ? <p className="text-white/35 text-xs leading-relaxed line-clamp-2">{c.description}</p>
+                  : <p className="text-white/20 text-xs italic">No description</p>}
+
+                {/* Stats + arrow */}
+                <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/[0.06]">
+                  <div>
+                    <p className="text-white font-bold text-sm leading-none">
+                      {subCounts[c.id] !== undefined ? subCounts[c.id] : <span className="text-white/30">—</span>}
+                    </p>
+                    <p className="text-white/30 text-[10px] mt-0.5">Sub-cats</p>
+                  </div>
+                  <div className="w-px h-7 bg-white/[0.08]" />
+                  <div>
+                    <p className="text-white font-bold text-sm leading-none">{c.serviceCount}</p>
+                    <p className="text-white/30 text-[10px] mt-0.5">Partners</p>
+                  </div>
+                  <div className="flex-1" />
+                  <span className="flex items-center gap-0.5 text-[10px] font-bold text-violet-400/50 group-hover:text-violet-400 transition-colors whitespace-nowrap">
+                    Manage <ChevronRight size={11} />
+                  </span>
+                </div>
+              </button>
+
+              {/* Action footer */}
+              <div className="flex items-center gap-2 px-4 py-3 border-t border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
+                <ActionBtn variant="edit" onClick={() => openEdit(c)}>Edit</ActionBtn>
+                <ActionBtn
+                  variant={c.isActive ? "warn" : "green"}
+                  onClick={() => handleToggleActive(c)}
+                  disabled={busyId === c.id}
+                >
+                  {busyId === c.id ? "…" : c.isActive ? "Deactivate" : "Activate"}
+                </ActionBtn>
+                <div className="flex-1" />
+                <ActionBtn variant="danger" onClick={() => setDeleteId(c.id)}>Delete</ActionBtn>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1474,6 +1577,8 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
   const [deleteId,   setDeleteId]   = useState<string | null>(null);
   const [form,       setForm]       = useState<SubCatForm>(EMPTY_SUB);
   const [saving,     setSaving]     = useState(false);
+  const [busyId,     setBusyId]     = useState<string | null>(null);
+  const [search,     setSearch]     = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1507,6 +1612,13 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
     finally { setSaving(false); }
   };
 
+  const handleToggle = async (s: SubCategory) => {
+    setBusyId(s.id);
+    try { await adminApi.updateSubcategory(s.id, { isActive: !s.isActive }, accessToken); load(); }
+    catch (e: any) { alert(e.message); }
+    finally { setBusyId(null); }
+  };
+
   const SubForm = () => (
     <div className="space-y-4">
       <Field label="Name *"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Bathroom Cleaning" /></Field>
@@ -1515,12 +1627,15 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
     </div>
   );
 
+  const filtered = subs.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Modals */}
       {creating && (
-        <Modal title={`New Sub-category under "${category.name}"`} onClose={() => setCreating(false)}>
+        <Modal title={`New Sub-category — ${category.name}`} onClose={() => setCreating(false)}>
           <SubForm />
-          <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create" />
+          <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create sub-category" />
         </Modal>
       )}
       {editTarget && (
@@ -1542,68 +1657,131 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
         </Modal>
       )}
       {deleteId && (
-        <ConfirmDialog title="Delete Sub-category?" body="This sub-category will be permanently deleted." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+        <ConfirmDialog
+          title="Delete Sub-category?"
+          body="This sub-category will be permanently deleted. Professionals linked to it will have their sub-category cleared."
+          confirmLabel="Delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
       )}
 
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-white/50 hover:text-white text-sm font-semibold transition-colors">
-          ← Back
-        </button>
-        <div className="w-px h-4 bg-white/10" />
-        <span className="text-white font-bold">{category.name}</span>
-        <span className="text-white/30 text-sm">/ Sub-categories</span>
-        <div className="flex-1" />
-        <button
-          onClick={() => { setForm(EMPTY_SUB); setCreating(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white"
-          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
-        >
-          <Plus size={14} /> Add Sub-category
-        </button>
+      {/* Header + Breadcrumb */}
+      <div className="flex flex-col gap-3">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-xs text-white/30">
+          <span>Dashboard</span>
+          <ChevronRight size={12} />
+          <button onClick={onBack} className="hover:text-white/60 transition-colors">Services</button>
+          <ChevronRight size={12} />
+          <span className="text-white/60 font-semibold">{category.name}</span>
+        </div>
+        {/* Title row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="w-8 h-8 rounded-xl border border-white/10 flex items-center justify-center text-white/50 hover:text-white hover:border-white/25 transition-colors text-sm"
+              title="Back to categories"
+            >
+              ←
+            </button>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0" style={{ background: category.color }}>
+              {category.imageUrl
+                ? <img src={category.imageUrl} alt={category.name} className="w-10 h-10 object-cover" />
+                : <Grid size={18} color={category.iconColor} />}
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-xl">{category.name}</h2>
+              <p className="text-white/35 text-xs mt-0.5">
+                {loading ? "Loading…" : `${filtered.length} sub-${filtered.length === 1 ? "category" : "categories"}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex-1 min-w-0" />
+          <div className="w-60 flex-shrink-0">
+            <SearchBar value={search} onChange={setSearch} placeholder={`Search in ${category.name}…`} />
+          </div>
+          <button
+            onClick={() => { setForm(EMPTY_SUB); setCreating(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            <Plus size={14} /> Add Sub-category
+          </button>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        {loading ? (
-          <div className="flex items-center justify-center h-32"><Loader2 size={24} className="animate-spin text-violet-500" /></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.07]">
-                  {["Sub-category", "Image", "Description", "Order", "Status", "Actions"].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {subs.map((s) => (
-                  <tr key={s.id} className="hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-white font-semibold whitespace-nowrap">{s.name}</td>
-                    <td className="px-4 py-3">
-                      {s.imageUrl
-                        ? <img src={s.imageUrl} alt={s.name} className="w-10 h-10 rounded-lg object-cover border border-white/10" />
-                        : <span className="text-white/30 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-white/50 text-xs max-w-[200px] truncate">{s.description ?? "—"}</td>
-                    <td className="px-4 py-3 text-white/60 text-xs">{s.sortOrder}</td>
-                    <td className="px-4 py-3"><Badge label={s.isActive ? "Active" : "Inactive"} color={s.isActive ? "#16A34A" : "#EF4444"} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <ActionBtn variant="edit" onClick={() => { setForm({ name: s.name, description: s.description ?? "", sortOrder: s.sortOrder, isActive: s.isActive }); setEditTarget(s); }}>Edit</ActionBtn>
-                        <ActionBtn variant={s.isActive ? "warn" : "green"} onClick={async () => { await adminApi.updateSubcategory(s.id, { isActive: !s.isActive }, accessToken); load(); }}>
-                          {s.isActive ? "Deactivate" : "Activate"}
-                        </ActionBtn>
-                        <ActionBtn variant="danger" onClick={() => setDeleteId(s.id)}>Delete</ActionBtn>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {subs.length === 0 && <EmptyRow cols={6} text="No sub-categories yet" />}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Cards */}
+      {loading ? (
+        <div className="flex items-center justify-center py-28">
+          <Loader2 size={28} className="animate-spin text-violet-500" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-white/20">
+          <Tag size={44} className="mb-3" />
+          <p className="text-sm">
+            {search ? `No sub-categories match "${search}"` : `No sub-categories yet — add the first one`}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((s) => (
+            <div
+              key={s.id}
+              className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col hover:border-violet-500/20 transition-all duration-200"
+              style={CARD}
+            >
+              {/* Image banner or coloured placeholder */}
+              <div
+                className="h-[88px] w-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+                style={{ background: s.imageUrl ? undefined : category.color + "55" }}
+              >
+                {s.imageUrl
+                  ? <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover" />
+                  : <Tag size={28} color={category.iconColor} className="opacity-50" />}
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="text-white font-bold text-sm leading-snug">{s.name}</h3>
+                  <span
+                    className="px-2 py-0.5 rounded-md text-[10px] font-bold flex-shrink-0"
+                    style={{ background: s.isActive ? "#16A34A22" : "#EF444422", color: s.isActive ? "#16A34A" : "#EF4444" }}
+                  >
+                    {s.isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                {s.description
+                  ? <p className="text-white/35 text-xs leading-relaxed line-clamp-2">{s.description}</p>
+                  : <p className="text-white/20 text-xs italic">No description</p>}
+                <p className="text-white/20 text-[10px] mt-3">Order: {s.sortOrder}</p>
+              </div>
+
+              {/* Action footer */}
+              <div className="flex items-center gap-2 px-4 py-3 border-t border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
+                <ActionBtn
+                  variant="edit"
+                  onClick={() => { setForm({ name: s.name, description: s.description ?? "", sortOrder: s.sortOrder, isActive: s.isActive }); setEditTarget(s); }}
+                >
+                  Edit
+                </ActionBtn>
+                <ActionBtn
+                  variant={s.isActive ? "warn" : "green"}
+                  onClick={() => handleToggle(s)}
+                  disabled={busyId === s.id}
+                >
+                  {busyId === s.id ? "…" : s.isActive ? "Deactivate" : "Activate"}
+                </ActionBtn>
+                <div className="flex-1" />
+                <ActionBtn variant="danger" onClick={() => setDeleteId(s.id)}>Delete</ActionBtn>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

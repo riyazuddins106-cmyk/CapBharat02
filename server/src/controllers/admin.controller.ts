@@ -204,15 +204,41 @@ export const adminController = {
 
   updateProfessional: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, title, bio, basePrice, priceUnit, badge, tags } = req.body as {
+    const { name, title, bio, basePrice, priceUnit, badge, tags, categoryId, subCategoryId } = req.body as {
       name?: string; title?: string; bio?: string; basePrice?: number;
       priceUnit?: string; badge?: string; tags?: string[];
+      categoryId?: string; subCategoryId?: string | null;
     };
 
     if (name !== undefined && String(name).trim().length === 0)
       throw AppError.badRequest('Name cannot be empty');
     if (basePrice !== undefined && (typeof basePrice !== 'number' || basePrice < 0))
       throw AppError.badRequest('basePrice must be a non-negative number');
+
+    // Validate categoryId if provided — must be an active category
+    if (categoryId !== undefined) {
+      const { serviceCategories } = await import('../database/schema/serviceCategories.js');
+      const [cat] = await db.select({ id: serviceCategories.id, isActive: serviceCategories.isActive })
+        .from(serviceCategories).where(eq(serviceCategories.id, categoryId)).limit(1);
+      if (!cat) throw AppError.badRequest('Category not found');
+      if (!cat.isActive) throw AppError.badRequest('Selected category is not active');
+    }
+
+    // Validate subCategoryId if provided — must be active and belong to the (new or existing) category
+    if (subCategoryId !== undefined && subCategoryId !== null) {
+      const { subServiceCategories } = await import('../database/schema/subServiceCategories.js');
+      const [sub] = await db.select({ id: subServiceCategories.id, categoryId: subServiceCategories.categoryId, isActive: subServiceCategories.isActive })
+        .from(subServiceCategories).where(eq(subServiceCategories.id, subCategoryId)).limit(1);
+      if (!sub) throw AppError.badRequest('Sub-category not found');
+      if (!sub.isActive) throw AppError.badRequest('Selected sub-category is not active');
+      // Resolve effective categoryId for cross-check
+      const effectiveCategoryId = categoryId ?? (await db
+        .select({ categoryId: professionals.categoryId })
+        .from(professionals).where(eq(professionals.id, id)).limit(1)
+      )[0]?.categoryId;
+      if (effectiveCategoryId && sub.categoryId !== effectiveCategoryId)
+        throw AppError.badRequest('Sub-category does not belong to the selected category');
+    }
 
     const [existing] = await db
       .select({ id: professionals.id, deletedAt: professionals.deletedAt })
@@ -221,13 +247,15 @@ export const adminController = {
     if (!existing || existing.deletedAt) throw AppError.notFound('Professional not found');
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (name      !== undefined) patch.name      = String(name).trim();
-    if (title     !== undefined) patch.title     = String(title).trim();
-    if (bio       !== undefined) patch.bio       = bio;
-    if (basePrice !== undefined) patch.basePrice = basePrice;
-    if (priceUnit !== undefined) patch.priceUnit = priceUnit;
-    if (badge     !== undefined) patch.badge     = badge || null;
-    if (tags      !== undefined) patch.tags      = Array.isArray(tags) ? tags : [];
+    if (name          !== undefined) patch.name          = String(name).trim();
+    if (title         !== undefined) patch.title         = String(title).trim();
+    if (bio           !== undefined) patch.bio           = bio;
+    if (basePrice     !== undefined) patch.basePrice     = basePrice;
+    if (priceUnit     !== undefined) patch.priceUnit     = priceUnit;
+    if (badge         !== undefined) patch.badge         = badge || null;
+    if (tags          !== undefined) patch.tags          = Array.isArray(tags) ? tags : [];
+    if (categoryId    !== undefined) patch.categoryId    = categoryId;
+    if (subCategoryId !== undefined) patch.subCategoryId = subCategoryId ?? null;
 
     const [row] = await db
       .update(professionals)

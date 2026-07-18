@@ -1,0 +1,289 @@
+Use the prompt below in Replit AI.
+
+---
+
+# Fix Customer Booking Flow – Add Subcategory Selection Before Showing Professionals
+
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Senior Mobile Engineer, Senior Backend Engineer, Senior Database Architect, Senior UI/UX Engineer, Security Engineer, and QA Engineer.
+
+## Problem
+
+The current Customer App booking flow is incorrect.
+
+Current Flow:
+
+```text
+Home Screen
+      ↓
+Cleaning
+      ↓
+Professionals List ❌
+```
+
+This skips the Subcategory selection.
+
+---
+
+## Required Flow
+
+Implement the following booking flow:
+
+```text
+Home Screen
+      ↓
+Service Category
+      ↓
+Subcategory (Sub Service)
+      ↓
+Professionals
+      ↓
+Professional Details
+      ↓
+Booking
+      ↓
+Payment
+```
+
+Example:
+
+```text
+Cleaning
+      ↓
+Home Cleaning
+      ↓
+Professional List
+
+Cleaning
+      ↓
+Kitchen Cleaning
+      ↓
+Professional List
+
+Cleaning
+      ↓
+Bathroom Cleaning
+      ↓
+Professional List
+
+Cleaning
+      ↓
+Sofa Cleaning
+      ↓
+Professional List
+```
+
+The Professionals screen must **never** open immediately after selecting a Service Category.
+
+Instead, the app must first display all active Subcategories belonging to the selected Category.
+
+---
+
+# Customer App
+
+When a customer taps
+
+Cleaning
+
+The app should navigate to a new screen:
+
+Cleaning Services
+
+Display cards or grid:
+
+🏠 Home Cleaning
+
+🍽 Kitchen Cleaning
+
+🛁 Bathroom Cleaning
+
+🛋 Sofa Cleaning
+
+🪟 Window Cleaning
+
+🚗 Vehicle Cleaning
+
+🍽 Utensil Cleaning
+
+🏢 Office Cleaning
+
+Each Subcategory card should display:
+
+* Icon
+* Name
+* Short Description (optional)
+* Starting Price (optional)
+* Estimated Duration (optional)
+
+Only after the customer selects a Subcategory should the app load the professionals.
+
+Example:
+
+```text
+Cleaning
+      ↓
+Home Cleaning
+      ↓
+Professional List
+```
+
+---
+
+# Professionals List
+
+The Professional List must only display partners whose:
+
+* Category = Cleaning
+* Subcategory = Home Cleaning
+* Status = Active
+* Verified = Yes
+* Available = Yes
+
+Do not display professionals from other subcategories.
+
+Example:
+
+Customer selects
+
+Cleaning → Home Cleaning
+
+Show only:
+
+✔ Home Cleaning professionals
+
+Do NOT show:
+
+❌ Kitchen Cleaning
+
+❌ Sofa Cleaning
+
+❌ Vehicle Cleaning
+
+---
+
+# Backend
+
+Update the APIs.
+
+Required API Flow:
+
+```text
+GET /categories
+
+↓
+
+GET /categories/{categoryId}/subcategories
+
+↓
+
+GET /professionals?categoryId={id}&subcategoryId={id}
+```
+
+Do not fetch professionals until a valid Subcategory is selected.
+
+---
+
+# Database
+
+Ensure relationships are enforced:
+
+```text
+Category
+   |
+   |----< Subcategory
+                 |
+                 |----< Partner
+```
+
+Partners must always belong to:
+
+* One Category
+* One or more Subcategories (future-ready)
+
+Bookings must store:
+
+* Category ID
+* Subcategory ID
+* Partner ID
+
+---
+
+# Navigation
+
+Current navigation:
+
+```text
+Category
+      ↓
+Professionals
+```
+
+Replace it with:
+
+```text
+Category
+      ↓
+Subcategory
+      ↓
+Professionals
+```
+
+This change must be applied everywhere in the Customer App.
+
+---
+
+# Search
+
+When searching:
+
+Cleaning
+
+The app should first show:
+
+Cleaning
+
+↓
+
+Home Cleaning
+
+Kitchen Cleaning
+
+Bathroom Cleaning
+
+Sofa Cleaning
+
+Only after selecting a Subcategory should professionals be displayed.
+
+---
+
+# Booking Validation
+
+Customers must not be able to book a professional without selecting a Subcategory.
+
+The selected Category and Subcategory must be carried through the entire booking flow and stored with the booking.
+
+---
+
+# UI/UX
+
+Create a modern Subcategory screen with:
+
+* Responsive grid or list
+* Category title at the top
+* Subcategory icon
+* Subcategory image (optional)
+* Search within subcategories
+* Smooth navigation animations
+* Skeleton loading
+* Empty state when no subcategories exist
+
+---
+
+# Integration Requirements
+
+Review the entire project and update all places where selecting a Service Category currently opens the Professional List directly.
+
+Replace that logic so the application always follows:
+
+**Service Category → Subcategory → Professionals → Professional Details → Booking → Payment**
+
+Update the Customer App, Backend APIs, Database queries, routing, booking flow, search, filters, favorites, recommendations, and analytics to use the selected Subcategory. Ensure only professionals registered under the selected Category and Subcategory are shown. Remove any hardcoded logic, maintain backward compatibility where possible, and ensure the implementation is production-ready, scalable, and does not break existing functionality.
