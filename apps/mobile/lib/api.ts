@@ -76,6 +76,7 @@ export interface Category {
   iconName: string;
   color: string;
   iconColor: string;
+  imageUrl?: string | null;
   serviceCount: number;
 }
 export interface Professional {

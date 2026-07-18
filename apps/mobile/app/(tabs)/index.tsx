@@ -320,12 +320,11 @@ export default function HomeScreen() {
                   router.push({ pathname: '/subcategories/[categoryId]', params: { categoryId: cat.id, categoryName: cat.name } });
                 }}
               >
-                <View style={[styles.catIcon, { backgroundColor: cat.color }]}>
-                  <MaterialCommunityIcons
-                    name={CAT_ICONS[cat.name] ?? 'tools'}
-                    size={22}
-                    color={cat.iconColor}
-                  />
+                <View style={[styles.catIcon, { backgroundColor: cat.imageUrl ? 'transparent' : cat.color, overflow: 'hidden' }]}>
+                  {cat.imageUrl
+                    ? <Image source={{ uri: cat.imageUrl }} style={styles.catImage} resizeMode="cover" />
+                    : <MaterialCommunityIcons name={CAT_ICONS[cat.name] ?? 'tools'} size={22} color={cat.iconColor} />
+                  }
                 </View>
                 <Text style={[styles.catLabel, { color: colors.foreground }]} numberOfLines={1}>{cat.name}</Text>
               </TouchableOpacity>
@@ -539,6 +538,7 @@ const styles = StyleSheet.create({
   catGrid:              { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catItem:              { width: '22%', alignItems: 'center', gap: 6, paddingVertical: 4 },
   catIcon:              { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  catImage:             { width: 52, height: 52, borderRadius: 16 },
   catLabel:             { fontSize: 11, fontWeight: '600', textAlign: 'center' },
   catLabelPlaceholder:  { width: '70%', height: 10, borderRadius: 4 },
   // Reels

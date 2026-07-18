@@ -1,3 +1,20 @@
 uploads = []
 generated = []
-outputs = []
+
+[[outputs]]
+id = "WyA0rvU7S5IGPXJNsaibP"
+uri = "file://attached_assets/qr_customer.png"
+type = "image"
+title = "📱 Customer App — Scan in Expo Go"
+
+[[outputs]]
+id = "sDVTYFnExpUBXhQm5jyJD"
+uri = "file://attached_assets/qr_partner.png"
+type = "image"
+title = "📱 Partner App — Scan in Expo Go"
+
+[[outputs]]
+id = "TvFDsSsQQQ5810a6l6Ju2"
+uri = "file://attached_assets/qr_customer_new.png"
+type = "image"
+title = "📱 Customer App — Scan in Expo Go"

@@ -46,25 +46,22 @@ fi
 # `expo start --tunnel` is invoked. ngrok is only a legacy fallback. On Replit
 # we simply skip the ngrok validation and let Expo use its own service.
 if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
-  echo "=== Replit: skipping ngrok, using Expo tunnel service (exp.direct) ==="
+  echo "=== Replit: using public dev domain (no tunnel auth needed) ==="
   echo "Starting Expo on port $PORT…"
 
-  # Only fall back to the dev domain if no API URL was explicitly passed in.
-  # When EXPO_PUBLIC_API_URL is already set (e.g. to the production URL for UAT),
-  # preserve it rather than overwriting with the ephemeral dev domain.
   if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
     export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
   fi
   echo "Using EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL"
 
-  # Retry loop — exp.direct can transiently reject connections, especially
-  # when both apps start near-simultaneously. Retry up to 5 times.
-  REPLIT_MAX_RETRIES=8
+  REPLIT_MAX_RETRIES=5
   REPLIT_RETRY_DELAY=30
   for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
     echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
     set +e
-    yes | pnpm exec expo start --tunnel --port "$PORT" "$@"
+    # Redirect stdin from /dev/null so any optional login prompts get EOF
+    # and are skipped automatically — anonymous tunnel connects without auth.
+    pnpm exec expo start --tunnel --port "$PORT" "$@" < /dev/null
     EXIT_CODE=$?
     set -e
     if [[ $EXIT_CODE -eq 0 ]]; then

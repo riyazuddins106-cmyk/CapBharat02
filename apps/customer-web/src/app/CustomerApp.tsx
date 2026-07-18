@@ -23,6 +23,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: stri
 /* ─────────────────────────── Sub-category icon map ─────────────── */
 type LucideIcon = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 
+/** Returns true only for real uploaded images — excludes auto-generated placeholder SVGs */
+const hasRealImage = (url?: string | null) => !!url && !url.includes('placeholder');
+
 const SUB_ICON_RULES: [string[], LucideIcon][] = [
   // ── Cleaning ──────────────────────────────────────────────────────
   [['home deep', 'full home', 'home clean', 'sanitiz'],          Sparkles    ],
@@ -53,10 +56,12 @@ const SUB_ICON_RULES: [string[], LucideIcon][] = [
   [['spa', 'massage', 'relax'],                                   Heart       ],
   [['bridal', 'makeup', 'bride'],                                 Star        ],
   // ── Painting ──────────────────────────────────────────────────────
-  [['interior paint', 'wall paint', 'room paint', 'indoor'],      Paintbrush  ],
-  [['exterior paint', 'outside', 'facade', 'outdoor'],            Paintbrush  ],
+  [['interior paint', 'interior painting', 'wall paint', 'room paint', 'indoor'], Paintbrush ],
+  [['exterior paint', 'exterior painting', 'outside', 'facade', 'outdoor'],       Paintbrush ],
+  [['texture', 'design paint', 'wall art', 'textured'],           Paintbrush  ],
+  [['putty', 'primer', 'wall prep'],                              Paintbrush  ],
   [['waterproof', 'damp', 'seepage', 'leak proof'],               Droplets    ],
-  [['wood', 'metal polish', 'varnish', 'lacquer'],                Sparkles    ],
+  [['wood polish', 'wood', 'metal polish', 'varnish', 'lacquer'], Sparkles    ],
   // ── AC Repair ─────────────────────────────────────────────────────
   [['ac service', 'ac clean', 'ac maintenance', 'split ac'],      Wind        ],
   [['ac repair', 'ac fix', 'ac gas', 'ac not'],                   Wrench      ],
@@ -64,10 +69,14 @@ const SUB_ICON_RULES: [string[], LucideIcon][] = [
   [['refrigerator', 'fridge', 'freezer'],                         Thermometer ],
   [['washing machine', 'washer repair'],                          WashingMachine ],
   // ── Laundry ───────────────────────────────────────────────────────
-  [['wash & fold', 'laundry', 'clothes wash'],                    Shirt       ],
+  [['wash & fold', 'wash and fold', 'laundry', 'clothes wash'],   Shirt       ],
   [['dry clean', 'dryclean'],                                     Shirt       ],
-  [['iron', 'press cloth', 'pressing'],                           Zap         ],
+  [['iron', 'ironing only', 'press cloth', 'pressing'],           Zap         ],
   [['stain', 'spot clean'],                                       Droplets    ],
+  [['curtain', 'drape'],                                          Shirt       ],
+  [['shoe', 'footwear'],                                          Package     ],
+  // ── Salon extras ─────────────────────────────────────────────────
+  [['hair spa', 'hair colour', 'hair color', 'hair spa & colour'], Heart      ],
 ];
 
 function getSubIcon(name: string): LucideIcon {
@@ -1171,8 +1180,11 @@ function CustHome({
               const Icon = ICON_MAP[cat.iconName] ?? Grid;
               return (
                 <button key={cat.id} onClick={() => onCategorySelect(cat.id)} className="flex flex-col items-center gap-1.5 group">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cat.color }}>
-                    <Icon size={22} color={cat.iconColor} />
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden" style={{ background: hasRealImage(cat.imageUrl) ? 'transparent' : cat.color }}>
+                    {hasRealImage(cat.imageUrl)
+                      ? <img src={cat.imageUrl!} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
+                      : <Icon size={22} color={cat.iconColor} />
+                    }
                   </div>
                   <span className="text-[11px] font-semibold text-foreground text-center leading-tight">{cat.name}</span>
                 </button>
@@ -1386,8 +1398,11 @@ function CustServices({
                     onClick={() => { setSelectedCatId(cat.id); setSelectedSubId(null); }}
                     className="flex flex-col items-center gap-1.5"
                   >
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cat.color }}>
-                      <Icon size={22} color={cat.iconColor} />
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden" style={{ background: hasRealImage(cat.imageUrl) ? 'transparent' : cat.color }}>
+                      {hasRealImage(cat.imageUrl)
+                        ? <img src={cat.imageUrl!} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
+                        : <Icon size={22} color={cat.iconColor} />
+                      }
                     </div>
                     <span className="text-[11px] font-semibold text-center leading-tight">{cat.name}</span>
                   </button>
@@ -1416,6 +1431,23 @@ function CustServices({
               {selectedCat?.name} — Pick a Service Type
             </h3>
             <div className="grid grid-cols-4 gap-3">
+              {/* ── All tile ── */}
+              <button
+                className="flex flex-col items-center gap-1.5"
+                onClick={() => setSelectedSubId(null)}
+              >
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all"
+                  style={{ background: "#5B3EF5" }}
+                >
+                  <Grid size={22} color="#fff" />
+                </div>
+                <span
+                  className="text-[11px] font-semibold text-center leading-tight"
+                  style={{ color: selectedSubId === null ? "#5B3EF5" : undefined }}
+                >All</span>
+              </button>
+
               {subs.map((s) => {
                 const isSelected = selectedSubId === s.id;
                 return (
@@ -1425,10 +1457,13 @@ function CustServices({
                     className="flex flex-col items-center gap-1.5"
                   >
                     <div
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all"
-                      style={{ background: isSelected ? "#5B3EF5" : (s.color || "#5B3EF5") }}
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all overflow-hidden"
+                      style={{ background: hasRealImage(s.imageUrl) ? "transparent" : (isSelected ? "#5B3EF5" : (s.color || "#5B3EF5")) }}
                     >
-                      {(() => { const SubIcon = getSubIcon(s.name); return <SubIcon size={22} color={s.iconColor || "#fff"} />; })()}
+                      {hasRealImage(s.imageUrl)
+                        ? <img src={s.imageUrl!} alt={s.name} className="w-full h-full object-cover rounded-2xl" />
+                        : (() => { const SubIcon = getSubIcon(s.name); return <SubIcon size={22} color={s.iconColor || "#fff"} />; })()
+                      }
                     </div>
                     <span
                       className="text-[11px] font-semibold text-center leading-tight"
