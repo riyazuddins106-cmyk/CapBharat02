@@ -72,6 +72,11 @@ export default function JobDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
       refetch();
+      Alert.alert(
+        '✅ Job Completed!',
+        'The customer has been notified to complete their payment. You will receive your earnings once payment is confirmed.',
+        [{ text: 'OK' }],
+      );
     },
     onError: (e: any) => Alert.alert('Error', e.message),
   });

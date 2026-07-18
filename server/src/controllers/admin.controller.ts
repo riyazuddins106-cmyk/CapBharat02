@@ -169,6 +169,7 @@ export const adminController = {
     const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
     const offset = Number(req.query.offset ?? 0);
 
+    const { subServiceCategories } = await import('../database/schema/subServiceCategories.js');
     const rows = await db
       .select({
         id: professionals.id,
@@ -185,10 +186,13 @@ export const adminController = {
         avatarUrl: professionals.avatarUrl,
         categoryId: professionals.categoryId,
         categoryName: serviceCategories.name,
+        subCategoryId: professionals.subCategoryId,
+        subCategoryName: subServiceCategories.name,
         createdAt: professionals.createdAt,
       })
       .from(professionals)
       .leftJoin(serviceCategories, eq(professionals.categoryId, serviceCategories.id))
+      .leftJoin(subServiceCategories, eq(professionals.subCategoryId, subServiceCategories.id))
       .where(isNull(professionals.deletedAt))
       .orderBy(desc(professionals.createdAt))
       .limit(limit)

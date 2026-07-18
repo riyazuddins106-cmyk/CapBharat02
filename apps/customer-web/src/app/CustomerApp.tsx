@@ -4,18 +4,79 @@ import {
   User, Clock, Shield, Sparkles, Wrench, Scissors, Zap, Droplets, Paintbrush,
   Wind, ChevronLeft, X, Calendar, ArrowRight, Plus, Trash2, Pencil,
   Navigation, Check,
+  // Sub-category icons
+  Flame, Lightbulb, Battery, Camera, Truck, Thermometer, Building2,
+  Sofa, Shirt, Package, WashingMachine, Tag, Waves,
 } from "lucide-react";
 import {
   auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
-  addressesApi, offersApi, profileApi, reelsApi,
+  addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig,
   type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
-  type ApiAddress, type ApiOffer, type ApiReel,
+  type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment,
 } from "../lib/api";
 
-/* ─────────────────────────── Icon map ──────────────────────────── */
+/* ─────────────────────────── Category icon map ─────────────────── */
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   Sparkles, Wrench, Zap, Scissors, Paintbrush, Wind, Droplets, Grid,
 };
+
+/* ─────────────────────────── Sub-category icon map ─────────────── */
+type LucideIcon = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+
+const SUB_ICON_RULES: [string[], LucideIcon][] = [
+  // ── Cleaning ──────────────────────────────────────────────────────
+  [['home deep', 'full home', 'home clean', 'sanitiz'],          Sparkles    ],
+  [['bathroom', 'toilet clean'],                                  Droplets    ],
+  [['kitchen', 'chimney', 'stove'],                               Flame       ],
+  [['sofa', 'carpet', 'upholstery'],                              Sofa        ],
+  [['move-in', 'move-out', 'move in', 'move out', 'handover'],   Truck       ],
+  [['office clean', 'commercial clean'],                          Building2   ],
+  // ── Plumbing ──────────────────────────────────────────────────────
+  [['pipe leak', 'burst pipe', 'pipe repair'],                    Wrench      ],
+  [['tap', 'faucet', 'mixer'],                                    Droplets    ],
+  [['toilet', 'flush', 'cistern'],                                Waves       ],
+  [['geyser', 'water heater', 'boiler'],                          Flame       ],
+  [['drain', 'blockage', 'clog', 'sewer'],                        Droplets    ],
+  [['pipe install', 'pipeline'],                                  Package     ],
+  // ── Electrical ────────────────────────────────────────────────────
+  [['wiring', 'rewiring', 'short circuit'],                       Zap         ],
+  [['fan', 'light', 'led', 'chandelier', 'fitting'],              Lightbulb   ],
+  [['switch', 'socket', 'plug', 'switchboard', 'outlet'],         Zap         ],
+  [['mcb', 'fuse', 'earthing'],                                   Shield      ],
+  [['cctv', 'camera', 'dvr', 'surveillance'],                     Camera      ],
+  [['inverter', 'battery', 'ups', 'backup power'],                Battery     ],
+  // ── Salon ─────────────────────────────────────────────────────────
+  [['haircut', 'hair cut', 'hair style', 'barber', 'blow-dry'],   Scissors    ],
+  [['facial', 'skincare', 'skin care', 'clean-up', 'cleanup'],    Sparkles    ],
+  [['nail', 'manicure', 'pedicure'],                              Tag         ],
+  [['wax', 'threading', 'epilat'],                                Scissors    ],
+  [['spa', 'massage', 'relax'],                                   Heart       ],
+  [['bridal', 'makeup', 'bride'],                                 Star        ],
+  // ── Painting ──────────────────────────────────────────────────────
+  [['interior paint', 'wall paint', 'room paint', 'indoor'],      Paintbrush  ],
+  [['exterior paint', 'outside', 'facade', 'outdoor'],            Paintbrush  ],
+  [['waterproof', 'damp', 'seepage', 'leak proof'],               Droplets    ],
+  [['wood', 'metal polish', 'varnish', 'lacquer'],                Sparkles    ],
+  // ── AC Repair ─────────────────────────────────────────────────────
+  [['ac service', 'ac clean', 'ac maintenance', 'split ac'],      Wind        ],
+  [['ac repair', 'ac fix', 'ac gas', 'ac not'],                   Wrench      ],
+  [['ac install'],                                                 Wind        ],
+  [['refrigerator', 'fridge', 'freezer'],                         Thermometer ],
+  [['washing machine', 'washer repair'],                          WashingMachine ],
+  // ── Laundry ───────────────────────────────────────────────────────
+  [['wash & fold', 'laundry', 'clothes wash'],                    Shirt       ],
+  [['dry clean', 'dryclean'],                                     Shirt       ],
+  [['iron', 'press cloth', 'pressing'],                           Zap         ],
+  [['stain', 'spot clean'],                                       Droplets    ],
+];
+
+function getSubIcon(name: string): LucideIcon {
+  const lower = name.toLowerCase();
+  for (const [keywords, Icon] of SUB_ICON_RULES) {
+    if (keywords.some(kw => lower.includes(kw))) return Icon;
+  }
+  return Grid; // fallback
+}
 
 /* ─────────────────────────── Address label config ───────────────── */
 const ADDR_LABELS = ["Home", "Work", "Other"] as const;
@@ -1277,8 +1338,8 @@ function CustServices({
   const selectedCat = selectedCatId ? categories.find((c) => c.id === selectedCatId) : null;
   const selectedSub = selectedSubId ? subs.find((s) => s.id === selectedSubId) : null;
 
-  // True when a category has subcategories and none is picked yet — show prompt instead of pros
-  const awaitingSubSelection = !!selectedCatId && subs.length > 0 && !selectedSubId;
+  // Never gate the list — show professionals immediately; subcategory is just a filter
+  const awaitingSubSelection = false;
 
   return (
     <div className="flex flex-col">
@@ -1367,9 +1428,7 @@ function CustServices({
                       className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all"
                       style={{ background: isSelected ? "#5B3EF5" : (s.color || "#5B3EF5") }}
                     >
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={s.iconColor || "#fff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                      </svg>
+                      {(() => { const SubIcon = getSubIcon(s.name); return <SubIcon size={22} color={s.iconColor || "#fff"} />; })()}
                     </div>
                     <span
                       className="text-[11px] font-semibold text-center leading-tight"
@@ -1425,6 +1484,150 @@ function CustServices({
 /* ═══════════════════════════════════════════════════════════════
    BOOKINGS TAB
 ═══════════════════════════════════════════════════════════════ */
+/* ── Payment Modal ──────────────────────────────────────────────────── */
+function PaymentModal({ booking, onClose, onPaid }: {
+  booking: ApiBooking;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null } | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [existingPayment, setExistingPayment] = useState<ApiPayment | null>(null);
+
+  useEffect(() => {
+    getPaymentConfig().then(cfg => {
+      setConfig(cfg);
+      if (cfg.methods.length > 0) setSelectedMethod(cfg.methods[0]);
+    }).catch(console.error);
+    bookingsApi.getPayment(booking.id).then(p => {
+      if (p?.status === 'paid') setPaid(true);
+      setExistingPayment(p);
+    }).catch(() => {});
+  }, [booking.id]);
+
+  const handlePay = async () => {
+    if (!selectedMethod) return;
+    setSubmitting(true);
+    try {
+      await bookingsApi.submitPayment(booking.id, selectedMethod, notes || undefined);
+      setPaid(true);
+      setTimeout(() => { onPaid(); onClose(); }, 1500);
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? e.message ?? 'Payment failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const METHOD_LABELS: Record<string, { icon: string; label: string; desc: string }> = {
+    cash:       { icon: "💵", label: "Cash on Delivery", desc: "Pay the professional in cash" },
+    upi_manual: { icon: "📱", label: "UPI Payment",      desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : "Pay via UPI" },
+    razorpay:   { icon: "💳", label: "Card / Net Banking / UPI", desc: "Secure online payment" },
+  };
+
+  if (paid) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div className="w-full max-w-sm bg-white rounded-t-3xl p-8 flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">✅</div>
+          <h3 className="text-lg font-bold text-gray-900">Payment Successful!</h3>
+          <p className="text-sm text-gray-500 text-center">Thank you for using ServeNow. Your payment has been recorded.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="w-full max-w-sm bg-white rounded-t-3xl overflow-hidden">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-base font-bold text-gray-900">Complete Payment</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          </div>
+          <p className="text-xs text-gray-500">{booking.serviceName} · {booking.proName}</p>
+          <div className="mt-3 bg-violet-50 rounded-xl px-4 py-3 flex items-baseline gap-1">
+            <span className="text-2xl font-black text-violet-700">₹{booking.price}</span>
+            <span className="text-xs text-violet-400 font-medium">total</span>
+          </div>
+        </div>
+
+        {/* Payment methods */}
+        <div className="px-5 py-4">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Choose payment method</p>
+          {!config ? (
+            <div className="text-center py-4 text-gray-400 text-sm">Loading…</div>
+          ) : config.methods.length === 0 ? (
+            <div className="text-center py-4 text-gray-400 text-sm">No payment methods configured.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {config.methods.map(method => {
+                const info = METHOD_LABELS[method] ?? { icon: "💳", label: method, desc: "" };
+                const selected = selectedMethod === method;
+                return (
+                  <button
+                    key={method}
+                    onClick={() => setSelectedMethod(method)}
+                    className="flex items-center gap-3 p-3 rounded-2xl border-2 transition-all text-left"
+                    style={{ borderColor: selected ? "#5B3EF5" : "#F3F4F6", background: selected ? "#F5F3FF" : "#FAFAFA" }}
+                  >
+                    <span className="text-xl w-8 text-center flex-shrink-0">{info.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900">{info.label}</p>
+                      <p className="text-xs text-gray-500 truncate">{info.desc}</p>
+                    </div>
+                    <div className="w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center"
+                      style={{ borderColor: selected ? "#5B3EF5" : "#D1D5DB", background: selected ? "#5B3EF5" : "transparent" }}>
+                      {selected && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* UPI VPA display */}
+          {selectedMethod === 'upi_manual' && config?.upiVpa && (
+            <div className="mt-3 bg-blue-50 rounded-xl p-3 text-center">
+              <p className="text-xs text-blue-600 font-medium mb-1">UPI ID to pay</p>
+              <p className="text-base font-bold text-blue-900 font-mono select-all">{config.upiVpa}</p>
+              <p className="text-xs text-blue-500 mt-1">After paying, enter transaction ID below</p>
+            </div>
+          )}
+
+          {/* Notes / transaction ref */}
+          {(selectedMethod === 'upi_manual') && (
+            <div className="mt-3">
+              <input
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="UPI transaction ID (optional)"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-violet-400"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Pay button */}
+        <div className="px-5 pb-8">
+          <button
+            onClick={handlePay}
+            disabled={!selectedMethod || submitting || !config}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 transition-all"
+            style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}
+          >
+            {submitting ? "Processing…" : selectedMethod === 'cash' ? "Confirm Cash Payment" : selectedMethod === 'upi_manual' ? "Confirm UPI Payment" : `Pay ₹${booking.price}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CustBookings({ bookings, onCancel, onRefresh }: {
   bookings: ApiBooking[];
   onCancel: (id: string) => void;
@@ -1432,6 +1635,7 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
 }) {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [payBooking, setPayBooking] = useState<ApiBooking | null>(null);
 
   const upcoming = bookings.filter((b) => ["pending", "upcoming", "in_progress"].includes(b.status));
   const past = bookings.filter((b) => ["completed", "cancelled"].includes(b.status));
@@ -1448,6 +1652,7 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
   }
 
   return (
+    <>
     <div className="flex flex-col">
       <div className="px-5 pt-3 pb-4 bg-white border-b border-black/[0.08] flex items-center justify-between">
         <h2 className="text-lg font-bold">My Bookings</h2>
@@ -1486,6 +1691,14 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
                   </button>
                 )}
                 {b.status === "completed" && (
+                  <button
+                    onClick={() => setPayBooking(b)}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
+                    style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
+                    Pay Now
+                  </button>
+                )}
+                {b.status === "completed" && (
                   <button className="flex-1 py-2 rounded-xl text-xs font-bold border border-black/[0.08]">Rate Service</button>
                 )}
               </div>
@@ -1501,6 +1714,15 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
         )}
       </div>
     </div>
+
+    {payBooking && (
+      <PaymentModal
+        booking={payBooking}
+        onClose={() => setPayBooking(null)}
+        onPaid={() => { setPayBooking(null); onRefresh(); }}
+      />
+    )}
+    </>
   );
 }
 

@@ -175,14 +175,35 @@ export const partnerService = {
     const updated = await partnerRepository.updateStatus(bookingId, 'completed');
 
     if (job.customerId) {
-      const title = 'Service completed';
-      const body = `Your ${job.serviceName} booking with ${pro.name} is complete. Thanks for using ServeNow!`;
+      const title = 'Service completed — please pay';
+      const body = `Your ${job.serviceName} booking with ${pro.name} is complete. Please proceed to payment.`;
       void notificationService.sendToUser(job.customerId, title, body, { bookingId, type: 'booking_completed' });
       const { notificationDbService } = await import('./notificationDb.service.js');
       void notificationDbService.create({ userId: job.customerId, title, body, type: 'booking', data: { bookingId } });
 
       const { pointsService } = await import('./points.service.js');
       void pointsService.earnForBooking(job.customerId, bookingId, job.price ?? 0);
+
+      // Create a pending payment record so the customer can pay immediately
+      try {
+        const { db } = await import('../config/database.js');
+        const { payments } = await import('../database/schema/payments.js');
+        const { eq } = await import('drizzle-orm');
+        // Only create if one doesn't exist yet
+        const existing = await db.select({ id: payments.id }).from(payments)
+          .where(eq(payments.bookingId, bookingId)).limit(1);
+        if (!existing.length) {
+          await db.insert(payments).values({
+            bookingId,
+            customerId: job.customerId,
+            amount: job.price ?? 0,
+            currency: 'INR',
+            status: 'created',
+          });
+        }
+      } catch (e) {
+        console.error('[partner.service] failed to create payment record:', e);
+      }
     }
 
     return updated;

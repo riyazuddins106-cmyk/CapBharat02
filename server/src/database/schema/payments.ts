@@ -15,6 +15,8 @@ export const paymentMethodEnum = pgEnum('payment_method', [
   'upi',
   'wallet',
   'other',
+  'cash',
+  'upi_manual',
 ]);
 
 export const payments = pgTable('payments', {
@@ -25,9 +27,10 @@ export const payments = pgTable('payments', {
   currency: varchar('currency', { length: 8 }).notNull().default('INR'),
   status: paymentStatusEnum('status').notNull().default('created'),
   method: paymentMethodEnum('method'),
-  razorpayOrderId: varchar('razorpay_order_id', { length: 128 }).notNull(),
+  razorpayOrderId: varchar('razorpay_order_id', { length: 128 }),    // nullable — not needed for COD/UPI
   razorpayPaymentId: varchar('razorpay_payment_id', { length: 128 }),
   razorpaySignature: varchar('razorpay_signature', { length: 256 }),
+  notes: varchar('notes', { length: 512 }),                           // UPI ref / cash receipt note
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

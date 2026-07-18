@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 // EXPO_PUBLIC_API_URL is set by the workflow to the current Replit dev domain
 // (e.g. https://<repl-id>.sisko.replit.dev). That domain's port-5000 vite server
 // already proxies /api → the Express server on port 8000, so we never need to
@@ -325,7 +327,26 @@ export const bookingsApi = {
     request<Booking>(`/api/bookings/${id}/reschedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }), token }),
   getQrToken: (id: string, token: string) =>
     request<{ qrToken: string }>(`/api/bookings/${id}/qr`, { token }),
+  getPayment: (id: string, token: string) =>
+    request<Payment | null>(`/api/bookings/${id}/payment`, { token }),
+  submitPayment: (id: string, body: { method: string; notes?: string }, token: string) =>
+    request<Payment>(`/api/bookings/${id}/payment`, { method: 'POST', body: JSON.stringify(body), token }),
 };
+
+export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null }> {
+  return request<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null }>('/api/payments/config');
+}
+
+export interface Payment {
+  id: string;
+  bookingId: string;
+  amount: number;
+  currency: string;
+  status: 'created' | 'paid' | 'failed' | 'refunded';
+  method: string | null;
+  notes: string | null;
+  createdAt: string;
+}
 
 // ── Favorites ──────────────────────────────────────────────
 export const favoritesApi = {

@@ -235,7 +235,33 @@ export const bookingsApi = {
     const { data } = await client.patch(`/bookings/${id}/reschedule`, { scheduledAt });
     return data.data as ApiBooking;
   },
+
+  async getPayment(id: string) {
+    const { data } = await client.get(`/bookings/${id}/payment`);
+    return data.data as ApiPayment | null;
+  },
+
+  async submitPayment(id: string, method: string, notes?: string) {
+    const { data } = await client.post(`/bookings/${id}/payment`, { method, notes });
+    return data.data as ApiPayment;
+  },
 };
+
+export interface ApiPayment {
+  id: string;
+  bookingId: string;
+  amount: number;
+  currency: string;
+  status: 'created' | 'paid' | 'failed' | 'refunded';
+  method: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null }> {
+  const { data } = await client.get('/payments/config');
+  return data.data;
+}
 
 // ─── Favorites API ────────────────────────────────────────────────────────────
 export const favoritesApi = {

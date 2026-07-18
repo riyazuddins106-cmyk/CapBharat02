@@ -278,7 +278,7 @@ export const adminApi = {
   // Professionals
   getProfessionals: (token: string) =>
     request<{ professionals: ProfessionalRow[]; total: number }>('/admin/professionals', { token }),
-  updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[] }, token: string) =>
+  updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }, token: string) =>
     request<ProfessionalRow>(`/admin/professionals/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   suspendProfessional: (id: string, token: string) =>
     request(`/admin/professionals/${id}/suspend`, { method: 'PATCH', token }),

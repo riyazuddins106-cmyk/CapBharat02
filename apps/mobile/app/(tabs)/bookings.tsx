@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Platform, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Platform, RefreshControl, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -7,9 +7,161 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { bookingsApi, reviewsApi, type Booking } from '@/lib/api';
+import { bookingsApi, reviewsApi, getPaymentConfig, type Booking, type Payment } from '@/lib/api';
 import { BookingCard } from '@/components/BookingCard';
 import { queryClient } from '@/lib/queryClient';
+
+/* ── Payment bottom-sheet ─────────────────────────────────────────── */
+function PaymentSheet({ booking, token, onClose, onPaid }: {
+  booking: Booking;
+  token: string;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const colors = useColors();
+  const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [upiRef, setUpiRef] = useState('');
+  const [paid, setPaid] = useState(false);
+
+  React.useEffect(() => {
+    // Check if already paid
+    bookingsApi.getPayment(booking.id, token).then(p => {
+      if (p?.status === 'paid') setPaid(true);
+    }).catch(() => {});
+
+    getPaymentConfig().then(cfg => {
+      setConfig(cfg);
+      if (cfg.methods.length) setSelected(cfg.methods[0]);
+    }).catch(() => setConfig({ methods: ['cash'], upiVpa: null }));
+  }, [booking.id, token]);
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) throw new Error('Select a payment method');
+      return bookingsApi.submitPayment(booking.id, { method: selected, notes: upiRef || undefined }, token);
+    },
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setPaid(true);
+      setTimeout(() => { onPaid(); onClose(); }, 1500);
+    },
+    onError: (e: any) => Alert.alert('Payment failed', e.message ?? 'Please try again'),
+  });
+
+  const METHOD_INFO: Record<string, { icon: string; label: string; desc: string }> = {
+    cash:       { icon: '💵', label: 'Cash on Delivery', desc: 'Pay the professional in cash' },
+    upi_manual: { icon: '📱', label: 'UPI Payment',      desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : 'Pay via UPI app' },
+    razorpay:   { icon: '💳', label: 'Card / Net Banking', desc: 'Secure online payment' },
+  };
+
+  if (paid) {
+    return (
+      <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+        <View style={styles.paidSuccess}>
+          <Text style={styles.paidIcon}>✅</Text>
+          <Text style={[styles.paidTitle, { color: colors.foreground }]}>Payment Recorded!</Text>
+          <Text style={[styles.paidSub, { color: colors.mutedForeground }]}>Thank you for using ServeNow</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+      {/* Handle bar */}
+      <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
+      {/* Header */}
+      <View style={styles.sheetHeader}>
+        <View>
+          <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Complete Payment</Text>
+          <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>{booking.serviceName} · {booking.proName}</Text>
+        </View>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons name="close" size={22} color={colors.mutedForeground} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Amount pill */}
+      <View style={[styles.amountPill, { backgroundColor: colors.primary + '15' }]}>
+        <Text style={[styles.amountText, { color: colors.primary }]}>₹{booking.price}</Text>
+        <Text style={[styles.amountLabel, { color: colors.primary + '88' }]}>total due</Text>
+      </View>
+
+      {/* Payment methods */}
+      <Text style={[styles.methodsLabel, { color: colors.mutedForeground }]}>CHOOSE PAYMENT METHOD</Text>
+
+      {!config ? (
+        <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+      ) : (
+        <View style={styles.methodsList}>
+          {config.methods.map(method => {
+            const info = METHOD_INFO[method] ?? { icon: '💳', label: method, desc: '' };
+            const isSelected = selected === method;
+            return (
+              <TouchableOpacity
+                key={method}
+                onPress={() => setSelected(method)}
+                activeOpacity={0.7}
+                style={[
+                  styles.methodRow,
+                  { borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary + '0F' : colors.muted }
+                ]}
+              >
+                <Text style={styles.methodIcon}>{info.icon}</Text>
+                <View style={styles.methodInfo}>
+                  <Text style={[styles.methodName, { color: colors.foreground }]}>{info.label}</Text>
+                  <Text style={[styles.methodDesc, { color: colors.mutedForeground }]}>{info.desc}</Text>
+                </View>
+                <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}>
+                  {isSelected && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* UPI VPA */}
+      {selected === 'upi_manual' && config?.upiVpa && (
+        <View style={[styles.upiBox, { backgroundColor: '#EFF6FF' }]}>
+          <Text style={styles.upiLabel}>UPI ID</Text>
+          <Text style={styles.upiVpa} selectable>{config.upiVpa}</Text>
+          <Text style={styles.upiHint}>After paying, enter transaction ID below (optional)</Text>
+        </View>
+      )}
+
+      {selected === 'upi_manual' && (
+        <TextInput
+          value={upiRef}
+          onChangeText={setUpiRef}
+          placeholder="UPI transaction ID (optional)"
+          placeholderTextColor={colors.mutedForeground}
+          style={[styles.upiInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: 12 }]}
+        />
+      )}
+
+      {/* Pay button */}
+      <TouchableOpacity
+        onPress={() => submitMutation.mutate()}
+        disabled={!selected || submitMutation.isPending || !config}
+        activeOpacity={0.85}
+        style={[styles.payBtn, { backgroundColor: colors.primary, opacity: (!selected || submitMutation.isPending || !config) ? 0.5 : 1 }]}
+      >
+        <Text style={styles.payBtnText}>
+          {submitMutation.isPending
+            ? 'Processing…'
+            : selected === 'cash'
+              ? 'Confirm Cash Payment'
+              : selected === 'upi_manual'
+                ? 'Confirm UPI Payment'
+                : `Pay ₹${booking.price}`}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function BookingsScreen() {
   const colors = useColors();
@@ -17,6 +169,7 @@ export default function BookingsScreen() {
   const { accessToken, isAuthenticated } = useAuth();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [reviewModal, setReviewModal] = useState<Booking | null>(null);
+  const [payModal, setPayModal] = useState<Booking | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -129,6 +282,7 @@ export default function BookingsScreen() {
               { text: 'Cancel Booking', style: 'destructive', onPress: () => cancelMutation.mutate(id) },
             ])}
             onReview={(b) => setReviewModal(b)}
+            onPay={(b) => setPayModal(b)}
           />
         )}
       />
@@ -177,6 +331,23 @@ export default function BookingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Payment Modal */}
+      <Modal visible={!!payModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.modalBackdrop}>
+          {payModal && accessToken && (
+            <PaymentSheet
+              booking={payModal}
+              token={accessToken}
+              onClose={() => setPayModal(null)}
+              onPaid={() => {
+                setPayModal(null);
+                queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+              }}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -202,4 +373,33 @@ const styles = StyleSheet.create({
   reviewInput: { padding: 12, fontSize: 14, textAlignVertical: 'top', minHeight: 80 },
   reviewSubmit: { paddingVertical: 14, alignItems: 'center' },
   reviewSubmitText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  // Payment sheet
+  sheet: { marginHorizontal: 0, paddingHorizontal: 20, paddingBottom: 40, borderTopLeftRadius: 28, borderTopRightRadius: 28, gap: 0 },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  sheetTitle: { fontSize: 18, fontWeight: '700' },
+  sheetSub: { fontSize: 12, marginTop: 3 },
+  amountPill: { borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
+  amountText: { fontSize: 28, fontWeight: '800' },
+  amountLabel: { fontSize: 12, fontWeight: '500', marginTop: 2 },
+  methodsLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
+  methodsList: { gap: 10, marginBottom: 16 },
+  methodRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 2, gap: 12 },
+  methodIcon: { fontSize: 22, width: 32, textAlign: 'center' },
+  methodInfo: { flex: 1 },
+  methodName: { fontSize: 14, fontWeight: '700' },
+  methodDesc: { fontSize: 12, marginTop: 2 },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  upiBox: { borderRadius: 14, padding: 14, marginBottom: 12, alignItems: 'center', gap: 4 },
+  upiLabel: { fontSize: 11, fontWeight: '600', color: '#1D4ED8', textTransform: 'uppercase' },
+  upiVpa: { fontSize: 16, fontWeight: '700', color: '#1E3A8A', letterSpacing: 0.3 },
+  upiHint: { fontSize: 11, color: '#3B82F6', textAlign: 'center' },
+  upiInput: { padding: 12, fontSize: 14, marginBottom: 16 },
+  payBtn: { paddingVertical: 16, borderRadius: 18, alignItems: 'center', marginTop: 4 },
+  payBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  paidSuccess: { alignItems: 'center', paddingVertical: 32, gap: 12 },
+  paidIcon: { fontSize: 52 },
+  paidTitle: { fontSize: 22, fontWeight: '800' },
+  paidSub: { fontSize: 14 },
 });

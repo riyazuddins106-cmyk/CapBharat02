@@ -22,9 +22,10 @@ interface Props {
   booking: Booking;
   onCancel?: (id: string) => void;
   onReview?: (booking: Booking) => void;
+  onPay?: (booking: Booking) => void;
 }
 
-export function BookingCard({ booking, onCancel, onReview }: Props) {
+export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
   const colors = useColors();
   const { accessToken } = useAuth();
   const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.upcoming;
@@ -106,13 +107,23 @@ export function BookingCard({ booking, onCancel, onReview }: Props) {
               <Text style={[styles.actionBtnText, { color: colors.destructive }]}>Cancel</Text>
             </TouchableOpacity>
           )}
-          {booking.status === 'completed' && !booking.reviewed && onReview && (
+          {booking.status === 'completed' && onPay && (
             <TouchableOpacity
-              onPress={() => onReview(booking)}
+              onPress={() => onPay(booking)}
               style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
               activeOpacity={0.8}
             >
-              <Text style={[styles.actionBtnText, { color: '#fff' }]}>Rate Service</Text>
+              <Ionicons name="wallet-outline" size={14} color="#fff" />
+              <Text style={[styles.actionBtnText, { color: '#fff' }]}>Pay Now</Text>
+            </TouchableOpacity>
+          )}
+          {booking.status === 'completed' && !booking.reviewed && onReview && (
+            <TouchableOpacity
+              onPress={() => onReview(booking)}
+              style={[styles.actionBtn, { borderColor: colors.primary }]}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.actionBtnText, { color: colors.primary }]}>Rate Service</Text>
             </TouchableOpacity>
           )}
         </View>

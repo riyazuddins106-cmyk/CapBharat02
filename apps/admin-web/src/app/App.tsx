@@ -1052,7 +1052,7 @@ function ProsView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Professional", "Category", "Rating", "Price", "Status", "Actions"].map(h => (
+                {["Professional", "Category", "Sub-category", "Rating", "Price", "Status", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1076,6 +1076,7 @@ function ProsView({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{p.categoryName ?? "—"}</td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{p.subCategoryName ?? "—"}</td>
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">⭐ {p.rating?.toFixed(1) ?? "—"}</td>
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">{fmt(p.basePrice)}{p.priceUnit}</td>
                   <td className="px-4 py-3">
@@ -1096,7 +1097,7 @@ function ProsView({
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={6} text="No professionals found" />}
+              {filtered.length === 0 && <EmptyRow cols={7} text="No professionals found" />}
             </tbody>
           </table>
         </div>
