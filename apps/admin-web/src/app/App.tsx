@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock,
   BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
-  Film, ChevronRight, Image, Upload,
+  Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
+  Send, Wallet, Smartphone, Zap,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
@@ -26,14 +28,15 @@ const INPUT_STYLE = {
 } as const;
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
       <div className="w-full max-w-md rounded-2xl border border-white/10 p-6 max-h-[90vh] overflow-y-auto" style={MODAL_BG}>
         <h3 className="text-white font-bold text-base mb-5">{title}</h3>
         {children}
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) as unknown as React.ReactElement;
 }
 
 function ConfirmDialog({
@@ -263,8 +266,10 @@ const ADMIN_SIDEBAR = [
   { id: "analytics",  icon: BarChart2,  label: "Analytics"          },
   { id: "audit-logs", icon: Activity,   label: "Audit Logs"         },
   { id: "privacy",    icon: Shield,     label: "Privacy & Security" },
-  { id: "support",    icon: HelpCircle, label: "Help & Support"     },
-  { id: "settings",   icon: Settings,   label: "Settings"           },
+  { id: "support",        icon: HelpCircle,  label: "Help & Support"    },
+  { id: "payment-config", icon: CreditCard,  label: "Payment Config"    },
+  { id: "email-config",   icon: Mail,        label: "Email Config"      },
+  { id: "settings",       icon: Settings,    label: "Settings"          },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -647,6 +652,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <PrivacySecurityView user={localUser} accessToken={accessToken} onUserUpdate={handleUserUpdate} />
           ) : activeSection === "support" ? (
             <HelpSupportView accessToken={accessToken} />
+          ) : activeSection === "payment-config" ? (
+            <PaymentConfigView accessToken={accessToken} />
+          ) : activeSection === "email-config" ? (
+            <EmailConfigView accessToken={accessToken} adminEmail={user.email} />
           ) : (
             <SettingsView user={user} />
           )}
@@ -2411,6 +2420,497 @@ function AnalyticsView({ stats }: { stats: DashboardStats | null }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARED CONFIG HELPERS
+═══════════════════════════════════════════════════════════════════ */
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${checked ? "bg-violet-500" : "bg-white/[0.12]"}`}
+    >
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
+    </button>
+  );
+}
+
+function SecretInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-xl px-4 py-2.5 pr-10 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+        style={INPUT_STYLE}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+      >
+        {show ? <EyeOff size={15} /> : <Eye size={15} />}
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PAYMENT CONFIG
+═══════════════════════════════════════════════════════════════════ */
+
+interface PaymentCfg {
+  cod:      { enabled: boolean };
+  upi:      { enabled: boolean; vpa: string };
+  razorpay: { enabled: boolean; keyId: string; keySecret: string; webhookSecret: string };
+  stripe:   { enabled: boolean; publishableKey: string; secretKey: string };
+}
+
+const DEFAULT_PAYMENT_CFG: PaymentCfg = {
+  cod:      { enabled: true },
+  upi:      { enabled: false, vpa: "" },
+  razorpay: { enabled: false, keyId: "", keySecret: "", webhookSecret: "" },
+  stripe:   { enabled: false, publishableKey: "", secretKey: "" },
+};
+
+function PaymentConfigView({ accessToken }: { accessToken: string }) {
+  const [cfg, setCfg]     = useState<PaymentCfg>(DEFAULT_PAYMENT_CFG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi.getSettings("payment_config", accessToken)
+      .then(res => setCfg(prev => ({ ...prev, ...(res.value as Partial<PaymentCfg>) })))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.saveSettings("payment_config", cfg, accessToken);
+      setMsg({ text: "Payment configuration saved successfully.", type: "success" });
+    } catch {
+      setMsg({ text: "Failed to save. Please try again.", type: "error" });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMsg(null), 4000);
+    }
+  };
+
+  const setMethod = <K extends keyof PaymentCfg>(method: K, patch: Partial<PaymentCfg[K]>) =>
+    setCfg(c => ({ ...c, [method]: { ...c[method], ...patch } }));
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <Loader2 size={28} className="animate-spin text-violet-500" />
+    </div>
+  );
+
+  const methods: Array<{
+    key: keyof PaymentCfg;
+    icon: React.ReactNode;
+    label: string;
+    badge?: string;
+    color: string;
+    description: string;
+    fields: React.ReactNode;
+  }> = [
+    {
+      key: "cod",
+      icon: <Wallet size={20} />,
+      label: "Cash on Delivery",
+      color: "#16A34A",
+      description: "Accept cash payments when the service is completed. No gateway fees.",
+      fields: null,
+    },
+    {
+      key: "upi",
+      icon: <Smartphone size={20} />,
+      label: "UPI",
+      badge: "India",
+      color: "#F59E0B",
+      description: "Accept instant UPI payments via PhonePe, GPay, Paytm, BHIM, and all UPI apps.",
+      fields: (
+        <Field label="UPI VPA / Payment Address">
+          <TextInput
+            value={cfg.upi.vpa}
+            onChange={v => setMethod("upi", { vpa: v })}
+            placeholder="e.g. merchant@oksbi or 9876543210@upi"
+          />
+        </Field>
+      ),
+    },
+    {
+      key: "razorpay",
+      icon: <Zap size={20} />,
+      label: "Razorpay",
+      badge: "India",
+      color: "#3B82F6",
+      description: "Full-stack payment gateway — cards, UPI, wallets, EMI, netbanking, and more.",
+      fields: (
+        <div className="space-y-3">
+          <Field label="Key ID (Publishable)">
+            <TextInput
+              value={cfg.razorpay.keyId}
+              onChange={v => setMethod("razorpay", { keyId: v })}
+              placeholder="rzp_live_xxxxxxxxxxxx"
+            />
+          </Field>
+          <Field label="Key Secret">
+            <SecretInput
+              value={cfg.razorpay.keySecret}
+              onChange={v => setMethod("razorpay", { keySecret: v })}
+              placeholder="Your Razorpay secret key"
+            />
+          </Field>
+          <Field label="Webhook Secret (optional)">
+            <SecretInput
+              value={cfg.razorpay.webhookSecret}
+              onChange={v => setMethod("razorpay", { webhookSecret: v })}
+              placeholder="Webhook signing secret from Razorpay dashboard"
+            />
+          </Field>
+        </div>
+      ),
+    },
+    {
+      key: "stripe",
+      icon: <CreditCard size={20} />,
+      label: "Stripe",
+      badge: "International",
+      color: "#6366F1",
+      description: "Accept international card payments. Supports 135+ currencies.",
+      fields: (
+        <div className="space-y-3">
+          <Field label="Publishable Key">
+            <TextInput
+              value={cfg.stripe.publishableKey}
+              onChange={v => setMethod("stripe", { publishableKey: v })}
+              placeholder="pk_live_xxxxxxxxxxxx"
+            />
+          </Field>
+          <Field label="Secret Key">
+            <SecretInput
+              value={cfg.stripe.secretKey}
+              onChange={v => setMethod("stripe", { secretKey: v })}
+              placeholder="sk_live_xxxxxxxxxxxx"
+            />
+          </Field>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="max-w-xl space-y-4">
+      <div className="mb-1">
+        <h2 className="text-white font-bold text-base">Payment Methods</h2>
+        <p className="text-white/40 text-xs mt-0.5">
+          Enable or disable payment options customers see at checkout. Keys are stored securely.
+        </p>
+      </div>
+
+      {methods.map(m => {
+        const enabled = (cfg[m.key] as { enabled: boolean }).enabled;
+        return (
+          <div key={String(m.key)} className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+            <div className="flex items-center gap-3 px-5 py-4">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: m.color + "22", color: m.color }}
+              >
+                {m.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-white text-sm font-semibold">{m.label}</p>
+                  {m.badge && (
+                    <span className="text-white/40 text-xs border border-white/10 px-1.5 py-0.5 rounded-md">
+                      {m.badge}
+                    </span>
+                  )}
+                </div>
+                <p className="text-white/40 text-xs mt-0.5 leading-snug">{m.description}</p>
+              </div>
+              <ToggleSwitch
+                checked={enabled}
+                onChange={v => setMethod(m.key, { enabled: v } as Partial<PaymentCfg[typeof m.key]>)}
+              />
+            </div>
+            {enabled && m.fields && (
+              <div className="px-5 pb-5 pt-2 border-t border-white/[0.05] space-y-3">
+                {m.fields}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {msg && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium ${msg.type === "success" ? "text-green-400 bg-green-500/10 border border-green-500/20" : "text-red-400 bg-red-500/10 border border-red-500/20"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+        >
+          {saving && <Loader2 size={15} className="animate-spin" />}
+          Save Configuration
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EMAIL CONFIG
+═══════════════════════════════════════════════════════════════════ */
+
+interface EmailCfg {
+  provider: "smtp" | "sendgrid";
+  smtp:     { host: string; port: number; user: string; password: string; secure: boolean };
+  sendgrid: { apiKey: string };
+  from:     { name: string; email: string };
+  notifications: {
+    bookingConfirmation: boolean;
+    bookingCancellation: boolean;
+    paymentReceipt: boolean;
+    otp: boolean;
+  };
+}
+
+const DEFAULT_EMAIL_CFG: EmailCfg = {
+  provider: "smtp",
+  smtp:     { host: "", port: 587, user: "", password: "", secure: false },
+  sendgrid: { apiKey: "" },
+  from:     { name: "ServeNow", email: "noreply@servenow.in" },
+  notifications: { bookingConfirmation: true, bookingCancellation: true, paymentReceipt: true, otp: true },
+};
+
+function EmailConfigView({ accessToken, adminEmail }: { accessToken: string; adminEmail: string }) {
+  const [cfg, setCfg]       = useState<EmailCfg>(DEFAULT_EMAIL_CFG);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [testing, setTesting]   = useState(false);
+  const [testAddr, setTestAddr] = useState(adminEmail);
+  const [msg, setMsg]           = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi.getSettings("email_config", accessToken)
+      .then(res => setCfg(prev => ({ ...prev, ...(res.value as Partial<EmailCfg>) })))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  const showMsg = (text: string, type: "success" | "error") => {
+    setMsg({ text, type });
+    setTimeout(() => setMsg(null), 5000);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.saveSettings("email_config", cfg, accessToken);
+      showMsg("Email configuration saved successfully.", "success");
+    } catch {
+      showMsg("Failed to save. Please try again.", "error");
+    } finally { setSaving(false); }
+  };
+
+  const sendTest = async () => {
+    if (!testAddr) return;
+    setTesting(true);
+    try {
+      const res = await adminApi.sendTestEmail(testAddr, accessToken);
+      showMsg(res.message, "success");
+    } catch (e: unknown) {
+      showMsg((e as Error).message || "Failed to send test email.", "error");
+    } finally { setTesting(false); }
+  };
+
+  const setSmtp  = (patch: Partial<EmailCfg["smtp"]>) =>
+    setCfg(c => ({ ...c, smtp: { ...c.smtp, ...patch } }));
+  const setNotif = (key: keyof EmailCfg["notifications"], val: boolean) =>
+    setCfg(c => ({ ...c, notifications: { ...c.notifications, [key]: val } }));
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <Loader2 size={28} className="animate-spin text-violet-500" />
+    </div>
+  );
+
+  const notifItems: { key: keyof EmailCfg["notifications"]; label: string; desc: string }[] = [
+    { key: "bookingConfirmation", label: "Booking Confirmation", desc: "Sent to customer when a new booking is placed." },
+    { key: "bookingCancellation", label: "Booking Cancellation", desc: "Sent when a booking is cancelled by any party." },
+    { key: "paymentReceipt",      label: "Payment Receipt",      desc: "Sent after a successful payment transaction." },
+    { key: "otp",                 label: "OTP / Verification",   desc: "OTP codes for login and account verification." },
+  ];
+
+  return (
+    <div className="max-w-xl space-y-5">
+      <div className="mb-1">
+        <h2 className="text-white font-bold text-base">Email Configuration</h2>
+        <p className="text-white/40 text-xs mt-0.5">
+          Configure how ServeNow sends transactional and notification emails.
+        </p>
+      </div>
+
+      {/* ── Provider ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold flex items-center gap-2">
+          <Mail size={15} className="text-violet-400" /> Email Provider
+        </h3>
+        <div className="flex gap-3">
+          {(["smtp", "sendgrid"] as const).map(p => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setCfg(c => ({ ...c, provider: p }))}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${cfg.provider === p ? "border-violet-500 text-violet-400 bg-violet-500/10" : "border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"}`}
+            >
+              {p === "smtp" ? "SMTP" : "SendGrid"}
+            </button>
+          ))}
+        </div>
+
+        {cfg.provider === "smtp" ? (
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <Field label="SMTP Host">
+                  <TextInput value={cfg.smtp.host} onChange={v => setSmtp({ host: v })} placeholder="smtp.gmail.com" />
+                </Field>
+              </div>
+              <Field label="Port">
+                <TextInput type="number" value={String(cfg.smtp.port)} onChange={v => setSmtp({ port: Number(v) || 587 })} placeholder="587" />
+              </Field>
+            </div>
+            <Field label="Username / Email">
+              <TextInput value={cfg.smtp.user} onChange={v => setSmtp({ user: v })} placeholder="you@gmail.com" />
+            </Field>
+            <Field label="Password / App Password">
+              <SecretInput value={cfg.smtp.password} onChange={v => setSmtp({ password: v })} placeholder="Gmail app password or SMTP password" />
+            </Field>
+            <div
+              className="flex items-center justify-between py-3 px-4 rounded-xl border border-white/[0.06]"
+              style={{ background: "rgba(255,255,255,0.02)" }}
+            >
+              <div>
+                <p className="text-white/80 text-xs font-medium">Use SSL / TLS</p>
+                <p className="text-white/40 text-xs">Enable for port 465. Disable for STARTTLS on port 587.</p>
+              </div>
+              <ToggleSwitch checked={cfg.smtp.secure} onChange={v => setSmtp({ secure: v })} />
+            </div>
+          </div>
+        ) : (
+          <Field label="SendGrid API Key">
+            <SecretInput
+              value={cfg.sendgrid.apiKey}
+              onChange={v => setCfg(c => ({ ...c, sendgrid: { apiKey: v } }))}
+              placeholder="SG.xxxxxxxxxxxxxxxxxxxxxxxx"
+            />
+          </Field>
+        )}
+      </div>
+
+      {/* ── Sender ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-3" style={CARD}>
+        <h3 className="text-white text-sm font-semibold">Sender Details</h3>
+        <Field label="From Name">
+          <TextInput
+            value={cfg.from.name}
+            onChange={v => setCfg(c => ({ ...c, from: { ...c.from, name: v } }))}
+            placeholder="ServeNow"
+          />
+        </Field>
+        <Field label="From Email">
+          <TextInput
+            type="email"
+            value={cfg.from.email}
+            onChange={v => setCfg(c => ({ ...c, from: { ...c.from, email: v } }))}
+            placeholder="noreply@servenow.in"
+          />
+        </Field>
+      </div>
+
+      {/* ── Notification types ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5" style={CARD}>
+        <h3 className="text-white text-sm font-semibold mb-3">Notification Triggers</h3>
+        <div className="space-y-0">
+          {notifItems.map((n, i) => (
+            <div
+              key={n.key}
+              className={`flex items-center justify-between py-3 ${i < notifItems.length - 1 ? "border-b border-white/[0.05]" : ""}`}
+            >
+              <div>
+                <p className="text-white/80 text-xs font-medium">{n.label}</p>
+                <p className="text-white/40 text-xs">{n.desc}</p>
+              </div>
+              <ToggleSwitch checked={cfg.notifications[n.key]} onChange={v => setNotif(n.key, v)} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Test email ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-3" style={CARD}>
+        <h3 className="text-white text-sm font-semibold">Send Test Email</h3>
+        <p className="text-white/40 text-xs">
+          Verify your configuration is working. Save first, then send a test.
+        </p>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <TextInput
+              type="email"
+              value={testAddr}
+              onChange={setTestAddr}
+              placeholder="recipient@example.com"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={sendTest}
+            disabled={testing || !testAddr}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.10] text-white text-sm font-medium border border-white/10 transition-colors disabled:opacity-50 whitespace-nowrap"
+          >
+            {testing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            Send Test
+          </button>
+        </div>
+      </div>
+
+      {msg && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium border ${msg.type === "success" ? "text-green-400 bg-green-500/10 border-green-500/20" : "text-red-400 bg-red-500/10 border-red-500/20"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+        >
+          {saving && <Loader2 size={15} className="animate-spin" />}
+          Save Configuration
+        </button>
+      </div>
     </div>
   );
 }

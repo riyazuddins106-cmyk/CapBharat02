@@ -5,6 +5,7 @@ import { platformPolicyController } from '../controllers/platformPolicy.controll
 import { offerController } from '../controllers/offer.controller.js';
 import { subCategoryController } from '../controllers/subCategory.controller.js';
 import { reelController } from '../controllers/reel.controller.js';
+import { getSettings, upsertSettings, testEmail } from '../controllers/platformSettings.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 
@@ -82,5 +83,10 @@ router.get('/offers',         offerController.adminList);
 router.post('/offers',        offerController.adminCreate);
 router.patch('/offers/:id',   offerController.adminUpdate);
 router.delete('/offers/:id',  offerController.adminDelete);
+
+// Platform Settings (payment config, email config)
+router.get('/settings/:key',        getSettings);
+router.put('/settings/:key',        upsertSettings);
+router.post('/settings/email/test', testEmail);
 
 export default router;

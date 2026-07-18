@@ -17,3 +17,4 @@ export * from './platformPolicies.js';
 export * from './offers.js';
 export * from './subServiceCategories.js';
 export * from './reels.js';
+export * from './platformSettings.js';

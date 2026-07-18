@@ -410,6 +410,14 @@ export const adminApi = {
   deleteOffer: (id: string, token: string) =>
     request<{ id: string }>(`/admin/offers/${id}`, { method: 'DELETE', token }),
 
+  // Platform Settings
+  getSettings: (key: 'payment_config' | 'email_config', token: string) =>
+    request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { token }),
+  saveSettings: (key: 'payment_config' | 'email_config', value: unknown, token: string) =>
+    request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { method: 'PUT', token, body: JSON.stringify(value) }),
+  sendTestEmail: (to: string, token: string) =>
+    request<{ message: string }>('/admin/settings/email/test', { method: 'POST', token, body: JSON.stringify({ to }) }),
+
   // Notifications
   getNotifications: (token: string) =>
     request<NotificationRow[]>('/notifications', { token }),
