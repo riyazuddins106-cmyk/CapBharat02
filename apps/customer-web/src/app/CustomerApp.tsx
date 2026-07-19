@@ -1122,8 +1122,8 @@ function CustHome({
         <div className="mt-4 px-5">
           <div
             ref={scrollRef}
-            className="flex gap-3 overflow-x-auto pb-1"
-            style={{ scrollbarWidth: "none" }}
+            className="flex overflow-x-auto gap-3"
+            style={{ scrollbarWidth: "none", scrollSnapType: "x mandatory" }}
             onScroll={(e) => {
               const el = e.currentTarget;
               const idx = Math.round(el.scrollLeft / el.clientWidth);
@@ -1131,28 +1131,43 @@ function CustHome({
             }}
           >
             {offers.map((offer) => (
-              <div key={offer.id} className="flex-shrink-0 rounded-2xl overflow-hidden" style={{ width: "100%", background: offer.bgColor || "#ff6b35" }}>
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-white/80 text-xs font-bold mb-1">{offer.tag}</p>
-                    <h3 className="text-white font-bold text-base leading-tight">
-                      {offer.title}{offer.discountText ? <><br />{offer.discountText}</> : null}
+              <div
+                key={offer.id}
+                className="flex-none rounded-2xl overflow-hidden"
+                style={{ width: "100%", height: 160, background: offer.bgColor || "#5B3EF5", scrollSnapAlign: "start" }}
+              >
+                <div className="flex items-center justify-between h-full px-5 py-5">
+                  <div className="flex flex-col gap-1.5">
+                    {offer.tag && (
+                      <p className="text-white/80 text-[10px] font-bold tracking-widest uppercase">{offer.tag}</p>
+                    )}
+                    <h3 className="text-white font-extrabold text-lg leading-tight">
+                      {offer.title}
                     </h3>
-                    {offer.subtitle && <p className="text-white/80 text-xs mt-0.5">{offer.subtitle}</p>}
-                    <button className="mt-2 bg-white rounded-lg px-3 py-1.5 text-xs font-bold" style={{ color: offer.bgColor || "#ff6b35" }}>
+                    {offer.subtitle && (
+                      <p className="text-white/75 text-xs leading-snug">{offer.subtitle}</p>
+                    )}
+                    <button
+                      className="mt-1 bg-white text-xs font-bold px-4 py-2 rounded-full self-start"
+                      style={{ color: offer.bgColor || "#5B3EF5" }}
+                    >
                       {offer.ctaText || "Book Now"}
                     </button>
                   </div>
-                  <div className="text-5xl">🛁</div>
+                  <div className="text-6xl opacity-20 select-none">🛁</div>
                 </div>
               </div>
             ))}
           </div>
           {/* Dots */}
           {offers.length > 1 && (
-            <div className="flex justify-center gap-1.5 mt-2">
+            <div className="flex justify-center gap-1.5 mt-2.5">
               {offers.map((_, i) => (
-                <div key={i} className="rounded-full transition-all" style={{ width: i === offerIdx ? 16 : 6, height: 6, background: i === offerIdx ? "#5B3EF5" : "#d1d5db" }} />
+                <div
+                  key={i}
+                  className="rounded-full transition-all duration-200"
+                  style={{ width: i === offerIdx ? 18 : 6, height: 6, background: i === offerIdx ? "#5B3EF5" : "#d1d5db" }}
+                />
               ))}
             </div>
           )}

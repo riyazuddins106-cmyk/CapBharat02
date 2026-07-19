@@ -54,15 +54,34 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   fi
   echo "Using EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL"
 
+  # Derive the tunnel URL from .expo/settings.json (urlRandomness field).
+  # The exp.direct URL is always: exp://{urlRandomness}-anonymous-{port}.exp.direct
+  URL_FILE="/tmp/expo-tunnel-${PORT}.url"
+  SETTINGS_FILE="$WORKSPACE_ROOT/apps/mobile/.expo/settings.json"
+  if [[ "$PORT" -eq 8099 ]]; then
+    SETTINGS_FILE="$WORKSPACE_ROOT/apps/mobile-partner/.expo/settings.json"
+  fi
+
+  if [[ -f "$SETTINGS_FILE" ]]; then
+    RANDOMNESS=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('urlRandomness',''))" "$SETTINGS_FILE" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    if [[ -n "$RANDOMNESS" ]]; then
+      TUNNEL_URL="exp://${RANDOMNESS}-anonymous-${PORT}.exp.direct"
+      echo "Tunnel URL (from settings.json): $TUNNEL_URL"
+      echo "$TUNNEL_URL" > "$URL_FILE"
+    fi
+  fi
+
   REPLIT_MAX_RETRIES=5
   REPLIT_RETRY_DELAY=30
   for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
     echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
     set +e
-    # Redirect stdin from /dev/null so any optional login prompts get EOF
-    # and are skipped automatically — anonymous tunnel connects without auth.
-    pnpm exec expo start --tunnel --port "$PORT" "$@" < /dev/null
-    EXIT_CODE=$?
+    # Send down-arrow + enter after 3 s to select "Proceed anonymously"
+    # when Expo shows its login prompt, then keep stdin open indefinitely
+    # so the process never gets an unexpected EOF.
+    { sleep 3; printf '\033[B\r'; sleep 999999; } | \
+      pnpm exec expo start --tunnel --port "$PORT" "$@"
+    EXIT_CODE=${PIPESTATUS[0]}
     set -e
     if [[ $EXIT_CODE -eq 0 ]]; then
       exit 0

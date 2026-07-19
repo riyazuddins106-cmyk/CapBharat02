@@ -12,7 +12,9 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { useRouter, useSegments } from 'expo-router';
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen is native-only — calling it on web shows a white overlay
+// that never gets removed, leaving a permanently blank page.
+if (Platform.OS !== 'web') SplashScreen.preventAutoHideAsync();
 
 // ── Error boundary: prevents a single render error from crashing the whole app ──
 class ErrorBoundary extends Component<
@@ -23,6 +25,12 @@ class ErrorBoundary extends Component<
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary] caught:', error.message);
+    console.error('[ErrorBoundary] stack:', error.stack);
+    console.error('[ErrorBoundary] componentStack:', info.componentStack);
   }
 
   render() {
@@ -88,13 +96,22 @@ export default function RootLayout() {
     ...Ionicons.font,
   });
 
+  // Safety net: useFonts() can stall indefinitely over tunnel connections.
+  // Force render with fallback fonts after a short timeout.
+  const [fontTimedOut, setFontTimedOut] = React.useState(false);
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded || fontError) return;
+    const timer = setTimeout(() => setFontTimedOut(true), 300);
+    return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  useEffect(() => {
+    if (fontsLoaded || fontError || fontTimedOut) {
+      if (Platform.OS !== 'web') SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError, fontTimedOut]);
+
+  if (!fontsLoaded && !fontError && !fontTimedOut) return null;
 
   return (
     <ErrorBoundary>

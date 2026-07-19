@@ -79,6 +79,7 @@ router.put('/platform-policies/:slug',    platformPolicyController.adminUpdate);
 router.delete('/platform-policies/:slug', platformPolicyController.adminDelete);
 
 // Offers / Banners (admin CRUD)
+router.post('/offers/image',  upload.single('image'), offerController.uploadImage);
 router.get('/offers',         offerController.adminList);
 router.post('/offers',        offerController.adminCreate);
 router.patch('/offers/:id',   offerController.adminUpdate);

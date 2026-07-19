@@ -1,0 +1,461 @@
+Use this prompt with Replit AI (or any coding AI). It is written as if a Principal UI/UX Designer, Frontend Engineer, and Product Designer are reviewing your application.
+
+---
+
+# Banner Module Redesign & Enhancement (UI/UX + Admin + Customer App)
+
+You are acting as a **Principal UI/UX Designer, Senior Frontend Engineer, Senior Backend Engineer, Product Designer, and QA Engineer**.
+
+Analyze the **Banner Section** in both the **Customer App** and **Admin Panel** and redesign it to production quality.
+
+## Current Issues
+
+* Banner text placement looks unprofessional.
+* CTA (button) position is not visually balanced.
+* Text overlaps the image on some screen sizes.
+* Banner spacing, padding and alignment are inconsistent.
+* Admin cannot upload a proper banner image with complete content management.
+* Banner is not flexible enough for future marketing campaigns.
+
+---
+
+# Customer App Requirements
+
+Redesign the banner to look similar to premium apps like:
+
+* Urban Company
+* Amazon
+* Swiggy
+* Blinkit
+* Zomato
+
+The banner should include:
+
+### 1. Background Image
+
+* Full width responsive image
+* Rounded corners
+* Proper aspect ratio
+* Image should never stretch
+* Image should crop intelligently
+* Lazy loading
+* High quality
+
+---
+
+### 2. Text Content
+
+Allow
+
+* Main Heading
+* Subtitle
+* Small description (optional)
+
+Example
+
+```
+Professional Home Cleaning
+
+Book verified cleaners with just one click.
+
+Starting from ₹499
+```
+
+Text should automatically reposition based on image brightness.
+
+Support
+
+* Left
+* Center
+* Right
+
+alignment.
+
+---
+
+### 3. CTA Button
+
+Admin should configure
+
+Button Text
+
+Examples
+
+```
+Book Now
+
+Explore
+
+Get Offer
+
+Learn More
+
+View Services
+```
+
+Button should support
+
+* Background Color
+* Text Color
+* Border Radius
+* Shadow
+* Padding
+
+Position options
+
+* Bottom Left
+* Bottom Right
+* Center
+* Custom Position
+
+---
+
+### 4. Optional Overlay
+
+Allow
+
+* Dark Overlay
+* Light Overlay
+* Overlay Opacity
+
+This improves text readability.
+
+---
+
+### 5. Click Action
+
+Banner should support
+
+* Open Category
+* Open Subcategory
+* Open Service
+* Open Offer
+* Open External URL
+* Open Internal Screen
+* Open Partner Profile
+* Open Custom Route
+
+---
+
+### 6. Banner Scheduling
+
+Admin can configure
+
+Start Date
+
+End Date
+
+Show Forever
+
+---
+
+### 7. Banner Priority
+
+Support
+
+Priority Number
+
+Higher priority appears first.
+
+---
+
+### 8. Banner Status
+
+* Active
+* Inactive
+* Draft
+
+---
+
+### 9. Banner Animation
+
+Support
+
+* Fade
+* Slide
+* Zoom
+* None
+
+---
+
+# Admin Panel Improvements
+
+Replace the existing banner form with a professional content management interface.
+
+---
+
+## Image Upload
+
+Allow uploading
+
+* JPG
+* JPEG
+* PNG
+* WEBP
+
+Show
+
+Image Preview
+
+Image Dimensions
+
+File Size
+
+Aspect Ratio
+
+Compression Status
+
+Replace Image
+
+Remove Image
+
+Drag & Drop Upload
+
+---
+
+## Text Editor
+
+Fields
+
+Banner Title
+
+Subtitle
+
+Description
+
+Button Text
+
+Button Link
+
+---
+
+## Image Controls
+
+Allow
+
+Crop
+
+Zoom
+
+Rotate
+
+Reposition
+
+---
+
+## Content Position
+
+Admin can choose
+
+```
+Top Left
+
+Top Center
+
+Top Right
+
+Center Left
+
+Center
+
+Center Right
+
+Bottom Left
+
+Bottom Center
+
+Bottom Right
+```
+
+Preview updates instantly.
+
+---
+
+## Button Settings
+
+Configure
+
+Background Color
+
+Text Color
+
+Border Radius
+
+Shadow
+
+Outline
+
+Hover Effect
+
+Disabled State
+
+---
+
+## Overlay Settings
+
+Choose
+
+Overlay Color
+
+Opacity
+
+Gradient
+
+Blur
+
+---
+
+## Banner Link
+
+Support
+
+Category
+
+Subcategory
+
+Service
+
+Offer
+
+External URL
+
+Internal Page
+
+Custom Route
+
+No Action
+
+---
+
+## Banner Ordering
+
+Support drag and drop sorting.
+
+---
+
+## Banner Preview
+
+Live Preview
+
+Desktop Preview
+
+Tablet Preview
+
+Mobile Preview
+
+before saving.
+
+---
+
+# Database
+
+Create or update banner table with fields like
+
+```
+id
+
+title
+
+subtitle
+
+description
+
+image
+
+mobileImage
+
+tabletImage
+
+buttonText
+
+buttonLink
+
+buttonType
+
+textPosition
+
+buttonPosition
+
+overlayColor
+
+overlayOpacity
+
+animation
+
+priority
+
+status
+
+startDate
+
+endDate
+
+displayOrder
+
+createdBy
+
+updatedBy
+
+createdAt
+
+updatedAt
+```
+
+---
+
+# Validation
+
+Prevent saving when
+
+* Image missing
+* Title empty
+* Invalid URL
+* Invalid date range
+* Image too large
+
+---
+
+# Performance
+
+Optimize images automatically.
+
+Generate thumbnails.
+
+Use lazy loading.
+
+Cache banner images.
+
+Support CDN.
+
+---
+
+# Accessibility
+
+Support
+
+Alt Text
+
+Keyboard navigation
+
+Screen readers
+
+High contrast mode
+
+Responsive typography
+
+---
+
+# QA Checklist
+
+Verify
+
+* Banner looks perfect on Android, iPhone, Tablet, and Desktop.
+* Text never overlaps important parts of the image.
+* CTA button is always visible and aligned.
+* Images maintain quality without distortion.
+* Admin can upload, edit, replace, crop, preview, reorder, schedule, activate/deactivate, and delete banners.
+* All changes sync correctly between Admin Panel, Backend, and Customer App.
+* Existing banners continue working after migration.
+* No UI regressions or broken layouts remain.
+
+**Goal:** Deliver a modern, premium, production-ready banner management system with a polished UI, flexible content controls, responsive behavior, and full end-to-end synchronization between the Admin Panel, Backend, and Customer App.

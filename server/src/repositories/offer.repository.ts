@@ -1,22 +1,28 @@
 import { db } from '../config/database.js';
 import { offers } from '../database/schema/index.js';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, desc, and, or, isNull, lte, gte } from 'drizzle-orm';
 
 export type Offer = typeof offers.$inferSelect;
 export type OfferInsert = typeof offers.$inferInsert;
 
 export const offerRepository = {
   async getAll(): Promise<Offer[]> {
-    return db.select().from(offers).orderBy(asc(offers.sortOrder), asc(offers.createdAt));
+    return db.select().from(offers).orderBy(desc(offers.priority), asc(offers.sortOrder), asc(offers.createdAt));
   },
 
   async getActive(): Promise<Offer[]> {
     const now = new Date();
-    const rows = await db.select().from(offers)
-      .where(eq(offers.isActive, true))
-      .orderBy(asc(offers.sortOrder), asc(offers.createdAt));
-    // filter out expired
-    return rows.filter(r => !r.expiresAt || r.expiresAt > now);
+    return db.select().from(offers)
+      .where(
+        and(
+          eq(offers.status, 'active'),
+          eq(offers.isActive, true),
+          or(isNull(offers.startDate), lte(offers.startDate, now)),
+          or(isNull(offers.endDate),   gte(offers.endDate,   now)),
+          or(isNull(offers.expiresAt), gte(offers.expiresAt, now)),
+        )
+      )
+      .orderBy(desc(offers.priority), asc(offers.sortOrder), asc(offers.createdAt));
   },
 
   async getById(id: string): Promise<Offer | undefined> {

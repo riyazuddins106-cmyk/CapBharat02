@@ -31,6 +31,7 @@ const CAT_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = 
 const LOCATION_KEY = 'sn_selected_location';
 const { width: SCREEN_W } = Dimensions.get('window');
 const BANNER_W = SCREEN_W - 32;
+const BANNER_H = 160;
 
 function greeting() {
   const h = new Date().getHours();
@@ -39,23 +40,76 @@ function greeting() {
   return 'Good evening';
 }
 
+// ── Position map for image banners ─────────────────────────
+const POS_MAP: Record<string, { jc: 'flex-start' | 'flex-end' | 'center'; ai: 'flex-start' | 'flex-end' | 'center' }> = {
+  'top-left':      { jc: 'flex-start', ai: 'flex-start' },
+  'top-center':    { jc: 'flex-start', ai: 'center'     },
+  'top-right':     { jc: 'flex-start', ai: 'flex-end'   },
+  'center-left':   { jc: 'center',     ai: 'flex-start' },
+  'center':        { jc: 'center',     ai: 'center'     },
+  'center-right':  { jc: 'center',     ai: 'flex-end'   },
+  'bottom-left':   { jc: 'flex-end',   ai: 'flex-start' },
+  'bottom-center': { jc: 'flex-end',   ai: 'center'     },
+  'bottom-right':  { jc: 'flex-end',   ai: 'flex-end'   },
+};
+
 // ── Offer banner card ──────────────────────────────────────
 function OfferBanner({ offer, colors }: { offer: Offer; colors: any }) {
+  const pos = POS_MAP[offer.textPosition ?? 'bottom-left'] ?? POS_MAP['bottom-left'];
+
+  const handlePress = () => {
+    Haptics.selectionAsync();
+    const route = offer.ctaRoute ?? '/(tabs)/services';
+    if (route.startsWith('http://') || route.startsWith('https://')) {
+      Linking.openURL(route);
+    } else {
+      router.push(route as any);
+    }
+  };
+
+  if (offer.imageUrl) {
+    return (
+      <TouchableOpacity
+        style={{ width: BANNER_W, height: BANNER_H, borderRadius: colors.radius, overflow: 'hidden' }}
+        activeOpacity={0.92}
+        onPress={handlePress}
+      >
+        <Image
+          source={{ uri: offer.imageUrl }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          accessibilityLabel={offer.altText ?? offer.title}
+        />
+        <View
+          style={[StyleSheet.absoluteFillObject, {
+            backgroundColor: offer.overlayColor ?? '#000000',
+            opacity: offer.overlayOpacity ?? 0.3,
+          }]}
+        />
+        <View style={[styles.bannerImgContent, { justifyContent: pos.jc, alignItems: pos.ai }]}>
+          {offer.tag ? <Text style={styles.bannerTagImg}>{offer.tag}</Text> : null}
+          <Text style={styles.bannerTitleImg} numberOfLines={2}>{offer.title}</Text>
+          {offer.subtitle ? <Text style={styles.bannerSubtitleImg} numberOfLines={2}>{offer.subtitle}</Text> : null}
+          <TouchableOpacity style={styles.bannerBtnImg} activeOpacity={0.85} onPress={handlePress}>
+            <Text style={[styles.bannerBtnText, { color: offer.bgColor ?? colors.primary }]}>{offer.ctaText}</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Colour-only fallback (no image)
   return (
     <TouchableOpacity
       style={[styles.banner, { backgroundColor: offer.bgColor, width: BANNER_W, borderRadius: colors.radius }]}
       activeOpacity={0.92}
-      onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/services'); }}
+      onPress={handlePress}
     >
       <View style={styles.bannerContent}>
         {offer.tag ? <Text style={styles.bannerTag}>{offer.tag}</Text> : null}
         <Text style={styles.bannerTitle}>{offer.title}</Text>
         {offer.subtitle ? <Text style={styles.bannerSubtitle}>{offer.subtitle}</Text> : null}
-        <TouchableOpacity
-          style={styles.bannerBtn}
-          activeOpacity={0.85}
-          onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/services'); }}
-        >
+        <TouchableOpacity style={styles.bannerBtn} activeOpacity={0.85} onPress={handlePress}>
           <Text style={[styles.bannerBtnText, { color: offer.bgColor }]}>{offer.ctaText}</Text>
         </TouchableOpacity>
       </View>
@@ -264,6 +318,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             snapToInterval={BANNER_W + 12}
             decelerationRate="fast"
+            style={{ height: BANNER_H }}
             contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
             renderItem={({ item }) => <OfferBanner offer={item} colors={colors} />}
             onMomentumScrollEnd={(e) => {
@@ -276,17 +331,17 @@ export default function HomeScreen() {
         </View>
       ) : (
         /* Fallback static banner while loading */
-        <View style={[styles.banner, { backgroundColor: colors.primary, marginHorizontal: 16, marginTop: 16, borderRadius: colors.radius, width: undefined }]}>
+        <View style={[styles.banner, { backgroundColor: colors.primary, marginHorizontal: 16, marginTop: 16, borderRadius: 16, width: undefined }]}>
           <View style={styles.bannerContent}>
-            <Text style={styles.bannerTag}>LIMITED OFFER</Text>
-            <Text style={styles.bannerTitle}>40% off{'\n'}your first booking</Text>
+            <Text style={styles.bannerTag}>Limited Offer</Text>
+            <Text style={styles.bannerTitle}>40% Off Your{'\n'}First Booking!</Text>
             <TouchableOpacity style={styles.bannerBtn} activeOpacity={0.85}
               onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/services'); }}>
               <Text style={[styles.bannerBtnText, { color: colors.primary }]}>Book Now</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.bannerDecor}>
-            <MaterialCommunityIcons name="home-search" size={80} color="rgba(255,255,255,0.15)" />
+            <MaterialCommunityIcons name="home-search" size={64} color="rgba(255,255,255,0.15)" />
           </View>
         </View>
       )}
@@ -519,7 +574,7 @@ const styles = StyleSheet.create({
   locationBar:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
   locationText:   { flex: 1, fontSize: 13, fontWeight: '600' },
   // Banners
-  banner:         { padding: 16, overflow: 'hidden', flexDirection: 'row', minHeight: 100 },
+  banner:         { height: BANNER_H, padding: 16, overflow: 'hidden', flexDirection: 'row' },
   bannerContent:  { flex: 1, gap: 4 },
   bannerTag:      { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
   bannerTitle:    { color: '#fff', fontSize: 17, fontWeight: '700', lineHeight: 22 },
@@ -527,7 +582,13 @@ const styles = StyleSheet.create({
   bannerBtn:      { backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, alignSelf: 'flex-start', marginTop: 6 },
   bannerBtnText:  { fontSize: 13, fontWeight: '700' },
   bannerDecor:    { alignItems: 'center', justifyContent: 'center', paddingLeft: 10 },
-  bannerDiscount: { color: 'rgba(255,255,255,0.25)', fontSize: 40, fontWeight: '900' },
+  bannerDiscount:    { color: 'rgba(255,255,255,0.25)', fontSize: 40, fontWeight: '900' },
+  // Image-backed banner
+  bannerImgContent:  { flex: 1, padding: 16, gap: 4 },
+  bannerTagImg:      { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  bannerTitleImg:    { color: '#fff', fontSize: 18, fontWeight: '800', lineHeight: 22 },
+  bannerSubtitleImg: { color: 'rgba(255,255,255,0.8)', fontSize: 12, lineHeight: 16 },
+  bannerBtnImg:      { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, alignSelf: 'flex-start', marginTop: 4 },
   dots:           { flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: 10 },
   dot:            { height: 6, borderRadius: 3 },
   // Categories

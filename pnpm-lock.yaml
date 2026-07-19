@@ -385,7 +385,7 @@ importers:
         specifier: ~19.1.17
         version: 19.1.17
       babel-preset-expo:
-        specifier: ^57.0.2
+        specifier: ~57.0.2
         version: 57.0.2(@babel/core@7.29.7)(@babel/runtime@7.29.7)(expo@54.0.35)(react-refresh@0.17.0)
       typescript:
         specifier: ^5.9.3
@@ -497,7 +497,7 @@ importers:
         specifier: ~19.1.17
         version: 19.1.17
       babel-preset-expo:
-        specifier: ^57.0.2
+        specifier: ~57.0.2
         version: 57.0.2(@babel/core@7.29.7)(@babel/runtime@7.29.7)(expo@54.0.35)(react-refresh@0.17.0)
       typescript:
         specifier: ~5.9.3
@@ -547,6 +547,9 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.45.4
         version: 2.45.4
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
       bcryptjs:
         specifier: 2.4.3
         version: 2.4.3
@@ -586,6 +589,9 @@ importers:
       postgres:
         specifier: 3.4.5
         version: 3.4.5
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       razorpay:
         specifier: ^2.9.6
         version: 2.9.6
@@ -3586,6 +3592,9 @@ packages:
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
+  '@types/qrcode@1.5.6':
+    resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
 
   '@types/qs@6.15.1':
     resolution: {integrity: sha512-GZHUBZR9hckSUhrxmp1nG6NwdpM9fCunJwyThLW1X3AyHgd9IlHb6VANpQQqDr2o/qQp6McZ3y/IA2rVzKzSbw==}
@@ -10413,6 +10422,10 @@ snapshots:
   '@types/phoenix@1.6.7': {}
 
   '@types/prop-types@15.7.15': {}
+
+  '@types/qrcode@1.5.6':
+    dependencies:
+      '@types/node': 22.9.0
 
   '@types/qs@6.15.1': {}
 

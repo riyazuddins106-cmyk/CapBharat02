@@ -130,13 +130,24 @@ export interface Offer {
   id: string;
   title: string;
   subtitle: string;
+  description: string | null;
   tag: string;
   discountText: string;
   bgColor: string;
+  imageUrl: string | null;
+  altText: string | null;
   ctaText: string;
   ctaRoute: string;
+  textPosition: string;
+  overlayColor: string;
+  overlayOpacity: number;
+  animation: string;
+  priority: number;
+  status: string;
   isActive: boolean;
   sortOrder: number;
+  startDate: string | null;
+  endDate: string | null;
   expiresAt: string | null;
 }
 

@@ -476,6 +476,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
     await adminApi.deleteOffer(id, accessToken);
     showMsg("Offer deleted"); load();
   };
+  const uploadBannerImage = async (file: File): Promise<string> =>
+    adminApi.uploadBannerImage(file, accessToken);
 
   /* ── Reel handlers ── */
   const createReel = async (data: { title: string; description?: string; videoUrl: string; thumbnailUrl?: string; sortOrder?: number }) => {
@@ -641,7 +643,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "reels" ? (
             <ReelsView reels={reelList} onCreate={createReel} onEdit={editReel} onDelete={deleteReel} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "offers" ? (
-            <OffersView offers={offerList} onCreate={createOffer} onEdit={editOffer} onDelete={deleteOffer} />
+            <OffersView offers={offerList} onCreate={createOffer} onEdit={editOffer} onDelete={deleteOffer} onUploadImage={uploadBannerImage} />
           ) : activeSection === "reviews" ? (
             <ReviewsView reviews={reviewList} onDelete={deleteReview} />
           ) : activeSection === "analytics" ? (
@@ -2071,41 +2073,101 @@ function ReelsView({
 }
 
 const BLANK_OFFER: OfferInput = {
-  title: "", subtitle: "", tag: "LIMITED OFFER", discountText: "",
-  bgColor: "#ff6b35", ctaText: "Book Now", ctaRoute: "/(tabs)/services",
-  isActive: true, sortOrder: 0, expiresAt: null,
+  title: "", subtitle: "", description: "", tag: "LIMITED OFFER", discountText: "",
+  bgColor: "#5B3EF5", imageUrl: null, altText: "",
+  ctaText: "Book Now", ctaRoute: "/(tabs)/services",
+  textPosition: "bottom-left", overlayColor: "#000000", overlayOpacity: 0.3,
+  animation: "slide", priority: 0, status: "active",
+  isActive: true, sortOrder: 0, startDate: null, endDate: null, expiresAt: null,
 };
 
+const POSITIONS_GRID = [
+  ["top-left", "top-center", "top-right"],
+  ["center-left", "center", "center-right"],
+  ["bottom-left", "bottom-center", "bottom-right"],
+];
+
+function BannerPreview({ form }: { form: OfferInput }) {
+  const posMap: Record<string, { jc: string; ai: string }> = {
+    "top-left":      { jc: "flex-start", ai: "flex-start" },
+    "top-center":    { jc: "flex-start", ai: "center"     },
+    "top-right":     { jc: "flex-start", ai: "flex-end"   },
+    "center-left":   { jc: "center",     ai: "flex-start" },
+    "center":        { jc: "center",     ai: "center"     },
+    "center-right":  { jc: "center",     ai: "flex-end"   },
+    "bottom-left":   { jc: "flex-end",   ai: "flex-start" },
+    "bottom-center": { jc: "flex-end",   ai: "center"     },
+    "bottom-right":  { jc: "flex-end",   ai: "flex-end"   },
+  };
+  const pos = posMap[form.textPosition ?? "bottom-left"] ?? posMap["bottom-left"];
+  return (
+    <div className="relative rounded-2xl overflow-hidden w-full" style={{ height: 168, background: form.bgColor ?? "#5B3EF5" }}>
+      {form.imageUrl && <img src={form.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+      {form.imageUrl && (
+        <div className="absolute inset-0" style={{ background: form.overlayColor ?? "#000", opacity: form.overlayOpacity ?? 0.3 }} />
+      )}
+      <div className="absolute inset-0 p-4 flex flex-col gap-1" style={{ justifyContent: pos.jc, alignItems: pos.ai }}>
+        {form.tag && <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.8)" }}>{form.tag}</span>}
+        <p className="font-bold text-sm leading-tight text-white">{form.title || "Banner Title"}</p>
+        {form.subtitle && <p className="text-xs leading-tight" style={{ color: "rgba(255,255,255,0.7)" }}>{form.subtitle}</p>}
+        <span className="inline-block mt-1 text-[11px] font-bold px-3 py-1.5 rounded-full" style={{ background: "white", color: form.bgColor ?? "#5B3EF5" }}>
+          {form.ctaText || "Book Now"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function OffersView({
-  offers, onCreate, onEdit, onDelete,
+  offers, onCreate, onEdit, onDelete, onUploadImage,
 }: {
   offers: OfferRow[];
   onCreate: (d: OfferInput) => Promise<void>;
   onEdit: (id: string, d: Partial<OfferInput>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onUploadImage: (file: File) => Promise<string>;
 }) {
-  const [showForm, setShowForm]   = useState(false);
-  const [editRow,  setEditRow]    = useState<OfferRow | null>(null);
-  const [form,     setForm]       = useState<OfferInput>(BLANK_OFFER);
-  const [saving,   setSaving]     = useState(false);
-  const [deleteId, setDeleteId]   = useState<string | null>(null);
-  const [formErr,  setFormErr]    = useState("");
+  const [showForm,  setShowForm]  = useState(false);
+  const [editRow,   setEditRow]   = useState<OfferRow | null>(null);
+  const [form,      setForm]      = useState<OfferInput>(BLANK_OFFER);
+  const [saving,    setSaving]    = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleteId,  setDeleteId]  = useState<string | null>(null);
+  const [formErr,   setFormErr]   = useState("");
+  const [activeTab, setActiveTab] = useState<"content" | "visual" | "schedule">("content");
+  const [dragOver,  setDragOver]  = useState(false);
+  const fileInputRef              = useRef<HTMLInputElement>(null);
 
-  function openCreate() { setForm(BLANK_OFFER); setEditRow(null); setFormErr(""); setShowForm(true); }
+  function openCreate() {
+    setForm(BLANK_OFFER); setEditRow(null); setFormErr(""); setActiveTab("content"); setShowForm(true);
+  }
   function openEdit(r: OfferRow) {
     setForm({
-      title: r.title, subtitle: r.subtitle, tag: r.tag, discountText: r.discountText,
-      bgColor: r.bgColor, ctaText: r.ctaText, ctaRoute: r.ctaRoute,
-      isActive: r.isActive, sortOrder: r.sortOrder, expiresAt: r.expiresAt,
+      title: r.title, subtitle: r.subtitle, description: r.description ?? "",
+      tag: r.tag, discountText: r.discountText,
+      bgColor: r.bgColor, imageUrl: r.imageUrl ?? null, altText: r.altText ?? "",
+      ctaText: r.ctaText, ctaRoute: r.ctaRoute,
+      textPosition: r.textPosition ?? "bottom-left",
+      overlayColor: r.overlayColor ?? "#000000", overlayOpacity: r.overlayOpacity ?? 0.3,
+      animation: r.animation ?? "slide", priority: r.priority ?? 0, status: r.status ?? "active",
+      isActive: r.isActive, sortOrder: r.sortOrder,
+      startDate: r.startDate ?? null, endDate: r.endDate ?? null, expiresAt: r.expiresAt,
     });
-    setEditRow(r); setFormErr(""); setShowForm(true);
+    setEditRow(r); setFormErr(""); setActiveTab("content"); setShowForm(true);
   }
 
-  const setF = (k: keyof OfferInput) => (v: string | boolean | number | null) =>
-    setForm(f => ({ ...f, [k]: v }));
+  const setF = (k: keyof OfferInput) => (v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  async function handleImageFile(file: File) {
+    if (file.size > 5 * 1024 * 1024) { setFormErr("Image must be < 5 MB."); return; }
+    setUploading(true); setFormErr("");
+    try { setF("imageUrl")(await onUploadImage(file)); }
+    catch (e: any) { setFormErr(e.message ?? "Upload failed."); }
+    finally { setUploading(false); }
+  }
 
   async function handleSave() {
-    if (!form.title.trim()) { setFormErr("Title is required."); return; }
+    if (!form.title.trim()) { setFormErr("Title is required."); setActiveTab("content"); return; }
     setSaving(true); setFormErr("");
     try {
       if (editRow) await onEdit(editRow.id, form);
@@ -2123,81 +2185,184 @@ function OffersView({
     finally { setSaving(false); }
   }
 
+  const statusColor: Record<string, string> = { active: "#16A34A", inactive: "#6B7280", draft: "#D97706" };
+
   return (
     <div className="space-y-4">
       {deleteId && (
-        <ConfirmDialog
-          title="Delete Offer?"
-          body="This offer banner will be permanently removed from the app."
-          confirmLabel="Yes, delete"
-          saving={saving}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteId(null)}
-        />
+        <ConfirmDialog title="Delete Banner?" body="This banner will be permanently removed from the app."
+          confirmLabel="Yes, delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
       )}
 
       {showForm && (
-        <Modal title={editRow ? "Edit Offer" : "Create Offer"} onClose={() => setShowForm(false)}>
-          <div className="space-y-3">
-            {/* Preview */}
-            <div className="rounded-xl p-4 mb-2" style={{ background: form.bgColor || "#ff6b35" }}>
-              <p className="text-white/80 text-xs font-bold mb-0.5">{form.tag || "TAG"}</p>
-              <p className="text-white font-bold text-sm">{form.title || "Title"}</p>
-              {form.discountText && <p className="text-white/90 text-xs">{form.discountText}</p>}
-              {form.subtitle && <p className="text-white/70 text-xs mt-0.5">{form.subtitle}</p>}
-              <span className="inline-block mt-2 bg-white text-xs font-bold px-3 py-1 rounded-lg" style={{ color: form.bgColor || "#ff6b35" }}>{form.ctaText || "Book Now"}</span>
+        <Modal title={editRow ? "Edit Banner" : "Create Banner"} onClose={() => setShowForm(false)}>
+          <div className="space-y-4">
+            <BannerPreview form={form} />
+
+            {/* Tabs */}
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.05)" }}>
+              {(["content", "visual", "schedule"] as const).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
+                  style={{ background: activeTab === tab ? "rgba(91,62,245,0.5)" : "transparent", color: activeTab === tab ? "#fff" : "rgba(255,255,255,0.5)" }}>
+                  {tab}
+                </button>
+              ))}
             </div>
 
-            {[
-              { key: "title" as const,        label: "Title *",         ph: "e.g. Get 40% off your first booking!" },
-              { key: "subtitle" as const,     label: "Subtitle",        ph: "e.g. Valid for new users" },
-              { key: "tag" as const,          label: "Tag Label",       ph: "e.g. LIMITED OFFER" },
-              { key: "discountText" as const, label: "Discount Text",   ph: "e.g. 40% OFF" },
-              { key: "ctaText" as const,      label: "Button Text",     ph: "e.g. Claim Now" },
-              { key: "ctaRoute" as const,     label: "Button Route",    ph: "e.g. /(tabs)/services" },
-            ].map(({ key, label, ph }) => (
-              <Field key={key} label={label}>
-                <TextInput value={String(form[key] ?? "")} onChange={v => setF(key)(v)} placeholder={ph} />
-              </Field>
-            ))}
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Background Color">
-                <div className="flex gap-2 items-center">
-                  <input type="color" value={form.bgColor} onChange={e => setF("bgColor")(e.target.value)}
-                    className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
-                  <TextInput value={form.bgColor} onChange={v => setF("bgColor")(v)} placeholder="#ff6b35" />
-                </div>
-              </Field>
-              <Field label="Sort Order">
-                <TextInput value={String(form.sortOrder ?? 0)} onChange={v => setF("sortOrder")(Number(v) || 0)} placeholder="0" />
-              </Field>
-            </div>
-
-            <Field label="Expires At (optional)">
-              <input type="datetime-local"
-                value={form.expiresAt ? new Date(form.expiresAt).toISOString().slice(0,16) : ""}
-                onChange={e => setF("expiresAt")(e.target.value ? new Date(e.target.value).toISOString() : null)}
-                className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
-                style={{ background: "rgba(255,255,255,0.05)" }}
-              />
-            </Field>
-
-            <button onClick={() => setF("isActive")(!form.isActive)}
-              className="flex items-center gap-2 text-sm text-white/70 hover:text-white">
-              <div className="w-8 h-4 rounded-full transition-all relative" style={{ background: form.isActive ? "#16A34A" : "rgba(255,255,255,0.15)" }}>
-                <div className="absolute top-0.5 rounded-full bg-white transition-all" style={{ width: 12, height: 12, left: form.isActive ? "calc(100% - 14px)" : 2 }} />
+            {/* Content tab */}
+            {activeTab === "content" && (
+              <div className="space-y-3">
+                {([
+                  { key: "title"       as const, label: "Title *",      ph: "e.g. 40% Off Your First Booking!" },
+                  { key: "subtitle"    as const, label: "Subtitle",     ph: "e.g. Exclusive for new users" },
+                  { key: "description" as const, label: "Description",  ph: "Optional extra details" },
+                  { key: "tag"         as const, label: "Tag Label",    ph: "e.g. LIMITED OFFER" },
+                  { key: "ctaText"     as const, label: "Button Text",  ph: "e.g. Book Now" },
+                  { key: "ctaRoute"    as const, label: "Button Route", ph: "e.g. /(tabs)/services or https://…" },
+                ]).map(({ key, label, ph }) => (
+                  <Field key={key} label={label}>
+                    <TextInput value={String(form[key] ?? "")} onChange={v => setF(key)(v)} placeholder={ph} />
+                  </Field>
+                ))}
               </div>
-              Active (visible in app)
-            </button>
+            )}
+
+            {/* Visual tab */}
+            {activeTab === "visual" && (
+              <div className="space-y-4">
+                <Field label="Banner Image">
+                  <div
+                    className="relative border-2 border-dashed rounded-xl transition-all cursor-pointer"
+                    style={{ borderColor: dragOver ? "#7c5bf8" : "rgba(255,255,255,0.15)", background: dragOver ? "rgba(91,62,245,0.1)" : "rgba(255,255,255,0.03)" }}
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleImageFile(f); }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ""; }} />
+                    {form.imageUrl ? (
+                      <div className="relative">
+                        <img src={form.imageUrl} alt="" className="w-full h-36 object-cover rounded-xl" />
+                        <button className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+                          onClick={e => { e.stopPropagation(); setF("imageUrl")(null); }}>
+                          <XCircle size={14} color="white" />
+                        </button>
+                        <span className="absolute bottom-2 right-2 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded-full">Click to replace</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        {uploading ? <Loader2 size={24} className="animate-spin text-white/40" /> : <Upload size={24} color="rgba(255,255,255,0.3)" />}
+                        <p className="text-white/40 text-xs">{uploading ? "Uploading…" : "Drop image or click to upload"}</p>
+                        <p className="text-white/20 text-[10px]">PNG, JPEG, WebP · max 5 MB</p>
+                      </div>
+                    )}
+                  </div>
+                </Field>
+
+                <Field label="Alt Text (accessibility)">
+                  <TextInput value={form.altText ?? ""} onChange={v => setF("altText")(v)} placeholder="Describe the image…" />
+                </Field>
+
+                <Field label="Background Color (fallback / tint)">
+                  <div className="flex gap-2 items-center">
+                    <input type="color" value={form.bgColor} onChange={e => setF("bgColor")(e.target.value)}
+                      className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
+                    <TextInput value={form.bgColor} onChange={v => setF("bgColor")(v)} placeholder="#5B3EF5" />
+                  </div>
+                </Field>
+
+                <Field label="Text Position">
+                  <div className="space-y-1">
+                    <div className="grid grid-cols-3 gap-1.5" style={{ width: 120 }}>
+                      {POSITIONS_GRID.map(row => row.map(pos => (
+                        <button key={pos} onClick={() => setF("textPosition")(pos)} title={pos}
+                          className="w-9 h-9 rounded-lg border transition-all flex items-center justify-center"
+                          style={{ background: form.textPosition === pos ? "#5B3EF5" : "rgba(255,255,255,0.05)", borderColor: form.textPosition === pos ? "#7c5bf8" : "rgba(255,255,255,0.1)" }}>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" style={{ opacity: form.textPosition === pos ? 1 : 0.3 }} />
+                        </button>
+                      )))}
+                    </div>
+                    <p className="text-white/30 text-[10px]">{form.textPosition}</p>
+                  </div>
+                </Field>
+
+                <div className={`space-y-3 rounded-xl p-3 border border-white/[0.07] ${form.imageUrl ? "" : "opacity-40"}`}>
+                  <p className="text-white/50 text-xs font-semibold">Image Overlay {!form.imageUrl && "(requires image)"}</p>
+                  <div className="flex gap-3 items-center">
+                    <div>
+                      <p className="text-white/40 text-[10px] mb-1">Color</p>
+                      <input type="color" value={form.overlayColor ?? "#000000"} onChange={e => setF("overlayColor")(e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-white/10 cursor-pointer bg-transparent" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white/40 text-[10px] mb-1">Opacity — {Math.round((form.overlayOpacity ?? 0.3) * 100)}%</p>
+                      <input type="range" min="0" max="1" step="0.05" value={form.overlayOpacity ?? 0.3}
+                        onChange={e => setF("overlayOpacity")(parseFloat(e.target.value))} className="w-full accent-violet-500" />
+                    </div>
+                  </div>
+                </div>
+
+                <Field label="Slide Animation">
+                  <div className="flex gap-2">
+                    {["slide", "fade", "none"].map(a => (
+                      <button key={a} onClick={() => setF("animation")(a)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all border"
+                        style={{ background: form.animation === a ? "rgba(91,62,245,0.4)" : "rgba(255,255,255,0.05)", color: form.animation === a ? "#fff" : "rgba(255,255,255,0.5)", borderColor: form.animation === a ? "#7c5bf8" : "rgba(255,255,255,0.1)" }}>
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+            )}
+
+            {/* Schedule tab */}
+            {activeTab === "schedule" && (
+              <div className="space-y-3">
+                <Field label="Status">
+                  <div className="flex gap-2">
+                    {(["active", "draft", "inactive"] as const).map(s => (
+                      <button key={s} onClick={() => { setF("status")(s); setF("isActive")(s === "active"); }}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold capitalize transition-all"
+                        style={{ background: form.status === s ? statusColor[s] : "rgba(255,255,255,0.05)", color: form.status === s ? "#fff" : "rgba(255,255,255,0.4)" }}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Priority (higher = first)">
+                    <TextInput value={String(form.priority ?? 0)} onChange={v => setF("priority")(Number(v) || 0)} placeholder="0" />
+                  </Field>
+                  <Field label="Sort Order">
+                    <TextInput value={String(form.sortOrder ?? 0)} onChange={v => setF("sortOrder")(Number(v) || 0)} placeholder="0" />
+                  </Field>
+                </div>
+                {[
+                  { key: "startDate" as const, label: "Start Date (optional)" },
+                  { key: "endDate"   as const, label: "End Date (optional)"   },
+                  { key: "expiresAt" as const, label: "Expires At (legacy)"   },
+                ].map(({ key, label }) => (
+                  <Field key={key} label={label}>
+                    <input type="datetime-local"
+                      value={form[key] ? new Date(form[key] as string).toISOString().slice(0, 16) : ""}
+                      onChange={e => setF(key)(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
+                      style={{ background: "rgba(255,255,255,0.05)" }} />
+                  </Field>
+                ))}
+              </div>
+            )}
 
             {formErr && <p className="text-red-400 text-xs">{formErr}</p>}
 
-            <div className="flex gap-3 pt-2">
-              <button onClick={handleSave} disabled={saving}
+            <div className="flex gap-3 pt-1">
+              <button onClick={handleSave} disabled={saving || uploading}
                 className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60"
                 style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-                {saving ? "Saving…" : editRow ? "Update Offer" : "Create Offer"}
+                {saving ? "Saving…" : editRow ? "Update Banner" : "Create Banner"}
               </button>
               <button onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold border border-white/10 text-white/60 hover:bg-white/5">
                 Cancel
@@ -2208,60 +2373,48 @@ function OffersView({
       )}
 
       <div className="flex items-center justify-between">
-        <p className="text-white/50 text-sm">{offers.length} offer{offers.length !== 1 ? "s" : ""} total</p>
+        <p className="text-white/50 text-sm">{offers.length} banner{offers.length !== 1 ? "s" : ""} total</p>
         <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-          <Plus size={15} /> Create Offer
+          <Plus size={15} /> Create Banner
         </button>
       </div>
 
       {offers.length === 0 ? (
         <div className="rounded-2xl border border-white/[0.07] p-12 text-center" style={CARD}>
           <Tag size={32} color="rgba(255,255,255,0.15)" className="mx-auto mb-3" />
-          <p className="text-white/30 text-sm">No offers yet. Create one to show banners in the customer app.</p>
+          <p className="text-white/30 text-sm">No banners yet. Create one to show in the customer app.</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.07]">
-                  {["Preview", "Title / Tag", "Discount", "Status", "Sort", "Expires", "Actions"].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {offers.map((r) => (
-                  <tr key={r.id} className="hover:bg-white/[0.02]">
-                    <td className="px-4 py-3">
-                      <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: r.bgColor }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-white font-medium">{r.title}</p>
-                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-wide">{r.tag}</p>
-                    </td>
-                    <td className="px-4 py-3 text-white/60 whitespace-nowrap">{r.discountText || "—"}</td>
-                    <td className="px-4 py-3">
-                      <Badge label={r.isActive ? "Active" : "Inactive"} color={r.isActive ? "#16A34A" : "#6B7280"} />
-                    </td>
-                    <td className="px-4 py-3 text-white/60">{r.sortOrder}</td>
-                    <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
-                      {r.expiresAt ? new Date(r.expiresAt).toLocaleDateString("en-IN") : "Never"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1.5">
-                        <ActionBtn variant="edit"   onClick={() => openEdit(r)}>Edit</ActionBtn>
-                        <ActionBtn variant={r.isActive ? "warn" : "green"} onClick={() => onEdit(r.id, { isActive: !r.isActive })}>
-                          {r.isActive ? "Deactivate" : "Activate"}
-                        </ActionBtn>
-                        <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid grid-cols-1 gap-3">
+          {offers.map(r => (
+            <div key={r.id} className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+              <div className="flex gap-4 p-4 items-center">
+                <div className="relative flex-shrink-0 w-24 h-16 rounded-xl overflow-hidden" style={{ background: r.bgColor ?? "#5B3EF5" }}>
+                  {r.imageUrl && <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <p className="text-white font-semibold text-sm">{r.title}</p>
+                    <Badge label={r.status ?? (r.isActive ? "active" : "inactive")} color={statusColor[r.status ?? (r.isActive ? "active" : "inactive")] ?? "#6B7280"} />
+                    {(r.priority ?? 0) > 0 && <span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full">P{r.priority}</span>}
+                  </div>
+                  {r.subtitle && <p className="text-white/50 text-xs truncate">{r.subtitle}</p>}
+                  <div className="flex gap-3 mt-0.5 flex-wrap">
+                    <span className="text-[10px] text-white/30">{r.tag}</span>
+                    {r.startDate && <span className="text-[10px] text-white/30">From {new Date(r.startDate).toLocaleDateString("en-IN")}</span>}
+                    {r.endDate && <span className="text-[10px] text-white/30">Until {new Date(r.endDate).toLocaleDateString("en-IN")}</span>}
+                  </div>
+                </div>
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <ActionBtn variant="edit" onClick={() => openEdit(r)}>Edit</ActionBtn>
+                  <ActionBtn variant={r.isActive ? "warn" : "green"} onClick={() => onEdit(r.id, { isActive: !r.isActive, status: r.isActive ? "inactive" : "active" })}>
+                    {r.isActive ? "Off" : "On"}
+                  </ActionBtn>
+                  <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Del</ActionBtn>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

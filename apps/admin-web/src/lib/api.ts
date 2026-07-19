@@ -47,13 +47,24 @@ export interface OfferRow {
   id: string;
   title: string;
   subtitle: string;
+  description: string | null;
   tag: string;
   discountText: string;
   bgColor: string;
+  imageUrl: string | null;
+  altText: string | null;
   ctaText: string;
   ctaRoute: string;
+  textPosition: string;
+  overlayColor: string;
+  overlayOpacity: number;
+  animation: string;
+  priority: number;
+  status: string;
   isActive: boolean;
   sortOrder: number;
+  startDate: string | null;
+  endDate: string | null;
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -409,6 +420,14 @@ export const adminApi = {
     request<OfferRow>(`/admin/offers/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteOffer: (id: string, token: string) =>
     request<{ id: string }>(`/admin/offers/${id}`, { method: 'DELETE', token }),
+  uploadBannerImage: async (file: File, token: string): Promise<string> => {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch('/api/admin/offers/image', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error?.message ?? 'Upload failed.');
+    return json.data.url;
+  },
 
   // Platform Settings
   getSettings: (key: 'payment_config' | 'email_config', token: string) =>

@@ -1,5 +1,5 @@
 import { AppError } from '../utils/AppError.js';
-import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET } from '../config/supabase.js';
+import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET, BANNER_BUCKET } from '../config/supabase.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -68,6 +68,16 @@ export const storageService = {
     const { error } = await supabaseAdmin.storage.from(REELS_BUCKET).upload(path, file.buffer, { contentType: mime, upsert: true });
     if (error) throw AppError.internal(`Upload failed: ${error.message}`);
     return supabaseAdmin.storage.from(REELS_BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+
+  async uploadBannerImage(key: string, file: Express.Multer.File): Promise<string> {
+    if (file.size > MAX_FILE_SIZE) throw AppError.badRequest('Banner image must be smaller than 5MB.');
+    const detected = detectImageType(file.buffer);
+    if (!detected) throw AppError.badRequest('Banner image must be PNG, JPEG, or WebP.');
+    const path = `${key}.${detected.ext}`;
+    const { error } = await supabaseAdmin.storage.from(BANNER_BUCKET).upload(path, file.buffer, { contentType: detected.mime, upsert: true });
+    if (error) throw AppError.internal(`Upload failed: ${error.message}`);
+    return supabaseAdmin.storage.from(BANNER_BUCKET).getPublicUrl(path).data.publicUrl;
   },
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
