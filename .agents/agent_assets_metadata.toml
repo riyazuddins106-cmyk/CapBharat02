@@ -18,3 +18,15 @@ id = "TvFDsSsQQQ5810a6l6Ju2"
 uri = "file://attached_assets/qr_customer_new.png"
 type = "image"
 title = "📱 Customer App — Scan in Expo Go"
+
+[[outputs]]
+id = "58f8UHgVSV5JlZ6NfbQm3"
+uri = "file://screenshots/expo-customer-qr.png"
+type = "image"
+title = "Expo Customer App QR"
+
+[[outputs]]
+id = "ZVixPCSwy5Ju0D6P1gIeb"
+uri = "file://screenshots/expo-partner-qr.png"
+type = "image"
+title = "Expo Partner App QR"
