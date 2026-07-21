@@ -1,14 +1,17 @@
 import { db } from '../config/database.js';
 import { platformPolicies, type PlatformPolicy } from '../database/schema/index.js';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, isNull, isNotNull } from 'drizzle-orm';
 
 export const platformPolicyRepository = {
   async getAll(): Promise<PlatformPolicy[]> {
-    return db.select().from(platformPolicies).orderBy(asc(platformPolicies.slug));
+    return db.select().from(platformPolicies)
+      .where(isNull(platformPolicies.deletedAt))
+      .orderBy(asc(platformPolicies.slug));
   },
 
   async getBySlug(slug: string): Promise<PlatformPolicy | undefined> {
-    const [row] = await db.select().from(platformPolicies).where(eq(platformPolicies.slug, slug));
+    const [row] = await db.select().from(platformPolicies)
+      .where(eq(platformPolicies.slug, slug));
     return row;
   },
 
@@ -34,9 +37,25 @@ export const platformPolicyRepository = {
 
   async remove(slug: string): Promise<PlatformPolicy | undefined> {
     const [row] = await db
-      .delete(platformPolicies)
+      .update(platformPolicies)
+      .set({ deletedAt: new Date() })
       .where(eq(platformPolicies.slug, slug))
       .returning();
     return row;
+  },
+
+  async restore(slug: string): Promise<PlatformPolicy | undefined> {
+    const [row] = await db
+      .update(platformPolicies)
+      .set({ deletedAt: null })
+      .where(eq(platformPolicies.slug, slug))
+      .returning();
+    return row;
+  },
+
+  async getDeleted(): Promise<PlatformPolicy[]> {
+    return db.select().from(platformPolicies)
+      .where(isNotNull(platformPolicies.deletedAt))
+      .orderBy(asc(platformPolicies.slug));
   },
 };

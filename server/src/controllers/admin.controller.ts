@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
-import { eq, desc, count, sum, ne, isNull, and, avg } from 'drizzle-orm';
+import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
@@ -557,6 +557,7 @@ export const adminController = {
         rating: reviews.rating,
         comment: reviews.comment,
         createdAt: reviews.createdAt,
+        deletedAt: reviews.deletedAt,
         customerId: reviews.customerId,
         professionalId: reviews.professionalId,
         customerName: users.fullName,
@@ -566,13 +567,15 @@ export const adminController = {
       .from(reviews)
       .leftJoin(users, eq(reviews.customerId, users.id))
       .leftJoin(professionals, eq(reviews.professionalId, professionals.id))
+      .where(isNull(reviews.deletedAt))
       .orderBy(desc(reviews.createdAt))
       .limit(limit)
       .offset(offset);
 
     const [{ total }] = await db
       .select({ total: count(reviews.id) })
-      .from(reviews);
+      .from(reviews)
+      .where(isNull(reviews.deletedAt));
 
     res.json({ success: true, data: { reviews: rows, total: Number(total) } });
   }),
@@ -582,16 +585,16 @@ export const adminController = {
     const [existing] = await db
       .select({ id: reviews.id, professionalId: reviews.professionalId })
       .from(reviews)
-      .where(eq(reviews.id, id));
+      .where(and(eq(reviews.id, id), isNull(reviews.deletedAt)));
     if (!existing) throw AppError.notFound('Review not found');
 
-    await db.delete(reviews).where(eq(reviews.id, id));
+    await db.update(reviews).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(reviews.id, id));
 
-    // Recalculate professional's cached rating and reviewCount
+    // Recalculate professional's cached rating and reviewCount (exclude soft-deleted)
     const [agg] = await db
       .select({ avgRating: avg(reviews.rating), total: count(reviews.id) })
       .from(reviews)
-      .where(eq(reviews.professionalId, existing.professionalId));
+      .where(and(eq(reviews.professionalId, existing.professionalId), isNull(reviews.deletedAt)));
 
     await db
       .update(professionals)
@@ -603,6 +606,31 @@ export const adminController = {
       .where(eq(professionals.id, existing.professionalId));
 
     await auditLogService.record(req.user!.userId, 'review.delete', 'review', id);
+    res.json({ success: true, data: { id } });
+  }),
+
+  restoreReview: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const [existing] = await db
+      .select({ id: reviews.id, professionalId: reviews.professionalId })
+      .from(reviews)
+      .where(and(eq(reviews.id, id), isNotNull(reviews.deletedAt)));
+    if (!existing) throw AppError.notFound('Review not found or not deleted');
+
+    await db.update(reviews).set({ deletedAt: null, updatedAt: new Date() }).where(eq(reviews.id, id));
+
+    // Recalculate professional's rating after restore
+    const [agg] = await db
+      .select({ avgRating: avg(reviews.rating), total: count(reviews.id) })
+      .from(reviews)
+      .where(and(eq(reviews.professionalId, existing.professionalId), isNull(reviews.deletedAt)));
+
+    await db
+      .update(professionals)
+      .set({ rating: Number(agg?.avgRating ?? 0), reviewCount: Number(agg?.total ?? 0), updatedAt: new Date() })
+      .where(eq(professionals.id, existing.professionalId));
+
+    await auditLogService.record(req.user!.userId, 'review.restore', 'review', id);
     res.json({ success: true, data: { id } });
   }),
 

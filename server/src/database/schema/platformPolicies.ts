@@ -6,6 +6,7 @@ export const platformPolicies = pgTable('platform_policies', {
   title:     varchar('title', { length: 255 }).notNull(),
   content:   text('content').notNull().default(''),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });
 
 export type PlatformPolicy    = typeof platformPolicies.$inferSelect;

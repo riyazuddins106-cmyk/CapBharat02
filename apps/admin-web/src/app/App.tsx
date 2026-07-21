@@ -460,7 +460,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   /* ── Review handlers ── */
   const deleteReview = async (id: string) => {
     await adminApi.deleteReview(id, accessToken);
-    showMsg("Review deleted"); load();
+    showMsg("Review moved to trash"); load();
+  };
+  const restoreReview = async (id: string) => {
+    await adminApi.restoreReview(id, accessToken);
+    showMsg("Review restored"); load();
   };
 
   /* ── Offer handlers ── */
@@ -474,7 +478,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
   const deleteOffer = async (id: string) => {
     await adminApi.deleteOffer(id, accessToken);
-    showMsg("Offer deleted"); load();
+    showMsg("Offer moved to trash"); load();
+  };
+  const restoreOffer = async (id: string) => {
+    await adminApi.restoreOffer(id, accessToken);
+    showMsg("Offer restored"); load();
   };
   const uploadBannerImage = async (file: File): Promise<string> =>
     adminApi.uploadBannerImage(file, accessToken);
@@ -490,7 +498,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
   const deleteReel = async (id: string) => {
     await adminApi.deleteReel(id, accessToken);
-    showMsg("Reel deleted"); load();
+    showMsg("Reel moved to trash"); load();
+  };
+  const restoreReel = async (id: string) => {
+    await adminApi.restoreReel(id, accessToken);
+    showMsg("Reel restored"); load();
   };
 
   return (
@@ -641,11 +653,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "reels" ? (
-            <ReelsView reels={reelList} onCreate={createReel} onEdit={editReel} onDelete={deleteReel} accessToken={accessToken} onRefresh={load} />
+            <ReelsView reels={reelList} onCreate={createReel} onEdit={editReel} onDelete={deleteReel} onRestore={restoreReel} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "offers" ? (
-            <OffersView offers={offerList} onCreate={createOffer} onEdit={editOffer} onDelete={deleteOffer} onUploadImage={uploadBannerImage} />
+            <OffersView offers={offerList} onCreate={createOffer} onEdit={editOffer} onDelete={deleteOffer} onRestore={restoreOffer} onUploadImage={uploadBannerImage} accessToken={accessToken} />
           ) : activeSection === "reviews" ? (
-            <ReviewsView reviews={reviewList} onDelete={deleteReview} />
+            <ReviewsView reviews={reviewList} onDelete={deleteReview} onRestore={restoreReview} accessToken={accessToken} />
           ) : activeSection === "analytics" ? (
             <AnalyticsView stats={stats} />
           ) : activeSection === "audit-logs" ? (
@@ -1946,12 +1958,13 @@ function ReelFormFields({
 }
 
 function ReelsView({
-  reels, onCreate, onEdit, onDelete, accessToken, onRefresh,
+  reels, onCreate, onEdit, onDelete, onRestore, accessToken, onRefresh,
 }: {
   reels: ReelRow[];
   onCreate: (d: { title: string; description?: string; videoUrl: string; thumbnailUrl?: string; sortOrder?: number }) => Promise<void>;
   onEdit: (id: string, d: Partial<{ title: string; description: string; videoUrl: string; thumbnailUrl: string; sortOrder: number; isActive: boolean }>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onRestore: (id: string) => Promise<void>;
   accessToken: string;
   onRefresh: () => void;
 }) {
@@ -1961,6 +1974,12 @@ function ReelsView({
   const [form,       setForm]       = useState<ReelForm>(EMPTY_REEL);
   const [saving,     setSaving]     = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [deletedReels, setDeletedReels] = useState<ReelRow[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
+  const loadDeleted = async () => {
+    try { setDeletedReels(await adminApi.getDeletedReels(accessToken)); } catch {}
+  };
+  const handleToggleTrash = () => { if (!showTrash) loadDeleted(); setShowTrash(v => !v); };
 
   const handleCreate = async () => {
     setSaving(true);
@@ -2018,7 +2037,7 @@ function ReelsView({
         </Modal>
       )}
       {deleteId && (
-        <ConfirmDialog title="Delete Reel?" body="This reel will be removed from the Customer App." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+        <ConfirmDialog title="Move to Trash?" body="This reel will be soft-deleted and can be restored later." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
       )}
 
       <div className="flex justify-between items-center">
@@ -2068,6 +2087,29 @@ function ReelsView({
           </div>
         )}
       </div>
+
+      {/* Trash section */}
+      {showTrash && (
+        <div className="rounded-2xl border border-red-500/20 overflow-hidden" style={{ background: "rgba(239,68,68,0.04)" }}>
+          <div className="px-4 py-3 border-b border-red-500/10">
+            <p className="text-red-400 text-sm font-semibold">🗑 Deleted Reels</p>
+          </div>
+          {deletedReels.length === 0
+            ? <p className="px-4 py-6 text-white/30 text-sm text-center">Trash is empty</p>
+            : <div className="divide-y divide-white/[0.04]">
+                {deletedReels.map(r => (
+                  <div key={r.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-white/60 font-medium text-sm truncate">{r.title}</p>
+                      <p className="text-white/30 text-[10px] truncate">{r.videoUrl}</p>
+                    </div>
+                    <ActionBtn variant="green" onClick={async () => { await onRestore(r.id); loadDeleted(); }}>Restore</ActionBtn>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      )}
     </div>
   );
 }
@@ -2119,13 +2161,15 @@ function BannerPreview({ form }: { form: OfferInput }) {
 }
 
 function OffersView({
-  offers, onCreate, onEdit, onDelete, onUploadImage,
+  offers, onCreate, onEdit, onDelete, onRestore, onUploadImage, accessToken,
 }: {
   offers: OfferRow[];
   onCreate: (d: OfferInput) => Promise<void>;
   onEdit: (id: string, d: Partial<OfferInput>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onRestore: (id: string) => Promise<void>;
   onUploadImage: (file: File) => Promise<string>;
+  accessToken: string;
 }) {
   const [showForm,  setShowForm]  = useState(false);
   const [editRow,   setEditRow]   = useState<OfferRow | null>(null);
@@ -2137,6 +2181,12 @@ function OffersView({
   const [activeTab, setActiveTab] = useState<"content" | "visual" | "schedule">("content");
   const [dragOver,  setDragOver]  = useState(false);
   const fileInputRef              = useRef<HTMLInputElement>(null);
+  const [deletedOffers, setDeletedOffers] = useState<OfferRow[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
+  const loadDeleted = async () => {
+    try { const data = await adminApi.getDeletedOffers(accessToken); setDeletedOffers(data.offers); } catch {}
+  };
+  const handleToggleTrash = () => { if (!showTrash) loadDeleted(); setShowTrash(v => !v); };
 
   function openCreate() {
     setForm(BLANK_OFFER); setEditRow(null); setFormErr(""); setActiveTab("content"); setShowForm(true);
@@ -2190,7 +2240,7 @@ function OffersView({
   return (
     <div className="space-y-4">
       {deleteId && (
-        <ConfirmDialog title="Delete Banner?" body="This banner will be permanently removed from the app."
+        <ConfirmDialog title="Delete Banner?" body="This banner will be moved to trash and can be restored later."
           confirmLabel="Yes, delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
       )}
 
@@ -2421,7 +2471,7 @@ function OffersView({
   );
 }
 
-function ReviewsView({ reviews, onDelete }: { reviews: ReviewRow[]; onDelete: (id: string) => Promise<void> }) {
+function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: ReviewRow[]; onDelete: (id: string) => Promise<void>; onRestore: (id: string) => Promise<void>; accessToken: string }) {
   const [search,   setSearch]   = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving,   setSaving]   = useState(false);
@@ -2447,7 +2497,7 @@ function ReviewsView({ reviews, onDelete }: { reviews: ReviewRow[]; onDelete: (i
       {deleteId && (
         <ConfirmDialog
           title="Delete Review?"
-          body="This review will be permanently removed. The professional's rating may be affected."
+          body="This review will be moved to trash. The professional's rating will be recalculated. You can restore it later."
           confirmLabel="Yes, delete"
           saving={saving}
           onConfirm={handleDelete}
@@ -2486,7 +2536,9 @@ function ReviewsView({ reviews, onDelete }: { reviews: ReviewRow[]; onDelete: (i
                     {new Date(r.createdAt).toLocaleDateString("en-IN")}
                   </td>
                   <td className="px-4 py-3">
-                    <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+                    <div className="flex gap-1 flex-wrap">
+                      <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -3642,6 +3694,22 @@ export default function App() {
       }
       setChecking(false);
     })();
+  }, []);
+
+  useEffect(() => {
+    const forceLogout = () => {
+      setUser(null); setAccessToken(null); setRefreshToken(null);
+    };
+    const onTokenRefreshed = (e: Event) => {
+      const { accessToken: a, refreshToken: r, user: u } = (e as CustomEvent).detail;
+      setAccessToken(a); setRefreshToken(r); setUser(u);
+    };
+    window.addEventListener('admin:unauthorized', forceLogout);
+    window.addEventListener('admin:token-refreshed', onTokenRefreshed);
+    return () => {
+      window.removeEventListener('admin:unauthorized', forceLogout);
+      window.removeEventListener('admin:token-refreshed', onTokenRefreshed);
+    };
   }, []);
 
   const handleLogin = (u: AdminUser, access: string, refresh: string) => {

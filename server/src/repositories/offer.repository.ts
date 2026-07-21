@@ -1,13 +1,21 @@
 import { db } from '../config/database.js';
 import { offers } from '../database/schema/index.js';
-import { eq, asc, desc, and, or, isNull, lte, gte } from 'drizzle-orm';
+import { eq, asc, desc, and, or, isNull, isNotNull, lte, gte } from 'drizzle-orm';
 
 export type Offer = typeof offers.$inferSelect;
 export type OfferInsert = typeof offers.$inferInsert;
 
 export const offerRepository = {
   async getAll(): Promise<Offer[]> {
-    return db.select().from(offers).orderBy(desc(offers.priority), asc(offers.sortOrder), asc(offers.createdAt));
+    return db.select().from(offers)
+      .where(isNull(offers.deletedAt))
+      .orderBy(desc(offers.priority), asc(offers.sortOrder), asc(offers.createdAt));
+  },
+
+  async getDeleted(): Promise<Offer[]> {
+    return db.select().from(offers)
+      .where(isNotNull(offers.deletedAt))
+      .orderBy(desc(offers.deletedAt));
   },
 
   async getActive(): Promise<Offer[]> {
@@ -15,6 +23,7 @@ export const offerRepository = {
     return db.select().from(offers)
       .where(
         and(
+          isNull(offers.deletedAt),
           eq(offers.status, 'active'),
           eq(offers.isActive, true),
           or(isNull(offers.startDate), lte(offers.startDate, now)),
@@ -44,6 +53,16 @@ export const offerRepository = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.delete(offers).where(eq(offers.id, id));
+    await db.update(offers)
+      .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
+      .where(eq(offers.id, id));
+  },
+
+  async restore(id: string): Promise<Offer | undefined> {
+    const [row] = await db.update(offers)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(eq(offers.id, id))
+      .returning();
+    return row;
   },
 };

@@ -50,20 +50,24 @@ router.get('/categories/:categoryId/subcategories',  subCategoryController.list)
 router.post('/categories/:categoryId/subcategories', subCategoryController.create);
 router.patch('/subcategories/:id',                   subCategoryController.update);
 router.delete('/subcategories/:id',                  subCategoryController.delete);
+router.patch('/subcategories/:id/restore',           subCategoryController.restore);
 router.post('/subcategories/:id/image',              upload.single('image'), subCategoryController.uploadImage);
 
 // Reels
-router.get('/reels/detect-platform',  reelController.detectPlatformEndpoint);
-router.get('/reels',                  reelController.adminList);
-router.post('/reels',                 reelController.adminCreate);
-router.patch('/reels/:id',            reelController.adminUpdate);
-router.delete('/reels/:id',           reelController.adminDelete);
-router.post('/reels/:id/thumbnail',   upload.single('image'), reelController.uploadThumbnail);
-router.post('/reels/:id/video',       upload.single('video'),  reelController.uploadVideo);
+router.get('/reels/detect-platform',   reelController.detectPlatformEndpoint);
+router.get('/reels',                   reelController.adminList);
+router.get('/reels/deleted',           reelController.adminListDeleted);
+router.post('/reels',                  reelController.adminCreate);
+router.patch('/reels/:id',             reelController.adminUpdate);
+router.delete('/reels/:id',            reelController.adminDelete);
+router.patch('/reels/:id/restore',     reelController.adminRestore);
+router.post('/reels/:id/thumbnail',    upload.single('image'), reelController.uploadThumbnail);
+router.post('/reels/:id/video',        upload.single('video'),  reelController.uploadVideo);
 
 // Reviews (moderation)
 router.get('/reviews',                adminController.listReviews);
 router.delete('/reviews/:id',         adminController.deleteReview);
+router.patch('/reviews/:id/restore',  adminController.restoreReview);
 
 // Audit log
 router.get('/audit-logs',             adminController.listAuditLogs);
@@ -73,17 +77,20 @@ router.get('/payouts',                adminController.listPayoutRequests);
 router.patch('/payouts/:id',          adminController.resolvePayoutRequest);
 
 // Platform Policies (admin CRUD)
-router.get('/platform-policies',          platformPolicyController.adminList);
-router.post('/platform-policies',         platformPolicyController.adminCreate);
-router.put('/platform-policies/:slug',    platformPolicyController.adminUpdate);
-router.delete('/platform-policies/:slug', platformPolicyController.adminDelete);
+router.get('/platform-policies',                   platformPolicyController.adminList);
+router.post('/platform-policies',                  platformPolicyController.adminCreate);
+router.put('/platform-policies/:slug',             platformPolicyController.adminUpdate);
+router.delete('/platform-policies/:slug',          platformPolicyController.adminDelete);
+router.patch('/platform-policies/:slug/restore',   platformPolicyController.adminRestore);
 
 // Offers / Banners (admin CRUD)
-router.post('/offers/image',  upload.single('image'), offerController.uploadImage);
-router.get('/offers',         offerController.adminList);
-router.post('/offers',        offerController.adminCreate);
-router.patch('/offers/:id',   offerController.adminUpdate);
-router.delete('/offers/:id',  offerController.adminDelete);
+router.post('/offers/image',           upload.single('image'), offerController.uploadImage);
+router.get('/offers',                  offerController.adminList);
+router.get('/offers/deleted',          offerController.adminListDeleted);
+router.post('/offers',                 offerController.adminCreate);
+router.patch('/offers/:id',            offerController.adminUpdate);
+router.delete('/offers/:id',           offerController.adminDelete);
+router.patch('/offers/:id/restore',    offerController.adminRestore);
 
 // Platform Settings (payment config, email config)
 router.get('/settings/:key',        getSettings);

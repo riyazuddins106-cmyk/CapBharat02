@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { reels } from '../database/schema/index.js';
-import { eq, and, gte, lte, or, isNull, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, or, isNull, isNotNull, sql } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { storageService } from '../services/storage.service.js';
 import { detectPlatform, getAutoThumbnail, validateReelUrl } from '../utils/reelPlatform.js';
@@ -31,6 +31,7 @@ export const reelController = {
       .from(reels)
       .where(
         and(
+          isNull(reels.deletedAt),
           eq(reels.isActive, true),
           or(isNull(reels.publishDate), lte(reels.publishDate, sql`now()`)),
           or(isNull(reels.expiryDate),  gte(reels.expiryDate,  sql`now()`)),
@@ -66,7 +67,7 @@ export const reelController = {
   // ── Admin ────────────────────────────────────────────────────────────────────
 
   adminList: asyncHandler(async (_req: Request, res: Response) => {
-    const rows = await db.select().from(reels).orderBy(reels.sortOrder, reels.createdAt);
+    const rows = await db.select().from(reels).where(isNull(reels.deletedAt)).orderBy(reels.sortOrder, reels.createdAt);
     const out = rows.map(r => ({ ...r, effectiveThumbnail: buildEffectiveThumbnail(r) }));
     res.json({ success: true, data: { reels: out, total: out.length } });
   }),
@@ -148,10 +149,23 @@ export const reelController = {
 
   adminDelete: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const [existing] = await db.select({ id: reels.id }).from(reels).where(eq(reels.id, id));
+    const [existing] = await db.select({ id: reels.id }).from(reels).where(and(eq(reels.id, id), isNull(reels.deletedAt)));
     if (!existing) throw AppError.notFound('Reel not found');
-    await db.delete(reels).where(eq(reels.id, id));
+    await db.update(reels).set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() }).where(eq(reels.id, id));
     res.json({ success: true, data: { id } });
+  }),
+
+  adminRestore: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const [existing] = await db.select({ id: reels.id }).from(reels).where(and(eq(reels.id, id), isNotNull(reels.deletedAt)));
+    if (!existing) throw AppError.notFound('Reel not found or not deleted');
+    const [row] = await db.update(reels).set({ deletedAt: null, updatedAt: new Date() }).where(eq(reels.id, id)).returning();
+    res.json({ success: true, data: row });
+  }),
+
+  adminListDeleted: asyncHandler(async (_req: Request, res: Response) => {
+    const rows = await db.select().from(reels).where(isNotNull(reels.deletedAt)).orderBy(reels.deletedAt);
+    res.json({ success: true, data: rows.map(r => ({ ...r, effectiveThumbnail: buildEffectiveThumbnail(r) })) });
   }),
 
   uploadThumbnail: asyncHandler(async (req: Request, res: Response) => {

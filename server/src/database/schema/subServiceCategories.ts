@@ -15,6 +15,7 @@ export const subServiceCategories = pgTable('sub_service_categories', {
   isActive:    boolean('is_active').notNull().default(true),
   createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:   timestamp('deleted_at', { withTimezone: true }),
 });
 
 export type SubServiceCategory    = typeof subServiceCategories.$inferSelect;

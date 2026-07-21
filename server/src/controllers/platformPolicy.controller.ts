@@ -65,4 +65,12 @@ export const platformPolicyController = {
     if (!removed) throw new AppError('Policy not found', 404);
     sendSuccess(res, { slug });
   }),
+
+  /** Admin — PATCH /api/admin/platform-policies/:slug/restore */
+  adminRestore: asyncHandler(async (req: Request, res: Response) => {
+    const { slug } = req.params;
+    const restored = await platformPolicyService.restore(slug);
+    if (!restored) throw new AppError('Policy not found or not deleted', 404);
+    sendSuccess(res, restored);
+  }),
 };

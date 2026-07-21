@@ -20,6 +20,7 @@ export const reels = pgTable('reels', {
   viewCount:          integer('view_count').notNull().default(0),
   createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:          timestamp('deleted_at', { withTimezone: true }),
 });
 
 export type Reel    = typeof reels.$inferSelect;

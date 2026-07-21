@@ -236,9 +236,30 @@ export interface SupportTicketRow {
 }
 
 // ── Base request ─────────────────────────────────────────────────────────────
-async function request<T>(path: string, options: RequestInit & { token?: string } = {}): Promise<T> {
-  const { token, ...init } = options;
-  const res = await fetch(`/api${path}`, {
+// ── Silent token refresh ──────────────────────────────────────────────────────
+// One in-flight refresh at a time; concurrent callers wait for the same promise.
+let refreshPromise: Promise<string> | null = null;
+
+async function silentRefresh(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const storedRefresh = adminAuth.getRefreshToken();
+    if (!storedRefresh) throw new Error('No refresh token');
+    const data = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: storedRefresh }),
+    }).then(r => r.json());
+    if (!data?.data?.accessToken) throw new Error('Refresh failed');
+    adminAuth.store(data.data.accessToken, data.data.refreshToken, data.data.user);
+    window.dispatchEvent(new CustomEvent('admin:token-refreshed', { detail: data.data }));
+    return data.data.accessToken as string;
+  })().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+async function doFetch(path: string, init: RequestInit, token?: string): Promise<Response> {
+  return fetch(`/api${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -246,6 +267,23 @@ async function request<T>(path: string, options: RequestInit & { token?: string 
       ...init.headers,
     },
   });
+}
+
+async function request<T>(path: string, options: RequestInit & { token?: string } = {}): Promise<T> {
+  const { token, ...init } = options;
+  let res = await doFetch(path, init, token);
+
+  // On 401, attempt a silent refresh and retry once (skip for auth endpoints)
+  if (res.status === 401 && !path.includes('/auth/')) {
+    try {
+      const newToken = await silentRefresh();
+      res = await doFetch(path, init, newToken);
+    } catch {
+      adminAuth.clear();
+      window.dispatchEvent(new CustomEvent('admin:unauthorized'));
+    }
+  }
+
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
   return json.data as T;
@@ -360,6 +398,10 @@ export const adminApi = {
     request<ReelRow>(`/admin/reels/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteReel: (id: string, token: string) =>
     request<{ id: string }>(`/admin/reels/${id}`, { method: 'DELETE', token }),
+  restoreReel: (id: string, token: string) =>
+    request<ReelRow>(`/admin/reels/${id}/restore`, { method: 'PATCH', token }),
+  getDeletedReels: (token: string) =>
+    request<ReelRow[]>('/admin/reels/deleted', { token }),
   uploadReelThumbnail: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('image', file);
     return fetch(`/api/admin/reels/${id}/thumbnail`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
@@ -376,6 +418,8 @@ export const adminApi = {
     request<{ reviews: ReviewRow[]; total: number }>('/admin/reviews', { token }),
   deleteReview: (id: string, token: string) =>
     request<{ id: string }>(`/admin/reviews/${id}`, { method: 'DELETE', token }),
+  restoreReview: (id: string, token: string) =>
+    request<{ id: string }>(`/admin/reviews/${id}/restore`, { method: 'PATCH', token }),
 
   // Audit logs
   getAuditLogs: (token: string) =>
@@ -410,6 +454,8 @@ export const adminApi = {
     request<PlatformPolicyRow>(`/admin/platform-policies/${slug}`, { method: 'PUT', token, body: JSON.stringify(data) }),
   deletePlatformPolicy: (slug: string, token: string) =>
     request<{ slug: string }>(`/admin/platform-policies/${slug}`, { method: 'DELETE', token }),
+  restorePlatformPolicy: (slug: string, token: string) =>
+    request<PlatformPolicyRow>(`/admin/platform-policies/${slug}/restore`, { method: 'PATCH', token }),
 
   // Offers / Banners
   getOffers: (token: string) =>
@@ -420,6 +466,10 @@ export const adminApi = {
     request<OfferRow>(`/admin/offers/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteOffer: (id: string, token: string) =>
     request<{ id: string }>(`/admin/offers/${id}`, { method: 'DELETE', token }),
+  restoreOffer: (id: string, token: string) =>
+    request<OfferRow>(`/admin/offers/${id}/restore`, { method: 'PATCH', token }),
+  getDeletedOffers: (token: string) =>
+    request<{ offers: OfferRow[]; total: number }>('/admin/offers/deleted', { token }),
   uploadBannerImage: async (file: File, token: string): Promise<string> => {
     const fd = new FormData();
     fd.append('image', file);

@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { subServiceCategories, serviceCategories } from '../database/schema/index.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { storageService } from '../services/storage.service.js';
 
@@ -14,7 +14,7 @@ export const subCategoryController = {
     const rows = await db
       .select()
       .from(subServiceCategories)
-      .where(eq(subServiceCategories.categoryId, categoryId))
+      .where(and(eq(subServiceCategories.categoryId, categoryId), isNull(subServiceCategories.deletedAt)))
       .orderBy(subServiceCategories.sortOrder, subServiceCategories.name);
     res.json({ success: true, data: { subcategories: rows, total: rows.length } });
   }),
@@ -62,10 +62,25 @@ export const subCategoryController = {
 
   delete: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const [existing] = await db.select({ id: subServiceCategories.id }).from(subServiceCategories).where(eq(subServiceCategories.id, id));
+    const [existing] = await db.select({ id: subServiceCategories.id }).from(subServiceCategories)
+      .where(and(eq(subServiceCategories.id, id), isNull(subServiceCategories.deletedAt)));
     if (!existing) throw AppError.notFound('Subcategory not found');
-    await db.delete(subServiceCategories).where(eq(subServiceCategories.id, id));
+    await db.update(subServiceCategories)
+      .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
+      .where(eq(subServiceCategories.id, id));
     res.json({ success: true, data: { id } });
+  }),
+
+  restore: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const [existing] = await db.select({ id: subServiceCategories.id }).from(subServiceCategories)
+      .where(and(eq(subServiceCategories.id, id), isNotNull(subServiceCategories.deletedAt)));
+    if (!existing) throw AppError.notFound('Subcategory not found or not deleted');
+    const [row] = await db.update(subServiceCategories)
+      .set({ deletedAt: null, isActive: true, updatedAt: new Date() })
+      .where(eq(subServiceCategories.id, id))
+      .returning();
+    res.json({ success: true, data: row });
   }),
 
   uploadImage: asyncHandler(async (req: Request, res: Response) => {

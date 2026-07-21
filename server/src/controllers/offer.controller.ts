@@ -13,10 +13,18 @@ export const offerController = {
     } catch (e) { next(e); }
   },
 
-  // Admin: all offers
+  // Admin: all offers (active)
   async adminList(req: Request, res: Response, next: NextFunction) {
     try {
       const rows = await offerRepository.getAll();
+      sendSuccess(res, { offers: rows, total: rows.length });
+    } catch (e) { next(e); }
+  },
+
+  // Admin: deleted offers
+  async adminListDeleted(req: Request, res: Response, next: NextFunction) {
+    try {
+      const rows = await offerRepository.getDeleted();
       sendSuccess(res, { offers: rows, total: rows.length });
     } catch (e) { next(e); }
   },
@@ -111,7 +119,7 @@ export const offerController = {
     } catch (e) { next(e); }
   },
 
-  // Admin: delete offer
+  // Admin: delete offer (soft)
   async adminDelete(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -119,6 +127,16 @@ export const offerController = {
       if (!existing) return res.status(404).json({ success: false, error: { message: 'Offer not found' } });
       await offerRepository.delete(id);
       sendSuccess(res, { id });
+    } catch (e) { next(e); }
+  },
+
+  // Admin: restore soft-deleted offer
+  async adminRestore(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const offer = await offerRepository.restore(id);
+      if (!offer) return res.status(404).json({ success: false, error: { message: 'Offer not found or not deleted' } });
+      sendSuccess(res, offer);
     } catch (e) { next(e); }
   },
 };

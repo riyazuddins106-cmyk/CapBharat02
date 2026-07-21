@@ -53,4 +53,8 @@ export const platformPolicyService = {
   async remove(slug: string) {
     return platformPolicyRepository.remove(slug);
   },
+
+  async restore(slug: string) {
+    return platformPolicyRepository.restore(slug);
+  },
 };
