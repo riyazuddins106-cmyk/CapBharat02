@@ -82,11 +82,19 @@ export const createRazorpayOrder = asyncHandler(async (req: Request, res: Respon
   const rz = makeRazorpay(cfg.razorpay);
 
   const amountPaise = (booking.price ?? 0) * 100; // Razorpay uses paise
-  const order = await rz.orders.create({
-    amount: amountPaise,
-    currency: 'INR',
-    receipt: `booking_${bookingId.slice(0, 20)}`,
-  });
+  let order: Awaited<ReturnType<typeof rz.orders.create>>;
+  try {
+    order = await rz.orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: `booking_${bookingId.slice(0, 20)}`,
+    });
+  } catch (err: unknown) {
+    // Razorpay SDK throws a plain object, not an Error instance
+    const rzErr = err as { error?: { description?: string }; message?: string };
+    const msg = rzErr?.error?.description ?? rzErr?.message ?? 'Razorpay order creation failed';
+    throw AppError.badRequest(msg);
+  }
 
   // Upsert a payment record with status=created
   if (existing) {
@@ -267,7 +275,10 @@ export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) 
   const secret = cfg.razorpay?.webhookSecret;
   if (secret) {
     const sig = req.headers['x-razorpay-signature'] as string;
-    const body = (req as any).rawBody as string; // requires express.raw() middleware on this route
+    const body = (req as any).rawBody as Buffer | string | undefined;
+    if (!body) {
+      return res.status(400).json({ success: false, error: 'Missing request body for signature verification' });
+    }
     const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
     if (sig !== expected) {
       return res.status(400).json({ success: false, error: 'Invalid webhook signature' });
@@ -394,10 +405,12 @@ export const stripeWebhook = asyncHandler(async (req: Request, res: Response) =>
 
   logger.info('[stripe-webhook] type=%s', event.type);
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const bookingId = session.metadata?.bookingId;
-    if (bookingId && session.payment_status === 'paid') {
+    if (bookingId && UUID_RE.test(bookingId) && session.payment_status === 'paid') {
       const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
       if (existing && existing.status !== 'paid') {
         await db.update(payments).set({
