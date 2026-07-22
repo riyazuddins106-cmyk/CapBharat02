@@ -30,3 +30,15 @@ id = "ZVixPCSwy5Ju0D6P1gIeb"
 uri = "file://screenshots/expo-partner-qr.png"
 type = "image"
 title = "Expo Partner App QR"
+
+[[outputs]]
+id = "GZdRQd6oXsMdenrGJujZV"
+uri = "file://tmp-qr/customer-qr.png"
+type = "image"
+title = "Customer App QR — exp://3p6_vk8-anonymous-8080.exp.direct"
+
+[[outputs]]
+id = "bIv2r13uHLxqnW3v6j5Sv"
+uri = "file://tmp-qr/partner-qr.png"
+type = "image"
+title = "Partner App QR — exp://k5nquq0-anonymous-8099.exp.direct"

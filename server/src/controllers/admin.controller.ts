@@ -250,7 +250,7 @@ export const adminController = {
       passwordHash,
       phone: phone?.trim() || null,
       role: 'partner',
-      emailVerified: true,
+      emailVerifiedAt: new Date(),
     }).returning();
 
     // Create professional profile

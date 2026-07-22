@@ -264,7 +264,7 @@ export default function AuthScreen() {
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>OTP Code</Text>
                 <TextInput
-                  value={otp} onChangeText={setOtp}
+                  value={otp} onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
                   keyboardType="number-pad" maxLength={6} placeholder="123456"
                   placeholderTextColor={colors.mutedForeground}
                   style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius, letterSpacing: 6, fontSize: 20, textAlign: 'center' }]}
@@ -272,12 +272,17 @@ export default function AuthScreen() {
               </View>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>New Password</Text>
-                <TextInput
-                  value={newPassword} onChangeText={setNewPassword}
-                  secureTextEntry placeholder="New password"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
-                />
+                <View style={styles.passRow}>
+                  <TextInput
+                    value={newPassword} onChangeText={setNewPassword}
+                    secureTextEntry={!showPass} placeholder="Min 8 chars, uppercase, number"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.input, { flex: 1, backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                  />
+                  <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eye}>
+                    <Ionicons name={showPass ? 'eye-off' : 'eye'} size={20} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                </View>
               </View>
               <TouchableOpacity
                 onPress={doReset} disabled={loading}

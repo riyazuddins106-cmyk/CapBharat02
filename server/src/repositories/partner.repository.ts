@@ -73,7 +73,7 @@ export const partnerRepository = {
   },
 
   /** Update booking status */
-  async updateStatus(bookingId: string, status: 'in_progress' | 'completed') {
+  async updateStatus(bookingId: string, status: 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled') {
     const [updated] = await db
       .update(bookings)
       .set({ status, updatedAt: new Date() })

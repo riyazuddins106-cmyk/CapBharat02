@@ -25,7 +25,9 @@ export default function AuthScreen() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
 
   const doLogin = async () => {
     if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
@@ -43,6 +45,11 @@ export default function AuthScreen() {
 
   const doRegister = async () => {
     if (!fullName || !email || !password) return Alert.alert('Error', 'Please fill in all fields');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) return Alert.alert('Error', 'Enter a valid email address');
+    if (password.length < 8) return Alert.alert('Error', 'Password must be at least 8 characters');
+    if (!/[A-Z]/.test(password)) return Alert.alert('Error', 'Password must contain an uppercase letter');
+    if (!/[0-9]/.test(password)) return Alert.alert('Error', 'Password must contain a number');
     setLoading(true);
     try {
       await register({ fullName: fullName.trim(), email: email.trim(), password, phone: phone.trim() || undefined });
@@ -86,6 +93,10 @@ export default function AuthScreen() {
 
   const doReset = async () => {
     if (otp.length !== 6 || !newPassword) return Alert.alert('Error', 'Fill in all fields');
+    if (newPassword.length < 8) return Alert.alert('Error', 'Password must be at least 8 characters');
+    if (!/[A-Z]/.test(newPassword)) return Alert.alert('Error', 'Password must contain an uppercase letter');
+    if (!/[0-9]/.test(newPassword)) return Alert.alert('Error', 'Password must contain a number');
+    if (newPassword !== confirmPassword) return Alert.alert('Error', 'Passwords do not match');
     setLoading(true);
     try {
       await resetPassword(pendingEmail, otp, newPassword);
@@ -225,22 +236,37 @@ export default function AuthScreen() {
 
           {/* New password for reset */}
           {mode === 'reset' && (
-            <View>
-              <Text style={[styles.label, { color: colors.foreground }]}>New Password</Text>
-              <View style={[styles.passWrap, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
-                <TextInput
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder="Min 8 characters"
-                  placeholderTextColor={colors.mutedForeground}
-                  secureTextEntry={!showPass}
-                  style={[styles.passInput, { color: colors.foreground }]}
-                />
-                <TouchableOpacity onPress={() => setShowPass((v) => !v)}>
-                  <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.mutedForeground} />
-                </TouchableOpacity>
+            <>
+              <View>
+                <Text style={[styles.label, { color: colors.foreground }]}>New Password</Text>
+                <View style={[styles.passWrap, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
+                  <TextInput
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="Min 8 chars, uppercase, number"
+                    placeholderTextColor={colors.mutedForeground}
+                    secureTextEntry={!showNewPass}
+                    style={[styles.passInput, { color: colors.foreground }]}
+                  />
+                  <TouchableOpacity onPress={() => setShowNewPass((v) => !v)}>
+                    <Ionicons name={showNewPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+              <View>
+                <Text style={[styles.label, { color: colors.foreground }]}>Confirm Password</Text>
+                <View style={[styles.passWrap, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
+                  <TextInput
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Re-enter new password"
+                    placeholderTextColor={colors.mutedForeground}
+                    secureTextEntry={!showNewPass}
+                    style={[styles.passInput, { color: colors.foreground }]}
+                  />
+                </View>
+              </View>
+            </>
           )}
 
           {/* Forgot password link */}

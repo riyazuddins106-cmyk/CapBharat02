@@ -71,6 +71,18 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     fi
   fi
 
+  # Expo's @expo/ngrok uses its own built-in relay token for exp.direct tunnels.
+  # We only override NGROK_AUTHTOKEN for the customer app (port 8080/8081) where
+  # the user's own ngrok v2 token is known to work. For all other ports (partner
+  # app) we leave NGROK_AUTHTOKEN unset so Expo uses its built-in token — the
+  # user-provided NGROK_AUTHTOKEN_2 is a ngrok v3 format token incompatible with
+  # the ngrok v2 binary that @expo/ngrok embeds.
+  AUTHTOKEN_VALUE="${!AUTHTOKEN_VAR}"
+  if [[ -n "$AUTHTOKEN_VALUE" && ( "$PORT" -eq 8080 || "$PORT" -eq 8081 ) ]]; then
+    echo "Setting NGROK_AUTHTOKEN for ngrok v2 (customer app)…"
+    export NGROK_AUTHTOKEN="$AUTHTOKEN_VALUE"
+  fi
+
   REPLIT_MAX_RETRIES=5
   REPLIT_RETRY_DELAY=30
   for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do

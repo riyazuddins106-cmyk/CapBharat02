@@ -23,7 +23,8 @@ async function loadDbConfig(): Promise<EmailConfig | null> {
       .from(platformSettings)
       .where(eq(platformSettings.key, 'email_config'));
     return row ? JSON.parse(row.value) : null;
-  } catch {
+  } catch (err) {
+    logger.error(`[email] Failed to load DB email config — falling back to env vars: ${(err as Error).message}`);
     return null;
   }
 }
@@ -48,14 +49,17 @@ async function buildTransporter(): Promise<{ transporter: nodemailer.Transporter
 
   // --- DB config: SMTP ---
   if (cfg?.smtp?.host && cfg.smtp.user) {
+    const smtpPort = cfg.smtp.port ?? 587;
+    // Port 465 always requires TLS; honour the explicit flag otherwise.
+    const smtpSecure = smtpPort === 465 ? true : (cfg.smtp.secure ?? false);
     const from = cfg.from?.email
       ? `"${cfg.from.name ?? 'ServeNow'}" <${cfg.from.email}>`
       : `ServeNow <${cfg.smtp.user}>`;
     return {
       transporter: nodemailer.createTransport({
         host: cfg.smtp.host,
-        port: cfg.smtp.port ?? 587,
-        secure: cfg.smtp.secure ?? false,
+        port: smtpPort,
+        secure: smtpSecure,
         auth: { user: cfg.smtp.user, pass: cfg.smtp.password ?? '' },
       }),
       from,
