@@ -114,6 +114,8 @@ export interface ApiService {
   partnerPayout: number;
   duration: number;
   requiredSkill: string | null;
+  badge: string | null;
+  featured: boolean;
   isActive: boolean;
 }
 
@@ -340,6 +342,10 @@ export const addressesApi = {
 export const servicesApi = {
   async list(params?: { categoryId?: string; subCategoryId?: string; q?: string }) {
     const { data } = await client.get('/services', { params });
+    return data.data as { services: ApiService[]; total: number };
+  },
+  async featured() {
+    const { data } = await client.get('/services', { params: { featured: 'true' } });
     return data.data as { services: ApiService[]; total: number };
   },
 };

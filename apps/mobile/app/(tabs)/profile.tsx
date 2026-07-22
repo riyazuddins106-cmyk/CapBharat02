@@ -33,10 +33,10 @@ async function handleRateApp() {
     if (supported) {
       await Linking.openURL(url);
     } else {
-      Alert.alert('Coming Soon', 'ServeNow will be available on app stores soon. Thank you for your support! 🙏');
+      Alert.alert('Coming Soon', 'ServeNow will be available on app stores soon. Thank you for your support! ');
     }
   } catch {
-    Alert.alert('Coming Soon', 'ServeNow will be available on app stores soon. Thank you for your support! 🙏');
+    Alert.alert('Coming Soon', 'ServeNow will be available on app stores soon. Thank you for your support! ');
   }
 }
 

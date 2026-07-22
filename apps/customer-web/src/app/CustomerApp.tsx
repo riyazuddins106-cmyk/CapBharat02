@@ -6,7 +6,7 @@ import {
   Navigation, Check,
   // Sub-category icons
   Flame, Lightbulb, Battery, Camera, Truck, Thermometer, Building2,
-  Sofa, Shirt, Package, WashingMachine, Tag, Waves,
+  Sofa, Shirt, Package, WashingMachine, Tag, Waves, Banknote, Smartphone, CreditCard,
 } from "lucide-react";
 import {
   auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
@@ -302,7 +302,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
         </div>
 
         {screen === "login" && <>
-          <h2 className="text-xl font-bold mb-1">Welcome back 👋</h2>
+          <h2 className="text-xl font-bold mb-1">Welcome back </h2>
           <p className="text-gray-400 text-xs mb-5">Sign in to your ServeNow account</p>
           <div className="flex flex-col gap-3">
             <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
@@ -341,7 +341,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
               style={{ background: "#f0edff", color: "#5b3ef5" }}
               onClick={() => setOtp(devCode)}
             >
-              <span className="text-base">🔑</span>
+              <span className="text-base">•</span>
               <span><strong>Dev mode:</strong> Code auto-filled — <strong>{devCode}</strong></span>
             </div>
           )}
@@ -798,7 +798,7 @@ function AddressFormModal({
                       background: active ? lc.bg : "#fff",
                       color: active ? lc.color : "#6B7280",
                     }}>
-                    {lbl === "Home" ? "🏠 " : lbl === "Work" ? "💼 " : "📍 "}{lbl}
+                    {lbl === "Home" ? "" : lbl === "Work" ? "" : ""}{lbl}
                   </button>
                 );
               })}
@@ -1055,12 +1055,13 @@ function ProfileEditModal({ user, onSave, onClose }: {
    HOME TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
-  user, categories, professionals, favoriteIds, offers, reels, location,
+  user, categories, professionals, featuredServices, favoriteIds, offers, reels, location,
   onToggleFavorite, onBook, onCategorySelect, onLocationPress,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
   professionals: ApiProfessional[];
+  featuredServices: ApiService[];
   favoriteIds: Set<string>;
   offers: ApiOffer[];
   reels: ApiReel[];
@@ -1070,7 +1071,6 @@ function CustHome({
   onCategorySelect: (id: string) => void;
   onLocationPress: () => void;
 }) {
-  const featured = professionals.slice(0, 3);
   const [offerIdx, setOfferIdx] = useState(0);
   const [activeReel, setActiveReel] = useState<ApiReel | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1088,7 +1088,7 @@ function CustHome({
 
   // Greet based on hour
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning 🌅" : hour < 17 ? "Good afternoon ☀️" : "Good evening 👋";
+  const greeting = hour < 12 ? "Good morning " : hour < 17 ? "Good afternoon " : "Good evening ";
 
   return (
     <div className="flex flex-col">
@@ -1154,7 +1154,7 @@ function CustHome({
                       {offer.ctaText || "Book Now"}
                     </button>
                   </div>
-                  <div className="text-6xl opacity-20 select-none">🛁</div>
+                  <div className="text-6xl opacity-20 select-none"></div>
                 </div>
               </div>
             ))}
@@ -1273,19 +1273,54 @@ function CustHome({
         </div>
       )}
 
-      {/* Featured professionals */}
+      {/* Featured products */}
       <div className="px-5 mt-6">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-foreground">Featured Professionals</h2>
+          <h2 className="text-base font-bold text-foreground">Featured Services</h2>
         </div>
-        {featured.length === 0 ? (
+        {featuredServices.length === 0 ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-gray-100 animate-pulse" />)}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {featured.map((pro) => (
-              <ProCard key={pro.id} pro={pro} wishlisted={favoriteIds.has(pro.id)} onWishlist={() => onToggleFavorite(pro.id)} onBook={() => onBook(pro)} />
+            {featuredServices.slice(0, 4).map((service) => (
+              <div key={service.id} className="relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all">
+                <div className="w-28 h-28 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0 relative">
+                  {service.images?.[0] ? (
+                    <img src={service.images[0]} alt={service.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EDE9FD] to-[#F5F3FF]">
+                      <Sparkles size={24} color="#C4B5FD" />
+                    </div>
+                  )}
+                  {service.badge && (
+                    <div className="absolute top-0 left-0 bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] px-2 py-1 rounded-br-xl text-[10px] font-bold text-white shadow-sm">
+                      {service.badge}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                  <div>
+                    <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
+                    <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Expert service"}</p>
+                  </div>
+                  <div className="flex items-end justify-between mt-2">
+                    <div>
+                      <p className="text-sm font-black text-gray-900">₹{service.customerPrice.toLocaleString("en-IN")}</p>
+                      <p className="text-[10px] font-semibold text-gray-400 mt-0.5 flex items-center gap-1">
+                        <Clock size={10} /> {service.duration} min
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => onCategorySelect(service.categoryId)} 
+                      className="h-8 px-3 rounded-lg text-xs font-bold text-[#5B3EF5] bg-[#F5F3FF] hover:bg-[#EDE9FD] transition-colors"
+                    >
+                      Book
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -1380,10 +1415,6 @@ function CustServices({
     setCart(next); onCartChange(next);
   };
 
-  const filtered = pros.filter((p) =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.title.toLowerCase().includes(search.toLowerCase())
-  );
-
   const selectedCat = selectedCatId ? categories.find((c) => c.id === selectedCatId) : null;
   const selectedSub = selectedSubId ? subs.find((s) => s.id === selectedSubId) : null;
 
@@ -1431,20 +1462,42 @@ function CustServices({
             </div>
             <div className="flex flex-col gap-3">
               {catalogue.map((service) => (
-                <div key={service.id} className="rounded-2xl bg-white border border-black/[0.08] p-3 flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-violet-50 overflow-hidden flex-shrink-0">
-                    {service.images?.[0] && <img src={service.images[0]} alt="" className="w-full h-full object-cover" />}
+                <div key={service.id} className="group relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all">
+                  <div className="w-28 h-28 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0 relative">
+                    {service.images?.[0] ? (
+                      <img src={service.images[0]} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EDE9FD] to-[#F5F3FF]">
+                        <Sparkles size={24} color="#C4B5FD" />
+                      </div>
+                    )}
+                    {service.badge && (
+                      <div className="absolute top-0 left-0 bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] px-2 py-1 rounded-br-xl text-[10px] font-bold text-white shadow-sm">
+                        {service.badge}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{service.name}</p>
-                    <p className="text-xs text-gray-400 mt-1">{service.duration} min{service.description ? ` · ${service.description}` : ""}</p>
-                    <p className="text-sm font-bold text-violet-600 mt-1">₹{service.customerPrice.toLocaleString("en-IN")}</p>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                    <div>
+                      <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
+                      <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
+                    </div>
+                    <div className="flex items-end justify-between mt-2">
+                      <div>
+                        <p className="text-sm font-black text-gray-900">₹{service.customerPrice.toLocaleString("en-IN")}</p>
+                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Clock size={10} /> {service.duration} min
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => addToCart(service.id)}
+                        disabled={!isLoggedIn}
+                        className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm"
+                      >
+                        {isLoggedIn ? "+ Add" : "Sign in"}
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => addToCart(service.id)}
-                    disabled={!isLoggedIn}
-                    className="self-center px-3 py-2 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 disabled:opacity-50"
-                  >{isLoggedIn ? "Add" : "Sign in"}</button>
                 </div>
               ))}
             </div>
@@ -1475,18 +1528,7 @@ function CustServices({
                 );
               })}
             </div>
-            <div className="mt-6">
-              <h3 className="text-sm font-bold mb-3">All Professionals <span className="text-gray-400 font-normal">({filtered.length})</span></h3>
-              {prosLoading ? (
-                <div className="flex flex-col gap-4">{Array(3).fill(0).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-gray-100 animate-pulse" />)}</div>
-              ) : filtered.length === 0 ? (
-                <div className="text-center py-12"><div className="text-4xl mb-3">🔍</div><p className="text-sm font-bold">No professionals found</p></div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {filtered.map((pro) => <ProCard key={pro.id} pro={pro} wishlisted={favoriteIds.has(pro.id)} onWishlist={() => onToggleFavorite(pro.id)} onBook={() => onBook(pro)} />)}
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-gray-400 mt-5">Choose a category to browse available services.</p>
           </>
         )}
 
@@ -1544,38 +1586,6 @@ function CustServices({
 
         {/* ── Category selected, no subcategories: skip the grid ── */}
 
-        {/* ── Professionals section ── */}
-        {selectedCatId && (
-          <div className="mt-6">
-            {awaitingSubSelection ? (
-              <div className="text-center py-10">
-                <div className="text-3xl mb-3">☝️</div>
-                <p className="text-sm font-bold text-gray-700">Select a service type above</p>
-                <p className="text-xs text-gray-400 mt-1">Tap any category icon to see professionals</p>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-sm font-bold mb-3">
-                  {selectedSub ? selectedSub.name : selectedCat?.name} Professionals
-                  <span className="text-gray-400 font-normal ml-1">({filtered.length})</span>
-                </h3>
-                {prosLoading ? (
-                  <div className="flex flex-col gap-4">{Array(3).fill(0).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-gray-100 animate-pulse" />)}</div>
-                ) : filtered.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-4xl mb-3">🔍</div>
-                    <p className="text-sm font-bold">No professionals found</p>
-                    <p className="text-xs text-gray-400 mt-1">Try a different category or search</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    {filtered.map((pro) => <ProCard key={pro.id} pro={pro} wishlisted={favoriteIds.has(pro.id)} onWishlist={() => onToggleFavorite(pro.id)} onBook={() => onBook(pro)} />)}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
       </div>
       <div className="h-6" />
       {cartOpen && cart && (
@@ -1675,17 +1685,17 @@ function PaymentModal({ booking, onClose, onPaid }: {
     }
   };
 
-  const METHOD_LABELS: Record<string, { icon: string; label: string; desc: string }> = {
-    cash:       { icon: "💵", label: "Cash on Delivery", desc: "Pay the professional in cash" },
-    upi_manual: { icon: "📱", label: "UPI Payment",      desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : "Pay via UPI" },
-    razorpay:   { icon: "💳", label: "Card / Net Banking / UPI", desc: "Secure online payment" },
+  const METHOD_LABELS: Record<string, { icon: React.ReactNode; label: string; desc: string }> = {
+    cash:       { icon: <Banknote size={20} color="#10B981" />, label: "Cash on Delivery", desc: "Pay the professional in cash" },
+    upi_manual: { icon: <Smartphone size={20} color="#3B82F6" />, label: "UPI Payment",      desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : "Pay via UPI" },
+    razorpay:   { icon: <CreditCard size={20} color="#6366F1" />, label: "Card / Net Banking / UPI", desc: "Secure online payment" },
   };
 
   if (paid) {
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
         <div className="w-full max-w-sm bg-white rounded-t-3xl p-8 flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">✅</div>
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center"><Check size={32} color="#10B981" /></div>
           <h3 className="text-lg font-bold text-gray-900">Payment Successful!</h3>
           <p className="text-sm text-gray-500 text-center">Thank you for using ServeNow. Your payment has been recorded.</p>
         </div>
@@ -1700,7 +1710,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
         <div className="px-5 pt-5 pb-4 border-b border-gray-100">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-base font-bold text-gray-900">Complete Payment</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 leading-none"><X size={20} /></button>
           </div>
           <p className="text-xs text-gray-500">{booking.serviceName} · {booking.proName}</p>
           <div className="mt-3 bg-violet-50 rounded-xl px-4 py-3 flex items-baseline gap-1">
@@ -1719,7 +1729,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
           ) : (
             <div className="flex flex-col gap-2">
               {config.methods.map(method => {
-                const info = METHOD_LABELS[method] ?? { icon: "💳", label: method, desc: "" };
+                const info = METHOD_LABELS[method] ?? { icon: <CreditCard size={20} />, label: method, desc: "" };
                 const selected = selectedMethod === method;
                 return (
                   <button
@@ -1860,7 +1870,7 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
         })}
         {filtered.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-4xl mb-3">📋</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm font-bold">No {tab} bookings</p>
             <p className="text-xs text-gray-400 mt-1">{tab === "upcoming" ? "Book a service to get started" : "Completed bookings will appear here"}</p>
           </div>
@@ -1979,6 +1989,7 @@ export default function CustomerApp() {
   const [categories, setCategories]       = useState<ApiCategory[]>([]);
   const [servicesInitCatId, setServicesInitCatId] = useState<string | null>(null);
   const [professionals, setProfessionals] = useState<ApiProfessional[]>([]);
+  const [featuredServices, setFeaturedServices] = useState<ApiService[]>([]);
   const [bookings, setBookings]           = useState<ApiBooking[]>([]);
   const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
   const [offers, setOffers]               = useState<ApiOffer[]>([]);
@@ -2000,6 +2011,7 @@ export default function CustomerApp() {
       setProfessionals(data);
       setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
     }).catch(console.error);
+    servicesApi.featured().then((data) => setFeaturedServices(data.services)).catch(console.error);
     offersApi.list().then(setOffers).catch(console.error);
     reelsApi.listActive().then(setReels).catch(console.error);
   }, []);
@@ -2118,6 +2130,7 @@ export default function CustomerApp() {
       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
         {activeTab === "home" && (
           <CustHome
+            featuredServices={featuredServices}
             user={user}
             categories={categories}
             professionals={professionals}

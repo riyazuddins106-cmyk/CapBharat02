@@ -5,7 +5,9 @@
 import 'dotenv/config';
 import postgres from 'postgres';
 
-const url = process.env.DATABASE_URL ?? process.env.SUPABASE_DATABASE_URL;
+// Prefer the explicitly configured Supabase connection. Some imported
+// environments retain a stale DATABASE_URL from the original project.
+const url = process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set');
 
 const sql = postgres(url, { ssl: 'require', max: 1 });
@@ -336,11 +338,17 @@ export async function runMigrations() {
       commission       INTEGER NOT NULL DEFAULT 0,
       duration         INTEGER NOT NULL DEFAULT 60,
       required_skill   VARCHAR(255),
+       badge            VARCHAR(64),
+       featured         BOOLEAN NOT NULL DEFAULT false,
       is_active        BOOLEAN NOT NULL DEFAULT true,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       deleted_at       TIMESTAMPTZ
     )`);
+  await run('column: services.badge',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS badge VARCHAR(64)`);
+  await run('column: services.featured',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT false`);
   await run('index: services_category',    `CREATE INDEX IF NOT EXISTS idx_services_category    ON services(category_id)`);
   await run('index: services_subcategory', `CREATE INDEX IF NOT EXISTS idx_services_subcategory ON services(sub_category_id)`);
   await run('index: services_active',      `CREATE INDEX IF NOT EXISTS idx_services_active      ON services(is_active)`);

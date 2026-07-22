@@ -14,6 +14,8 @@ export const services = pgTable('services', {
   commission:    integer('commission').notNull().default(0),
   duration:      integer('duration').notNull().default(60), // minutes
   requiredSkill: varchar('required_skill', { length: 255 }),
+  badge:        varchar('badge', { length: 64 }),
+  featured:     boolean('featured').notNull().default(false),
   isActive:      boolean('is_active').notNull().default(true),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -105,6 +105,8 @@ export interface Service {
   customerPrice: number;
   duration: number;
   requiredSkill: string | null;
+  badge: string | null;
+  featured: boolean;
   isActive: boolean;
 }
 export interface CartItem {
@@ -294,6 +296,7 @@ export const servicesApi = {
     const qs = new URLSearchParams(Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>).toString();
     return request<{ services: Service[]; total: number }>(`/api/services${qs ? `?${qs}` : ''}`);
   },
+  featured: () => request<{ services: Service[]; total: number }>('/api/services?featured=true'),
 };
 
 export const cartApi = {

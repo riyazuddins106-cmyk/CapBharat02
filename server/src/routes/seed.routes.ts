@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { eq } from 'drizzle-orm';
+import { seedCatalog } from '../database/seed-catalog.js';
 
 const router = Router();
 
@@ -19,6 +20,8 @@ router.post(
   requireRole('admin'),
   asyncHandler(async (_req, res) => {
     if (isProduction) throw AppError.forbidden('Seeding is disabled in production.');
+
+    const catalogResult = await seedCatalog();
 
     // Upsert categories
     const categoryData = [
@@ -133,6 +136,7 @@ router.post(
     }
 
     sendSuccess(res, {
+      catalog: catalogResult,
       categories: insertedCats.length,
       professionals: insertedPros.length,
       message: `Seeded ${insertedCats.length} categories and ${insertedPros.length} new professionals.`,

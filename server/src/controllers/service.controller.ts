@@ -22,6 +22,8 @@ function formatService(row: any, cat: any, sub: any) {
     commission:     row.commission,
     duration:       row.duration,
     requiredSkill:  row.requiredSkill,
+    badge:          row.badge,
+    featured:       row.featured,
     isActive:       row.isActive,
     createdAt:      row.createdAt,
     updatedAt:      row.updatedAt,
@@ -34,7 +36,7 @@ export const serviceController = {
 
   /* Public: list active services, optional filter by category/subcategory */
   list: asyncHandler(async (req: Request, res: Response) => {
-    const { categoryId, subCategoryId, q } = req.query as Record<string, string>;
+    const { categoryId, subCategoryId, q, featured } = req.query as Record<string, string>;
 
     const rows = await db
       .select({
@@ -51,6 +53,7 @@ export const serviceController = {
         categoryId    ? eq(services.categoryId,    categoryId)    : undefined,
         subCategoryId ? eq(services.subCategoryId, subCategoryId) : undefined,
         q             ? ilike(services.name, `%${q}%`)            : undefined,
+        featured === 'true' ? eq(services.featured, true) : undefined,
       ) as any)
       .orderBy(services.name);
 

@@ -98,11 +98,11 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
     onError: (e: any) => Alert.alert('Payment failed', e.message ?? 'Please try again'),
   });
 
-  const METHOD_INFO: Record<string, { icon: string; label: string; desc: string }> = {
-    cash:       { icon: '💵', label: 'Cash on Delivery',   desc: 'Pay the professional in cash' },
-    upi_manual: { icon: '📱', label: 'UPI Payment',        desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : 'Pay via UPI app' },
-    razorpay:   { icon: '💳', label: 'Razorpay',           desc: 'Cards, Net Banking, Wallets & UPI' },
-    stripe:     { icon: '🌐', label: 'Card (International)',desc: 'Visa, Mastercard & more via Stripe' },
+  const METHOD_INFO: Record<string, { icon: any; label: string; desc: string }> = {
+    cash:       { icon: 'cash-outline', label: 'Cash on Delivery',   desc: 'Pay the professional in cash' },
+    upi_manual: { icon: 'phone-portrait-outline', label: 'UPI Payment',        desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : 'Pay via UPI app' },
+    razorpay:   { icon: 'card-outline', label: 'Razorpay',           desc: 'Cards, Net Banking, Wallets & UPI' },
+    stripe:     { icon: 'globe-outline', label: 'Card (International)',desc: 'Visa, Mastercard & more via Stripe' },
   };
 
   /* ── Gateway WebView modal ─────────────────────────────────────── */
@@ -144,7 +144,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
     return (
       <View style={[styles.sheet, { backgroundColor: colors.card }]}>
         <View style={styles.paidSuccess}>
-          <Text style={styles.paidIcon}>✅</Text>
+          <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
           <Text style={[styles.paidTitle, { color: colors.foreground }]}>Payment Recorded!</Text>
           <Text style={[styles.paidSub, { color: colors.mutedForeground }]}>Thank you for using ServeNow</Text>
         </View>
@@ -184,7 +184,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
       ) : (
         <View style={styles.methodsList}>
           {config.methods.map(method => {
-            const info = METHOD_INFO[method] ?? { icon: '💳', label: method, desc: '' };
+            const info = METHOD_INFO[method] ?? { icon: 'card-outline', label: method, desc: '' };
             const isSelected = selected === method;
             return (
               <TouchableOpacity
@@ -196,7 +196,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
                   { borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary + '0F' : colors.muted }
                 ]}
               >
-                <Text style={styles.methodIcon}>{info.icon}</Text>
+                <Ionicons name={info.icon} size={24} color={colors.primary} style={{ width: 28, textAlign: 'center' }} />
                 <View style={styles.methodInfo}>
                   <Text style={[styles.methodName, { color: colors.foreground }]}>{info.label}</Text>
                   <Text style={[styles.methodDesc, { color: colors.mutedForeground }]}>{info.desc}</Text>

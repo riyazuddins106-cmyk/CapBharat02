@@ -11,8 +11,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, professionalsApi, offersApi, addressesApi, notificationsApi, reelsApi, type Offer, type Reel } from '@/lib/api';
-import { ProCard } from '@/components/ProCard';
+import { categoriesApi, professionalsApi, offersApi, addressesApi, notificationsApi, reelsApi, servicesApi, cartApi, type Offer, type Reel } from '@/lib/api';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { storage } from '@/lib/storage';
 import { WebView } from 'react-native-webview';
@@ -260,7 +259,12 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const featured = professionals?.slice(0, 6) ?? [];
+  const { data: featuredCatalogue, isLoading: featuredServicesLoading } = useQuery({
+    queryKey: ['/api/services/featured'],
+    queryFn: servicesApi.featured,
+    staleTime: 60_000,
+  });
+  const featuredServices = featuredCatalogue?.services ?? [];
 
   return (
     <ScrollView
@@ -274,7 +278,7 @@ export default function HomeScreen() {
         <View>
           <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{greeting()}</Text>
           <Text style={[styles.name, { color: colors.foreground }]}>
-            {user ? (user.fullName?.split(' ')?.[0] ?? 'User') : 'Guest'} 👋
+            {user ? (user.fullName?.split(' ')?.[0] ?? 'User') : 'Guest'} 
           </Text>
         </View>
         <View style={styles.headerRight}>
@@ -388,21 +392,56 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Featured Professionals */}
+      {/* Featured products */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top Professionals</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Featured Services</Text>
         </View>
-        {prosLoading ? (
+        {featuredServicesLoading ? (
           [0, 1, 2].map((i) => <ProCardShimmer key={i} />)
         ) : (
-          featured.map((pro) => (
-            <ProCard
-              key={pro.id}
-              pro={pro}
-              onPress={() => router.push({ pathname: '/professional/[id]', params: { id: pro.id } })}
-              onBook={() => router.push({ pathname: '/professional/[id]', params: { id: pro.id, openBook: '1' } })}
-            />
+          featuredServices.slice(0, 6).map((service) => (
+            <TouchableOpacity
+              key={service.id}
+              activeOpacity={0.9}
+              onPress={() => router.push({
+                pathname: '/(tabs)/services',
+                params: { categoryId: service.categoryId, subCategoryId: service.subCategoryId ?? undefined },
+              })}
+              style={[styles.productCard, { backgroundColor: colors.card, borderColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }]}
+            >
+              <View style={styles.productImageWrapper}>
+                {service.images?.[0] ? (
+                  <Image source={{ uri: service.images[0] }} style={styles.productImage} />
+                ) : (
+                  <View style={[styles.productImage, { backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="sparkles" size={24} color="#C4B5FD" />
+                  </View>
+                )}
+                {service.badge && (
+                  <View style={styles.productBadgeContainer}>
+                    <Text style={styles.productBadgeText}>{service.badge}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.productContent}>
+                <View>
+                  <Text numberOfLines={2} style={[styles.productName, { color: colors.foreground }]}>{service.name}</Text>
+                  <Text numberOfLines={1} style={[styles.productDescription, { color: colors.mutedForeground }]}>{service.description || 'Professional service'}</Text>
+                </View>
+                <View style={styles.productFooter}>
+                  <View>
+                    <Text style={[styles.productPrice, { color: colors.foreground }]}>₹{service.customerPrice}</Text>
+                    <Text style={[styles.productDuration, { color: colors.mutedForeground }]}>
+                      <Ionicons name="time-outline" size={10} color={colors.mutedForeground} /> {service.duration} min
+                    </Text>
+                  </View>
+                  <View style={[styles.bookBtn, { backgroundColor: '#F5F3FF' }]}>
+                    <Text style={styles.bookBtnText}>Book</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
           ))
         )}
       </View>
@@ -564,6 +603,19 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  productCard: { flexDirection: 'row', gap: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderRadius: 16 },
+  productImageWrapper: { width: 100, height: 100, borderRadius: 12, overflow: 'hidden' },
+  productImage: { width: '100%', height: '100%' },
+  productBadgeContainer: { position: 'absolute', top: 0, left: 0, backgroundColor: '#5B3EF5', paddingHorizontal: 6, paddingVertical: 4, borderBottomRightRadius: 8 },
+  productBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  productContent: { flex: 1, justifyContent: 'space-between', paddingVertical: 2 },
+  productName: { fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  productDescription: { fontSize: 12, marginTop: 4 },
+  productFooter: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8 },
+  productPrice: { fontSize: 16, fontWeight: '800' },
+  productDuration: { fontSize: 11, marginTop: 2, fontWeight: '600' },
+  bookBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  bookBtnText: { color: '#5B3EF5', fontSize: 12, fontWeight: '700' },
   header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   greeting:       { fontSize: 13 },
   name:           { fontSize: 22, fontWeight: '700', marginTop: 1 },

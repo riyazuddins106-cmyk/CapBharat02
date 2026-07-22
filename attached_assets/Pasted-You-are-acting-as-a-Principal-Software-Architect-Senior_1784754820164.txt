@@ -1,0 +1,938 @@
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Backend Engineer, Database Architect, Mobile App Engineer, UI/UX Engineer, and QA Engineer.
+
+I have an existing Urban Company style marketplace application with:
+
+1. Customer App
+2. Partner App
+3. Admin Panel
+
+
+IMPORTANT BUSINESS LOGIC CHANGE:
+
+The current application is wrong because professionals are showing their own services and prices.
+
+REMOVE THIS MODEL COMPLETELY.
+
+
+CURRENT WRONG FLOW:
+
+Customer
+   |
+Select Professional
+   |
+Professional shows service
+   |
+Professional sets price
+   |
+Customer books
+
+
+THIS SHOULD BE REMOVED.
+
+
+====================================================
+
+NEW REQUIRED MODEL (URBAN COMPANY STYLE)
+
+ADMIN OWNS THE SERVICE CATALOG.
+
+
+Only Admin can create:
+
+- Categories
+- Sub Categories
+- Service Products
+- Pricing
+- Images
+- Description
+- Duration
+- Partner payout
+- Required skills
+
+
+Partners cannot:
+
+- Create products
+- Create categories
+- Set prices
+- Modify pricing
+
+
+Partners are only service professionals who complete assigned jobs.
+
+
+====================================================
+
+NEW COMPLETE CUSTOMER FLOW
+
+
+Example:
+
+
+ADMIN CREATES:
+
+
+Category:
+
+Cleaning
+
+
+Sub Category:
+
+Floor Cleaning
+
+
+Product:
+
+
+Deep Floor Cleaning
+
+
+Product Details:
+
+
+Name:
+Deep Floor Cleaning
+
+
+Customer Price:
+
+₹999
+
+
+Partner Earnings:
+
+₹600
+
+
+Duration:
+
+2 Hours
+
+
+Required Skill:
+
+Floor Cleaning
+
+
+Images:
+
+Uploaded by Admin
+
+
+
+====================================================
+
+CUSTOMER APP FLOW
+
+
+Customer opens app:
+
+
+Cleaning
+
+
+↓
+
+Floor Cleaning
+
+
+↓
+
+Deep Floor Cleaning
+
+
+Customer sees:
+
+
+Image
+
+Description
+
+Duration
+
+Price
+
+
+₹999
+
+
+
+Button:
+
+
+ADD TO CART
+
+
+
+====================================================
+
+CART SYSTEM
+
+
+Implement proper cart functionality.
+
+
+Customer can add multiple products.
+
+
+Example:
+
+
+Cart:
+
+
+Deep Floor Cleaning
+
+₹999
+
+
+Bathroom Cleaning
+
+₹799
+
+
+Sofa Cleaning
+
+₹1200
+
+
+
+Total:
+
+₹2998
+
+
+
+Checkout:
+
+
+Customer selects:
+
+
+Address
+
+
+Date
+
+
+Time Slot
+
+
+
+Example:
+
+
+Date:
+
+25 July
+
+
+Time:
+
+10 AM - 12 PM
+
+
+
+Then:
+
+
+Confirm Booking
+
+
+
+====================================================
+
+BOOKING CREATION
+
+
+After checkout:
+
+
+Create booking:
+
+
+Booking ID:
+
+#10001
+
+
+Customer:
+
+Riyaz
+
+
+Products:
+
+
+Deep Floor Cleaning
+
+
+Price:
+
+₹999
+
+
+Date:
+
+25 July
+
+
+Time:
+
+10 AM
+
+
+Status:
+
+SEARCHING_PROFESSIONAL
+
+
+
+====================================================
+
+PROFESSIONAL MATCHING SYSTEM
+
+
+After booking creation:
+
+
+System should automatically find professionals.
+
+
+Matching conditions:
+
+
+1.
+
+Professional has required skill
+
+
+Example:
+
+Floor Cleaning
+
+
+
+2.
+
+Professional status:
+
+
+AVAILABLE
+
+
+
+3.
+
+Professional location is within service area
+
+
+
+4.
+
+Professional is not already assigned another job
+
+
+
+====================================================
+
+JOB REQUEST NOTIFICATION
+
+
+Send request popup to professionals like Urban Company / Ola style.
+
+
+Example Partner App popup:
+
+
+--------------------------------
+
+NEW SERVICE REQUEST
+
+
+Service:
+
+Deep Floor Cleaning
+
+
+Customer Location:
+
+Andheri
+
+
+Distance:
+
+2 KM
+
+
+Scheduled Time:
+
+10 AM
+
+
+Your Earnings:
+
+₹600
+
+
+
+Buttons:
+
+
+ACCEPT JOB
+
+
+REJECT
+
+
+--------------------------------
+
+
+
+====================================================
+
+MULTIPLE PROFESSIONAL REQUEST
+
+
+Do not send only one request.
+
+
+Send request to multiple eligible professionals.
+
+
+Example:
+
+
+5 cleaners receive request.
+
+
+
+If one professional accepts:
+
+
+Booking is assigned immediately.
+
+
+Other professionals receive:
+
+
+"This booking has already been assigned."
+
+
+
+====================================================
+
+PARTNER APP FLOW
+
+
+Partner should see:
+
+
+Incoming Requests
+
+
+Accepted Jobs
+
+
+Upcoming Jobs
+
+
+Completed Jobs
+
+
+Earnings
+
+
+
+Partner cannot see:
+
+
+Create Service ❌
+
+Add Price ❌
+
+Change Product ❌
+
+
+
+====================================================
+
+PARTNER ACCEPT FLOW
+
+
+Professional clicks:
+
+
+ACCEPT JOB
+
+
+
+System updates:
+
+
+Booking:
+
+
+SEARCHING_PROFESSIONAL
+
+
+to
+
+
+PROFESSIONAL_ASSIGNED
+
+
+
+Save:
+
+
+Assigned Partner ID
+
+Accepted Time
+
+Partner Location
+
+
+
+====================================================
+
+CUSTOMER UPDATE
+
+
+Customer receives:
+
+
+Professional Assigned
+
+
+Show:
+
+
+Professional Name
+
+
+Profile Image
+
+
+Rating
+
+
+Arrival Time
+
+
+
+====================================================
+
+OPERATIONS CONTROL CENTRE
+
+
+Because this is a new marketplace, there may be cases where no professional accepts.
+
+
+Create:
+
+
+Service Dispatch Centre
+
+
+
+This page receives all booking requests where:
+
+
+- No professional accepted
+- Request expired
+- Professional rejected
+
+
+
+====================================================
+
+SERVICE DISPATCH CENTRE FEATURES
+
+
+Show:
+
+
+Booking ID
+
+
+Customer
+
+
+Service Product
+
+
+Location
+
+
+Time
+
+
+Professionals notified
+
+
+Accepted Professional
+
+
+Status
+
+
+Assignment Type
+
+
+Assigned By
+
+
+
+Example:
+
+
+Booking:
+
+#10001
+
+
+Service:
+
+Deep Floor Cleaning
+
+
+Sent To:
+
+5 Professionals
+
+
+Accepted:
+
+None
+
+
+Status:
+
+Waiting For Assignment
+
+
+
+Action:
+
+
+Assign Professional
+
+
+
+====================================================
+
+MANUAL ASSIGNMENT
+
+
+Operations Manager can manually assign.
+
+
+Click:
+
+
+Assign Professional
+
+
+
+Show:
+
+
+Available Professionals:
+
+
+Name
+
+Skill
+
+Distance
+
+Rating
+
+Availability
+
+
+
+Example:
+
+
+Ahmed
+
+
+Skill:
+
+Floor Cleaning
+
+
+Status:
+
+Available
+
+
+Distance:
+
+2 KM
+
+
+
+Select:
+
+
+Ahmed
+
+
+
+Confirm Assignment
+
+
+
+====================================================
+
+AFTER MANUAL ASSIGNMENT:
+
+
+Update:
+
+
+Booking Status:
+
+ASSIGNED_MANUALLY
+
+
+Professional:
+
+Ahmed
+
+
+Assigned By:
+
+Operations Manager
+
+
+Assignment Time:
+
+Timestamp
+
+
+
+Professional receives:
+
+
+NEW ASSIGNED JOB
+
+
+Assigned by Operations Team
+
+
+
+====================================================
+
+DATABASE REQUIREMENTS
+
+
+Create/modify:
+
+
+services table
+
+
+id
+
+category_id
+
+subcategory_id
+
+name
+
+description
+
+image
+
+customer_price
+
+partner_payout
+
+duration
+
+required_skill
+
+status
+
+
+
+--------------------
+
+
+cart table
+
+
+id
+
+customer_id
+
+service_id
+
+quantity
+
+price
+
+
+
+--------------------
+
+
+bookings table
+
+
+id
+
+customer_id
+
+status
+
+total_amount
+
+date
+
+time
+
+assigned_partner_id
+
+
+
+--------------------
+
+
+partner_services table
+
+
+partner_id
+
+service_id
+
+
+
+--------------------
+
+
+booking_partner_requests
+
+
+id
+
+booking_id
+
+partner_id
+
+status
+
+PENDING
+
+ACCEPTED
+
+REJECTED
+
+EXPIRED
+
+sent_time
+
+response_time
+
+
+
+--------------------
+
+
+assignment_logs
+
+
+id
+
+booking_id
+
+partner_id
+
+action
+
+
+AUTO_ASSIGNED
+
+PARTNER_ACCEPTED
+
+MANUAL_ASSIGNED
+
+
+assigned_by
+
+created_at
+
+
+
+====================================================
+
+IMPORTANT DEVELOPMENT RULES
+
+
+1. Analyze current application before coding.
+
+2. Do not rebuild.
+
+3. Remove partner pricing logic completely.
+
+4. Make Admin the single source of truth for products and prices.
+
+5. Customer App, Partner App, and Admin Panel must use the same backend data.
+
+6. Maintain existing UI design.
+
+7. Add proper API changes.
+
+8. Add database migrations safely.
+
+9. Add notifications.
+
+10. Test complete flow:
+
+
+Admin creates product
+
+↓
+
+Customer sees product
+
+↓
+
+Customer adds to cart
+
+↓
+
+Customer selects time
+
+↓
+
+Booking created
+
+↓
+
+Professionals receive popup
+
+↓
+
+Professional accepts
+
+↓
+
+Customer gets professional details
+
+↓
+
+Professional completes work
+
+↓
+
+Customer reviews
+
+
+
+Build this as a real Urban Company style marketplace workflow.
