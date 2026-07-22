@@ -234,11 +234,36 @@ export default function JobDetailScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 100 }}>
         {/* Service info */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Service Details</Text>
-          <DetailRow icon="construct-outline" label="Service" value={job.serviceName} colors={colors} />
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Job Details</Text>
           <DetailRow icon="time-outline" label="Scheduled" value={fmtDate(job.scheduledAt)} colors={colors} />
           <DetailRow icon="cash-outline" label="Earnings" value={`₹${job.price}`} colors={colors} bold />
           {job.notes && <DetailRow icon="document-text-outline" label="Notes" value={job.notes} colors={colors} />}
+        </View>
+
+        {/* All services in this booking */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Services to Complete</Text>
+          {job.services && job.services.length > 0 ? (
+            job.services.map((svc, idx) => (
+              <View key={idx} style={[styles.serviceRow, idx > 0 && { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, marginTop: 10 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="construct-outline" size={14} color={colors.primary} />
+                  <Text style={[{ fontSize: 14, fontWeight: '600', flex: 1 }, { color: colors.foreground }]}>{svc.name}</Text>
+                  {svc.quantity > 1 && (
+                    <Text style={{ fontSize: 12, color: colors.mutedForeground }}>×{svc.quantity}</Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingLeft: 22 }}>
+                  <Text style={{ fontSize: 12, color: colors.mutedForeground }}>
+                    <Ionicons name="time-outline" size={11} /> {svc.duration} min
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>₹{svc.unitPartnerPayout} payout</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <DetailRow icon="construct-outline" label="Service" value={job.serviceName} colors={colors} />
+          )}
         </View>
 
         {/* Customer info */}
@@ -351,6 +376,7 @@ const styles = StyleSheet.create({
   card: { padding: 16, borderWidth: 1, gap: 12 },
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
   detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  serviceRow: { paddingVertical: 2 },
   detailLabel: { fontSize: 13, width: 70 },
   detailValue: { fontSize: 13, flex: 1 },
   infoBox: { flexDirection: 'row', gap: 8, padding: 12, alignItems: 'flex-start' },

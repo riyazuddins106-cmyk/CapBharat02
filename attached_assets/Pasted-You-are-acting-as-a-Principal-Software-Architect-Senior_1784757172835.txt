@@ -1,0 +1,756 @@
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Backend Engineer, Mobile App Engineer, Database Architect, UI/UX Engineer, and QA Engineer.
+
+I need you to modify the existing Customer App booking flow.
+
+IMPORTANT:
+The current system is wrong because every service/product is directly showing:
+
+"BOOK NOW"
+
+Remove this flow.
+
+The application should work like an Urban Company style marketplace where customers can add multiple services/products into a cart and schedule a home service booking.
+
+====================================================
+
+NEW CUSTOMER BOOKING FLOW
+
+REMOVE:
+
+Product Page
+      |
+      BOOK NOW
+
+
+REPLACE WITH:
+
+
+Product Page
+
+      |
+
+ADD TO CART
+
+
+      |
+
+Customer Cart
+
+
+      |
+
+Checkout
+
+
+      |
+
+Select Address
+
+
+      |
+
+Select Date & Time Slot
+
+
+      |
+
+Confirm Booking
+
+
+      |
+
+Professional Assignment
+
+
+      |
+
+Professional Visits Customer Location
+
+
+
+====================================================
+
+PRODUCT PAGE CHANGES
+
+
+Every service/product should show:
+
+
+Image
+
+
+Service Name
+
+
+Description
+
+
+Duration
+
+
+Price
+
+
+
+Example:
+
+
+Deep Floor Cleaning
+
+
+Duration:
+
+2 Hours
+
+
+Price:
+
+₹999
+
+
+
+Button:
+
+
+ADD TO CART
+
+
+NOT:
+
+BOOK NOW
+
+
+
+====================================================
+
+CART FUNCTIONALITY
+
+
+Implement complete cart system.
+
+
+Customer can add multiple services/products.
+
+
+Example:
+
+
+Customer Cart:
+
+
+1.
+
+Deep Floor Cleaning
+
+₹999
+
+
+2.
+
+Bathroom Deep Cleaning
+
+₹799
+
+
+3.
+
+Sofa Cleaning
+
+₹1200
+
+
+
+Cart should show:
+
+
+Product Image
+
+
+Product Name
+
+
+Quantity
+
+
+Price
+
+
+Remove option
+
+
+Total Amount
+
+
+
+Example:
+
+
+Subtotal:
+
+₹2998
+
+
+
+Button:
+
+
+PROCEED TO CHECKOUT
+
+
+
+====================================================
+
+CHECKOUT FLOW
+
+
+After clicking checkout:
+
+
+Step 1:
+
+
+Select Customer Address
+
+
+Example:
+
+
+Home Address
+
+Office Address
+
+Add New Address
+
+
+
+====================================================
+
+Step 2:
+
+
+Select Booking Date
+
+
+Example:
+
+
+Today
+
+Tomorrow
+
+Custom Date
+
+
+
+====================================================
+
+Step 3:
+
+
+Select Time Slot
+
+
+Example:
+
+
+9 AM - 11 AM
+
+
+11 AM - 1 PM
+
+
+2 PM - 4 PM
+
+
+4 PM - 6 PM
+
+
+
+The selected time slot should be stored with booking.
+
+
+
+====================================================
+
+Step 4:
+
+
+Booking Summary
+
+
+
+Example:
+
+
+
+Services:
+
+
+Deep Floor Cleaning
+
+₹999
+
+
+Bathroom Cleaning
+
+₹799
+
+
+Sofa Cleaning
+
+₹1200
+
+
+
+Date:
+
+25 July 2026
+
+
+Time:
+
+10 AM - 12 PM
+
+
+Address:
+
+Customer Address
+
+
+
+Total:
+
+₹2998
+
+
+
+Button:
+
+
+CONFIRM BOOKING
+
+
+
+====================================================
+
+BOOKING CREATION
+
+
+After confirmation:
+
+
+Create ONE booking.
+
+
+Example:
+
+
+
+Booking ID:
+
+#10001
+
+
+
+Customer:
+
+Riyaz
+
+
+
+Services:
+
+
+
+Floor Cleaning
+
+
+Bathroom Cleaning
+
+
+Sofa Cleaning
+
+
+
+Total:
+
+₹2998
+
+
+
+Scheduled Date:
+
+25 July
+
+
+
+Scheduled Time:
+
+10 AM - 12 PM
+
+
+
+Address:
+
+Customer Location
+
+
+
+Status:
+
+
+SEARCHING_PROFESSIONAL
+
+
+
+====================================================
+
+PROFESSIONAL ASSIGNMENT
+
+
+After booking creation:
+
+
+The system should find professionals based on all services in the booking.
+
+
+Example:
+
+
+Customer booked:
+
+
+Floor Cleaning
+
+Bathroom Cleaning
+
+
+
+Find professionals who have required skills.
+
+
+Send job request popup.
+
+
+
+Professional receives:
+
+
+
+NEW SERVICE REQUEST
+
+
+
+Services:
+
+
+Floor Cleaning
+
+
+Bathroom Cleaning
+
+
+
+Customer Location:
+
+
+Address
+
+
+
+Date:
+
+
+25 July
+
+
+
+Time:
+
+
+10 AM
+
+
+
+Your Earnings:
+
+
+₹1200
+
+
+
+Buttons:
+
+
+ACCEPT JOB
+
+
+REJECT
+
+
+
+====================================================
+
+IMPORTANT BUSINESS RULE
+
+
+The professional is not selling the service.
+
+The platform sells the service.
+
+Professional only receives the job and completes the work.
+
+
+
+====================================================
+
+DATABASE CHANGES
+
+
+Create/modify:
+
+
+cart table:
+
+
+
+id
+
+customer_id
+
+service_id
+
+quantity
+
+price
+
+created_at
+
+
+
+--------------------
+
+
+cart_items:
+
+
+
+cart_id
+
+service_id
+
+quantity
+
+price
+
+
+
+--------------------
+
+
+bookings:
+
+
+
+id
+
+customer_id
+
+total_amount
+
+booking_date
+
+booking_time
+
+address
+
+status
+
+assigned_partner_id
+
+
+
+--------------------
+
+
+booking_services:
+
+
+
+booking_id
+
+service_id
+
+price
+
+duration
+
+
+
+This allows one booking to contain multiple services.
+
+
+
+====================================================
+
+PARTNER APP CHANGES
+
+
+Partner should receive the complete booking details.
+
+
+
+Example:
+
+
+Booking #10001
+
+
+Customer:
+
+Riyaz
+
+
+
+Services:
+
+
+Floor Cleaning
+
+
+Bathroom Cleaning
+
+
+Sofa Cleaning
+
+
+
+Duration:
+
+4 Hours
+
+
+
+Location:
+
+Customer Address
+
+
+
+Partner accepts entire booking.
+
+
+
+====================================================
+
+ADMIN PANEL
+
+
+Admin should see:
+
+
+Booking Details:
+
+
+
+Booking ID
+
+
+Customer
+
+
+All Services
+
+
+Total Amount
+
+
+Date
+
+
+Time
+
+
+Assigned Professional
+
+
+Booking Status
+
+
+
+====================================================
+
+TEST COMPLETE FLOW:
+
+
+Admin creates products/services
+
+
+↓
+
+Customer opens product
+
+
+↓
+
+Customer clicks ADD TO CART
+
+
+↓
+
+Customer adds multiple services
+
+
+↓
+
+Customer opens cart
+
+
+↓
+
+Customer checks out
+
+
+↓
+
+Customer selects address/date/time
+
+
+↓
+
+Booking created
+
+
+↓
+
+Professionals receive popup
+
+
+↓
+
+Professional accepts
+
+
+↓
+
+Professional visits customer
+
+
+↓
+
+Services completed
+
+
+↓
+
+Customer reviews
+
+
+
+====================================================
+
+Do not keep "Book Now" on product page.
+
+The correct action is:
+
+PRODUCT → ADD TO CART → CHECKOUT → SCHEDULE → BOOKING → PROFESSIONAL ASSIGNMENT.

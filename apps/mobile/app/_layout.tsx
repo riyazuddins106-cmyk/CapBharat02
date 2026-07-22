@@ -116,6 +116,7 @@ export default function RootLayout() {
                 <Stack.Screen name="subcategories/[categoryId]" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="professional/[id]" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="checkout" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
                 <Stack.Screen name="wishlist" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="points" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="privacy-security" options={{ animation: 'slide_from_right' }} />

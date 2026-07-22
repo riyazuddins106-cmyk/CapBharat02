@@ -437,8 +437,8 @@ function ProCard({ pro, wishlisted, onWishlist, onBook }: {
           <span className="text-lg font-bold text-foreground">₹{pro.basePrice}</span>
           <span className="text-xs text-gray-400">{pro.priceUnit}</span>
         </div>
-        <button onClick={onBook} className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-          Book Now
+        <button onClick={onBook} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ background: "#EDE9FD", color: "#5B3EF5" }}>
+          View Services
         </button>
       </div>
     </div>
@@ -1316,7 +1316,7 @@ function CustHome({
                       onClick={() => onCategorySelect(service.categoryId)} 
                       className="h-8 px-3 rounded-lg text-xs font-bold text-[#5B3EF5] bg-[#F5F3FF] hover:bg-[#EDE9FD] transition-colors"
                     >
-                      Book
+                      Explore
                     </button>
                   </div>
                 </div>
@@ -1589,9 +1589,9 @@ function CustServices({
       </div>
       <div className="h-6" />
       {cartOpen && cart && (
-        <CartSheet
+        <CheckoutFlow
           cart={cart}
-          onClose={() => setCartOpen(false)}
+          onClose={() => { setCartOpen(false); }}
           onChange={(next) => { setCart(next); onCartChange(next); }}
         />
       )}
@@ -1599,46 +1599,434 @@ function CustServices({
   );
 }
 
-function CartSheet({ cart, onClose, onChange }: { cart: ApiCart; onClose: () => void; onChange: (cart: ApiCart) => void }) {
-  const [saving, setSaving] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState("");
-  const checkout = async () => {
-    if (!scheduledAt || !cart.items.length) return;
-    setSaving(true);
+/* ═══════════════════════════════════════════════════════════════
+   CHECKOUT FLOW  (cart → address → date → time → summary → done)
+═══════════════════════════════════════════════════════════════ */
+const CHECKOUT_TIME_SLOTS = ["9 AM - 11 AM", "11 AM - 1 PM", "2 PM - 4 PM", "4 PM - 6 PM"];
+const CHECKOUT_SLOT_HOURS: Record<string, number> = {
+  "9 AM - 11 AM": 9, "11 AM - 1 PM": 11, "2 PM - 4 PM": 14, "4 PM - 6 PM": 16,
+};
+
+function buildSlotScheduledAt(dateLabel: string, slotLabel: string): string {
+  const hour = CHECKOUT_SLOT_HOURS[slotLabel] ?? 9;
+  const base = new Date();
+  if (dateLabel === "Tomorrow") base.setDate(base.getDate() + 1);
+  else if (dateLabel !== "Today") {
+    const match = dateLabel.match(/(\d+)\s+(\w+)/);
+    if (match) {
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const day = parseInt(match[1]);
+      const monthIdx = months.indexOf(match[2]);
+      if (monthIdx !== -1) {
+        const year = new Date().getFullYear();
+        const proposed = new Date(year, monthIdx, day);
+        if (proposed < new Date()) proposed.setFullYear(year + 1);
+        base.setFullYear(proposed.getFullYear(), proposed.getMonth(), proposed.getDate());
+      }
+    }
+  }
+  base.setHours(hour, 0, 0, 0);
+  return base.toISOString();
+}
+
+const STEP_TITLES = ["Your Cart", "Select Address", "Select Date", "Select Time Slot", "Booking Summary"];
+
+function CheckoutFlow({ cart, onClose, onChange }: {
+  cart: ApiCart;
+  onClose: () => void;
+  onChange: (cart: ApiCart) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [addresses, setAddresses] = useState<ApiAddress[]>([]);
+  const [addrsLoading, setAddrsLoading] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addingSaving, setAddingSaving] = useState(false);
+
+  const today = new Date();
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    if (i === 0) return "Today";
+    if (i === 1) return "Tomorrow";
+    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  });
+  const [selectedDate, setSelectedDate] = useState("Today");
+  const [selectedSlot, setSelectedSlot] = useState("9 AM - 11 AM");
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState("");
+  const [bookingDone, setBookingDone] = useState(false);
+
+  useEffect(() => {
+    if (step === 1 && addresses.length === 0) {
+      setAddrsLoading(true);
+      addressesApi.list()
+        .then((list) => {
+          setAddresses(list);
+          const def = list.find((a) => a.isDefault);
+          setSelectedAddressId(def?.id ?? list[0]?.id ?? null);
+        })
+        .catch(() => {})
+        .finally(() => setAddrsLoading(false));
+    }
+  }, [step]);
+
+  const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
+
+  async function handleAddAddress(data: typeof BLANK_FORM) {
+    setAddingSaving(true);
     try {
-      await cartApi.checkout({ scheduledAt: new Date(scheduledAt).toISOString() });
+      const created = await addressesApi.create(data);
+      const next = [...addresses, created];
+      setAddresses(next);
+      setSelectedAddressId(created.id);
+      setShowAddressForm(false);
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message ?? "Failed to save address.");
+    } finally { setAddingSaving(false); }
+  }
+
+  async function handleConfirm() {
+    setError(""); setConfirming(true);
+    try {
+      const scheduledAt = buildSlotScheduledAt(selectedDate, selectedSlot);
+      await cartApi.checkout({ scheduledAt, addressId: selectedAddressId ?? undefined });
       onChange({ ...cart, items: [], total: 0 });
-      onClose();
-    } finally { setSaving(false); }
-  };
+      setBookingDone(true);
+      setStep(5);
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? "Booking failed. Please try again.");
+    } finally { setConfirming(false); }
+  }
+
   return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={onClose}>
-      <div className="w-full max-w-[390px] bg-white rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg">Your cart</h3>
-          <button onClick={onClose}><X size={20} color="#6B7280" /></button>
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center"
+      onClick={bookingDone ? undefined : onClose}>
+      <div className="w-full max-w-[390px] bg-white rounded-t-3xl flex flex-col"
+        style={{ maxHeight: "90vh" }}
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full bg-gray-200" />
         </div>
-        {cart.items.length === 0 ? <p className="text-sm text-gray-400 py-8 text-center">Your cart is empty.</p> : (
-          <>
-            <div className="flex flex-col gap-3">
-              {cart.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 border-b border-black/5 pb-3">
-                  <div className="flex-1"><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-gray-400">₹{item.unitPrice} each</p></div>
-                  <button onClick={async () => onChange(await cartApi.update(item.id, Math.max(1, item.quantity - 1)))} className="w-7 h-7 rounded-lg bg-gray-100">−</button>
-                  <span className="text-sm font-bold">{item.quantity}</span>
-                  <button onClick={async () => onChange(await cartApi.update(item.id, item.quantity + 1))} className="w-7 h-7 rounded-lg bg-violet-50 text-violet-700">+</button>
-                  <button onClick={async () => onChange(await cartApi.remove(item.id))} className="ml-1"><Trash2 size={15} color="#EF4444" /></button>
-                </div>
-              ))}
+
+        {/* Header */}
+        {step < 5 && (
+          <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06] flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {step > 0 && (
+                <button onClick={() => setStep(step - 1)} className="p-1 -ml-1">
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+              <h3 className="text-base font-bold">{STEP_TITLES[step]}</h3>
             </div>
-            <div className="flex justify-between font-bold mt-4"><span>Total</span><span>₹{cart.total.toLocaleString("en-IN")}</span></div>
-            <label className="block text-xs font-semibold text-gray-500 mt-4 mb-1">Preferred date and time</label>
-            <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full rounded-xl border border-black/10 px-3 py-2.5 text-sm" />
-            <button disabled={!scheduledAt || saving} onClick={checkout} className="w-full mt-4 rounded-xl bg-violet-600 py-3 text-white font-bold text-sm disabled:opacity-50">
-              {saving ? "Confirming…" : "Confirm booking"}
-            </button>
-          </>
+            <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
+          </div>
         )}
+
+        {/* Progress */}
+        {step < 5 && (
+          <div className="flex justify-center gap-1.5 pt-3 pb-1 flex-shrink-0">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-1.5 rounded-full transition-all duration-200"
+                style={{ width: i === step ? 20 : 6, background: i <= step ? "#5B3EF5" : "#E5E7EB" }} />
+            ))}
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 pt-3 pb-6" style={{ scrollbarWidth: "none" }}>
+
+          {/* ── Step 0: Cart ── */}
+          {step === 0 && (
+            <>
+              {cart.items.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="text-4xl mb-3">🛒</div>
+                  <p className="text-sm font-bold text-gray-700">Your cart is empty</p>
+                  <p className="text-xs text-gray-400 mt-1">Add services to continue</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3 mb-4">
+                    {cart.items.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name}
+                            className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#EDE9FD] to-[#F5F3FF] flex items-center justify-center flex-shrink-0">
+                            <Sparkles size={18} color="#C4B5FD" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                            <Clock size={9} /> {item.duration} min · ₹{item.unitPrice}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={async () => {
+                              if (item.quantity <= 1) onChange(await cartApi.remove(item.id));
+                              else onChange(await cartApi.update(item.id, item.quantity - 1));
+                            }}
+                            className="w-7 h-7 rounded-lg bg-white border border-black/10 text-sm font-bold flex items-center justify-center"
+                          >−</button>
+                          <span className="text-sm font-bold w-5 text-center">{item.quantity}</span>
+                          <button
+                            onClick={async () => onChange(await cartApi.update(item.id, item.quantity + 1))}
+                            className="w-7 h-7 rounded-lg text-sm font-bold text-white flex items-center justify-center"
+                            style={{ background: "#5B3EF5" }}
+                          >+</button>
+                          <button onClick={async () => onChange(await cartApi.remove(item.id))} className="ml-0.5 p-1">
+                            <Trash2 size={13} color="#EF4444" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 rounded-xl px-4 py-3 mb-5">
+                    <span className="text-sm font-bold text-gray-700">Subtotal</span>
+                    <span className="text-lg font-black" style={{ color: "#5B3EF5" }}>
+                      ₹{cart.total.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setStep(1)}
+                    className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+                  >
+                    Proceed to Checkout <ArrowRight size={16} />
+                  </button>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── Step 1: Address ── */}
+          {step === 1 && (
+            <>
+              {addrsLoading ? (
+                <div className="py-8 text-center text-sm text-gray-400">Loading addresses…</div>
+              ) : addresses.length > 0 ? (
+                <div className="flex flex-col gap-2 mb-4">
+                  {addresses.map((a) => {
+                    const lbl = (a.label ?? "Other") as AddrLabel;
+                    const lc = LABEL_COLORS[lbl] ?? LABEL_COLORS.Other;
+                    const selected = selectedAddressId === a.id;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => setSelectedAddressId(a.id)}
+                        className="flex items-start gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all"
+                        style={{
+                          borderColor: selected ? "#5B3EF5" : "rgba(0,0,0,0.08)",
+                          background: selected ? "#F5F3FF" : "#FAFAFA",
+                        }}
+                      >
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                          style={{ background: lc.bg }}>
+                          <MapPin size={14} color={lc.color} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold" style={{ color: lc.color }}>{a.label ?? "Other"}</p>
+                          <p className="text-sm font-semibold text-gray-800 leading-snug">{a.line1}</p>
+                          {a.line2 && <p className="text-xs text-gray-400">{a.line2}</p>}
+                          <p className="text-xs text-gray-400">{[a.city, a.state].filter(Boolean).join(", ")}</p>
+                        </div>
+                        <div className="w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1.5 flex items-center justify-center"
+                          style={{ borderColor: selected ? "#5B3EF5" : "#D1D5DB", background: selected ? "#5B3EF5" : "transparent" }}>
+                          {selected && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-6 text-center mb-2">
+                  <div className="text-3xl mb-2">📍</div>
+                  <p className="text-sm font-bold text-gray-700 mb-1">No addresses saved</p>
+                  <p className="text-xs text-gray-400">Add an address for service delivery</p>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowAddressForm(true)}
+                className="w-full py-3 rounded-2xl text-sm font-semibold border-2 border-dashed flex items-center justify-center gap-2 mb-4"
+                style={{ borderColor: "#5B3EF5", color: "#5B3EF5" }}
+              >
+                <Plus size={16} /> Add New Address
+              </button>
+
+              <button
+                onClick={() => setStep(2)}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                Continue <ArrowRight size={16} />
+              </button>
+
+              {showAddressForm && (
+                <AddressFormModal
+                  onSave={handleAddAddress}
+                  onClose={() => setShowAddressForm(false)}
+                  saving={addingSaving}
+                />
+              )}
+            </>
+          )}
+
+          {/* ── Step 2: Date ── */}
+          {step === 2 && (
+            <>
+              <p className="text-xs font-bold text-gray-500 mb-3">Choose a preferred date</p>
+              <div className="grid grid-cols-2 gap-2 mb-5">
+                {dates.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setSelectedDate(d)}
+                    className="py-3 rounded-xl text-sm font-bold border-2 transition-all"
+                    style={{
+                      borderColor: selectedDate === d ? "#5B3EF5" : "rgba(0,0,0,0.08)",
+                      background: selectedDate === d ? "#5B3EF5" : "#FAFAFA",
+                      color: selectedDate === d ? "#fff" : "#374151",
+                    }}
+                  >{d}</button>
+                ))}
+              </div>
+              <button
+                onClick={() => setStep(3)}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                Continue <ArrowRight size={16} />
+              </button>
+            </>
+          )}
+
+          {/* ── Step 3: Time Slot ── */}
+          {step === 3 && (
+            <>
+              <p className="text-xs font-bold text-gray-500 mb-3">Pick a time for {selectedDate}</p>
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                {CHECKOUT_TIME_SLOTS.map((slot) => (
+                  <button
+                    key={slot}
+                    onClick={() => setSelectedSlot(slot)}
+                    className="py-4 rounded-2xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1.5"
+                    style={{
+                      borderColor: selectedSlot === slot ? "#5B3EF5" : "rgba(0,0,0,0.08)",
+                      background: selectedSlot === slot ? "#5B3EF5" : "#FAFAFA",
+                      color: selectedSlot === slot ? "#fff" : "#374151",
+                    }}
+                  >
+                    <Clock size={16} color={selectedSlot === slot ? "#fff" : "#9CA3AF"} />
+                    {slot}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setStep(4)}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                Continue <ArrowRight size={16} />
+              </button>
+            </>
+          )}
+
+          {/* ── Step 4: Summary ── */}
+          {step === 4 && (
+            <>
+              <div className="flex flex-col gap-3 mb-4">
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Services</p>
+                  {cart.items.map((item) => (
+                    <div key={item.id}
+                      className="flex justify-between items-center py-2 border-b border-black/[0.05] last:border-0">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ""}
+                      </span>
+                      <span className="text-sm font-bold">₹{item.lineTotal.toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+                {[
+                  { label: "Date", value: selectedDate },
+                  { label: "Time", value: selectedSlot },
+                  {
+                    label: "Address",
+                    value: selectedAddress
+                      ? `${selectedAddress.line1}${selectedAddress.city ? ", " + selectedAddress.city : ""}`
+                      : "No address selected",
+                  },
+                ].map((r) => (
+                  <div key={r.label} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                    <span className="text-xs text-gray-400">{r.label}</span>
+                    <span className="text-xs font-bold text-right max-w-[58%] leading-tight">{r.value}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between rounded-xl px-4 py-3"
+                  style={{ background: "#EDE9FD" }}>
+                  <span className="text-sm font-bold">Total</span>
+                  <span className="text-lg font-black" style={{ color: "#5B3EF5" }}>
+                    ₹{cart.total.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+              {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+              <button
+                onClick={handleConfirm}
+                disabled={confirming}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                {confirming ? "Confirming…" : "Confirm Booking"}
+              </button>
+            </>
+          )}
+
+          {/* ── Step 5: Success ── */}
+          {step === 5 && (
+            <div className="flex flex-col items-center py-8">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                style={{ background: "#DCFCE7" }}>
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                  <path d="M6 16L13 23L26 9" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold mb-1">Booking Confirmed!</h3>
+              <p className="text-xs text-gray-400 text-center mb-5">
+                We're finding the best professional for your service.
+              </p>
+              <div className="w-full bg-gray-50 rounded-2xl p-4 mb-5 text-left">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Details</p>
+                <p className="text-xs text-gray-700 mb-1">
+                  <span className="font-bold">Date: </span>{selectedDate} · {selectedSlot}
+                </p>
+                {selectedAddress && (
+                  <p className="text-xs text-gray-700 mb-1">
+                    <span className="font-bold">Address: </span>
+                    {selectedAddress.line1}, {selectedAddress.city}
+                  </p>
+                )}
+                <p className="text-xs mt-2">
+                  Status: <span className="font-bold text-orange-500">Searching Professional</span>
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2202,13 +2590,7 @@ export default function CustomerApp() {
       )}
 
       {/* Booking modal */}
-      {bookingPro && (
-        <BookingModal
-          pro={bookingPro}
-          onClose={() => setBookingPro(null)}
-          onBooked={handleBooked}
-        />
-      )}
+      {/* BookingModal removed — booking flow now uses cart → checkout */}
     </PhoneFrame>
   );
 }

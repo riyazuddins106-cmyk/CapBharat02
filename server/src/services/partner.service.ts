@@ -90,7 +90,24 @@ export const partnerService = {
     if (!pro) throw AppError.notFound('Partner profile not found.');
     const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
     if (!job) throw AppError.notFound('Job not found.');
-    return job;
+
+    // Fetch individual booking items so the partner can see all services
+    const { db } = await import('../config/database.js');
+    const { bookingItems, services } = await import('../database/schema/index.js');
+    const { eq } = await import('drizzle-orm');
+    const items = await db
+      .select({
+        name: services.name,
+        quantity: bookingItems.quantity,
+        unitPartnerPayout: bookingItems.unitPartnerPayout,
+        duration: bookingItems.duration,
+        lineTotal: bookingItems.lineTotal,
+      })
+      .from(bookingItems)
+      .innerJoin(services, eq(bookingItems.serviceId, services.id))
+      .where(eq(bookingItems.bookingId, bookingId));
+
+    return { ...job, services: items };
   },
 
   async acceptJob(userId: string, bookingId: string) {

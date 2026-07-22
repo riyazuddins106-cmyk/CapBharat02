@@ -96,6 +96,14 @@ export interface PartnerProfile {
 
 export type JobStatus = 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
 
+export interface JobService {
+  name: string;
+  quantity: number;
+  unitPartnerPayout: number;
+  duration: number;
+  lineTotal: number;
+}
+
 export interface Job {
   id: string;
   customerId: string;
@@ -112,6 +120,7 @@ export interface Job {
   updatedAt: string;
   customerName: string | null;
   customerPhone: string | null;
+  services?: JobService[];
 }
 
 export interface Earnings {

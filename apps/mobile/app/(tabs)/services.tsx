@@ -24,7 +24,6 @@ export default function ServicesScreen() {
   }>();
   const { accessToken } = useAuth();
   const [cartOpen, setCartOpen] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState('');
 
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string | null>(params.categoryId ?? null);
@@ -94,10 +93,6 @@ export default function ServicesScreen() {
     mutationFn: ({ itemId, quantity }: { itemId: string; quantity: number }) =>
       quantity > 0 ? cartApi.update(itemId, quantity, accessToken!) : cartApi.remove(itemId, accessToken!),
     onSuccess: (next) => queryClient.setQueryData(['/api/cart', accessToken], next),
-  });
-  const checkoutMutation = useMutation({
-    mutationFn: () => cartApi.checkout({ scheduledAt: new Date(scheduledAt).toISOString() }, accessToken!),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/cart', accessToken] }); setCartOpen(false); setScheduledAt(''); },
   });
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
@@ -209,12 +204,14 @@ export default function ServicesScreen() {
             </View>
           ))}
           {cart.items.length > 0 && (
-            <>
-              <TextInput value={scheduledAt} onChangeText={setScheduledAt} placeholder="2026-08-01T10:00" placeholderTextColor={colors.mutedForeground} style={[styles.scheduleInput, { color: colors.foreground, backgroundColor: colors.muted }]} />
-              <TouchableOpacity disabled={!scheduledAt || checkoutMutation.isPending} onPress={() => checkoutMutation.mutate()} style={[styles.checkoutButton, { backgroundColor: colors.primary }]}>
-                <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>{checkoutMutation.isPending ? 'Confirming…' : 'Confirm booking'}</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              onPress={() => { setCartOpen(false); router.push('/checkout'); }}
+              style={[styles.checkoutButton, { backgroundColor: colors.primary, marginTop: 10 }]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center', fontSize: 15 }}>
+                Proceed to Checkout →
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       )}
@@ -304,8 +301,7 @@ const styles = StyleSheet.create({
   addButton: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   cartPanel: { margin: 12, padding: 14, borderWidth: 1, borderRadius: 16 },
   cartRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  scheduleInput: { padding: 10, borderRadius: 10, marginTop: 8 },
-  checkoutButton: { padding: 12, borderRadius: 10, marginTop: 8 },
+  checkoutButton: { padding: 14, borderRadius: 14, marginTop: 8 },
   title: { fontSize: 24, fontWeight: '700' },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
