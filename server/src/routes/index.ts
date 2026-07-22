@@ -17,6 +17,7 @@ import platformPolicyRoutes from './platformPolicy.routes.js';
 import offerRoutes from './offer.routes.js';
 import reelRoutes from './reel.routes.js';
 import paymentRoutes from './payment.routes.js';
+import serviceRoutes from './service.routes.js';
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use('/platform-policies', platformPolicyRoutes);
 router.use('/offers', offerRoutes);
 router.use('/reels', reelRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/services', serviceRoutes);
 
 export default router;

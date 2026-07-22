@@ -305,6 +305,78 @@ async function migrate() {
     )`);
   await run('index: offers_active', `CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(is_active)`);
 
+  // ── Phase 1: Admin-controlled service marketplace ────────────────────────
+
+  await run('enum: user_role → operations_manager',
+    `DO $$ BEGIN ALTER TYPE user_role ADD VALUE 'operations_manager'; EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+  await run('column: professionals.availability_status',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS availability_status VARCHAR(16) NOT NULL DEFAULT 'offline'`);
+  await run('column: professionals.latitude',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION`);
+  await run('column: professionals.longitude',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION`);
+  await run('column: professionals.completed_jobs',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS completed_jobs INTEGER NOT NULL DEFAULT 0`);
+  await run('column: professionals.acceptance_rate',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS acceptance_rate DOUBLE PRECISION NOT NULL DEFAULT 0`);
+
+  await run('table: services', `
+    CREATE TABLE IF NOT EXISTS services (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      category_id      UUID NOT NULL REFERENCES service_categories(id) ON DELETE RESTRICT,
+      sub_category_id  UUID REFERENCES sub_service_categories(id) ON DELETE SET NULL,
+      name             VARCHAR(255) NOT NULL,
+      description      TEXT,
+      images           JSONB NOT NULL DEFAULT '[]',
+      customer_price   INTEGER NOT NULL DEFAULT 0,
+      partner_payout   INTEGER NOT NULL DEFAULT 0,
+      commission       INTEGER NOT NULL DEFAULT 0,
+      duration         INTEGER NOT NULL DEFAULT 60,
+      required_skill   VARCHAR(255),
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at       TIMESTAMPTZ
+    )`);
+  await run('index: services_category',    `CREATE INDEX IF NOT EXISTS idx_services_category    ON services(category_id)`);
+  await run('index: services_subcategory', `CREATE INDEX IF NOT EXISTS idx_services_subcategory ON services(sub_category_id)`);
+  await run('index: services_active',      `CREATE INDEX IF NOT EXISTS idx_services_active      ON services(is_active)`);
+
+  await run('table: partner_services', `
+    CREATE TABLE IF NOT EXISTS partner_services (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      partner_id UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(partner_id, service_id)
+    )`);
+  await run('index: partner_services_partner', `CREATE INDEX IF NOT EXISTS idx_partner_services_partner ON partner_services(partner_id)`);
+  await run('index: partner_services_service', `CREATE INDEX IF NOT EXISTS idx_partner_services_service ON partner_services(service_id)`);
+
+  await run('table: booking_partner_requests', `
+    CREATE TABLE IF NOT EXISTS booking_partner_requests (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id   UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      partner_id   UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      status       VARCHAR(32) NOT NULL DEFAULT 'pending',
+      sent_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      responded_at TIMESTAMPTZ
+    )`);
+  await run('index: booking_partner_requests_booking', `CREATE INDEX IF NOT EXISTS idx_bpr_booking ON booking_partner_requests(booking_id)`);
+  await run('index: booking_partner_requests_partner', `CREATE INDEX IF NOT EXISTS idx_bpr_partner ON booking_partner_requests(partner_id)`);
+
+  await run('table: booking_assignment_logs', `
+    CREATE TABLE IF NOT EXISTS booking_assignment_logs (
+      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id          UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      partner_id          UUID REFERENCES professionals(id) ON DELETE SET NULL,
+      action              VARCHAR(64) NOT NULL,
+      assigned_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: booking_assignment_logs_booking', `CREATE INDEX IF NOT EXISTS idx_bal_booking ON booking_assignment_logs(booking_id)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

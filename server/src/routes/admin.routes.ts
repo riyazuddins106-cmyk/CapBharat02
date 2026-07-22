@@ -8,6 +8,7 @@ import { reelController } from '../controllers/reel.controller.js';
 import { getSettings, upsertSettings, testEmail } from '../controllers/platformSettings.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { serviceController } from '../controllers/service.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
@@ -93,6 +94,12 @@ router.post('/offers',                 offerController.adminCreate);
 router.patch('/offers/:id',            offerController.adminUpdate);
 router.delete('/offers/:id',           offerController.adminDelete);
 router.patch('/offers/:id/restore',    offerController.adminRestore);
+
+// Services (admin-owned service catalogue)
+router.get('/services',      serviceController.adminList);
+router.post('/services',     serviceController.adminCreate);
+router.patch('/services/:id', serviceController.adminUpdate);
+router.delete('/services/:id', serviceController.adminDelete);
 
 // Platform Settings (payment config, email config)
 router.get('/settings/:key',        getSettings);

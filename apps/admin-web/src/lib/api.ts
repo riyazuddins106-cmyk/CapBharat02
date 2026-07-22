@@ -235,6 +235,38 @@ export interface SupportTicketRow {
   updatedAt: string;
 }
 
+export interface ServiceRow {
+  id: string;
+  categoryId: string;
+  categoryName?: string | null;
+  subCategoryId?: string | null;
+  subCategoryName?: string | null;
+  name: string;
+  description?: string | null;
+  images: string[];
+  customerPrice: number;
+  partnerPayout: number;
+  commission: number;
+  duration: number;
+  requiredSkill?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ServiceInput = {
+  name: string;
+  categoryId: string;
+  subCategoryId?: string | null;
+  description?: string;
+  images?: string[];
+  customerPrice: number;
+  partnerPayout: number;
+  duration?: number;
+  requiredSkill?: string;
+  isActive?: boolean;
+};
+
 // ── Base request ─────────────────────────────────────────────────────────────
 // ── Silent token refresh ──────────────────────────────────────────────────────
 // One in-flight refresh at a time; concurrent callers wait for the same promise.
@@ -491,6 +523,18 @@ export const adminApi = {
     if (!res.ok) throw new Error(json?.error?.message ?? 'Upload failed.');
     return json.data.url;
   },
+
+  // Services
+  getServices: (token: string, params?: { categoryId?: string; subCategoryId?: string; q?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString() : '';
+    return request<{ services: ServiceRow[]; total: number }>(`/admin/services${qs}`, { token });
+  },
+  createService: (data: ServiceInput, token: string) =>
+    request<ServiceRow>('/admin/services', { method: 'POST', token, body: JSON.stringify(data) }),
+  updateService: (id: string, data: Partial<ServiceInput>, token: string) =>
+    request<ServiceRow>(`/admin/services/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  deleteService: (id: string, token: string) =>
+    request<{ id: string }>(`/admin/services/${id}`, { method: 'DELETE', token }),
 
   // Platform Settings
   getSettings: (key: 'payment_config' | 'email_config' | 'sms_config', token: string) =>

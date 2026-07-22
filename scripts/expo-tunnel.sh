@@ -88,12 +88,21 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
     echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
     set +e
+    # Use a FIFO so we can keep Expo's stdin open (preventing EOF) without
+    # a `sleep 999999` that would block the pipe and prevent retries.
+    # Open with <> (O_RDWR) — does NOT block, unlike write-only open.
+    _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
+    mkfifo "$_FIFO"
+    exec 9<>"$_FIFO"       # O_RDWR: non-blocking, holds write-end open → Expo never sees EOF
     # Send down-arrow + enter after 3 s to select "Proceed anonymously"
-    # when Expo shows its login prompt, then keep stdin open indefinitely
-    # so the process never gets an unexpected EOF.
-    { sleep 3; printf '\033[B\r'; sleep 999999; } | \
-      pnpm exec expo start --tunnel --port "$PORT" "$@"
-    EXIT_CODE=${PIPESTATUS[0]}
+    ( sleep 3 && printf '\033[B\r' >&9 ) 2>/dev/null &
+    _KEYPRESS_PID=$!
+    pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
+    EXIT_CODE=$?
+    exec 9>&-              # Close our fd; FIFO is now fully released
+    kill "$_KEYPRESS_PID" 2>/dev/null || true
+    wait "$_KEYPRESS_PID" 2>/dev/null || true
+    rm -f "$_FIFO"
     set -e
     if [[ $EXIT_CODE -eq 0 ]]; then
       exit 0

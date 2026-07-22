@@ -18,3 +18,7 @@ export * from './offers.js';
 export * from './subServiceCategories.js';
 export * from './reels.js';
 export * from './platformSettings.js';
+export * from './services.js';
+export * from './partnerServices.js';
+export * from './bookingPartnerRequests.js';
+export * from './bookingAssignmentLogs.js';

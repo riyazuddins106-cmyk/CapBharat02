@@ -49,7 +49,7 @@ Batch independent operations **within the same artifact** into parallel tool cal
 
 When building subsequent artifacts, carry over brand context from earlier artifacts — colors, fonts, theme, branding — so all artifacts feel visually cohesive. For example, if delegating a video to a design subagent, pass the website's theme/colors so the video matches.
 
-**Design tokens:** After the first artifact's frontend is built, read its `src/index.css` (or `constants/colors.ts` for Expo) to extract colors, fonts, and radius, then sync them into the new artifact's equivalent config files before building its UI. The expo skill's `design-and-aesthetics.md` reference has the full process.
+**Design source:** Inspect the current Artifacts state immediately before building each frontend; a design system may have been created earlier in the same turn. Always respect a design system explicitly passed by the user or creation flow. If none was passed but design-system artifacts exist, use one by default: use the only one automatically, or with several prefer one already consumed by the source/sibling artifact and then one implied by the request, asking only if still ambiguous. Web artifacts import its web theme and components; Expo artifacts build and import its native theme, hooks, and components directly. Do not copy tokens into artifact-local theme files. Only when no design system exists, read the first completed frontend's `src/index.css` (or `constants/colors.ts` for Expo) and sync its colors, fonts, and radius into the new artifact's equivalent local config files. The Expo skill's `design-and-aesthetics.md` reference has the full fallback process.
 
 **Image assets:** Before building a new artifact that represents the same product, copy brand and product images from the existing artifact. Do not let the new artifact use generated placeholders when real images already exist:
 
@@ -82,8 +82,10 @@ Only delegate to the **design** subagent for artifact types where it is effectiv
 
 1. Create react-vite artifact first (its skill uses an async frontend build, creating an idle window) → OpenAPI (covering BOTH web + mobile) → codegen → launch the async frontend build
 2. While the async frontend build runs: build all shared backend routes for both artifacts → create expo artifact (scaffolding only, not UI)
-3. Async frontend build finishes → extract design tokens from the generated `src/index.css` (colors, fonts, radius) → sync tokens into the expo artifact's `constants/colors.ts`, `app.json`, and fonts
-4. Build the expo frontend using the synced tokens
+3. Async frontend build finishes → inspect the current Artifacts state:
+   - Design system exists: verify web consumes it → build missing native theme, hooks, and components in that package → import them directly from Expo and delete Expo's local theme files
+   - No design system exists: extract the generated web `src/index.css` tokens → sync them into Expo's `constants/colors.ts`, `app.json`, and fonts
+4. Build the Expo frontend against the selected source: direct design-system imports or, only without a design system, the synced local tokens
 5. Fix any integration issues → restart all workflows in parallel → check logs → present both
 
 ## Critical Rules

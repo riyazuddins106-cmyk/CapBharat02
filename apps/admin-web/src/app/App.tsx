@@ -7,13 +7,13 @@ import {
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
-  Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle,
+  Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
-  PlatformPolicyRow, OfferRow, OfferInput, NotificationRow,
+  PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -260,6 +260,7 @@ const ADMIN_SIDEBAR = [
   { id: "pros",       icon: Users,      label: "Professionals"      },
   { id: "users",      icon: UserCheck,  label: "Users"              },
   { id: "categories", icon: Grid,       label: "Categories"         },
+  { id: "services",   icon: Package,    label: "Services"           },
   { id: "reels",      icon: Film,       label: "Reels"              },
   { id: "offers",     icon: Tag,        label: "Offers / Banners"   },
   { id: "reviews",    icon: Star,       label: "Reviews"            },
@@ -302,6 +303,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [auditLogs,    setAuditLogs]    = useState<AuditLogRow[]>([]);
   const [offerList,    setOfferList]    = useState<OfferRow[]>([]);
   const [reelList,     setReelList]     = useState<ReelRow[]>([]);
+  const [serviceList,  setServiceList]  = useState<ServiceRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -313,7 +315,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u, c, r, a, o, rl] = await Promise.all([
+      const [s, b, p, u, c, r, a, o, rl, sv] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken),
@@ -323,6 +325,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         adminApi.getAuditLogs(accessToken),
         adminApi.getOffers(accessToken),
         adminApi.getReels(accessToken),
+        adminApi.getServices(accessToken),
       ]);
       setStats(s);
       setBookingList(b.bookings);
@@ -333,6 +336,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setAuditLogs(a.logs);
       setOfferList(o.offers);
       setReelList(rl.reels);
+      setServiceList(sv.services);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
@@ -471,6 +475,20 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const restoreReview = async (id: string) => {
     await adminApi.restoreReview(id, accessToken);
     showMsg("Review restored"); load();
+  };
+
+  /* ── Service handlers ── */
+  const createService = async (data: ServiceInput) => {
+    await adminApi.createService(data, accessToken);
+    showMsg("Service created"); load();
+  };
+  const editService = async (id: string, data: Partial<ServiceInput>) => {
+    await adminApi.updateService(id, data, accessToken);
+    showMsg("Service updated"); load();
+  };
+  const deleteService = async (id: string) => {
+    await adminApi.deleteService(id, accessToken);
+    showMsg("Service deleted"); load();
   };
 
   /* ── Offer handlers ── */
@@ -660,6 +678,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
+          ) : activeSection === "services" ? (
+            <ServicesView services={serviceList} categories={categoryList} accessToken={accessToken} onCreate={createService} onEdit={editService} onDelete={deleteService} onRefresh={load} />
           ) : activeSection === "reels" ? (
             <ReelsView reels={reelList} onCreate={createReel} onEdit={editReel} onDelete={deleteReel} onRestore={restoreReel} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "offers" ? (
@@ -4134,6 +4154,271 @@ function HelpSupportView({ accessToken }: { accessToken: string }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SERVICES VIEW
+═══════════════════════════════════════════════════════════════════ */
+
+type SvcForm = {
+  name: string; categoryId: string; subCategoryId: string;
+  description: string; customerPrice: string; partnerPayout: string;
+  duration: string; requiredSkill: string; isActive: boolean;
+};
+const EMPTY_SVC: SvcForm = {
+  name: "", categoryId: "", subCategoryId: "", description: "",
+  customerPrice: "", partnerPayout: "", duration: "60", requiredSkill: "", isActive: true,
+};
+
+function ServicesView({
+  services, categories, accessToken, onCreate, onEdit, onDelete, onRefresh,
+}: {
+  services: ServiceRow[];
+  categories: Category[];
+  accessToken: string;
+  onCreate: (d: ServiceInput) => Promise<void>;
+  onEdit: (id: string, d: Partial<ServiceInput>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onRefresh: () => void;
+}) {
+  const [search,       setSearch]       = useState("");
+  const [filterCat,    setFilterCat]    = useState("");
+  const [creating,     setCreating]     = useState(false);
+  const [editTarget,   setEditTarget]   = useState<ServiceRow | null>(null);
+  const [deleteId,     setDeleteId]     = useState<string | null>(null);
+  const [form,         setForm]         = useState<SvcForm>(EMPTY_SVC);
+  const [saving,       setSaving]       = useState(false);
+  const [subCats,      setSubCats]      = useState<SubCategory[]>([]);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
+
+  // Load sub-categories when category changes in the form
+  useEffect(() => {
+    if (!form.categoryId) { setSubCats([]); return; }
+    setSubCatsLoading(true);
+    adminApi.getSubcategories(form.categoryId, accessToken)
+      .then(r => setSubCats(r.subcategories ?? []))
+      .catch(() => setSubCats([]))
+      .finally(() => setSubCatsLoading(false));
+  }, [form.categoryId, accessToken]);
+
+  const openCreate = () => { setForm(EMPTY_SVC); setCreating(true); };
+  const openEdit   = (s: ServiceRow) => {
+    setForm({
+      name: s.name, categoryId: s.categoryId, subCategoryId: s.subCategoryId ?? "",
+      description: s.description ?? "", customerPrice: String(s.customerPrice),
+      partnerPayout: String(s.partnerPayout), duration: String(s.duration),
+      requiredSkill: s.requiredSkill ?? "", isActive: s.isActive,
+    });
+    setEditTarget(s);
+  };
+
+  const toInput = (f: SvcForm): ServiceInput => ({
+    name: f.name.trim(), categoryId: f.categoryId,
+    subCategoryId: f.subCategoryId || null,
+    description: f.description || undefined,
+    customerPrice: Number(f.customerPrice) || 0,
+    partnerPayout: Number(f.partnerPayout) || 0,
+    duration: Number(f.duration) || 60,
+    requiredSkill: f.requiredSkill || undefined,
+    isActive: f.isActive,
+  });
+
+  const handleCreate = async () => {
+    if (!form.name.trim()) return alert("Name is required");
+    if (!form.categoryId) return alert("Category is required");
+    setSaving(true);
+    try { await onCreate(toInput(form)); setCreating(false); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try { await onEdit(editTarget.id, toInput(form)); setEditTarget(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setSaving(true);
+    try { await onDelete(deleteId); setDeleteId(null); }
+    catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const commission = (Number(form.customerPrice) || 0) - (Number(form.partnerPayout) || 0);
+
+  const filtered = services.filter(s => {
+    const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase());
+    const matchCat    = !filterCat || s.categoryId === filterCat;
+    return matchSearch && matchCat;
+  });
+
+  const ServiceForm = () => (
+    <div className="space-y-4">
+      <Field label="Service Name *">
+        <TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Deep Floor Cleaning" />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Category *">
+          <SelectInput value={form.categoryId} onChange={v => setForm(f => ({ ...f, categoryId: v, subCategoryId: "" }))} >
+            <option value="">— select —</option>
+            {categories.filter(c => c.isActive).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </SelectInput>
+        </Field>
+        <Field label="Sub-category">
+          <SelectInput value={form.subCategoryId} onChange={v => setForm(f => ({ ...f, subCategoryId: v }))} disabled={!form.categoryId || subCatsLoading}>
+            <option value="">— none —</option>
+            {subCats.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </SelectInput>
+        </Field>
+      </div>
+      <Field label="Description">
+        <TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="What's included in this service…" rows={2} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Customer Price (₹) *">
+          <TextInput type="number" value={form.customerPrice} onChange={v => setForm(f => ({ ...f, customerPrice: v }))} placeholder="999" />
+        </Field>
+        <Field label="Partner Payout (₹) *">
+          <TextInput type="number" value={form.partnerPayout} onChange={v => setForm(f => ({ ...f, partnerPayout: v }))} placeholder="600" />
+        </Field>
+      </div>
+      {/* Auto-calculated commission */}
+      <div className="rounded-xl px-4 py-3 border border-white/10 flex items-center justify-between" style={{ background: "rgba(91,62,245,0.07)" }}>
+        <span className="text-white/50 text-xs">Platform Commission</span>
+        <span className={`font-bold text-sm ${commission >= 0 ? "text-violet-400" : "text-red-400"}`}>
+          ₹{commission.toLocaleString("en-IN")}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Duration (minutes)">
+          <TextInput type="number" value={form.duration} onChange={v => setForm(f => ({ ...f, duration: v }))} placeholder="60" />
+        </Field>
+        <Field label="Required Skill">
+          <TextInput value={form.requiredSkill} onChange={v => setForm(f => ({ ...f, requiredSkill: v }))} placeholder="e.g. Floor Cleaning" />
+        </Field>
+      </div>
+      <div className="flex items-center gap-3 cursor-pointer" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}>
+        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.isActive ? "bg-violet-600" : "bg-white/10"}`}>
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.isActive ? "translate-x-5" : ""}`} />
+        </div>
+        <span className="text-white/60 text-xs">{form.isActive ? "Active" : "Inactive"} — customers can book this service</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Modals */}
+      {creating && (
+        <Modal title="New Service" onClose={() => setCreating(false)}>
+          <ServiceForm />
+          <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create service" />
+        </Modal>
+      )}
+      {editTarget && (
+        <Modal title="Edit Service" onClose={() => setEditTarget(null)}>
+          <ServiceForm />
+          <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
+        </Modal>
+      )}
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete Service?"
+          body="This service will be deactivated. Existing bookings are not affected."
+          confirmLabel="Delete"
+          saving={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-1.5 text-xs text-white/30">
+          <span>Dashboard</span><ChevronRight size={12} /><span className="text-white/60 font-semibold">Services</span>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div>
+            <h2 className="text-white font-bold text-xl">Service Catalogue</h2>
+            <p className="text-white/35 text-xs mt-0.5">{filtered.length} service{filtered.length !== 1 ? "s" : ""}</p>
+          </div>
+          <div className="flex-1 min-w-0" />
+          <div className="w-48 flex-shrink-0">
+            <SelectInput value={filterCat} onChange={setFilterCat}>
+              <option value="">All categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </SelectInput>
+          </div>
+          <div className="w-52 flex-shrink-0">
+            <SearchBar value={search} onChange={setSearch} placeholder="Search services…" />
+          </div>
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            <Plus size={14} /> Add Service
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-white/20">
+          <Package size={44} className="mb-3" />
+          <p className="text-sm">No services yet. Create your first service above.</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>
+                {["Service", "Category", "Price", "Payout", "Commission", "Duration", "Status", ""].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(s => (
+                <tr key={s.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors last:border-b-0">
+                  <td className="px-4 py-3">
+                    <div>
+                      <p className="text-white font-semibold text-sm leading-snug">{s.name}</p>
+                      {s.requiredSkill && <p className="text-white/35 text-xs mt-0.5">Skill: {s.requiredSkill}</p>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div>
+                      <p className="text-white/70 text-xs">{s.categoryName ?? "—"}</p>
+                      {s.subCategoryName && <p className="text-white/40 text-[11px]">{s.subCategoryName}</p>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-white font-bold">₹{s.customerPrice.toLocaleString("en-IN")}</td>
+                  <td className="px-4 py-3 text-emerald-400 font-semibold">₹{s.partnerPayout.toLocaleString("en-IN")}</td>
+                  <td className="px-4 py-3 text-violet-400 font-semibold">₹{s.commission.toLocaleString("en-IN")}</td>
+                  <td className="px-4 py-3 text-white/50">{s.duration} min</td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: s.isActive ? "#16A34A22" : "#EF444422", color: s.isActive ? "#16A34A" : "#EF4444" }}>
+                      {s.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 justify-end">
+                      <ActionBtn variant="edit" onClick={() => openEdit(s)}>Edit</ActionBtn>
+                      <ActionBtn variant={s.isActive ? "warn" : "green"} onClick={() => onEdit(s.id, { isActive: !s.isActive }).then(onRefresh)}>
+                        {s.isActive ? "Deactivate" : "Activate"}
+                      </ActionBtn>
+                      <ActionBtn variant="danger" onClick={() => setDeleteId(s.id)}>Delete</ActionBtn>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

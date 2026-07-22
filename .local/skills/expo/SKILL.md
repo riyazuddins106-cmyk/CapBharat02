@@ -18,6 +18,15 @@ Always follow these guidelines when building a mobile application using Expo:
 - ALWAYS use native device capabilities (camera, location, contacts, etc.) when the app requires them. NEVER use fake/mock data when real device features are available and appropriate.
 - Client-Server: the Expo client talks to an Express + TypeScript server via a RESTful API. The server handles data storage, API requests, auth, and any other server-specific logic.
 
+## Design System
+
+Immediately before writing UI, inspect the current Artifacts state or call `listArtifacts()` filtered to `kind: "design-system"`. Do not rely on whether a design system existed at the start of the turn; one may have been created earlier in this turn.
+
+- If the user or creation flow passed a selected design system, use that exact artifact. Never replace an explicit selection with an inferred one.
+- If no design system was passed but design-system artifacts exist, use one by default rather than falling back to copied sibling tokens. Use the only system automatically. When several exist, prefer one already consumed by the source/sibling artifact, then one the request implies; ask only if the choice remains genuinely ambiguous.
+- After selecting, read that artifact's `docs/AGENTS.md` and `docs/consuming-expo.md`. If the Expo artifact contains scaffolded or existing local theme, hooks, fonts, or product-agnostic components, also read `docs/migrating-expo.md` and complete that migration before authoring UI.
+- If none exists, use the Expo scaffold's local theme files and, for multi-artifact projects, the sibling-artifact fallback in `design-and-aesthetics.md`.
+
 ## Routing
 
 This stack uses Expo Router for file-based routing (similar to Next.js Pages Router) for the frontend. The backend uses Express with TypeScript.
@@ -67,9 +76,9 @@ You can import using `@/` to avoid relative paths (e.g., `import { Button } from
 
 ## Styling
 
-Use react-native's `StyleSheet` for styling. Reference colors from `constants/colors.ts` via the `useColors()` hook in `hooks/useColors.ts` — avoid hardcoding hex values in components.
+Use react-native's `StyleSheet` for styling and never hardcode hex values in components. When the current Artifacts state contains a selected design system, import its semantic theme and color-scheme hook directly from the concrete paths in `docs/consuming-expo.md`; use `docs/migrating-expo.md` to remove local copies. When no design system exists, use the Expo scaffold's local `constants/colors.ts` and `hooks/useColors.ts`.
 
-If this Expo artifact is part of a multi-artifact project (e.g., alongside a react-vite web app), read `design-and-aesthetics.md` before writing component code — it covers how to sync colors, fonts, and radius from the sibling artifact so both share the same visual identity.
+If this Expo artifact is part of a multi-artifact project, read `design-and-aesthetics.md` before writing component code — it covers how to consume a design system or, when none exists, sync colors, fonts, and radius from a sibling artifact.
 
 ## Networking
 - Use `@/lib/query-client` for all data fetching.
@@ -197,7 +206,7 @@ Games and absolute positioning: account for safe area insets in positioning calc
 
 The scaffold ships with `@expo-google-fonts/inter` pre-installed and already loaded in `_layout.tsx` with the correct `useFonts` + `SplashScreen` font-gating pattern. Available weights: `Inter_400Regular`, `Inter_500Medium`, `Inter_600SemiBold`, `Inter_700Bold`.
 
-If the user wants a different font, swap the import and `useFonts` call — keep the same font-gating pattern.
+When the current Artifacts state contains a selected design system, follow `docs/consuming-expo.md` and `docs/migrating-expo.md` to replace local font loading with the package hook while preserving SplashScreen gating. When no design system exists and the user wants a different font, swap the local import and `useFonts` call while keeping the same font-gating pattern.
 
 Rules:
 
@@ -290,7 +299,7 @@ Before writing code, identify whether any reference below applies to the task. I
 
 - `.local/skills/expo/references/first-build.md` - Use this reference when first building an Expo app (from 0 to 1)
 - `.local/skills/expo/references/react-context.md` - Use this reference when creating or modifying shared state with React context, provider composition, or context-based hooks.
-- `.local/skills/expo/references/design-and-aesthetics.md` - Use this reference when designing or restyling UI, selecting iconography, or implementing animations and visual polish. Skip the "Cross-Artifact Design Consistency" section unless this expo artifact is part of a multi-artifact project with a sibling web app.
+- `.local/skills/expo/references/design-and-aesthetics.md` - Use this reference when designing or restyling UI, selecting iconography, or implementing animations and visual polish. Read "Cross-Artifact Design Consistency" when this Expo artifact is part of a multi-artifact project with a design system or sibling web app.
 - `.local/skills/expo/references/device-features-and-permissions.md` - Use this reference when implementing camera, location, notifications, contacts, file uploads, or any permission request/denial flow.
 - mobile-ui skill's `.local/skills/mobile-ui/references/keyboard.md` - Use this reference when implementing any keyboard handling — forms with multiple inputs, chat/messaging UIs, FlatList with inputs, or keyboard utilities (dismiss, detect visibility).
 - mobile-ui skill's `.local/skills/mobile-ui/references/sheets.md` - Use this reference when implementing modals, sheets, formSheet presentations, auth flows (login/register), wizards, or overlay UI.
