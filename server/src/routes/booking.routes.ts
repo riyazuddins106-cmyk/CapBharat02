@@ -7,7 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { signBookingQrToken } from '../utils/bookingQr.js';
 import { bookingRepository } from '../repositories/booking.repository.js';
 import { AppError } from '../utils/AppError.js';
-import { getPaymentForBooking, submitPayment } from '../controllers/payment.controller.js';
+import { getPaymentForBooking, submitPayment, createRazorpayOrder, createStripeSession } from '../controllers/payment.controller.js';
 
 const router = Router();
 
@@ -22,6 +22,8 @@ router.patch('/:id/reschedule', validate({ params: bookingIdParamSchema, body: r
 // Payment endpoints
 router.get('/:id/payment', validate({ params: bookingIdParamSchema }), getPaymentForBooking);
 router.post('/:id/payment', validate({ params: bookingIdParamSchema }), submitPayment);
+router.post('/:id/razorpay/create-order', validate({ params: bookingIdParamSchema }), createRazorpayOrder);
+router.post('/:id/stripe/create-session', validate({ params: bookingIdParamSchema }), createStripeSession);
 
 // Generate a short-lived signed QR token for the customer to display
 router.get('/:id/qr', asyncHandler(async (req, res) => {

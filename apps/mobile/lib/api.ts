@@ -8,6 +8,7 @@ function getApiBase(): string {
   return (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 }
 const API_BASE = getApiBase();
+export { API_BASE };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -343,10 +344,16 @@ export const bookingsApi = {
     request<Payment | null>(`/api/bookings/${id}/payment`, { token }),
   submitPayment: (id: string, body: { method: string; notes?: string }, token: string) =>
     request<Payment>(`/api/bookings/${id}/payment`, { method: 'POST', body: JSON.stringify(body), token }),
+  createRazorpayOrder: (id: string, token: string) =>
+    request<{ orderId: string; amount: number; currency: string; keyId: string; bookingId: string; businessName: string }>(
+      `/api/bookings/${id}/razorpay/create-order`, { method: 'POST', body: '{}', token }),
+  createStripeSession: (id: string, token: string) =>
+    request<{ checkoutUrl: string; sessionId: string }>(
+      `/api/bookings/${id}/stripe/create-session`, { method: 'POST', body: '{}', token }),
 };
 
-export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null }> {
-  return request<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null }>('/api/payments/config');
+export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null; stripePublishableKey: string | null }> {
+  return request<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null; stripePublishableKey: string | null }>('/api/payments/config');
 }
 
 export interface Payment {

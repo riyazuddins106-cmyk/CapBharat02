@@ -269,6 +269,7 @@ const ADMIN_SIDEBAR = [
   { id: "support",        icon: HelpCircle,  label: "Help & Support"    },
   { id: "payment-config", icon: CreditCard,  label: "Payment Config"    },
   { id: "email-config",   icon: Mail,        label: "Email Config"      },
+  { id: "sms-config",     icon: Smartphone,  label: "SMS Config"        },
   { id: "settings",       icon: Settings,    label: "Settings"          },
 ];
 
@@ -677,6 +678,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <PaymentConfigView accessToken={accessToken} />
           ) : activeSection === "email-config" ? (
             <EmailConfigView accessToken={accessToken} adminEmail={user.email} />
+          ) : activeSection === "sms-config" ? (
+            <SmsConfigView accessToken={accessToken} />
           ) : (
             <SettingsView user={user} />
           )}
@@ -3442,6 +3445,126 @@ function EmailConfigView({ accessToken, adminEmail }: { accessToken: string; adm
             Send Test
           </button>
         </div>
+      </div>
+
+      {msg && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium border ${msg.type === "success" ? "text-green-400 bg-green-500/10 border-green-500/20" : "text-red-400 bg-red-500/10 border-red-500/20"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+        >
+          {saving && <Loader2 size={15} className="animate-spin" />}
+          Save Configuration
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SMS CONFIG
+═══════════════════════════════════════════════════════════════════ */
+
+interface SmsCfg {
+  enabled: boolean;
+  provider: "fast2sms";
+  fast2sms: { apiKey: string };
+}
+
+const DEFAULT_SMS_CFG: SmsCfg = {
+  enabled: false,
+  provider: "fast2sms",
+  fast2sms: { apiKey: "" },
+};
+
+function SmsConfigView({ accessToken }: { accessToken: string }) {
+  const [cfg, setCfg]     = useState<SmsCfg>(DEFAULT_SMS_CFG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi.getSettings("sms_config", accessToken)
+      .then(res => setCfg(prev => ({ ...prev, ...(res.value as Partial<SmsCfg>) })))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  const showMsg = (text: string, type: "success" | "error") => {
+    setMsg({ text, type });
+    setTimeout(() => setMsg(null), 5000);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.saveSettings("sms_config", cfg, accessToken);
+      showMsg("SMS configuration saved successfully.", "success");
+    } catch {
+      showMsg("Failed to save. Please try again.", "error");
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <Loader2 size={28} className="animate-spin text-violet-500" />
+    </div>
+  );
+
+  return (
+    <div className="max-w-xl space-y-5">
+      <div className="mb-1">
+        <h2 className="text-white font-bold text-base">SMS Configuration</h2>
+        <p className="text-white/40 text-xs mt-0.5">
+          Configure Fast2SMS to send OTP codes to customers' mobile numbers.
+          OTPs are always sent via email; SMS is an additional delivery channel.
+        </p>
+      </div>
+
+      {/* Enable toggle */}
+      <div className="rounded-2xl border border-white/[0.07] p-5" style={CARD}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white/80 text-sm font-medium">Enable SMS OTP</p>
+            <p className="text-white/40 text-xs mt-0.5">
+              Send OTP codes via SMS in addition to email.
+            </p>
+          </div>
+          <ToggleSwitch checked={cfg.enabled} onChange={v => setCfg(c => ({ ...c, enabled: v }))} />
+        </div>
+      </div>
+
+      {/* Provider */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold flex items-center gap-2">
+          <Smartphone size={15} className="text-violet-400" /> SMS Provider
+        </h3>
+        <p className="text-white/40 text-xs -mt-2">
+          Fast2SMS is a popular Indian bulk SMS gateway. Get your API key from{" "}
+          <a href="https://www.fast2sms.com" target="_blank" rel="noreferrer" className="text-violet-400 underline">fast2sms.com</a>.
+        </p>
+        <Field label="Fast2SMS API Key">
+          <SecretInput
+            value={cfg.fast2sms.apiKey}
+            onChange={v => setCfg(c => ({ ...c, fast2sms: { apiKey: v } }))}
+            placeholder="Your Fast2SMS API key"
+          />
+        </Field>
+      </div>
+
+      {/* Info box */}
+      <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 text-xs text-violet-300 space-y-1">
+        <p className="font-semibold text-violet-400">How it works</p>
+        <p>• OTP is always sent to the user's email first.</p>
+        <p>• If a phone number was provided at signup and this is enabled, the same OTP is also sent via SMS.</p>
+        <p>• SMS delivery failures are silently ignored — the email OTP still works.</p>
       </div>
 
       {msg && (

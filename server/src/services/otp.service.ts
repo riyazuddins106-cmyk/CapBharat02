@@ -5,6 +5,7 @@ import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { otpRepository } from '../repositories/otp.repository.js';
 import { emailService } from './email.service.js';
+import { smsService } from './sms.service.js';
 import type { OtpCode } from '../database/schema/otpCodes.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -36,7 +37,11 @@ function buildEmailHtml(purpose: OtpCode['purpose'], code: string): string {
 }
 
 export const otpService = {
-  async issue(email: string, purpose: OtpCode['purpose'], userId?: string): Promise<string> {
+  /**
+   * Issue an OTP and deliver it via email (always) and SMS (when phone is
+   * provided and a Fast2SMS API key is configured via admin panel or env var).
+   */
+  async issue(email: string, purpose: OtpCode['purpose'], userId?: string, phone?: string): Promise<string> {
     const code = generateCode();
     const codeHash = await bcrypt.hash(code, 10);
 
@@ -48,16 +53,15 @@ export const otpService = {
       expiresAt: new Date(Date.now() + OTP_TTL_MS),
     });
 
-    // Send via SMTP if configured (see email.service.ts for required env vars:
-    // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM). Falls back to
-    // logging the code in non-production so the flow stays testable until a
-    // provider is wired up.
-    let emailed = false;
-    emailed = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
+    const emailed = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
+
+    // Best-effort SMS — never blocks or throws even if provider not configured
+    if (phone) {
+      smsService.sendOtp(phone, code).catch(() => {});
+    }
 
     if (!emailed && process.env.NODE_ENV !== 'production') {
       logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);
-      // Also append to a temp file so test scripts can pick up OTPs without SMTP
       try {
         fs.appendFileSync('/tmp/otp-dev.log', `${email} ${purpose} ${code}\n`);
       } catch { /* ignore */ }

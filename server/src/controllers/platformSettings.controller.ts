@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import nodemailer from 'nodemailer';
 
 /* ── Allowed setting keys ─────────────────────────────────────────── */
-const ALLOWED_KEYS = new Set(['payment_config', 'email_config']);
+const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config']);
 
 /* ── GET /admin/settings/:key ─────────────────────────────────────── */
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -120,6 +120,13 @@ function getDefaults(key: string): object {
         paymentReceipt:      true,
         otp:                 true,
       },
+    };
+  }
+  if (key === 'sms_config') {
+    return {
+      enabled:   false,
+      provider:  'fast2sms',
+      fast2sms:  { apiKey: '' },
     };
   }
   return {};

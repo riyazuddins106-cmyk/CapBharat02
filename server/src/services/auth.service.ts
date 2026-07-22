@@ -76,7 +76,7 @@ export const authService = {
       priceUnit: '/visit',
     });
 
-    const code = await otpService.issue(user.email, 'signup', user.id);
+    const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
     return { userId: user.id, email: user.email, devCode: code };
   },
 
@@ -94,7 +94,7 @@ export const authService = {
       passwordHash,
     });
 
-    const code = await otpService.issue(user.email, 'signup', user.id);
+    const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
 
     return { userId: user.id, email: user.email, devCode: code };
   },
@@ -119,7 +119,7 @@ export const authService = {
     if (!user) {
       throw AppError.notFound('Account not found.');
     }
-    const code = await otpService.issue(email, purpose, user.id);
+    const code = await otpService.issue(email, purpose, user.id, user.phone ?? undefined);
     return { devCode: code };
   },
 
@@ -135,7 +135,7 @@ export const authService = {
     }
 
     if (!user.emailVerifiedAt) {
-      await otpService.issue(user.email, 'signup', user.id);
+      await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
       throw AppError.forbidden('Email not verified. A new verification code has been sent.');
     }
 
@@ -198,7 +198,7 @@ export const authService = {
       // Do not reveal whether the account exists.
       return {};
     }
-    const code = await otpService.issue(email, 'password_reset', user.id);
+    const code = await otpService.issue(email, 'password_reset', user.id, user.phone ?? undefined);
     return { devCode: code };
   },
 
