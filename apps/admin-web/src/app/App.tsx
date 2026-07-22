@@ -1761,7 +1761,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
       {deleteId && (
         <ConfirmDialog
           title="Delete Sub-category?"
-          body="This sub-category will be permanently deleted. Professionals linked to it will have their sub-category cleared."
+          body="This sub-category will be moved to trash. You can restore it later."
           confirmLabel="Delete"
           saving={saving}
           onConfirm={handleDelete}
@@ -1898,6 +1898,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
 /* ═══════════════════════════════════════════════════════════════════
    REVIEWS
 ═══════════════════════════════════════════════════════════════════ */
+
 
 /* ═══════════════════════════════════════════════════════════════════
    OFFERS / BANNERS
@@ -2424,9 +2425,19 @@ function OffersView({
 
       <div className="flex items-center justify-between">
         <p className="text-white/50 text-sm">{offers.length} banner{offers.length !== 1 ? "s" : ""} total</p>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-          <Plus size={15} /> Create Banner
-        </button>
+        <div className="flex gap-2">
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            <Plus size={15} /> Create Banner
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <div className="flex gap-2">
+          <button onClick={handleToggleTrash} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border" style={{ borderColor: "rgba(255,255,255,0.1)", color: showTrash ? "#f87171" : "rgba(255,255,255,0.4)", background: "transparent" }}>
+            🗑 {showTrash ? "Hide Trash" : "Trash"}
+          </button>
+        </div>
       </div>
 
       {offers.length === 0 ? (
@@ -2465,6 +2476,29 @@ function OffersView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Trash section */}
+      {showTrash && (
+        <div className="rounded-2xl border border-red-500/20 overflow-hidden" style={{ background: "rgba(239,68,68,0.04)" }}>
+          <div className="px-4 py-3 border-b border-red-500/10">
+            <p className="text-red-400 text-sm font-semibold">🗑 Deleted Banners</p>
+          </div>
+          {deletedOffers.length === 0
+            ? <p className="px-4 py-6 text-white/30 text-sm text-center">Trash is empty</p>
+            : <div className="divide-y divide-white/[0.04]">
+                {deletedOffers.map(r => (
+                  <div key={r.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-white/60 font-medium text-sm truncate">{r.title}</p>
+                      {r.subtitle && <p className="text-white/30 text-xs truncate">{r.subtitle}</p>}
+                    </div>
+                    <ActionBtn variant="green" onClick={async () => { await onRestore(r.id); loadDeleted(); }}>Restore</ActionBtn>
+                  </div>
+                ))}
+              </div>
+          }
         </div>
       )}
     </div>
@@ -2538,6 +2572,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
                   <td className="px-4 py-3">
                     <div className="flex gap-1 flex-wrap">
                       <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+                      <ActionBtn variant="green" onClick={async () => { try { await onRestore(r.id); } catch(e: any) { alert(e.message); } }}>Restore</ActionBtn>
                     </div>
                   </td>
                 </tr>
@@ -3239,7 +3274,7 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
   };
 
   const handleDeletePolicy = async (slug: string) => {
-    if (!window.confirm("Delete this policy? This cannot be undone.")) return;
+    if (!window.confirm("Move this policy to trash? It can be restored later.")) return;
     setDeletingSlug(slug);
     try {
       await adminApi.deletePlatformPolicy(slug, accessToken);

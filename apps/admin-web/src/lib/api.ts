@@ -372,6 +372,8 @@ export const adminApi = {
     request<SubCategory>(`/admin/subcategories/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteSubcategory: (id: string, token: string) =>
     request<{ id: string }>(`/admin/subcategories/${id}`, { method: 'DELETE', token }),
+  restoreSubcategory: (id: string, token: string) =>
+    request<SubCategory>(`/admin/subcategories/${id}/restore`, { method: 'PATCH', token }),
   uploadSubcategoryImage: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('image', file);
     return fetch(`/api/admin/subcategories/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })

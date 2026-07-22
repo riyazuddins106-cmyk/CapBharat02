@@ -43,3 +43,4 @@ initial_open_files:
 additional_skills:
   - database
   - /pnpm-workspace/references/openapi.md
+  - references/first-build.md
