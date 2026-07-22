@@ -25,6 +25,7 @@ router.patch('/bookings/:id/cancel',     adminController.cancelBooking);
 router.delete('/bookings/:id',           adminController.deleteBooking);
 
 // Professionals management
+router.post('/professionals',                   adminController.createProfessional);
 router.get('/professionals',                    adminController.listProfessionals);
 router.patch('/professionals/:id',              adminController.updateProfessional);
 router.patch('/professionals/:id/suspend',      adminController.suspendProfessional);

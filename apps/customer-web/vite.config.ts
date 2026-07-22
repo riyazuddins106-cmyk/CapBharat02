@@ -45,7 +45,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/admin-panel': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5001',
         changeOrigin: true,
       },
       '/partner': {

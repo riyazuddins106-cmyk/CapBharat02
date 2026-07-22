@@ -1,58 +1,102 @@
-import nodemailer, { type Transporter } from 'nodemailer';
+import nodemailer from 'nodemailer';
 import { logger } from '../utils/logger.js';
+import { db } from '../config/database.js';
+import { platformSettings } from '../database/schema/index.js';
+import { eq } from 'drizzle-orm';
 
 /**
- * Generic SMTP-based email sender. Works with any provider that exposes SMTP
- * credentials (Resend, SendGrid, Gmail, Mailgun, a custom mail server, etc.).
- *
- * Configure via env vars once you have provider details:
- *   SMTP_HOST      e.g. smtp.resend.com
- *   SMTP_PORT      e.g. 587 (defaults to 587)
- *   SMTP_SECURE    "true" for port 465 (defaults to "false")
- *   SMTP_USER      SMTP username (for Resend this is "resend")
- *   SMTP_PASS      SMTP password / API key
- *   EMAIL_FROM     e.g. "ServeNow <no-reply@yourdomain.com>"
- *
- * Until these are set, sendEmail() is a no-op and callers should fall back
- * to logging (see otp.service.ts) so the flow stays testable.
+ * Email sender that prefers the admin-panel DB config (email_config) and
+ * falls back to SMTP_* environment variables when no DB config is saved.
  */
 
-let transporter: Transporter | null = null;
-let initialized = false;
-
-function isConfigured(): boolean {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+interface EmailConfig {
+  provider?: 'smtp' | 'sendgrid';
+  smtp?: { host: string; port: number; user: string; password: string; secure: boolean };
+  sendgrid?: { apiKey: string };
+  from?: { name: string; email: string };
 }
 
-function getTransporter(): Transporter | null {
-  if (!isConfigured()) return null;
-  if (!initialized) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-    initialized = true;
+async function loadDbConfig(): Promise<EmailConfig | null> {
+  try {
+    const [row] = await db
+      .select()
+      .from(platformSettings)
+      .where(eq(platformSettings.key, 'email_config'));
+    return row ? JSON.parse(row.value) : null;
+  } catch {
+    return null;
   }
-  return transporter;
+}
+
+async function buildTransporter(): Promise<{ transporter: nodemailer.Transporter; from: string } | null> {
+  const cfg = await loadDbConfig();
+
+  // --- DB config: SendGrid ---
+  if (cfg?.provider === 'sendgrid' && cfg.sendgrid?.apiKey) {
+    const from = cfg.from?.email
+      ? `"${cfg.from.name ?? 'ServeNow'}" <${cfg.from.email}>`
+      : 'ServeNow <noreply@servenow.in>';
+    return {
+      transporter: nodemailer.createTransport({
+        host: 'smtp.sendgrid.net',
+        port: 587,
+        auth: { user: 'apikey', pass: cfg.sendgrid.apiKey },
+      }),
+      from,
+    };
+  }
+
+  // --- DB config: SMTP ---
+  if (cfg?.smtp?.host && cfg.smtp.user) {
+    const from = cfg.from?.email
+      ? `"${cfg.from.name ?? 'ServeNow'}" <${cfg.from.email}>`
+      : `ServeNow <${cfg.smtp.user}>`;
+    return {
+      transporter: nodemailer.createTransport({
+        host: cfg.smtp.host,
+        port: cfg.smtp.port ?? 587,
+        secure: cfg.smtp.secure ?? false,
+        auth: { user: cfg.smtp.user, pass: cfg.smtp.password ?? '' },
+      }),
+      from,
+    };
+  }
+
+  // --- Fallback: environment variables ---
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (host && user && pass) {
+    return {
+      transporter: nodemailer.createTransport({
+        host,
+        port: Number(process.env.SMTP_PORT ?? 587),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: { user, pass },
+      }),
+      from: process.env.EMAIL_FROM ?? `ServeNow <${user}>`,
+    };
+  }
+
+  return null;
 }
 
 export const emailService = {
-  isConfigured,
+  isConfigured: async (): Promise<boolean> => {
+    const t = await buildTransporter();
+    return t !== null;
+  },
 
   async send(to: string, subject: string, html: string, text?: string): Promise<boolean> {
-    const t = getTransporter();
-    if (!t) return false;
+    const built = await buildTransporter();
+    if (!built) {
+      logger.warn('[email] No email provider configured — skipping send');
+      return false;
+    }
 
     try {
-      await t.sendMail({
-        // Gmail rejects a From address that doesn't match the authenticated
-        // account, so default to SMTP_USER when EMAIL_FROM isn't set.
-        from: process.env.EMAIL_FROM ?? process.env.SMTP_USER ?? 'ServeNow <no-reply@servenow.in>',
+      await built.transporter.sendMail({
+        from: built.from,
         to,
         subject,
         html,

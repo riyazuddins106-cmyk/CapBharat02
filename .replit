@@ -27,12 +27,12 @@ name = "Admin Panel"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @servenow/admin-web dev"
-waitForPort = 3000
+waitForPort = 5001
 
 [[workflows.workflow]]
 name = "Project"

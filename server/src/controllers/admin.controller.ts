@@ -7,6 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { storageService } from '../services/storage.service.js';
+import { hashPassword } from '../utils/password.js';
 
 export const adminController = {
   /* ───────────────────────── Dashboard ───────────────────────── */
@@ -204,6 +205,71 @@ export const adminController = {
       .where(isNull(professionals.deletedAt));
 
     res.json({ success: true, data: { professionals: rows, total: Number(total) } });
+  }),
+
+  createProfessional: asyncHandler(async (req: Request, res: Response) => {
+    const { fullName, email, password, phone, title, bio, categoryId, subCategoryId, basePrice, priceUnit, badge, tags } = req.body as {
+      fullName: string; email: string; password: string; phone?: string;
+      title: string; bio?: string; categoryId: string; subCategoryId?: string;
+      basePrice: number; priceUnit?: string; badge?: string; tags?: string[];
+    };
+
+    if (!fullName?.trim()) throw AppError.badRequest('Full name is required');
+    if (!email?.trim())    throw AppError.badRequest('Email is required');
+    if (!password || password.length < 6) throw AppError.badRequest('Password must be at least 6 characters');
+    if (!title?.trim())    throw AppError.badRequest('Title is required');
+    if (!categoryId)       throw AppError.badRequest('Category is required');
+    if (basePrice === undefined || basePrice < 0) throw AppError.badRequest('Base price must be a non-negative number');
+
+    // Check email not already taken
+    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email.trim().toLowerCase())).limit(1);
+    if (existing) throw AppError.badRequest('A user with this email already exists');
+
+    // Validate category
+    const { serviceCategories: sc } = await import('../database/schema/serviceCategories.js');
+    const [cat] = await db.select({ id: sc.id, isActive: sc.isActive }).from(sc).where(eq(sc.id, categoryId)).limit(1);
+    if (!cat) throw AppError.badRequest('Category not found');
+    if (!cat.isActive) throw AppError.badRequest('Selected category is not active');
+
+    // Validate sub-category if provided
+    if (subCategoryId) {
+      const { subServiceCategories: ssc } = await import('../database/schema/subServiceCategories.js');
+      const [sub] = await db.select({ id: ssc.id, categoryId: ssc.categoryId, isActive: ssc.isActive })
+        .from(ssc).where(eq(ssc.id, subCategoryId)).limit(1);
+      if (!sub) throw AppError.badRequest('Sub-category not found');
+      if (!sub.isActive) throw AppError.badRequest('Sub-category is not active');
+      if (sub.categoryId !== categoryId) throw AppError.badRequest('Sub-category does not belong to selected category');
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    // Create user with partner role (already verified — admin-created)
+    const [newUser] = await db.insert(users).values({
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      passwordHash,
+      phone: phone?.trim() || null,
+      role: 'partner',
+      emailVerified: true,
+    }).returning();
+
+    // Create professional profile
+    const [pro] = await db.insert(professionals).values({
+      userId: newUser.id,
+      name: fullName.trim(),
+      title: title.trim(),
+      bio: bio?.trim() || null,
+      categoryId,
+      subCategoryId: subCategoryId || null,
+      basePrice: Number(basePrice),
+      priceUnit: priceUnit || '/visit',
+      badge: badge?.trim() || null,
+      tags: Array.isArray(tags) ? tags : [],
+      isActive: true,
+    }).returning();
+
+    await auditLogService.record(req.user!.userId, 'professional.create', 'professional', pro.id, { email: newUser.email, name: pro.name });
+    res.status(201).json({ success: true, data: { ...pro, email: newUser.email, phone: newUser.phone } });
   }),
 
   updateProfessional: asyncHandler(async (req: Request, res: Response) => {

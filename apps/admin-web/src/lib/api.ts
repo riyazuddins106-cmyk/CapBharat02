@@ -325,6 +325,12 @@ export const adminApi = {
     request<{ id: string }>(`/admin/bookings/${id}`, { method: 'DELETE', token }),
 
   // Professionals
+  createProfessional: (data: {
+    fullName: string; email: string; password: string; phone?: string;
+    title: string; bio?: string; categoryId: string; subCategoryId?: string;
+    basePrice: number; priceUnit?: string; badge?: string; tags?: string[];
+  }, token: string) =>
+    request<ProfessionalRow>('/admin/professionals', { method: 'POST', token, body: JSON.stringify(data) }),
   getProfessionals: (token: string) =>
     request<{ professionals: ProfessionalRow[]; total: number }>('/admin/professionals', { token }),
   updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }, token: string) =>

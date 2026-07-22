@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 5001,
     strictPort: true,
     allowedHosts: true,
     proxy: {
@@ -23,7 +23,7 @@ export default defineConfig({
   },
   preview: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 5001,
     strictPort: true,
     allowedHosts: true,
   },

@@ -53,9 +53,7 @@ export const otpService = {
     // logging the code in non-production so the flow stays testable until a
     // provider is wired up.
     let emailed = false;
-    if (emailService.isConfigured()) {
-      emailed = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
-    }
+    emailed = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
 
     if (!emailed && process.env.NODE_ENV !== 'production') {
       logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);

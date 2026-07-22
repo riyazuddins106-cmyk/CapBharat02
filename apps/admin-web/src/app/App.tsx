@@ -7,7 +7,7 @@ import {
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
-  Send, Wallet, Smartphone, Zap,
+  Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
@@ -258,6 +258,7 @@ const ADMIN_SIDEBAR = [
   { id: "dashboard",  icon: Home,       label: "Dashboard"          },
   { id: "bookings",   icon: BookOpen,   label: "Bookings"           },
   { id: "pros",       icon: Users,      label: "Professionals"      },
+  { id: "create-pro", icon: UserPlus,   label: "Create Professional" },
   { id: "users",      icon: UserCheck,  label: "Users"              },
   { id: "categories", icon: Grid,       label: "Categories"         },
   { id: "reels",      icon: Film,       label: "Reels"              },
@@ -414,6 +415,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
 
   /* ── Professional handlers ── */
+  const createPro = async (data: { fullName: string; email: string; password: string; phone?: string; title: string; bio?: string; categoryId: string; subCategoryId?: string; basePrice: number; priceUnit?: string; badge?: string; tags?: string[] }) => {
+    await adminApi.createProfessional(data, accessToken);
+    showMsg("Professional created successfully"); load();
+  };
   const editPro = async (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => {
     await adminApi.updateProfessional(id, patch, accessToken);
     showMsg("Professional updated"); load();
@@ -648,6 +653,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "pros" ? (
             <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} />
+          ) : activeSection === "create-pro" ? (
+            <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
             <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
           ) : activeSection === "categories" ? (
@@ -919,6 +926,204 @@ function BookingsView({
 ═══════════════════════════════════════════════════════════════════ */
 
 type ProPatch = { name: string; title: string; bio: string; basePrice: number; priceUnit: string; badge: string; tags: string; categoryId: string; subCategoryId: string };
+
+/* ═══════════════════════════════════════════════════════════════════
+   CREATE PROFESSIONAL
+═══════════════════════════════════════════════════════════════════ */
+const EMPTY_PRO_FORM = {
+  fullName: "", email: "", password: "", phone: "",
+  title: "", bio: "", categoryId: "", subCategoryId: "",
+  basePrice: 0, priceUnit: "/visit", badge: "", tags: "",
+};
+
+function CreateProfessionalView({
+  categories, accessToken, onCreate, onCreated,
+}: {
+  categories: Category[];
+  accessToken: string;
+  onCreate: (data: { fullName: string; email: string; password: string; phone?: string; title: string; bio?: string; categoryId: string; subCategoryId?: string; basePrice: number; priceUnit?: string; badge?: string; tags?: string[] }) => Promise<void>;
+  onCreated: () => void;
+}) {
+  const [form, setForm] = useState(EMPTY_PRO_FORM);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [subCats, setSubCats] = useState<SubCategory[]>([]);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+
+  const set = (k: keyof typeof EMPTY_PRO_FORM, v: string | number) =>
+    setForm(f => ({ ...f, [k]: v }));
+
+  const loadSubCats = async (catId: string) => {
+    setSubCats([]); set("subCategoryId", "");
+    if (!catId) return;
+    setSubCatsLoading(true);
+    try {
+      const res = await adminApi.getSubcategories(catId, accessToken);
+      setSubCats((res.subcategories ?? []).filter(s => s.isActive));
+    } catch { setSubCats([]); }
+    finally { setSubCatsLoading(false); }
+  };
+
+  const handleSubmit = async () => {
+    setError("");
+    if (!form.fullName.trim()) { setError("Full name is required."); return; }
+    if (!form.email.trim())    { setError("Email is required."); return; }
+    if (!form.password || form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (!form.title.trim())    { setError("Title / role is required."); return; }
+    if (!form.categoryId)      { setError("Please select a category."); return; }
+    if (form.basePrice < 0)    { setError("Base price cannot be negative."); return; }
+
+    setSaving(true);
+    try {
+      await onCreate({
+        fullName:    form.fullName.trim(),
+        email:       form.email.trim(),
+        password:    form.password,
+        phone:       form.phone.trim() || undefined,
+        title:       form.title.trim(),
+        bio:         form.bio.trim() || undefined,
+        categoryId:  form.categoryId,
+        subCategoryId: form.subCategoryId || undefined,
+        basePrice:   Number(form.basePrice),
+        priceUnit:   form.priceUnit,
+        badge:       form.badge.trim() || undefined,
+        tags:        form.tags.split(",").map(t => t.trim()).filter(Boolean),
+      });
+      setSuccess(true);
+      setForm(EMPTY_PRO_FORM);
+      setSubCats([]);
+    } catch (e: any) {
+      setError(e.message ?? "Failed to create professional.");
+    } finally { setSaving(false); }
+  };
+
+  if (success) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-6">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(22,163,74,0.15)" }}>
+          <CheckCircle size={36} className="text-green-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-white text-xl font-bold mb-1">Professional Created!</p>
+          <p className="text-white/40 text-sm">The account and profile are ready. They can log in with their email and password.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setSuccess(false)}
+            className="px-5 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5 transition-colors">
+            Create Another
+          </button>
+          <button onClick={onCreated}
+            className="px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            View Professionals
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const activeCategories = categories.filter(c => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-white text-xl font-bold">Create Professional</h2>
+        <p className="text-white/40 text-sm mt-1">Creates a partner login account and professional profile in one step.</p>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 rounded-xl px-4 py-3 border border-red-500/20">
+          <XCircle size={15} className="flex-shrink-0" /> {error}
+        </div>
+      )}
+
+      {/* Account details */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={{ background: "rgba(255,255,255,0.03)" }}>
+        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Account Details</p>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Full Name *">
+            <TextInput value={form.fullName} onChange={v => set("fullName", v)} placeholder="e.g. Ravi Kumar" />
+          </Field>
+          <Field label="Phone (optional)">
+            <TextInput value={form.phone} onChange={v => set("phone", v)} placeholder="+91 98765 43210" />
+          </Field>
+        </div>
+        <Field label="Email *">
+          <TextInput value={form.email} onChange={v => set("email", v)} type="email" placeholder="ravi@example.com" />
+        </Field>
+        <Field label="Password *">
+          <div className="relative">
+            <TextInput value={form.password} onChange={v => set("password", v)} type={showPass ? "text" : "password"} placeholder="Min. 6 characters" />
+            <button type="button" onClick={() => setShowPass(p => !p)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+              {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+        </Field>
+      </div>
+
+      {/* Professional profile */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={{ background: "rgba(255,255,255,0.03)" }}>
+        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Professional Profile</p>
+        <Field label="Title / Role *">
+          <TextInput value={form.title} onChange={v => set("title", v)} placeholder="e.g. Expert Plumber, Senior Electrician" />
+        </Field>
+        <Field label="Bio">
+          <TextArea value={form.bio} onChange={v => set("bio", v)} placeholder="Brief description of experience and expertise…" />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Category *">
+            <SelectInput value={form.categoryId} onChange={v => { set("categoryId", v); loadSubCats(v); }}>
+              <option value="">— Select category —</option>
+              {activeCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </SelectInput>
+          </Field>
+          <Field label="Sub-category">
+            <SelectInput value={form.subCategoryId} onChange={v => set("subCategoryId", v)} disabled={!form.categoryId || subCatsLoading}>
+              <option value="">
+                {!form.categoryId ? "Select category first" : subCatsLoading ? "Loading…" : subCats.length === 0 ? "None available" : "— None —"}
+              </option>
+              {subCats.sort((a, b) => a.sortOrder - b.sortOrder).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </SelectInput>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Base Price (₹) *">
+            <TextInput type="number" value={String(form.basePrice)} onChange={v => set("basePrice", Number(v))} placeholder="500" />
+          </Field>
+          <Field label="Price Unit">
+            <SelectInput value={form.priceUnit} onChange={v => set("priceUnit", v)}>
+              {["/visit", "/hr", "/day", "/session"].map(u => <option key={u} value={u}>{u}</option>)}
+            </SelectInput>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Badge (optional)">
+            <TextInput value={form.badge} onChange={v => set("badge", v)} placeholder="e.g. Top Rated" />
+          </Field>
+          <Field label="Tags (comma-separated)">
+            <TextInput value={form.tags} onChange={v => set("tags", v)} placeholder="plumbing, pipes, repair" />
+          </Field>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pb-6">
+        <button onClick={() => { setForm(EMPTY_PRO_FORM); setSubCats([]); setError(""); }}
+          className="px-5 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5 transition-colors">
+          Reset
+        </button>
+        <button onClick={handleSubmit} disabled={saving}
+          className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-50 transition-opacity"
+          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+          {saving && <Loader2 size={14} className="animate-spin" />}
+          {saving ? "Creating…" : "Create Professional"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ProsView({
   pros, onEdit, onToggle, onDelete, categories, accessToken,
