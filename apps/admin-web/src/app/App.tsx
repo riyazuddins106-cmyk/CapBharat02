@@ -7,13 +7,14 @@ import {
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
-  Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package,
+  Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
+  DispatchRequestRow, EligiblePartner,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -261,6 +262,7 @@ const ADMIN_SIDEBAR = [
   { id: "users",      icon: UserCheck,  label: "Users"              },
   { id: "categories", icon: Grid,       label: "Categories"         },
   { id: "services",   icon: Package,    label: "Services"           },
+  { id: "dispatch",   icon: Navigation, label: "Booking Operations Centre" },
   { id: "reels",      icon: Film,       label: "Reels"              },
   { id: "offers",     icon: Tag,        label: "Offers / Banners"   },
   { id: "reviews",    icon: Star,       label: "Reviews"            },
@@ -304,6 +306,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [offerList,    setOfferList]    = useState<OfferRow[]>([]);
   const [reelList,     setReelList]     = useState<ReelRow[]>([]);
   const [serviceList,  setServiceList]  = useState<ServiceRow[]>([]);
+  const [dispatchList, setDispatchList] = useState<DispatchRequestRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -315,7 +318,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u, c, r, a, o, rl, sv] = await Promise.all([
+      const [s, b, p, u, c, r, a, o, rl, sv, d] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken),
@@ -326,6 +329,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         adminApi.getOffers(accessToken),
         adminApi.getReels(accessToken),
         adminApi.getServices(accessToken),
+        adminApi.getDispatch(accessToken),
       ]);
       setStats(s);
       setBookingList(b.bookings);
@@ -337,6 +341,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setOfferList(o.offers);
       setReelList(rl.reels);
       setServiceList(sv.services);
+      setDispatchList(d);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
@@ -590,7 +595,9 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] flex-shrink-0">
           <div>
             <h1 className="text-white font-bold text-base capitalize">
-              {ADMIN_SIDEBAR.find(s => s.id === activeSection)?.label ?? activeSection}
+              {activeSection === "dispatch"
+                ? "Customer Booking Operations Control Centre"
+                : ADMIN_SIDEBAR.find(s => s.id === activeSection)?.label ?? activeSection}
             </h1>
             <p className="text-white/30 text-xs">ServeNow Admin Panel</p>
           </div>
@@ -678,6 +685,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
+          ) : activeSection === "dispatch" ? (
+            <DispatchView requests={dispatchList} accessToken={accessToken} onAssigned={load} />
           ) : activeSection === "services" ? (
             <ServicesView services={serviceList} categories={categoryList} accessToken={accessToken} onCreate={createService} onEdit={editService} onDelete={deleteService} onRefresh={load} />
           ) : activeSection === "reels" ? (
@@ -795,6 +804,121 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
 /* ═══════════════════════════════════════════════════════════════════
    BOOKINGS
 ═══════════════════════════════════════════════════════════════════ */
+
+function DispatchView({
+  requests,
+  accessToken,
+  onAssigned,
+}: {
+  requests: DispatchRequestRow[];
+  accessToken: string;
+  onAssigned: () => void;
+}) {
+  const [eligible, setEligible] = useState<Record<string, EligiblePartner[]>>({});
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState<string | null>(null);
+
+  const loadEligible = async (bookingId: string) => {
+    setLoadingId(bookingId);
+    try {
+      const partners = await adminApi.getEligiblePartners(bookingId, accessToken);
+      setEligible((current) => ({ ...current, [bookingId]: partners }));
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const assign = async (bookingId: string, partnerId: string) => {
+    setAssigning(bookingId);
+    try {
+      await adminApi.assignPartner(bookingId, partnerId, accessToken);
+      onAssigned();
+    } finally {
+      setAssigning(null);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-white font-bold text-xl">Customer Booking Operations Control Centre</h2>
+        <p className="text-white/40 text-sm mt-1">Monitor customer bookings and coordinate partner assignment.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          ["Searching", requests.filter((r) => r.dispatchStatus === "searching_partner").length],
+          ["Waiting for operations", requests.filter((r) => r.dispatchStatus === "waiting_operation").length],
+          ["Assigned", requests.filter((r) => r.dispatchStatus === "assigned").length],
+        ].map(([label, value]) => (
+          <div key={String(label)} className="rounded-2xl border border-white/[0.07] p-4" style={CARD}>
+            <p className="text-white/40 text-xs">{label}</p>
+            <p className="text-white font-bold text-2xl mt-1">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.07]">
+                {["Customer", "Service", "Scheduled", "Status", "Partner", "Actions"].map((heading) => (
+                  <th key={heading} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{heading}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {requests.map((request) => (
+                <tr key={request.id}>
+                  <td className="px-4 py-3 text-white font-medium">{request.customerName}</td>
+                  <td className="px-4 py-3 text-white/70">{request.serviceName}</td>
+                  <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(request.scheduledAt).toLocaleString("en-IN")}</td>
+                  <td className="px-4 py-3"><Badge label={request.dispatchStatus.replace("_", " ")} color={request.dispatchStatus === "assigned" ? "#16A34A" : "#F59E0B"} /></td>
+                  <td className="px-4 py-3 text-white/70">{request.proName ?? "Unassigned"}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => loadEligible(request.id)}
+                      disabled={loadingId === request.id}
+                      className="rounded-lg bg-violet-500/15 px-3 py-2 text-xs font-bold text-violet-300 disabled:opacity-50"
+                    >
+                      {loadingId === request.id ? "Loading…" : "Eligible partners"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {requests.length === 0 && <EmptyRow cols={6} text="No active dispatch bookings" />}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {Object.entries(eligible).map(([bookingId, partners]) => (
+        <div key={bookingId} className="rounded-2xl border border-white/[0.07] p-4" style={CARD}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-bold text-sm">Eligible partners</h3>
+            <span className="text-white/35 text-xs">{bookingId.slice(0, 8)}</span>
+          </div>
+          <div className="space-y-2">
+            {partners.map((partner) => (
+              <div key={partner.id} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2">
+                <div className="flex-1">
+                  <p className="text-white text-sm font-semibold">{partner.name}</p>
+                  <p className="text-white/40 text-xs">★ {partner.rating.toFixed(1)} · {partner.availabilityStatus}</p>
+                </div>
+                <button
+                  onClick={() => assign(bookingId, partner.id)}
+                  disabled={assigning === bookingId}
+                  className="rounded-lg bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 disabled:opacity-50"
+                >
+                  {assigning === bookingId ? "Assigning…" : "Assign"}
+                </button>
+              </div>
+            ))}
+            {partners.length === 0 && <p className="text-white/40 text-sm">No eligible partners currently available.</p>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type BookingPatch = { status: string; notes: string; price: number; scheduledAt: string };
 

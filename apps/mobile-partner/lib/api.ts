@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 // EXPO_PUBLIC_API_URL is set by the workflow to the current Replit dev domain
 // (e.g. https://<repl-id>.sisko.replit.dev). That domain's port-5000 vite server
 // already proxies /api → the Express server on port 8000, so we never need to
@@ -88,6 +90,8 @@ export interface PartnerProfile {
   tags: string[];
   isActive: boolean;
   categoryId: string;
+  availabilityStatus?: 'available' | 'offline' | 'busy';
+  currentBookingStatus?: string;
 }
 
 export type JobStatus = 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
@@ -207,6 +211,13 @@ export const authApi = {
 export const partnerApi = {
   getProfile: (token: string) =>
     request<PartnerProfile>('/api/partner/profile', { token }),
+
+  updateAvailability: (availabilityStatus: 'available' | 'offline' | 'busy', token: string) =>
+    request<PartnerProfile>('/api/partner/availability', {
+      method: 'PATCH',
+      body: JSON.stringify({ availabilityStatus }),
+      token,
+    }),
 
   updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),

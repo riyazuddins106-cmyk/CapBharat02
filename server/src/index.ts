@@ -2,8 +2,10 @@ import { env } from './config/env.js';
 import { createApp } from './app.js';
 import { ensureAvatarBucket } from './config/supabase.js';
 import { logger } from './utils/logger.js';
+import { runMigrations } from './database/migrate.js';
 
 async function main() {
+  await runMigrations();
   const app = createApp();
   const port = Number(env.PORT);
 

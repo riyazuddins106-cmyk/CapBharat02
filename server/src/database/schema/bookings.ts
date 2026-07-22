@@ -15,11 +15,11 @@ export const bookingStatusEnum = pgEnum('booking_status', [
 export const bookings = pgTable('bookings', {
   id: uuid('id').primaryKey().defaultRandom(),
   customerId: uuid('customer_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  professionalId: uuid('professional_id').notNull().references(() => professionals.id, { onDelete: 'restrict' }),
+  professionalId: uuid('professional_id').references(() => professionals.id, { onDelete: 'restrict' }),
   categoryId: uuid('category_id').notNull().references(() => serviceCategories.id, { onDelete: 'restrict' }),
   addressId: uuid('address_id').references(() => addresses.id, { onDelete: 'set null' }),
   serviceName: varchar('service_name', { length: 255 }).notNull(),
-  proName: varchar('pro_name', { length: 255 }).notNull(),
+  proName: varchar('pro_name', { length: 255 }),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
   status: bookingStatusEnum('status').notNull().default('upcoming'),
   notes: text('notes'),
@@ -27,6 +27,10 @@ export const bookings = pgTable('bookings', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  assignmentType: varchar('assignment_type', { length: 16 }).notNull().default('auto'),
+  assignedBy: uuid('assigned_by').references(() => users.id, { onDelete: 'set null' }),
+  dispatchStatus: varchar('dispatch_status', { length: 32 }).notNull().default('searching_partner'),
+  dispatchDeadline: timestamp('dispatch_deadline', { withTimezone: true }),
 });
 
 export type Booking = typeof bookings.$inferSelect;

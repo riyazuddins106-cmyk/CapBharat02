@@ -57,7 +57,7 @@ export const bookingService = {
     }
     const updated = await bookingRepository.updateStatus(bookingId, 'cancelled');
 
-    const pro = await professionalRepository.findById(booking.professionalId);
+    const pro = booking.professionalId ? await professionalRepository.findById(booking.professionalId) : undefined;
     if (pro?.userId) {
       const title = 'Booking cancelled';
       const body = `A booking for ${booking.serviceName} was cancelled by the customer.`;

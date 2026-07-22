@@ -82,7 +82,7 @@ export const createRazorpayOrder = asyncHandler(async (req: Request, res: Respon
   const rz = makeRazorpay(cfg.razorpay);
 
   const amountPaise = (booking.price ?? 0) * 100; // Razorpay uses paise
-  let order: Awaited<ReturnType<typeof rz.orders.create>>;
+  let order: any;
   try {
     order = await rz.orders.create({
       amount: amountPaise,

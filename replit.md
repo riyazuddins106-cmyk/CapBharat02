@@ -44,6 +44,11 @@ pnpm --filter @servenow/server exec tsx src/database/link-partner.ts
 pnpm --filter @servenow/server exec tsx src/database/seed-demo.ts
 ```
 
+For Replit development, set the Postgres connection string as `DATABASE_URL`.
+The server accepts it and maps it to the legacy `SUPABASE_DATABASE_URL`
+configuration internally. This project is configured for development preview
+only; no Replit Cloud deployment is required.
+
 ## Test credentials
 | Role | Email | Password |
 |---|---|---|
@@ -79,7 +84,7 @@ Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. No E
 | SUPABASE_URL | Supabase REST project URL |
 | SUPABASE_ANON_KEY | Supabase anonymous key |
 | SUPABASE_SERVICE_ROLE_KEY | Supabase service role key |
-| SUPABASE_DATABASE_URL | Postgres connection string |
+| DATABASE_URL | Supabase Postgres connection string |
 | JWT_SECRET | Access token signing secret |
 | JWT_REFRESH_SECRET | Refresh token signing secret |
 | NGROK_AUTHTOKEN | Customer App ngrok (fallback outside Replit) |

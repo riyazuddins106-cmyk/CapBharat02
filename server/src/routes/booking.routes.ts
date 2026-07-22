@@ -15,6 +15,7 @@ router.use(authenticate);
 
 router.get('/', bookingController.list);
 router.post('/', validate({ body: createBookingSchema }), bookingController.create);
+router.post('/checkout', bookingController.checkout);
 router.get('/:id', validate({ params: bookingIdParamSchema }), bookingController.getById);
 router.patch('/:id/cancel', validate({ params: bookingIdParamSchema }), bookingController.cancel);
 router.patch('/:id/reschedule', validate({ params: bookingIdParamSchema, body: rescheduleBookingSchema }), bookingController.reschedule);

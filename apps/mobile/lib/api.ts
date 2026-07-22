@@ -95,6 +95,29 @@ export interface Professional {
   categoryId: string;
   reviews?: Review[];
 }
+export interface Service {
+  id: string;
+  categoryId: string;
+  subCategoryId: string | null;
+  name: string;
+  description: string | null;
+  images: string[];
+  customerPrice: number;
+  duration: number;
+  requiredSkill: string | null;
+  isActive: boolean;
+}
+export interface CartItem {
+  id: string;
+  serviceId: string;
+  name: string;
+  image: string | null;
+  quantity: number;
+  unitPrice: number;
+  duration: number;
+  lineTotal: number;
+}
+export interface Cart { id: string; items: CartItem[]; total: number; }
 export interface Booking {
   id: string;
   professionalId: string;
@@ -264,6 +287,25 @@ export const professionalsApi = {
     return request<Professional[]>(`/api/professionals${qs ? `?${qs}` : ''}`);
   },
   get: (id: string) => request<Professional>(`/api/professionals/${id}`),
+};
+
+export const servicesApi = {
+  list: (params?: { categoryId?: string; subCategoryId?: string; q?: string }) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>).toString();
+    return request<{ services: Service[]; total: number }>(`/api/services${qs ? `?${qs}` : ''}`);
+  },
+};
+
+export const cartApi = {
+  get: (token: string) => request<Cart>('/api/cart', { token }),
+  add: (serviceId: string, quantity: number, token: string) =>
+    request<Cart>('/api/cart/items', { method: 'POST', body: JSON.stringify({ serviceId, quantity }), token }),
+  update: (itemId: string, quantity: number, token: string) =>
+    request<Cart>(`/api/cart/items/${itemId}`, { method: 'PATCH', body: JSON.stringify({ quantity }), token }),
+  remove: (itemId: string, token: string) =>
+    request<Cart>(`/api/cart/items/${itemId}`, { method: 'DELETE', token }),
+  checkout: (payload: { scheduledAt: string; addressId?: string; notes?: string }, token: string) =>
+    request<Booking>('/api/bookings/checkout', { method: 'POST', body: JSON.stringify(payload), token }),
 };
 
 // ── Offers / Banners ───────────────────────────────────────

@@ -7,6 +7,12 @@ export const createBookingSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+export const cartCheckoutSchema = z.object({
+  scheduledAt: z.string().datetime({ message: 'scheduledAt must be an ISO datetime string' }),
+  addressId: z.string().uuid().optional(),
+  notes: z.string().max(1000).optional(),
+});
+
 export const rescheduleBookingSchema = z.object({
   scheduledAt: z.string().datetime({ message: 'scheduledAt must be an ISO datetime string' }),
 });
@@ -16,4 +22,5 @@ export const bookingIdParamSchema = z.object({
 });
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
+export type CartCheckoutInput = z.infer<typeof cartCheckoutSchema>;
 export type RescheduleBookingInput = z.infer<typeof rescheduleBookingSchema>;

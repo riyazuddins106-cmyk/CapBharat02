@@ -5,8 +5,8 @@
 import 'dotenv/config';
 import postgres from 'postgres';
 
-const url = process.env.SUPABASE_DATABASE_URL;
-if (!url) throw new Error('SUPABASE_DATABASE_URL is not set');
+const url = process.env.DATABASE_URL ?? process.env.SUPABASE_DATABASE_URL;
+if (!url) throw new Error('DATABASE_URL is not set');
 
 const sql = postgres(url, { ssl: 'require', max: 1 });
 
@@ -26,7 +26,7 @@ async function run(label: string, query: string) {
   }
 }
 
-async function migrate() {
+export async function runMigrations() {
   console.log('[migrate] Connecting…');
 
   await run('enum: user_role',
@@ -320,6 +320,8 @@ async function migrate() {
     `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS completed_jobs INTEGER NOT NULL DEFAULT 0`);
   await run('column: professionals.acceptance_rate',
     `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS acceptance_rate DOUBLE PRECISION NOT NULL DEFAULT 0`);
+  await run('column: professionals.current_booking_status',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS current_booking_status VARCHAR(16) NOT NULL DEFAULT 'available'`);
 
   await run('table: services', `
     CREATE TABLE IF NOT EXISTS services (
@@ -377,11 +379,58 @@ async function migrate() {
     )`);
   await run('index: booking_assignment_logs_booking', `CREATE INDEX IF NOT EXISTS idx_bal_booking ON booking_assignment_logs(booking_id)`);
 
+  await run('column: bookings.professional_id nullable',
+    `ALTER TABLE bookings ALTER COLUMN professional_id DROP NOT NULL`);
+  await run('column: bookings.pro_name nullable',
+    `ALTER TABLE bookings ALTER COLUMN pro_name DROP NOT NULL`);
+  await run('column: bookings.assignment_type',
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS assignment_type VARCHAR(16) NOT NULL DEFAULT 'auto'`);
+  await run('column: bookings.assigned_by',
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS assigned_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+  await run('column: bookings.dispatch_status',
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispatch_status VARCHAR(32) NOT NULL DEFAULT 'searching_partner'`);
+  await run('column: bookings.dispatch_deadline',
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispatch_deadline TIMESTAMPTZ`);
+
+  await run('table: carts', `
+    CREATE TABLE IF NOT EXISTS carts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      customer_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('table: cart_items', `
+    CREATE TABLE IF NOT EXISTS cart_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      cart_id UUID NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+      service_id UUID NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+      quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(cart_id, service_id)
+    )`);
+  await run('table: booking_items', `
+    CREATE TABLE IF NOT EXISTS booking_items (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      service_id UUID NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      unit_customer_price INTEGER NOT NULL,
+      unit_partner_payout INTEGER NOT NULL,
+      line_total INTEGER NOT NULL,
+      duration INTEGER NOT NULL DEFAULT 60,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: cart_items_cart', `CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id)`);
+  await run('index: booking_items_booking', `CREATE INDEX IF NOT EXISTS idx_booking_items_booking ON booking_items(booking_id)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }
 
-migrate().catch((err) => {
+if (process.argv[1]?.endsWith('migrate.ts') || process.argv[1]?.endsWith('migrate.js')) {
+  runMigrations().catch((err) => {
   console.error('[migrate] Failed:', err.message ?? err);
   process.exit(1);
-});
+  });
+}

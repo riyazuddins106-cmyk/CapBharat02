@@ -31,7 +31,7 @@ export interface AdminUser {
   email: string;
   phone?: string | null;
   fullName: string;
-  role: 'admin';
+  role: 'admin' | 'operations_manager';
   avatarUrl?: string | null;
 }
 
@@ -252,6 +252,27 @@ export interface ServiceRow {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DispatchRequestRow {
+  id: string;
+  status: string;
+  dispatchStatus: string;
+  assignmentType: string;
+  serviceName: string;
+  proName: string | null;
+  price: number;
+  scheduledAt: string;
+  customerName: string;
+  requests: Array<{ request: { id: string; status: string; sentAt: string; respondedAt: string | null }; partner: { id: string; name: string; rating: number; availabilityStatus: string } }>;
+}
+
+export interface EligiblePartner {
+  id: string;
+  name: string;
+  rating: number;
+  availabilityStatus: string;
+  currentBookingStatus: string;
 }
 
 export type ServiceInput = {
@@ -535,6 +556,13 @@ export const adminApi = {
     request<ServiceRow>(`/admin/services/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteService: (id: string, token: string) =>
     request<{ id: string }>(`/admin/services/${id}`, { method: 'DELETE', token }),
+
+  getDispatch: (token: string, status?: string) =>
+    request<DispatchRequestRow[]>(`/operations/dispatch${status ? `?status=${encodeURIComponent(status)}` : ''}`, { token }),
+  getEligiblePartners: (bookingId: string, token: string) =>
+    request<EligiblePartner[]>(`/operations/dispatch/${bookingId}/eligible-partners`, { token }),
+  assignPartner: (bookingId: string, partnerId: string, token: string) =>
+    request<BookingRow>(`/operations/dispatch/${bookingId}/assign`, { method: 'POST', token, body: JSON.stringify({ partnerId }) }),
 
   // Platform Settings
   getSettings: (key: 'payment_config' | 'email_config' | 'sms_config', token: string) =>

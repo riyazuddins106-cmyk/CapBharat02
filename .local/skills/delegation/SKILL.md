@@ -61,6 +61,10 @@ const authfixResult = await subagent({
 console.log(authfixResult.text); // Mainly the `text` matter. Unless the skill for a particular specialized subagent indicates otherwise.
 ```
 
+#### Sidekick
+
+Some sessions include a persistent sidekick worker — if yours does, your system prompt describes it in detail; without that section, the `sidekick` kind does not exist for you. Its config takes no fields beyond `$kind: "sidekick"`. Exception to the create semantics above: a sidekick create whose `name` lands on the live sidekick continues that sidekick (no auto-rename, no fresh context); only a new name starts a separate one.
+
 ### sendFollowup
 
 `sendFollowup({ name, message })` continues an **existing** subagent, keeping its

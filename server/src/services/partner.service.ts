@@ -99,7 +99,8 @@ export const partnerService = {
     const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'pending') throw AppError.badRequest(`Cannot accept a booking with status "${job.status}".`);
-    const updated = await partnerRepository.updateStatus(bookingId, 'upcoming');
+    const { dispatchService } = await import('./dispatch.service.js');
+    const updated = await dispatchService.accept(bookingId, pro.id);
     if (job.customerId) {
       const title = 'Booking confirmed!';
       const body = `${pro.name} has accepted your ${job.serviceName} booking.`;
@@ -116,7 +117,9 @@ export const partnerService = {
     const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'pending') throw AppError.badRequest(`Cannot reject a booking with status "${job.status}".`);
-    const updated = await partnerRepository.updateStatus(bookingId, 'cancelled');
+    const { dispatchService } = await import('./dispatch.service.js');
+    await dispatchService.reject(bookingId, pro.id);
+    const updated = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
     if (job.customerId) {
       const title = 'Booking declined';
       const body = `Your ${job.serviceName} booking was declined by the partner. Please book another professional.`;
@@ -125,6 +128,16 @@ export const partnerService = {
       void notificationDbService.create({ userId: job.customerId, title, body, type: 'booking', data: { bookingId } });
     }
     return updated;
+  },
+
+  async updateAvailability(userId: string, status: 'available' | 'busy' | 'offline') {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    if (!['available', 'busy', 'offline'].includes(status)) throw AppError.badRequest('Invalid availability status.');
+    return professionalRepository.update(pro.id, {
+      availabilityStatus: status,
+      currentBookingStatus: status === 'available' ? 'available' : status === 'busy' ? 'busy' : 'available',
+    });
   },
 
   async checkIn(userId: string, bookingId: string, qrToken: string) {

@@ -14,6 +14,7 @@ export const reviewService = {
     const booking = await bookingRepository.findByIdAndCustomer(input.bookingId, customerId);
     if (!booking) throw AppError.notFound('Booking not found.');
     if (booking.status !== 'completed') throw AppError.badRequest('You can only review completed bookings.');
+    if (!booking.professionalId) throw AppError.badRequest('This booking has no assigned professional.');
 
     const existing = await reviewRepository.findByBooking(input.bookingId);
     if (existing) throw AppError.conflict('You have already reviewed this booking.');

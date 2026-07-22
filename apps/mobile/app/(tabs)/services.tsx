@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, subcategoriesApi, professionalsApi, favoritesApi } from '@/lib/api';
+import { categoriesApi, subcategoriesApi, professionalsApi, favoritesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
 import { ProCard } from '@/components/ProCard';
 import { CategoryPill } from '@/components/CategoryPill';
 import { ProCardShimmer, CategoryShimmer } from '@/components/Shimmer';
@@ -23,6 +23,8 @@ export default function ServicesScreen() {
     subCategoryName?: string;
   }>();
   const { accessToken } = useAuth();
+  const [cartOpen, setCartOpen] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
 
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string | null>(params.categoryId ?? null);
@@ -70,6 +72,32 @@ export default function ServicesScreen() {
   const favMutation = useMutation({
     mutationFn: (proId: string) => favoritesApi.toggle(proId, accessToken!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/favorites'] }),
+  });
+  const { data: catalogue } = useQuery({
+    queryKey: ['/api/services', selectedCat, selectedSubCat, search],
+    queryFn: () => servicesApi.list({
+      ...(selectedCat ? { categoryId: selectedCat } : {}),
+      ...(selectedSubCat ? { subCategoryId: selectedSubCat } : {}),
+      ...(search.trim() ? { q: search.trim() } : {}),
+    }),
+  });
+  const { data: cart } = useQuery({
+    queryKey: ['/api/cart', accessToken],
+    queryFn: () => cartApi.get(accessToken!),
+    enabled: !!accessToken,
+  });
+  const cartMutation = useMutation({
+    mutationFn: (serviceId: string) => cartApi.add(serviceId, 1, accessToken!),
+    onSuccess: (next) => { queryClient.setQueryData(['/api/cart', accessToken], next); setCartOpen(true); },
+  });
+  const cartUpdateMutation = useMutation({
+    mutationFn: ({ itemId, quantity }: { itemId: string; quantity: number }) =>
+      quantity > 0 ? cartApi.update(itemId, quantity, accessToken!) : cartApi.remove(itemId, accessToken!),
+    onSuccess: (next) => queryClient.setQueryData(['/api/cart', accessToken], next),
+  });
+  const checkoutMutation = useMutation({
+    mutationFn: () => cartApi.checkout({ scheduledAt: new Date(scheduledAt).toISOString() }, accessToken!),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/cart', accessToken] }); setCartOpen(false); setScheduledAt(''); },
   });
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
@@ -165,6 +193,53 @@ export default function ServicesScreen() {
         </View>
       )}
 
+      {!!catalogue?.services?.length && (
+        <View style={[styles.serviceSection, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Book a service</Text>
+            <TouchableOpacity onPress={() => setCartOpen(true)} disabled={!accessToken}>
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
+                Cart{cart?.items.length ? ` (${cart.items.reduce((sum, item) => sum + item.quantity, 0)})` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {catalogue.services.slice(0, 4).map((service) => (
+            <View key={service.id} style={[styles.serviceRow, { borderBottomColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.serviceName, { color: colors.foreground }]}>{service.name}</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{service.duration} min · ₹{service.customerPrice}</Text>
+              </View>
+              <TouchableOpacity onPress={() => accessToken && cartMutation.mutate(service.id)} disabled={!accessToken} style={[styles.addButton, { backgroundColor: colors.secondary }]}>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>{accessToken ? 'Add' : 'Sign in'}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+      {cartOpen && cart && (
+        <View style={[styles.cartPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Your cart · ₹{cart.total}</Text>
+            <TouchableOpacity onPress={() => setCartOpen(false)}><Ionicons name="close" size={18} color={colors.mutedForeground} /></TouchableOpacity>
+          </View>
+          {cart.items.map((item) => (
+            <View key={item.id} style={styles.cartRow}>
+              <Text style={[styles.serviceName, { color: colors.foreground, flex: 1 }]}>{item.name}</Text>
+              <TouchableOpacity onPress={() => cartUpdateMutation.mutate({ itemId: item.id, quantity: item.quantity - 1 })}><Text style={{ color: colors.primary, fontSize: 20 }}>−</Text></TouchableOpacity>
+              <Text style={{ color: colors.foreground, marginHorizontal: 10 }}>{item.quantity}</Text>
+              <TouchableOpacity onPress={() => cartUpdateMutation.mutate({ itemId: item.id, quantity: item.quantity + 1 })}><Text style={{ color: colors.primary, fontSize: 20 }}>+</Text></TouchableOpacity>
+            </View>
+          ))}
+          {cart.items.length > 0 && (
+            <>
+              <TextInput value={scheduledAt} onChangeText={setScheduledAt} placeholder="2026-08-01T10:00" placeholderTextColor={colors.mutedForeground} style={[styles.scheduleInput, { color: colors.foreground, backgroundColor: colors.muted }]} />
+              <TouchableOpacity disabled={!scheduledAt || checkoutMutation.isPending} onPress={() => checkoutMutation.mutate()} style={[styles.checkoutButton, { backgroundColor: colors.primary }]}>
+                <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>{checkoutMutation.isPending ? 'Confirming…' : 'Confirm booking'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
       {/* Results — shows all professionals for the selected category; filters by sub-category once one is chosen */}
       <FlatList
         data={isLoading ? [] : (professionals ?? [])}
@@ -198,6 +273,16 @@ export default function ServicesScreen() {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, gap: 10 },
+  serviceSection: { padding: 16, borderBottomWidth: 1 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  serviceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
+  serviceName: { fontSize: 14, fontWeight: '600' },
+  addButton: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  cartPanel: { margin: 12, padding: 14, borderWidth: 1, borderRadius: 16 },
+  cartRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  scheduleInput: { padding: 10, borderRadius: 10, marginTop: 8 },
+  checkoutButton: { padding: 12, borderRadius: 10, marginTop: 8 },
   title: { fontSize: 24, fontWeight: '700' },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },

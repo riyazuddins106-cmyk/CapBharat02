@@ -68,6 +68,11 @@ export const partnerController = {
     res.json({ success: true, data });
   }),
 
+  updateAvailability: asyncHandler(async (req: Request, res: Response) => {
+    const data = await partnerService.updateAvailability(req.user!.userId, req.body.status);
+    res.json({ success: true, data });
+  }),
+
   uploadAvatar: asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw AppError.badRequest('No file uploaded. Use the "avatar" field.');
     const avatarUrl = await storageService.uploadAvatar(req.user!.userId, req.file);

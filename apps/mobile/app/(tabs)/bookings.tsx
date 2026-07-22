@@ -499,6 +499,12 @@ const styles = StyleSheet.create({
   reviewSubmitText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   // Payment sheet
   sheet: { marginHorizontal: 0, paddingHorizontal: 20, paddingBottom: 40, borderTopLeftRadius: 28, borderTopRightRadius: 28, gap: 0 },
+  webviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
+  webviewTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  webviewClose: { padding: 6 },
+  webviewLoader: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
+  gatewayBanner: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 },
+  gatewayBannerText: { fontSize: 12, lineHeight: 18 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   sheetTitle: { fontSize: 18, fontWeight: '700' },

@@ -62,6 +62,16 @@ export default function ProfileScreen() {
     enabled: !!accessToken,
   });
 
+  const availabilityMutation = useMutation({
+    mutationFn: (status: 'available' | 'busy' | 'offline') =>
+      partnerApi.updateAvailability(status, accessToken!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/profile'] });
+      refetch();
+    },
+    onError: (e: any) => showAlert('Availability update failed', e.message ?? 'Please try again.'),
+  });
+
   const { data: categories } = useQuery({
     queryKey: ['/api/categories'],
     queryFn: () => categoriesApi.list(),
@@ -282,6 +292,32 @@ export default function ProfileScreen() {
                   ))}
                 </View>
               )}
+            </View>
+          )}
+
+          {profile && (
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Partner Availability</Text>
+              <Text style={[styles.securitySub, { color: colors.mutedForeground }]}>
+                Choose when you can receive new customer bookings.
+              </Text>
+              <View style={styles.availabilityRow}>
+                {(['available', 'busy', 'offline'] as const).map((status) => {
+                  const selected = (profile.availabilityStatus ?? 'offline') === status;
+                  return (
+                    <TouchableOpacity
+                      key={status}
+                      disabled={availabilityMutation.isPending}
+                      onPress={() => availabilityMutation.mutate(status)}
+                      style={[styles.availabilityChip, { backgroundColor: selected ? colors.primary : colors.muted, borderRadius: colors.radius }]}
+                    >
+                      <Text style={{ color: selected ? '#fff' : colors.foreground, fontSize: 12, fontWeight: '700' }}>
+                        {status[0].toUpperCase() + status.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           )}
 
@@ -568,6 +604,8 @@ const styles = StyleSheet.create({
   securityIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   securityLabel: { fontSize: 14, fontWeight: '600' },
   securitySub:   { fontSize: 12 },
+  availabilityRow: { flexDirection: 'row', gap: 8 },
+  availabilityChip: { flex: 1, alignItems: 'center', paddingVertical: 10 },
   logoutBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
   logoutText:    { color: '#D4183D', fontSize: 15, fontWeight: '700' },
   backdrop:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

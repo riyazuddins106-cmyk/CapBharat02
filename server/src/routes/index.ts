@@ -18,6 +18,8 @@ import offerRoutes from './offer.routes.js';
 import reelRoutes from './reel.routes.js';
 import paymentRoutes from './payment.routes.js';
 import serviceRoutes from './service.routes.js';
+import cartRoutes from './cart.routes.js';
+import dispatchRoutes from './dispatch.routes.js';
 
 const router = Router();
 
@@ -44,5 +46,7 @@ router.use('/offers', offerRoutes);
 router.use('/reels', reelRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/services', serviceRoutes);
+router.use('/cart', cartRoutes);
+router.use('/operations/dispatch', dispatchRoutes);
 
 export default router;

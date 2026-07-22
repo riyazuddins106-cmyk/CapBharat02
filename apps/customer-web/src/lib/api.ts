@@ -99,8 +99,39 @@ export interface ApiBooking {
   status: 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
   price: number;
   notes: string | null;
-  professionalId: string;
+  professionalId: string | null;
   categoryId: string;
+}
+
+export interface ApiService {
+  id: string;
+  categoryId: string;
+  subCategoryId: string | null;
+  name: string;
+  description: string | null;
+  images: string[];
+  customerPrice: number;
+  partnerPayout: number;
+  duration: number;
+  requiredSkill: string | null;
+  isActive: boolean;
+}
+
+export interface ApiCartItem {
+  id: string;
+  serviceId: string;
+  name: string;
+  image: string | null;
+  quantity: number;
+  unitPrice: number;
+  duration: number;
+  lineTotal: number;
+}
+
+export interface ApiCart {
+  id: string;
+  items: ApiCartItem[];
+  total: number;
 }
 
 export interface ApiReview {
@@ -304,6 +335,21 @@ export const addressesApi = {
   async delete(id: string) {
     await client.delete(`/addresses/${id}`);
   },
+};
+
+export const servicesApi = {
+  async list(params?: { categoryId?: string; subCategoryId?: string; q?: string }) {
+    const { data } = await client.get('/services', { params });
+    return data.data as { services: ApiService[]; total: number };
+  },
+};
+
+export const cartApi = {
+  async get() { const { data } = await client.get('/cart'); return data.data as ApiCart; },
+  async add(serviceId: string, quantity = 1) { const { data } = await client.post('/cart/items', { serviceId, quantity }); return data.data as ApiCart; },
+  async update(itemId: string, quantity: number) { const { data } = await client.patch(`/cart/items/${itemId}`, { quantity }); return data.data as ApiCart; },
+  async remove(itemId: string) { const { data } = await client.delete(`/cart/items/${itemId}`); return data.data as ApiCart; },
+  async checkout(payload: { scheduledAt: string; addressId?: string; notes?: string }) { const { data } = await client.post('/bookings/checkout', payload); return data.data as ApiBooking; },
 };
 
 // ─── Offers API ───────────────────────────────────────────────────────────────

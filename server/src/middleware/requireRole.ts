@@ -5,7 +5,7 @@ import { db } from '../config/database.js';
 import { users } from '../database/schema/index.js';
 import { eq } from 'drizzle-orm';
 
-type Role = 'customer' | 'partner' | 'admin';
+type Role = 'customer' | 'partner' | 'admin' | 'operations_manager';
 
 /**
  * Middleware that verifies the authenticated user has one of the required roles.

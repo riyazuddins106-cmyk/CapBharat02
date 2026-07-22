@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 import {
   auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
-  addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig,
+  addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig, servicesApi, cartApi,
   type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
-  type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment,
+  type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment, type ApiService, type ApiCart,
 } from "../lib/api";
 
 /* ─────────────────────────── Category icon map ─────────────────── */
@@ -1319,13 +1319,15 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, favoriteIds, onToggleFavorite, onBook, initialCategoryId,
+  categories, favoriteIds, onToggleFavorite, onBook, initialCategoryId, isLoggedIn, onCartChange,
 }: {
   categories: ApiCategory[];
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
   onBook: (pro: ApiProfessional) => void;
   initialCategoryId?: string | null;
+  isLoggedIn: boolean;
+  onCartChange: (cart: ApiCart) => void;
 }) {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
@@ -1333,6 +1335,9 @@ function CustServices({
   const [pros, setPros] = useState<ApiProfessional[]>([]);
   const [prosLoading, setProsLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [catalogue, setCatalogue] = useState<ApiService[]>([]);
+  const [cart, setCart] = useState<ApiCart | null>(null);
+  const [cartOpen, setCartOpen] = useState(false);
 
   // Sync when home tab navigates here with a category pre-selected
   useEffect(() => {
@@ -1357,6 +1362,23 @@ function CustServices({
       .catch(() => setPros([]))
       .finally(() => setProsLoading(false));
   }, [selectedCatId, selectedSubId]);
+
+  useEffect(() => {
+    servicesApi.list({ categoryId: selectedCatId ?? undefined, subCategoryId: selectedSubId ?? undefined, q: search || undefined })
+      .then((result) => setCatalogue(result.services))
+      .catch(() => setCatalogue([]));
+  }, [selectedCatId, selectedSubId, search]);
+
+  useEffect(() => {
+    if (isLoggedIn) cartApi.get().then((value) => { setCart(value); onCartChange(value); }).catch(() => undefined);
+    else { setCart(null); onCartChange({ id: "", items: [], total: 0 }); }
+  }, [isLoggedIn, onCartChange]);
+
+  const addToCart = async (serviceId: string) => {
+    if (!isLoggedIn) return;
+    const next = await cartApi.add(serviceId);
+    setCart(next); onCartChange(next);
+  };
 
   const filtered = pros.filter((p) =>
     !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.title.toLowerCase().includes(search.toLowerCase())
@@ -1399,6 +1421,35 @@ function CustServices({
       </div>
 
       <div className="px-5 mt-5">
+        {catalogue.length > 0 && (
+          <section className="mb-7">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold">Book a service</h3>
+              <button onClick={() => setCartOpen(true)} className="text-xs font-bold text-violet-600">
+                Cart{cart?.items.length ? ` (${cart.items.reduce((n, item) => n + item.quantity, 0)})` : ""}
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {catalogue.map((service) => (
+                <div key={service.id} className="rounded-2xl bg-white border border-black/[0.08] p-3 flex gap-3">
+                  <div className="w-16 h-16 rounded-xl bg-violet-50 overflow-hidden flex-shrink-0">
+                    {service.images?.[0] && <img src={service.images[0]} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{service.name}</p>
+                    <p className="text-xs text-gray-400 mt-1">{service.duration} min{service.description ? ` · ${service.description}` : ""}</p>
+                    <p className="text-sm font-bold text-violet-600 mt-1">₹{service.customerPrice.toLocaleString("en-IN")}</p>
+                  </div>
+                  <button
+                    onClick={() => addToCart(service.id)}
+                    disabled={!isLoggedIn}
+                    className="self-center px-3 py-2 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 disabled:opacity-50"
+                  >{isLoggedIn ? "Add" : "Sign in"}</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── No category selected: show category icon grid ── */}
         {!selectedCatId && (
@@ -1527,6 +1578,58 @@ function CustServices({
         )}
       </div>
       <div className="h-6" />
+      {cartOpen && cart && (
+        <CartSheet
+          cart={cart}
+          onClose={() => setCartOpen(false)}
+          onChange={(next) => { setCart(next); onCartChange(next); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CartSheet({ cart, onClose, onChange }: { cart: ApiCart; onClose: () => void; onChange: (cart: ApiCart) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
+  const checkout = async () => {
+    if (!scheduledAt || !cart.items.length) return;
+    setSaving(true);
+    try {
+      await cartApi.checkout({ scheduledAt: new Date(scheduledAt).toISOString() });
+      onChange({ ...cart, items: [], total: 0 });
+      onClose();
+    } finally { setSaving(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={onClose}>
+      <div className="w-full max-w-[390px] bg-white rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg">Your cart</h3>
+          <button onClick={onClose}><X size={20} color="#6B7280" /></button>
+        </div>
+        {cart.items.length === 0 ? <p className="text-sm text-gray-400 py-8 text-center">Your cart is empty.</p> : (
+          <>
+            <div className="flex flex-col gap-3">
+              {cart.items.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 border-b border-black/5 pb-3">
+                  <div className="flex-1"><p className="font-semibold text-sm">{item.name}</p><p className="text-xs text-gray-400">₹{item.unitPrice} each</p></div>
+                  <button onClick={async () => onChange(await cartApi.update(item.id, Math.max(1, item.quantity - 1)))} className="w-7 h-7 rounded-lg bg-gray-100">−</button>
+                  <span className="text-sm font-bold">{item.quantity}</span>
+                  <button onClick={async () => onChange(await cartApi.update(item.id, item.quantity + 1))} className="w-7 h-7 rounded-lg bg-violet-50 text-violet-700">+</button>
+                  <button onClick={async () => onChange(await cartApi.remove(item.id))} className="ml-1"><Trash2 size={15} color="#EF4444" /></button>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between font-bold mt-4"><span>Total</span><span>₹{cart.total.toLocaleString("en-IN")}</span></div>
+            <label className="block text-xs font-semibold text-gray-500 mt-4 mb-1">Preferred date and time</label>
+            <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full rounded-xl border border-black/10 px-3 py-2.5 text-sm" />
+            <button disabled={!scheduledAt || saving} onClick={checkout} className="w-full mt-4 rounded-xl bg-violet-600 py-3 text-white font-bold text-sm disabled:opacity-50">
+              {saving ? "Confirming…" : "Confirm booking"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -1881,6 +1984,7 @@ export default function CustomerApp() {
   const [offers, setOffers]               = useState<ApiOffer[]>([]);
   const [reels, setReels]                 = useState<ApiReel[]>([]);
   const [addresses, setAddresses]         = useState<ApiAddress[]>([]);
+  const [cart, setCart]                   = useState<ApiCart>({ id: "", items: [], total: 0 });
 
   // Location
   const [location, setLocation] = useState<string>(() => localStorage.getItem(LOC_KEY) ?? "Set your location");
@@ -1926,6 +2030,7 @@ export default function CustomerApp() {
     setBookings([]);
     setFavoriteIds(new Set());
     setAddresses([]);
+    setCart({ id: "", items: [], total: 0 });
     setActiveTab("home");
     setProfileScreen("main");
   }, []);
@@ -2033,6 +2138,8 @@ export default function CustomerApp() {
             onToggleFavorite={handleToggleFavorite}
             onBook={handleBook}
             initialCategoryId={servicesInitCatId}
+            isLoggedIn={isLoggedIn}
+            onCartChange={setCart}
           />
         )}
         {activeTab === "bookings" && (

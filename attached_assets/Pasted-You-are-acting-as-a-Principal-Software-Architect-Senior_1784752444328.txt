@@ -1,0 +1,1285 @@
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Backend Engineer, Database Architect, Mobile App Engineer, Web App Engineer, UI/UX Engineer, and QA Engineer.
+
+I have an existing Urban Company style service marketplace application with:
+
+1. Customer App
+2. Partner App (Service Professional App)
+3. Admin Panel
+
+The current system has a major architecture issue:
+
+- Partners are currently selecting categories/services themselves.
+- Partners are adding their own pricing.
+- There is no proper product/service catalog controlled by Admin.
+- Customer does not have Add To Cart functionality.
+- Service assignment workflow is not like Urban Company.
+
+I need you to MODIFY the existing application and convert it into an Admin-controlled service marketplace.
+
+Do NOT rebuild from scratch.
+Analyze the existing codebase, database, APIs, and UI first.
+Preserve the existing design, components, authentication, and working features.
+Implement the following architecture.
+
+====================================================
+
+NEW BUSINESS MODEL
+
+ADMIN IS THE OWNER OF ALL SERVICES.
+
+Partners cannot create services or set prices.
+
+Admin will create and manage:
+
+- Categories
+- Sub Categories
+- Services / Products
+- Pricing
+- Partner payout
+- Duration
+- Required skills
+- Images
+- Descriptions
+- Availability
+
+====================================================
+
+ADMIN PANEL CHANGES
+
+Create/modify Service Management module.
+
+Structure:
+
+Category
+ |
+ |-- Sub Category
+        |
+        |-- Service/Product
+
+
+Example:
+
+Cleaning
+
+   Floor Cleaning
+   Bathroom Cleaning
+   Kitchen Cleaning
+   Sofa Cleaning
+   Full Home Cleaning
+
+
+Each service/product should have:
+
+- Service Name
+- Category
+- Sub Category
+- Description
+- Images
+- Customer Price
+- Partner Commission/Payout
+- Platform Commission
+- Duration
+- Required Skill
+- Status Active/Inactive
+
+
+Example:
+
+Service:
+
+Floor Deep Cleaning
+
+
+Customer Price:
+₹999
+
+
+Partner payout:
+₹600
+
+
+Platform earning:
+₹399
+
+
+Duration:
+2 hours
+
+
+Required Skill:
+Floor Cleaning
+
+
+====================================================
+
+DATABASE CHANGES
+
+Analyze current database and create/modify tables.
+
+Required structure:
+
+
+services
+
+- id
+- category_id
+- sub_category_id
+- name
+- description
+- images
+- customer_price
+- partner_price
+- commission
+- duration
+- required_skill
+- status
+- created_at
+
+
+categories
+
+- id
+- name
+- image
+- status
+
+
+sub_categories
+
+- id
+- category_id
+- name
+- image
+- status
+
+
+partners
+
+Add:
+
+- availability_status
+- current_booking_status
+- location
+- rating
+
+
+partner_services
+
+Mapping table:
+
+partner_id
+service_id
+
+
+Example:
+
+Partner Ahmed:
+
+Floor Cleaning
+Bathroom Cleaning
+
+
+====================================================
+
+CUSTOMER APP CHANGES
+
+Modify customer flow:
+
+Current:
+
+Category → Partner decides service
+
+
+Change to:
+
+Category
+
+↓
+
+Sub Category
+
+↓
+
+Services
+
+
+Example:
+
+
+Cleaning
+
+↓
+
+Floor Cleaning
+
+↓
+
+Deep Floor Cleaning
+
+₹999
+
+
+Customer should see:
+
+- Service image
+- Service name
+- Description
+- Price
+- Duration
+- Rating
+
+
+Add:
+
+ADD TO CART FUNCTIONALITY
+
+
+Cart should support:
+
+- Multiple services
+- Quantity
+- Price calculation
+- Total amount
+
+
+Example:
+
+
+Cart:
+
+Floor Cleaning       ₹999
+
+Bathroom Cleaning    ₹799
+
+Sofa Cleaning        ₹1200
+
+
+Total:
+₹2998
+
+
+Checkout:
+
+
+- Select address
+- Select date
+- Select time slot
+- Confirm booking
+- Payment
+
+
+====================================================
+
+BOOKING SYSTEM
+
+
+After checkout create booking.
+
+
+Booking status flow:
+
+
+Pending
+
+↓
+
+Searching Professional
+
+↓
+
+Partner Assigned
+
+↓
+
+Accepted
+
+↓
+
+On The Way
+
+↓
+
+Started
+
+↓
+
+Completed
+
+↓
+
+Reviewed
+
+
+====================================================
+
+PARTNER APP CHANGES
+
+
+Partners should NOT have:
+
+Remove:
+
+- Create service
+- Add category
+- Change price
+
+
+Partners should only manage:
+
+
+Profile
+
+Skills
+
+Availability
+
+Jobs
+
+Earnings
+
+Reviews
+
+
+Partner registration should include:
+
+Skills selection.
+
+Example:
+
+
+Ahmed:
+
+✓ Floor Cleaning
+
+✓ Bathroom Cleaning
+
+✓ Sofa Cleaning
+
+
+====================================================
+
+AUTOMATIC PARTNER ASSIGNMENT SYSTEM
+
+
+When customer books a service:
+
+
+Example:
+
+Customer books:
+
+Floor Cleaning
+
+
+System should find partners where:
+
+
+partner skill contains:
+Floor Cleaning
+
+
+AND
+
+
+partner availability = Available
+
+
+AND
+
+
+location is within service area
+
+
+
+Send job request notification.
+
+
+Example:
+
+
+Partner App Notification:
+
+
+NEW JOB REQUEST
+
+
+Service:
+Floor Cleaning
+
+
+Customer:
+Name
+
+
+Location:
+Address
+
+
+Distance:
+2 KM
+
+
+Time:
+10 AM
+
+
+Earning:
+₹600
+
+
+Buttons:
+
+ACCEPT
+
+REJECT
+
+
+
+====================================================
+
+MULTIPLE PARTNER NOTIFICATION
+
+
+Do not send only one request.
+
+
+Send request to multiple eligible partners.
+
+
+Example:
+
+
+5 available partners receive notification.
+
+
+First partner who accepts gets booking.
+
+
+Others receive:
+
+
+"This booking has already been assigned."
+
+
+====================================================
+
+PARTNER AVAILABILITY SYSTEM
+
+
+Partner statuses:
+
+
+AVAILABLE
+
+BUSY
+
+OFFLINE
+
+
+Only AVAILABLE partners should receive jobs.
+
+
+When partner accepts:
+
+
+Status becomes:
+
+BUSY
+
+
+When job completes:
+
+
+Status becomes:
+
+AVAILABLE
+
+
+====================================================
+
+NOTIFICATION SYSTEM
+
+
+Implement notifications for:
+
+
+Customer:
+
+- Booking created
+- Partner assigned
+- Partner accepted
+- Partner arriving
+- Job started
+- Job completed
+- Review request
+
+
+Partner:
+
+- New job request
+- Job accepted
+- Job cancelled
+- Payment update
+
+
+Admin:
+
+- New booking
+- Partner acceptance
+- Completion
+
+
+====================================================
+
+ADMIN DASHBOARD
+
+
+Add:
+
+
+Service analytics:
+
+- Total bookings
+- Revenue
+- Popular services
+
+
+Partner analytics:
+
+- Active partners
+- Busy partners
+- Ratings
+- Completed jobs
+
+
+Booking management:
+
+- View all bookings
+- Assign manually
+- Track status
+
+
+====================================================
+
+IMPORTANT DEVELOPMENT RULES
+
+
+1. First analyze existing project architecture.
+
+2. Do not break existing authentication.
+
+3. Do not remove existing features.
+
+4. Reuse existing components wherever possible.
+
+5. Update database migrations safely.
+
+6. Maintain API compatibility.
+
+7. Ensure Customer App, Partner App, and Admin Panel use the same backend data.
+
+8. Every service, price, booking, and partner assignment must be synchronized across all applications.
+
+9. Add proper validation and error handling.
+
+10. Test complete workflow:
+
+Admin creates service
+↓
+Customer sees service
+↓
+Customer adds to cart
+↓
+Customer books
+↓
+Eligible partners receive request
+↓
+Partner accepts
+↓
+Customer gets update
+↓
+Partner completes job
+↓
+Customer reviews
+
+
+====================================================
+
+Before making changes:
+
+1. Provide an analysis of current architecture.
+2. List files/modules that need modification.
+3. Explain database changes.
+4. Then implement changes step-by-step.
+
+Treat this as converting the application into a production-level Urban Company marketplace architecture.
+
+
+
+You are acting as a Principal Software Architect, Backend Engineer, Full Stack Developer, Database Architect, Product Manager, and QA Engineer.
+
+I have an existing Urban Company style marketplace application with:
+
+1. Customer App
+2. Partner App
+3. Admin Panel
+
+I need to add a new critical module called:
+
+"Operations Manager Dispatch & Manual Assignment System"
+
+The purpose of this module is to handle situations where automatic partner assignment fails, especially because the platform is new and there may not be enough partners available.
+
+Do NOT rebuild the application.
+Analyze the existing architecture, database, APIs, authentication, and booking flow first.
+Integrate this functionality into the existing system.
+
+====================================================
+
+BUSINESS REQUIREMENT
+
+Current flow:
+
+Customer books service
+        |
+System sends request to partners
+        |
+Partner accepts
+        |
+Booking assigned
+
+
+New requirement:
+
+If no partner accepts the request within a defined time:
+
+The request should automatically appear in the Operations Manager Panel.
+
+The Operations Manager can:
+
+- View pending requests
+- Contact partners manually
+- Assign available partners manually
+- Confirm booking assignment
+- Track who assigned the booking
+
+
+====================================================
+
+NEW USER ROLE
+
+Create a new role:
+
+Operations Manager
+
+
+Roles:
+
+Super Admin
+Admin
+Operations Manager
+Partner
+Customer
+
+
+Operations Manager permissions:
+
+CAN:
+
+- View all bookings
+- View pending partner requests
+- View partner availability
+- Assign partner manually
+- Reassign partner
+- Track assignment history
+- Update dispatch status
+
+
+CANNOT:
+
+- Change service pricing
+- Delete services
+- Manage admin users
+
+
+====================================================
+
+CREATE OPERATIONS DISPATCH PANEL
+
+Admin Panel new menu:
+
+
+Operations
+
+   |
+   |-- Dispatch Dashboard
+   |
+   |-- Pending Requests
+   |
+   |-- Assigned Jobs
+   |
+   |-- Assignment History
+
+
+
+====================================================
+
+DISPATCH DASHBOARD
+
+
+Create a page showing all booking requests.
+
+Columns:
+
+
+Booking ID
+
+Customer Name
+
+Service Name
+
+Customer Location
+
+Booking Date
+
+Booking Time
+
+Partners Notified
+
+Accepted Partner
+
+Current Status
+
+Assignment Type
+
+Assigned By
+
+
+
+Example:
+
+
+
+Booking #10001
+
+Customer:
+Riyaz
+
+
+Service:
+Floor Cleaning
+
+
+Partners Notified:
+5
+
+
+Accepted:
+None
+
+
+Status:
+Waiting For Partner
+
+
+Action:
+
+Assign Partner
+
+
+
+====================================================
+
+AUTOMATIC PARTNER REQUEST TRACKING
+
+
+Every time the system sends a booking request to partners:
+
+Store the request.
+
+
+Example:
+
+
+Booking:
+
+#10001
+
+
+Sent To:
+
+Ahmed
+Sameer
+Imran
+Rahul
+
+
+Status:
+
+
+Pending
+
+Accepted
+
+Rejected
+
+Expired
+
+
+
+The Operations Manager should see:
+
+Who received the request.
+
+Who rejected.
+
+Who ignored.
+
+Who accepted.
+
+
+
+====================================================
+
+TIMEOUT SYSTEM
+
+
+Create configurable timeout.
+
+
+Example:
+
+Partner response timeout:
+
+10 minutes
+
+
+If no partner accepts:
+
+
+Booking status changes:
+
+
+WAITING_FOR_PARTNER
+
+
+to
+
+
+OPERATION_REQUIRED
+
+
+
+The booking appears in Operations Dashboard.
+
+
+
+====================================================
+
+MANUAL ASSIGNMENT FLOW
+
+
+Operations Manager opens pending booking.
+
+
+
+Clicks:
+
+Assign Partner
+
+
+
+Show available partners:
+
+
+Example:
+
+
+Ahmed
+
+Skill:
+Floor Cleaning
+
+
+Status:
+Available
+
+
+Distance:
+2 KM
+
+
+Rating:
+4.8
+
+
+
+Sameer
+
+Skill:
+Floor Cleaning
+
+
+Status:
+Available
+
+
+Distance:
+5 KM
+
+
+
+Manager selects partner.
+
+
+
+Clicks:
+
+Confirm Assignment
+
+
+
+====================================================
+
+AFTER MANUAL ASSIGNMENT
+
+
+Update booking:
+
+
+Booking ID:
+
+#10001
+
+
+Status:
+
+Assigned
+
+
+Partner:
+
+Ahmed
+
+
+Assignment Type:
+
+Manual
+
+
+Assigned By:
+
+Operations Manager Name
+
+
+Assigned Date:
+
+Timestamp
+
+
+
+====================================================
+
+PARTNER APP CHANGES
+
+
+When Operations Manager manually assigns a job:
+
+
+Partner receives notification:
+
+
+NEW ASSIGNED JOB
+
+
+Assigned by:
+Operations Team
+
+
+Service:
+
+Floor Cleaning
+
+
+Customer:
+
+Riyaz
+
+
+Location:
+
+Andheri
+
+
+Time:
+
+10 AM
+
+
+
+Buttons:
+
+Accept Job
+
+Reject
+
+
+
+====================================================
+
+CUSTOMER APP CHANGES
+
+
+Customer should receive update:
+
+
+Your professional has been assigned.
+
+
+Show:
+
+
+Partner Name
+
+Profile Image
+
+Rating
+
+Expected Arrival Time
+
+
+
+====================================================
+
+DATABASE CHANGES
+
+
+Create table:
+
+
+booking_partner_requests
+
+
+Fields:
+
+
+id
+
+booking_id
+
+partner_id
+
+status
+
+
+PENDING
+
+ACCEPTED
+
+REJECTED
+
+EXPIRED
+
+
+sent_time
+
+response_time
+
+
+
+----------------------------------------------------
+
+
+Create table:
+
+
+booking_assignment_logs
+
+
+Fields:
+
+
+id
+
+booking_id
+
+partner_id
+
+action
+
+
+AUTO_SENT
+
+PARTNER_ACCEPTED
+
+MANUAL_ASSIGNED
+
+REASSIGNED
+
+
+assigned_by_user_id
+
+created_at
+
+
+
+----------------------------------------------------
+
+
+Update bookings table:
+
+
+Add:
+
+
+assignment_type
+
+
+AUTO
+
+MANUAL
+
+
+
+assigned_by
+
+
+
+dispatch_status
+
+
+SEARCHING_PARTNER
+
+WAITING_OPERATION
+
+ASSIGNED
+
+COMPLETED
+
+
+
+====================================================
+
+PARTNER SELECTION LOGIC
+
+
+When assigning manually:
+
+
+Only show partners who:
+
+
+1. Have required service skill
+
+2. Are available
+
+3. Are inside service area
+
+4. Are not already assigned another job
+
+
+====================================================
+
+OPERATIONS DASHBOARD FILTERS
+
+
+Add filters:
+
+
+All Requests
+
+Waiting Partner
+
+No Response
+
+Accepted
+
+Manual Assigned
+
+Auto Assigned
+
+Completed
+
+Cancelled
+
+
+
+====================================================
+
+NOTIFICATION SYSTEM
+
+
+Send notifications:
+
+
+Customer:
+
+- Booking received
+- Searching partner
+- Partner assigned
+- Partner details
+
+
+Partner:
+
+- New job request
+- Manually assigned job
+- Cancelled job
+
+
+Operations Manager:
+
+- New pending dispatch
+- No partner accepted
+- Customer waiting
+
+
+
+====================================================
+
+IMPORTANT RULES
+
+
+1. Maintain existing UI design.
+
+2. Reuse existing components.
+
+3. Do not break current booking flow.
+
+4. Make Customer App, Partner App, and Admin Panel use the same backend data.
+
+5. Add proper database migrations.
+
+6. Add API endpoints required for this workflow.
+
+7. Add permission checks for Operations Manager role.
+
+8. Add complete audit logs.
+
+9. Test complete scenarios:
+
+
+Scenario 1:
+
+Customer books service → Partner accepts → Auto assignment successful
+
+
+Scenario 2:
+
+Customer books service → No partner accepts → Operations Manager manually assigns → Partner receives job
+
+
+Scenario 3:
+
+Customer books service → Partner rejects → Request goes to Operations Queue
+
+
+
+Before coding:
+
+1. Analyze current project structure.
+2. Explain files/modules that will change.
+3. Explain database modifications.
+4. Then implement step-by-step.
+
+Build this as a production-level service dispatch system similar to Urban Company operations.

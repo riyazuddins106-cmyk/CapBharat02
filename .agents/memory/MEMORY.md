@@ -1,4 +1,6 @@
-- [Env variable contract](env-contract.md) — server uses DATABASE_URL (not SUPABASE_DATABASE_URL); all DB scripts must match this.
+- [Env variable contract](env-contract.md) — DATABASE_URL is the preferred Supabase Postgres secret; the server aliases it to the legacy name.
+- [Startup migrations](startup-migrations.md) — Supabase schema changes must be applied idempotently before the API starts serving queries.
+- [Marketplace completion](marketplace-completion.md) — user confirmed the requested marketplace, dispatch, admin, customer, partner, and mobile flows are complete and end-to-end tested.
 - [Drizzle-kit ESM compat](drizzle-kit-esm.md) — schema/index.ts must use extensionless imports; drizzle-kit uses CJS require() internally and cannot resolve .js extensions on .ts files.
 - [SUPABASE_URL vs DATABASE_URL](supabase-url-warning.md) — SUPABASE_URL must be the REST project URL (https://xxx.supabase.co), not the postgres connection string.
 - [ServeNow app separation](servenow-arch.md) — three apps share one server; admin-web extracted from App.tsx prototype; mobile apps were already isolated.
