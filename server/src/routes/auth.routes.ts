@@ -5,6 +5,7 @@ import { authRateLimiter, otpRateLimiter, refreshRateLimiter } from '../middlewa
 import { authenticate } from '../middleware/authenticate.js';
 import {
   registerSchema,
+  registerPartnerSchema,
   verifyOtpSchema,
   resendOtpSchema,
   loginSchema,
@@ -16,6 +17,7 @@ import {
 const router = Router();
 
 router.post('/register', authRateLimiter, validate({ body: registerSchema }), authController.register);
+router.post('/register-partner', authRateLimiter, validate({ body: registerPartnerSchema }), authController.registerPartner);
 router.post('/verify-otp', authRateLimiter, validate({ body: verifyOtpSchema }), authController.verifyOtp);
 router.post('/resend-otp', otpRateLimiter, validate({ body: resendOtpSchema }), authController.resendOtp);
 router.post('/login', authRateLimiter, validate({ body: loginSchema }), authController.login);

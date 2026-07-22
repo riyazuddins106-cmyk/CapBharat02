@@ -14,6 +14,11 @@ function sanitize<T extends { devCode?: string }>(data: T): Omit<T, 'devCode'> |
 }
 
 export const authController = {
+  registerPartner: asyncHandler(async (req: Request, res: Response) => {
+    const result = await authService.registerPartner(req.body);
+    sendSuccess(res, sanitize(result), 201);
+  }),
+
   register: asyncHandler(async (req: Request, res: Response) => {
     const result = await authService.register(req.body);
     sendSuccess(res, sanitize(result), 201);

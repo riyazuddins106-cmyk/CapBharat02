@@ -195,6 +195,12 @@ export const authApi = {
 
   resendOtp: (data: { email: string; purpose: string }) =>
     request<void>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
+
+  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string }) =>
+    request<{ userId: string; email: string; devCode?: string }>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
+
+  verifyOtp: (data: { email: string; code: string; purpose: string }) =>
+    request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Partner ────────────────────────────────────────────────

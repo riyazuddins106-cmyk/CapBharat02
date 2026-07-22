@@ -80,6 +80,16 @@ export const storageService = {
     return supabaseAdmin.storage.from(BANNER_BUCKET).getPublicUrl(path).data.publicUrl;
   },
 
+  async uploadProfessionalAvatar(proId: string, file: Express.Multer.File): Promise<string> {
+    if (file.size > MAX_FILE_SIZE) throw AppError.badRequest('Avatar must be smaller than 5MB.');
+    const detected = detectImageType(file.buffer);
+    if (!detected) throw AppError.badRequest('Avatar must be a PNG, JPEG, or WebP image.');
+    const path = `pro-${proId}/avatar-${Date.now()}.${detected.ext}`;
+    const { error } = await supabaseAdmin.storage.from(AVATAR_BUCKET).upload(path, file.buffer, { contentType: detected.mime, upsert: true });
+    if (error) throw AppError.internal(`Failed to upload avatar: ${error.message}`);
+    return supabaseAdmin.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
     if (file.size > MAX_FILE_SIZE) {
       throw AppError.badRequest('Avatar must be smaller than 5MB.');

@@ -5,7 +5,9 @@ import { userRepository } from '../repositories/user.repository.js';
 import { refreshTokenRepository } from '../repositories/refreshToken.repository.js';
 import { otpService } from './otp.service.js';
 import bcrypt from 'bcryptjs';
-import type { RegisterInput, LoginInput, ResetPasswordInput } from '../validators/auth.validators.js';
+import type { RegisterInput, RegisterPartnerInput, LoginInput, ResetPasswordInput } from '../validators/auth.validators.js';
+import { professionalRepository } from '../repositories/professional.repository.js';
+import { categoryRepository } from '../repositories/category.repository.js';
 import type { User } from '../database/schema/users.js';
 
 function toPublicUser(user: User) {
@@ -43,6 +45,41 @@ async function issueTokenPair(user: User) {
 }
 
 export const authService = {
+  async registerPartner(input: RegisterPartnerInput) {
+    const existing = await userRepository.findByEmail(input.email);
+    if (existing) {
+      throw AppError.conflict('An account with this email already exists.');
+    }
+
+    // Validate category exists
+    const category = await categoryRepository.findById(input.categoryId);
+    if (!category) {
+      throw AppError.notFound('Selected category not found.');
+    }
+
+    const passwordHash = await hashPassword(input.password);
+    const user = await userRepository.create({
+      email: input.email,
+      phone: input.phone,
+      fullName: input.fullName,
+      passwordHash,
+      role: 'partner',
+    });
+
+    // Create a linked professional record so the partner can log in immediately
+    await professionalRepository.create({
+      userId: user.id,
+      name: input.fullName,
+      categoryId: input.categoryId,
+      title: input.title,
+      basePrice: 0,
+      priceUnit: '/visit',
+    });
+
+    const code = await otpService.issue(user.email, 'signup', user.id);
+    return { userId: user.id, email: user.email, devCode: code };
+  },
+
   async register(input: RegisterInput) {
     const existing = await userRepository.findByEmail(input.email);
     if (existing) {

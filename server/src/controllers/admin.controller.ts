@@ -584,6 +584,17 @@ export const adminController = {
     res.json({ success: true, data: row });
   }),
 
+  uploadProfessionalAvatar: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!req.file) throw AppError.badRequest('No file uploaded. Use the "avatar" field.');
+    const [existing] = await db.select({ id: professionals.id }).from(professionals).where(eq(professionals.id, id));
+    if (!existing) throw AppError.notFound('Professional not found');
+    const avatarUrl = await storageService.uploadProfessionalAvatar(id, req.file);
+    const [row] = await db.update(professionals).set({ avatarUrl, updatedAt: new Date() }).where(eq(professionals.id, id)).returning();
+    await auditLogService.record(req.user!.userId, 'professional.avatar_upload', 'professional', id, {});
+    res.json({ success: true, data: row });
+  }),
+
   uploadCategoryImage: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!req.file) throw AppError.badRequest('No file uploaded. Use the "image" field.');

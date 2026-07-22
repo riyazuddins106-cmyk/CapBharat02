@@ -258,7 +258,6 @@ const ADMIN_SIDEBAR = [
   { id: "dashboard",  icon: Home,       label: "Dashboard"          },
   { id: "bookings",   icon: BookOpen,   label: "Bookings"           },
   { id: "pros",       icon: Users,      label: "Professionals"      },
-  { id: "create-pro", icon: UserPlus,   label: "Create Professional" },
   { id: "users",      icon: UserCheck,  label: "Users"              },
   { id: "categories", icon: Grid,       label: "Categories"         },
   { id: "reels",      icon: Film,       label: "Reels"              },
@@ -415,9 +414,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
 
   /* ── Professional handlers ── */
-  const createPro = async (data: { fullName: string; email: string; password: string; phone?: string; title: string; bio?: string; categoryId: string; subCategoryId?: string; basePrice: number; priceUnit?: string; badge?: string; tags?: string[] }) => {
-    await adminApi.createProfessional(data, accessToken);
+  const createPro = async (data: { fullName: string; email: string; password: string; phone?: string; title: string; bio?: string; categoryId: string; subCategoryId?: string; basePrice: number; priceUnit?: string; badge?: string; tags?: string[] }): Promise<string> => {
+    const pro = await adminApi.createProfessional(data, accessToken);
     showMsg("Professional created successfully"); load();
+    return pro.id;
   };
   const editPro = async (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => {
     await adminApi.updateProfessional(id, patch, accessToken);
@@ -652,7 +652,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} />
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
@@ -941,7 +941,7 @@ function CreateProfessionalView({
 }: {
   categories: Category[];
   accessToken: string;
-  onCreate: (data: { fullName: string; email: string; password: string; phone?: string; title: string; bio?: string; categoryId: string; subCategoryId?: string; basePrice: number; priceUnit?: string; badge?: string; tags?: string[] }) => Promise<void>;
+  onCreate: (data: { fullName: string; email: string; password: string; phone?: string; title: string; bio?: string; categoryId: string; subCategoryId?: string; basePrice: number; priceUnit?: string; badge?: string; tags?: string[] }) => Promise<string>;
   onCreated: () => void;
 }) {
   const [form, setForm] = useState(EMPTY_PRO_FORM);
@@ -951,9 +951,19 @@ function CreateProfessionalView({
   const [subCats, setSubCats] = useState<SubCategory[]>([]);
   const [subCatsLoading, setSubCatsLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof typeof EMPTY_PRO_FORM, v: string | number) =>
     setForm(f => ({ ...f, [k]: v }));
+
+  const handleAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
 
   const loadSubCats = async (catId: string) => {
     setSubCats([]); set("subCategoryId", "");
@@ -977,7 +987,7 @@ function CreateProfessionalView({
 
     setSaving(true);
     try {
-      await onCreate({
+      const proId = await onCreate({
         fullName:    form.fullName.trim(),
         email:       form.email.trim(),
         password:    form.password,
@@ -991,9 +1001,14 @@ function CreateProfessionalView({
         badge:       form.badge.trim() || undefined,
         tags:        form.tags.split(",").map(t => t.trim()).filter(Boolean),
       });
+      if (avatarFile && proId) {
+        try { await adminApi.uploadProfessionalAvatar(proId, avatarFile, accessToken); } catch { /* non-fatal */ }
+      }
       setSuccess(true);
       setForm(EMPTY_PRO_FORM);
       setSubCats([]);
+      setAvatarFile(null);
+      setAvatarPreview(null);
     } catch (e: any) {
       setError(e.message ?? "Failed to create professional.");
     } finally { setSaving(false); }
@@ -1042,6 +1057,32 @@ function CreateProfessionalView({
       {/* Account details */}
       <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={{ background: "rgba(255,255,255,0.03)" }}>
         <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Account Details</p>
+
+        {/* Avatar picker */}
+        <div className="flex items-center gap-4">
+          <div
+            className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer border-2 border-dashed border-white/20 hover:border-white/40 transition-colors"
+            style={{ background: avatarPreview ? "transparent" : "rgba(91,62,245,0.12)" }}
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            {avatarPreview
+              ? <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+              : <span className="text-2xl text-white/30">📷</span>}
+          </div>
+          <div>
+            <button type="button" onClick={() => avatarInputRef.current?.click()}
+              className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:bg-white/5 transition-colors">
+              {avatarFile ? "Change Photo" : "Upload Photo"}
+            </button>
+            {avatarFile && (
+              <button type="button" onClick={() => { setAvatarFile(null); setAvatarPreview(null); if (avatarInputRef.current) avatarInputRef.current.value = ""; }}
+                className="ml-2 text-sm text-white/30 hover:text-white/60 transition-colors">Remove</button>
+            )}
+            <p className="text-white/30 text-xs mt-1">PNG, JPG or WebP · max 5 MB · optional</p>
+          </div>
+          <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleAvatarPick} />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <Field label="Full Name *">
             <TextInput value={form.fullName} onChange={v => set("fullName", v)} placeholder="e.g. Ravi Kumar" />
@@ -1126,7 +1167,7 @@ function CreateProfessionalView({
 }
 
 function ProsView({
-  pros, onEdit, onToggle, onDelete, categories, accessToken,
+  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew,
 }: {
   pros: ProfessionalRow[];
   onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => Promise<void>;
@@ -1134,6 +1175,7 @@ function ProsView({
   onDelete: (id: string) => Promise<void>;
   categories: Category[];
   accessToken: string;
+  onCreateNew: () => void;
 }) {
   const [search,      setSearch]      = useState("");
   const [editTarget,  setEditTarget]  = useState<ProfessionalRow | null>(null);
@@ -1143,6 +1185,10 @@ function ProsView({
   const [busyId,      setBusyId]      = useState<string | null>(null);
   const [subCats,     setSubCats]     = useState<SubCategory[]>([]);
   const [subCatsLoading, setSubCatsLoading] = useState(false);
+  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
+  const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
+  const [editAvatarUploading, setEditAvatarUploading] = useState(false);
+  const editAvatarInputRef = useRef<HTMLInputElement>(null);
 
   const loadSubCats = async (categoryId: string) => {
     if (!categoryId) { setSubCats([]); return; }
@@ -1163,8 +1209,28 @@ function ProsView({
       categoryId: catId, subCategoryId: p.subCategoryId ?? "",
     });
     setSubCats([]);
+    setEditAvatarFile(null);
+    setEditAvatarPreview(null);
     if (catId) loadSubCats(catId);
     setEditTarget(p);
+  };
+
+  const handleEditAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditAvatarFile(file);
+    setEditAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleEditAvatarUpload = async () => {
+    if (!editAvatarFile || !editTarget) return;
+    setEditAvatarUploading(true);
+    try {
+      await adminApi.uploadProfessionalAvatar(editTarget.id, editAvatarFile, accessToken);
+      setEditAvatarFile(null);
+      setEditAvatarPreview(null);
+    } catch (err: any) { alert(err.message); }
+    finally { setEditAvatarUploading(false); }
   };
 
   const handleCategoryChange = (catId: string) => {
@@ -1176,6 +1242,7 @@ function ProsView({
     if (!editTarget) return;
     setSaving(true);
     try {
+      if (editAvatarFile) await handleEditAvatarUpload();
       await onEdit(editTarget.id, {
         name: form.name, title: form.title, bio: form.bio,
         basePrice: Number(form.basePrice), priceUnit: form.priceUnit,
@@ -1215,6 +1282,32 @@ function ProsView({
       {editTarget && (
         <Modal title="Edit Professional" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
+            {/* Avatar upload */}
+            <div className="flex items-center gap-4 pb-2 border-b border-white/[0.07]">
+              <div
+                className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer border-2 border-dashed border-white/20 hover:border-white/40 transition-colors flex items-center justify-center"
+                style={{ background: "rgba(91,62,245,0.12)" }}
+                onClick={() => editAvatarInputRef.current?.click()}
+              >
+                {editAvatarPreview
+                  ? <img src={editAvatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                  : editTarget.avatarUrl
+                    ? <img src={editTarget.avatarUrl} alt={editTarget.name} className="w-full h-full object-cover" />
+                    : <span className="text-xl text-white/30">📷</span>}
+              </div>
+              <div>
+                <button type="button" onClick={() => editAvatarInputRef.current?.click()}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/10 text-white/70 hover:bg-white/5 transition-colors">
+                  {editAvatarFile ? "Change Photo" : editTarget.avatarUrl ? "Replace Photo" : "Upload Photo"}
+                </button>
+                {editAvatarFile && (
+                  <button type="button" onClick={() => { setEditAvatarFile(null); setEditAvatarPreview(null); if (editAvatarInputRef.current) editAvatarInputRef.current.value = ""; }}
+                    className="ml-2 text-xs text-white/30 hover:text-white/60 transition-colors">Remove</button>
+                )}
+                <p className="text-white/30 text-xs mt-1">PNG, JPG, WebP · max 5 MB</p>
+              </div>
+              <input ref={editAvatarInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleEditAvatarPick} />
+            </div>
             <Field label="Name"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
             <Field label="Title"><TextInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} /></Field>
             <Field label="Bio"><TextArea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} placeholder="Professional bio…" /></Field>
@@ -1264,7 +1357,17 @@ function ProsView({
         />
       )}
 
-      <SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" />
+      <div className="flex items-center justify-between gap-3">
+        <SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" />
+        <button
+          onClick={onCreateNew}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white whitespace-nowrap"
+          style={{ background: "#5B3EF5" }}
+        >
+          <UserPlus size={15} />
+          Create Professional
+        </button>
+      </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">

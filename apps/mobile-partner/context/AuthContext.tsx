@@ -17,6 +17,8 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   resendOtp: (email: string, purpose: string) => Promise<void>;
+  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string }) => Promise<{ email: string; devCode?: string }>;
+  verifySignupOtp: (email: string, code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
@@ -148,11 +150,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authApi.resendOtp({ email, purpose });
   }, []);
 
+  const registerPartner = useCallback(async (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string }) => {
+    const result = await authApi.registerPartner(data);
+    return { email: result.email, devCode: result.devCode };
+  }, []);
+
+  const verifySignupOtp = useCallback(async (email: string, code: string) => {
+    const data = await authApi.verifyOtp({ email, code, purpose: 'signup' });
+    if (!isPartnerRole(data.user.role)) {
+      throw new Error('This account is not registered as a partner.');
+    }
+    await persistTokens(data.accessToken, data.refreshToken);
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    setupRefreshHandler(data.refreshToken);
+    queryClient.clear();
+    registerPushToken(data.accessToken);
+  }, [registerPushToken, setupRefreshHandler]);
+
   return (
     <AuthContext.Provider value={{
       user, accessToken, isLoading,
       isAuthenticated: !!accessToken,
-      login, logout, forgotPassword, resetPassword, resendOtp,
+      login, logout, forgotPassword, resetPassword, resendOtp, registerPartner, verifySignupOtp,
     }}>
       {children}
     </AuthContext.Provider>

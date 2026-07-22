@@ -47,6 +47,21 @@ export const resetPasswordSchema = z.object({
     .regex(/[0-9]/, 'Password must contain a number'),
 });
 
+export const registerPartnerSchema = z.object({
+  fullName: z.string().trim().min(2, 'Full name must be at least 2 characters').max(255),
+  email: z.string().trim().toLowerCase().email('Invalid email address'),
+  phone: z.string().trim().min(7).max(20).optional(),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain an uppercase letter')
+    .regex(/[a-z]/, 'Password must contain a lowercase letter')
+    .regex(/[0-9]/, 'Password must contain a number'),
+  categoryId: z.string().uuid('Invalid category'),
+  title: z.string().trim().min(2, 'Title must be at least 2 characters').max(255),
+});
+
+export type RegisterPartnerInput = z.infer<typeof registerPartnerSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>;

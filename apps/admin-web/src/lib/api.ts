@@ -341,6 +341,11 @@ export const adminApi = {
     request(`/admin/professionals/${id}/activate`, { method: 'PATCH', token }),
   deleteProfessional: (id: string, token: string) =>
     request<{ id: string }>(`/admin/professionals/${id}`, { method: 'DELETE', token }),
+  uploadProfessionalAvatar: (id: string, file: File, token: string) => {
+    const fd = new FormData(); fd.append('avatar', file);
+    return fetch(`/api/admin/professionals/${id}/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ProfessionalRow; }));
+  },
 
   // Users
   getUsers: (token: string) =>

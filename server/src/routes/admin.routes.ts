@@ -31,6 +31,7 @@ router.patch('/professionals/:id',              adminController.updateProfession
 router.patch('/professionals/:id/suspend',      adminController.suspendProfessional);
 router.patch('/professionals/:id/activate',     adminController.activateProfessional);
 router.delete('/professionals/:id',             adminController.deleteProfessional);
+router.post('/professionals/:id/avatar',        upload.single('avatar'), adminController.uploadProfessionalAvatar);
 
 // Users / Customers
 router.get('/users',                  adminController.listUsers);
