@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import nodemailer from 'nodemailer';
 
 /* ── Allowed setting keys ─────────────────────────────────────────── */
-const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config']);
+const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config']);
 
 /* ── GET /admin/settings/:key ─────────────────────────────────────── */
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -127,6 +127,14 @@ function getDefaults(key: string): object {
       enabled:   false,
       provider:  'fast2sms',
       fast2sms:  { apiKey: '' },
+    };
+  }
+  if (key === 'contact_config') {
+    return {
+      email:       'support@servenow.in',
+      phone:       '+91 98765 43210',
+      hours:       'Mon–Sat, 9am–6pm IST',
+      docsUrl:     'docs.servenow.in',
     };
   }
   return {};

@@ -805,6 +805,106 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
    BOOKINGS
 ═══════════════════════════════════════════════════════════════════ */
 
+function PartnerStatusBadge({ status }: { status: string }) {
+  const cfg: Record<string, { label: string; color: string; bg: string }> = {
+    available:  { label: "Available",  color: "#4ade80", bg: "rgba(74,222,128,0.12)" },
+    busy:       { label: "Busy",       color: "#fb923c", bg: "rgba(251,146,60,0.12)" },
+    offline:    { label: "Offline",    color: "#94a3b8", bg: "rgba(148,163,184,0.12)" },
+  };
+  const s = cfg[status] ?? cfg.offline;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: s.color, background: s.bg }}>
+      <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: s.color }} />
+      {s.label}
+    </span>
+  );
+}
+
+function EligiblePartnersModal({
+  booking,
+  partners,
+  loading,
+  assigning,
+  onAssign,
+  onClose,
+}: {
+  booking: DispatchRequestRow;
+  partners: EligiblePartner[] | null;
+  loading: boolean;
+  assigning: string | null;
+  onAssign: (partnerId: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl border border-white/[0.1] shadow-2xl" style={{ background: "#18181b" }} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b border-white/[0.07]">
+          <div>
+            <h3 className="text-white font-bold text-base">Assign Partner</h3>
+            <p className="text-white/40 text-xs mt-0.5">{booking.serviceName} · {booking.customerName}</p>
+            <p className="text-white/30 text-xs">{new Date(booking.scheduledAt).toLocaleString("en-IN")}</p>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors text-lg leading-none ml-4">✕</button>
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-3 px-5 pt-4 pb-2">
+          <span className="text-white/30 text-xs">Partner status:</span>
+          {["available", "busy", "offline"].map((s) => <PartnerStatusBadge key={s} status={s} />)}
+          <span className="text-white/25 text-xs ml-auto">All active partners shown</span>
+        </div>
+
+        {/* Partner list */}
+        <div className="px-5 pb-5 max-h-[420px] overflow-y-auto space-y-2">
+          {loading && (
+            <div className="flex items-center justify-center py-10">
+              <span className="text-white/40 text-sm">Loading partners…</span>
+            </div>
+          )}
+          {!loading && partners && partners.length === 0 && (
+            <div className="text-center py-10">
+              <p className="text-white/40 text-sm">No active partners found for this service.</p>
+              <p className="text-white/25 text-xs mt-1">Make sure partners have this service added to their profile.</p>
+            </div>
+          )}
+          {!loading && partners && partners.map((partner) => (
+            <div key={partner.id} className="flex items-center gap-3 rounded-xl px-3 py-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              {/* Avatar */}
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: "rgba(139,92,246,0.25)" }}>
+                {partner.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-white text-sm font-semibold truncate">{partner.name}</p>
+                  <PartnerStatusBadge status={partner.availabilityStatus} />
+                </div>
+                <p className="text-white/40 text-xs mt-0.5">
+                  ★ {partner.rating.toFixed(1)}
+                  {partner.currentBookingStatus === "busy" && partner.availabilityStatus !== "offline" && (
+                    <span className="ml-2 text-orange-400/70">· Currently on a job</span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => onAssign(partner.id)}
+                disabled={assigning === partner.id}
+                className="rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 flex-shrink-0"
+                style={{
+                  background: partner.availabilityStatus === "available" ? "rgba(74,222,128,0.15)" : "rgba(139,92,246,0.15)",
+                  color: partner.availabilityStatus === "available" ? "#4ade80" : "#a78bfa",
+                }}
+              >
+                {assigning === partner.id ? "Assigning…" : partner.availabilityStatus === "available" ? "Assign" : "Force Assign"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DispatchView({
   requests,
   accessToken,
@@ -814,29 +914,71 @@ function DispatchView({
   accessToken: string;
   onAssigned: () => void;
 }) {
-  const [eligible, setEligible] = useState<Record<string, EligiblePartner[]>>({});
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [modalBooking, setModalBooking] = useState<DispatchRequestRow | null>(null);
+  const [partners, setPartners] = useState<EligiblePartner[] | null>(null);
+  const [loadingPartners, setLoadingPartners] = useState(false);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const loadEligible = async (bookingId: string) => {
-    setLoadingId(bookingId);
+  const openModal = async (request: DispatchRequestRow) => {
+    setModalBooking(request);
+    setPartners(null);
+    setLoadingPartners(true);
     try {
-      const partners = await adminApi.getEligiblePartners(bookingId, accessToken);
-      setEligible((current) => ({ ...current, [bookingId]: partners }));
+      const list = await adminApi.getEligiblePartners(request.id, accessToken);
+      setPartners(list);
+    } catch {
+      setPartners([]);
     } finally {
-      setLoadingId(null);
+      setLoadingPartners(false);
     }
   };
 
-  const assign = async (bookingId: string, partnerId: string) => {
-    setAssigning(bookingId);
+  const closeModal = () => {
+    setModalBooking(null);
+    setPartners(null);
+    setAssigning(null);
+  };
+
+  const assign = async (partnerId: string) => {
+    if (!modalBooking) return;
+    setAssigning(partnerId);
     try {
-      await adminApi.assignPartner(bookingId, partnerId, accessToken);
+      await adminApi.assignPartner(modalBooking.id, partnerId, accessToken);
+      setToast("Partner assigned successfully!");
+      closeModal();
       onAssigned();
+      setTimeout(() => setToast(null), 3000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Assignment failed";
+      setToast(msg);
+      setTimeout(() => setToast(null), 3000);
     } finally {
       setAssigning(null);
     }
   };
+
+  const dispatchStatusColor = (s: string) =>
+    s === "assigned" ? "#16A34A" : s === "waiting_operation" ? "#ef4444" : "#F59E0B";
+
+  const q = search.toLowerCase();
+  const filtered = requests.filter((r) => {
+    const matchesSearch = !q ||
+      r.customerName?.toLowerCase().includes(q) ||
+      r.serviceName?.toLowerCase().includes(q) ||
+      (r.proName ?? "").toLowerCase().includes(q);
+    const matchesStatus = statusFilter === "all" || r.dispatchStatus === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const STATUS_OPTIONS = [
+    { value: "all",               label: "All" },
+    { value: "searching_partner", label: "Searching" },
+    { value: "waiting_operation", label: "Waiting" },
+    { value: "assigned",          label: "Assigned" },
+  ];
 
   return (
     <div className="space-y-5">
@@ -844,78 +986,132 @@ function DispatchView({
         <h2 className="text-white font-bold text-xl">Customer Booking Operations Control Centre</h2>
         <p className="text-white/40 text-sm mt-1">Monitor customer bookings and coordinate partner assignment.</p>
       </div>
+
+      {/* Stats — clickable to filter */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          ["Searching", requests.filter((r) => r.dispatchStatus === "searching_partner").length],
-          ["Waiting for operations", requests.filter((r) => r.dispatchStatus === "waiting_operation").length],
-          ["Assigned", requests.filter((r) => r.dispatchStatus === "assigned").length],
-        ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border border-white/[0.07] p-4" style={CARD}>
+        {([
+          ["Searching",             "searching_partner", requests.filter((r) => r.dispatchStatus === "searching_partner").length],
+          ["Waiting for operations","waiting_operation", requests.filter((r) => r.dispatchStatus === "waiting_operation").length],
+          ["Assigned",              "assigned",          requests.filter((r) => r.dispatchStatus === "assigned").length],
+        ] as [string, string, number][]).map(([label, val, count]) => (
+          <button
+            key={label}
+            onClick={() => setStatusFilter(statusFilter === val ? "all" : val)}
+            className="rounded-2xl border p-4 text-left transition-all"
+            style={{
+              ...CARD,
+              borderColor: statusFilter === val ? "rgba(139,92,246,0.5)" : "rgba(255,255,255,0.07)",
+              background: statusFilter === val ? "rgba(139,92,246,0.08)" : undefined,
+            }}
+          >
             <p className="text-white/40 text-xs">{label}</p>
-            <p className="text-white font-bold text-2xl mt-1">{value}</p>
-          </div>
+            <p className="text-white font-bold text-2xl mt-1">{count}</p>
+          </button>
         ))}
       </div>
+
+      {/* Search + filter bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by customer, service, or partner…"
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] pl-9 pr-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-xs">✕</button>
+          )}
+        </div>
+        <div className="flex gap-1.5 flex-shrink-0">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setStatusFilter(opt.value)}
+              className="rounded-lg px-3 py-2 text-xs font-semibold transition-all"
+              style={{
+                background: statusFilter === opt.value ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.04)",
+                color: statusFilter === opt.value ? "#a78bfa" : "rgba(255,255,255,0.4)",
+                border: statusFilter === opt.value ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.07)",
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Result count */}
+      <p className="text-white/25 text-xs -mt-2">
+        Showing {filtered.length} of {requests.length} bookings
+        {search && <span> matching "<span className="text-white/40">{search}</span>"</span>}
+      </p>
+
+      {/* Table */}
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Customer", "Service", "Scheduled", "Status", "Partner", "Actions"].map((heading) => (
+                {["Customer", "Service", "Scheduled", "Dispatch Status", "Current Partner", "Actions"].map((heading) => (
                   <th key={heading} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{heading}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {requests.map((request) => (
-                <tr key={request.id}>
+              {filtered.map((request) => (
+                <tr key={request.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-4 py-3 text-white font-medium">{request.customerName}</td>
                   <td className="px-4 py-3 text-white/70">{request.serviceName}</td>
                   <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(request.scheduledAt).toLocaleString("en-IN")}</td>
-                  <td className="px-4 py-3"><Badge label={request.dispatchStatus.replace("_", " ")} color={request.dispatchStatus === "assigned" ? "#16A34A" : "#F59E0B"} /></td>
-                  <td className="px-4 py-3 text-white/70">{request.proName ?? "Unassigned"}</td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      label={request.dispatchStatus.replace(/_/g, " ")}
+                      color={dispatchStatusColor(request.dispatchStatus)}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-white/70">
+                    {request.dispatchStatus === "assigned" && request.proName
+                      ? request.proName
+                      : <span className="text-white/25 italic">—</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => loadEligible(request.id)}
-                      disabled={loadingId === request.id}
-                      className="rounded-lg bg-violet-500/15 px-3 py-2 text-xs font-bold text-violet-300 disabled:opacity-50"
+                      onClick={() => openModal(request)}
+                      className="rounded-lg bg-violet-500/15 px-3 py-2 text-xs font-bold text-violet-300 hover:bg-violet-500/25 transition-colors whitespace-nowrap"
                     >
-                      {loadingId === request.id ? "Loading…" : "Eligible partners"}
+                      {request.dispatchStatus === "assigned" ? "Reassign Partner" : "Eligible Partners"}
                     </button>
                   </td>
                 </tr>
               ))}
-              {requests.length === 0 && <EmptyRow cols={6} text="No active dispatch bookings" />}
+              {filtered.length === 0 && (
+                <EmptyRow cols={6} text={search || statusFilter !== "all" ? "No bookings match your filter" : "No active dispatch bookings"} />
+              )}
             </tbody>
           </table>
         </div>
       </div>
-      {Object.entries(eligible).map(([bookingId, partners]) => (
-        <div key={bookingId} className="rounded-2xl border border-white/[0.07] p-4" style={CARD}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-bold text-sm">Eligible partners</h3>
-            <span className="text-white/35 text-xs">{bookingId.slice(0, 8)}</span>
-          </div>
-          <div className="space-y-2">
-            {partners.map((partner) => (
-              <div key={partner.id} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2">
-                <div className="flex-1">
-                  <p className="text-white text-sm font-semibold">{partner.name}</p>
-                  <p className="text-white/40 text-xs">★ {partner.rating.toFixed(1)} · {partner.availabilityStatus}</p>
-                </div>
-                <button
-                  onClick={() => assign(bookingId, partner.id)}
-                  disabled={assigning === bookingId}
-                  className="rounded-lg bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 disabled:opacity-50"
-                >
-                  {assigning === bookingId ? "Assigning…" : "Assign"}
-                </button>
-              </div>
-            ))}
-            {partners.length === 0 && <p className="text-white/40 text-sm">No eligible partners currently available.</p>}
-          </div>
+
+      {/* Modal */}
+      {modalBooking && (
+        <EligiblePartnersModal
+          booking={modalBooking}
+          partners={partners}
+          loading={loadingPartners}
+          assigning={assigning}
+          onAssign={assign}
+          onClose={closeModal}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-4 py-2 text-sm font-semibold shadow-lg" style={{ background: "#18181b", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}>
+          {toast}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -4121,6 +4317,9 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
    HELP & SUPPORT
 ═══════════════════════════════════════════════════════════════════ */
 
+interface ContactConfig { email: string; phone: string; hours: string; docsUrl: string; }
+const CONTACT_DEFAULTS: ContactConfig = { email: "support@servenow.in", phone: "+91 98765 43210", hours: "Mon–Sat, 9am–6pm IST", docsUrl: "docs.servenow.in" };
+
 function HelpSupportView({ accessToken }: { accessToken: string }) {
   const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4128,6 +4327,12 @@ function HelpSupportView({ accessToken }: { accessToken: string }) {
   const [responseText, setResponseText] = useState<Record<string, string>>({});
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Contact config state
+  const [contactEdit, setContactEdit] = useState(false);
+  const [contactForm, setContactForm] = useState<ContactConfig>(CONTACT_DEFAULTS);
+  const [contactSaved, setContactSaved] = useState<ContactConfig>(CONTACT_DEFAULTS);
+  const [contactSaving, setContactSaving] = useState(false);
 
   const loadTickets = async () => {
     setLoading(true);

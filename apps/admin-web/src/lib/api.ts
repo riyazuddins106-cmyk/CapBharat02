@@ -565,9 +565,9 @@ export const adminApi = {
     request<BookingRow>(`/operations/dispatch/${bookingId}/assign`, { method: 'POST', token, body: JSON.stringify({ partnerId }) }),
 
   // Platform Settings
-  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config', token: string) =>
+  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config', token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { token }),
-  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config', value: unknown, token: string) =>
+  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config', value: unknown, token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { method: 'PUT', token, body: JSON.stringify(value) }),
   sendTestEmail: (to: string, token: string) =>
     request<{ message: string }>('/admin/settings/email/test', { method: 'POST', token, body: JSON.stringify({ to }) }),

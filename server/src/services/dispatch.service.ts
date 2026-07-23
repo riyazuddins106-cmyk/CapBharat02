@@ -90,23 +90,30 @@ export const dispatchService = {
     if (!booking) throw AppError.notFound('Booking not found.');
     const [firstItem] = await db.select({ serviceId: services.id }).from(services)
       .where(eq(services.name, booking.serviceName)).limit(1);
+    // Return ALL active partners (any status) so admin can see who's busy/free and decide
     const rows = await db.select({ pro: professionals })
       .from(professionals)
-      .where(and(eq(professionals.isActive, true), eq(professionals.availabilityStatus, 'available'), eq(professionals.currentBookingStatus, 'available'), isNull(professionals.deletedAt)));
+      .where(and(eq(professionals.isActive, true), isNull(professionals.deletedAt)));
     if (!firstItem) return rows.map(({ pro }) => pro);
     const mapped = await db.select({ partnerId: partnerServices.partnerId }).from(partnerServices).where(eq(partnerServices.serviceId, firstItem.serviceId));
     const ids = new Set(mapped.map((r) => r.partnerId));
-    return rows.filter(({ pro }) => ids.has(pro.id)).map(({ pro }) => pro);
+    // Sort: available first, then busy, then offline
+    const filtered = rows.filter(({ pro }) => ids.has(pro.id)).map(({ pro }) => pro);
+    const order: Record<string, number> = { available: 0, busy: 1, offline: 2 };
+    filtered.sort((a, b) => (order[a.availabilityStatus] ?? 3) - (order[b.availabilityStatus] ?? 3));
+    return filtered;
   },
 
   async assign(bookingId: string, partnerId: string, assignedBy: string) {
-    const [pro] = await db.select().from(professionals).where(and(eq(professionals.id, partnerId), eq(professionals.isActive, true), eq(professionals.availabilityStatus, 'available'), eq(professionals.currentBookingStatus, 'available'))).limit(1);
-    if (!pro) throw AppError.badRequest('Partner is not available.');
+    // Admin can force-assign any active partner regardless of current availability
+    const [pro] = await db.select().from(professionals).where(and(eq(professionals.id, partnerId), eq(professionals.isActive, true), isNull(professionals.deletedAt))).limit(1);
+    if (!pro) throw AppError.badRequest('Partner not found or inactive.');
+    // Allow admin to reassign even if booking already has a professional (force-assign)
     const [booking] = await db.update(bookings).set({
       professionalId: partnerId, proName: pro.name, status: 'upcoming',
       dispatchStatus: 'assigned', assignmentType: 'manual', assignedBy, updatedAt: new Date(),
-    }).where(and(eq(bookings.id, bookingId), isNull(bookings.professionalId))).returning();
-    if (!booking) throw AppError.conflict('Booking has already been assigned.');
+    }).where(and(eq(bookings.id, bookingId), isNull(bookings.deletedAt))).returning();
+    if (!booking) throw AppError.notFound('Booking not found.');
     await db.update(bookingPartnerRequests).set({ status: 'expired', respondedAt: new Date() }).where(eq(bookingPartnerRequests.bookingId, bookingId));
     await db.insert(bookingAssignmentLogs).values({ bookingId, partnerId, action: 'MANUAL_ASSIGNED', assignedByUserId: assignedBy });
     await db.update(professionals).set({ availabilityStatus: 'busy', currentBookingStatus: 'busy', updatedAt: new Date() }).where(eq(professionals.id, partnerId));
