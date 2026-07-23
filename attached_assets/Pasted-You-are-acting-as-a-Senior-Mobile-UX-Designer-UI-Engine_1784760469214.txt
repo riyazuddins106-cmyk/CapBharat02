@@ -1,0 +1,336 @@
+You are acting as a Senior Mobile UX Designer, UI Engineer, Full Stack Engineer, and Product Architect.
+
+I need you to improve the Customer App cart experience.
+
+The application has a service marketplace model where customers can add multiple services/products into a cart before booking.
+
+Implement a professional e-commerce style cart UX similar to Amazon, Swiggy, and Zomato while maintaining the existing app design.
+
+====================================================
+
+CART ICON PLACEMENT REQUIREMENT
+
+The cart should always be accessible to the customer.
+
+Implement TWO cart entry points:
+
+
+1. GLOBAL HEADER CART ICON
+
+
+Show cart icon in the top-right corner on all customer browsing screens.
+
+
+Example:
+
+
+------------------------------------------------
+
+ServeNow                              🛒 2
+
+------------------------------------------------
+
+
+Rules:
+
+- Always visible.
+- Show item count badge.
+- Badge updates instantly when products are added or removed.
+- Clicking icon opens Cart page.
+
+
+
+====================================================
+
+2. FLOATING CART SUMMARY BUTTON
+
+
+When customer adds at least one service/product:
+
+
+Show a floating bottom-right cart button.
+
+
+Example:
+
+
+---------------------------------------
+
+
+Cleaning Services
+
+
+Floor Cleaning
+
+₹999
+
+
+Bathroom Cleaning
+
+₹599
+
+
+
+                         ┌───────────────┐
+                         │ 🛒 2 Services │
+                         │ ₹1598         │
+                         │ View Cart     │
+                         └───────────────┘
+
+
+---------------------------------------
+
+
+Rules:
+
+- Only appear when cart has items.
+- Hide when cart is empty.
+- Fixed position above bottom navigation.
+- Should not cover important buttons.
+- Smooth animation when appearing.
+
+
+
+====================================================
+
+SERVICE LISTING PAGE
+
+
+Each service/product card should have:
+
+
+Image
+
+Service Name
+
+Rating
+
+Duration
+
+Price
+
+
+Example:
+
+
+Floor Cleaning
+
+
+⭐ 4.8
+
+
+2 Hours
+
+
+₹999
+
+
+
+Button:
+
+
++ Add
+
+
+
+NOT:
+
+Book Now
+
+
+
+====================================================
+
+ADD TO CART BEHAVIOUR
+
+
+When user clicks:
+
+
++ Add
+
+
+Do:
+
+
+1. Add service to cart.
+
+2. Update header cart count.
+
+3. Show floating cart button.
+
+4. Show small confirmation animation.
+
+
+Example:
+
+
+"Floor Cleaning added to cart"
+
+
+
+====================================================
+
+CART PAGE
+
+
+Create professional cart page.
+
+
+Show:
+
+
+Service Image
+
+Service Name
+
+Selected Options
+
+Quantity
+
+Price
+
+Remove option
+
+
+
+Example:
+
+
+My Cart
+
+
+
+🧹 Floor Cleaning
+
+Deep Cleaning
+
+₹999
+
+
+
+🚿 Bathroom Cleaning
+
+₹599
+
+
+
+--------------------------------
+
+Total:
+
+₹1598
+
+
+Button:
+
+
+Proceed To Checkout
+
+
+
+====================================================
+
+CHECKOUT FLOW
+
+
+After clicking checkout:
+
+
+Address
+
+
+↓
+
+Date Selection
+
+
+↓
+
+Time Slot Selection
+
+
+↓
+
+Booking Summary
+
+
+↓
+
+Confirm Booking
+
+
+
+====================================================
+
+IMPORTANT UX RULES
+
+
+1. Customer should never lose access to cart.
+
+2. Customer should be able to browse and add multiple services.
+
+3. Do not force customer to open product detail page to add service.
+
+4. Do not use "Book Now" for services.
+
+5. Use "Add To Cart" model.
+
+6. Keep cart experience fast with minimum clicks.
+
+7. Maintain existing UI theme and components.
+
+
+
+====================================================
+
+TEST CASES
+
+
+Test 1:
+
+Customer opens app.
+
+Cart icon visible.
+
+Cart count = 0.
+
+
+
+Test 2:
+
+Customer adds Floor Cleaning.
+
+Cart count changes to 1.
+
+Floating cart appears.
+
+
+
+Test 3:
+
+Customer adds Bathroom Cleaning.
+
+Cart count changes to 2.
+
+Total price updates.
+
+
+
+Test 4:
+
+Customer opens cart.
+
+Both services are visible.
+
+
+
+Test 5:
+
+Customer removes service.
+
+Count and total update immediately.
+
+
+
+Implement this as a production-level service marketplace cart experience.

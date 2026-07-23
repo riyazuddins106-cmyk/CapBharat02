@@ -23,3 +23,4 @@
 - [Expo settings.json URL derivation](expo-settings-url-derivation.md) — exp.direct URL = settings.json urlRandomness (lowercased) + port; never capture from piped Metro stdout (TTY format differs).
 - [Expo tunnel FIFO stdin fix](expo-tunnel-fifo-stdin.md) — sleep 999999 in pipe blocks retry; use FIFO with exec 9<> (O_RDWR, non-blocking) to hold stdin open.
 - [Admin catalog ownership](admin-catalog-ownership.md) — customers book centrally managed products; partners are matched by skills and do not create or price products.
+- [Live serviceCount query](servicecount-live-query.md) — category serviceCount was static/stale; fixed to JOIN services table; Laundry got 6 new services.

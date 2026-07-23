@@ -43,6 +43,18 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        // Gracefully handle the startup race: Express finishes migrations
+        // after Vite is ready. Return 503 (not a raw connection error that
+        // the browser turns into a red 500) while the backend warms up.
+        configure: (proxy) => {
+          proxy.on('error', (err, _req, res) => {
+            console.warn('[proxy] /api backend not ready:', err.message);
+            if (!res.headersSent) {
+              (res as any).writeHead(503, { 'Content-Type': 'application/json' });
+              (res as any).end(JSON.stringify({ success: false, error: { message: 'Service starting – please retry' } }));
+            }
+          });
+        },
       },
       '/admin-panel': {
         target: 'http://localhost:5001',

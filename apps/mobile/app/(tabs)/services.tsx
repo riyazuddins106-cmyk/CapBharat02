@@ -9,9 +9,26 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { categoriesApi, subcategoriesApi, professionalsApi, favoritesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
 import { ProCard } from '@/components/ProCard';
-import { CategoryPill } from '@/components/CategoryPill';
-import { ProCardShimmer, CategoryShimmer } from '@/components/Shimmer';
+import { ProCardShimmer } from '@/components/Shimmer';
 import { queryClient } from '@/lib/queryClient';
+
+const serviceTypeIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  all: 'grid-outline',
+  cleaning: 'sparkles-outline',
+  plumbing: 'water-outline',
+  electrical: 'flash-outline',
+  salon: 'cut-outline',
+  painting: 'color-palette-outline',
+  'ac repair': 'snow-outline',
+  laundry: 'shirt-outline',
+  appliance: 'home-outline',
+  default: 'sparkles-outline',
+};
+
+function getServiceTypeIcon(name: string): keyof typeof Ionicons.glyphMap {
+  const normalized = name.trim().toLowerCase();
+  return serviceTypeIcons[normalized] ?? serviceTypeIcons.default;
+}
 
 export default function ServicesScreen() {
   const colors = useColors();
@@ -39,6 +56,10 @@ export default function ServicesScreen() {
     queryKey: ['/api/categories'],
     queryFn: categoriesApi.list,
   });
+
+  const availableCategories = (categories ?? []).filter((category) => category.serviceCount > 0);
+  const selectedCategory = availableCategories.find((category) => category.id === selectedCat);
+  const selectedCategoryName = selectedCategory?.name ?? params.categoryName ?? 'Services';
 
   const { data: subcategories } = useQuery({
     queryKey: ['/api/subcategories', selectedCat],
@@ -99,11 +120,99 @@ export default function ServicesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Search header */}
-      <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>
-          {params.subCategoryName ? params.subCategoryName : 'Find Services'}
+      {/* Visual service-type picker — keeps the first browse decision on one screen. */}
+      <View style={[styles.serviceTypePicker, { paddingTop: topPadding + 10, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.serviceTypeTitle, { color: colors.foreground }]}>
+          {selectedCat ? `${selectedCategoryName} — Pick a Service Type` : 'Pick a Service Type'}
         </Text>
+
+        <FlatList
+          horizontal
+          data={[{ id: null, name: 'All' } as any, ...availableCategories]}
+          keyExtractor={(item) => item.id ?? 'all'}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryTabsContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              testID={`category-tab-${item.id ?? 'all'}`}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setSelectedCat(item.id);
+                setSelectedSubCat(null);
+              }}
+              activeOpacity={0.85}
+              style={[
+                styles.categoryTab,
+                {
+                  backgroundColor: selectedCat === item.id ? colors.primary : colors.muted,
+                  borderColor: selectedCat === item.id ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.categoryTabText, { color: selectedCat === item.id ? '#fff' : colors.mutedForeground }]}>
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+
+        {selectedCat && (
+          <View style={styles.serviceTypeGrid}>
+            <TouchableOpacity
+              testID="service-type-all"
+              onPress={() => { setSelectedSubCat(null); Haptics.selectionAsync(); }}
+              activeOpacity={0.85}
+              style={styles.serviceTypeTile}
+            >
+              <View style={[styles.serviceTypeIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="grid-outline" size={25} color="#fff" />
+              </View>
+              <Text numberOfLines={2} style={[styles.serviceTypeLabel, { color: selectedSubCat === null ? colors.primary : colors.foreground, fontWeight: selectedSubCat === null ? '700' : '500' }]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            {(subcategories ?? []).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                testID={`service-type-${item.id}`}
+                onPress={() => { setSelectedSubCat(item.id); Haptics.selectionAsync(); }}
+                activeOpacity={0.85}
+                style={styles.serviceTypeTile}
+              >
+                <View style={[styles.serviceTypeIcon, { backgroundColor: colors.primary }]}>
+                  {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.serviceTypeImage} />
+                  ) : (
+                    <Ionicons name={getServiceTypeIcon(item.name)} size={25} color="#fff" />
+                  )}
+                </View>
+                <Text numberOfLines={2} style={[styles.serviceTypeLabel, { color: selectedSubCat === item.id ? colors.primary : colors.foreground, fontWeight: selectedSubCat === item.id ? '700' : '500' }]}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Search header */}
+      <View style={[styles.header, { paddingTop: 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={styles.headerTitleRow}>
+          <Text style={[styles.title, { color: colors.foreground }]}>
+            {params.subCategoryName ? params.subCategoryName : 'Find Services'}
+          </Text>
+          <TouchableOpacity
+            testID="services-header-cart"
+            onPress={() => accessToken ? router.push('/checkout') : router.push('/auth')}
+            activeOpacity={0.8}
+            style={[styles.headerCartButton, { backgroundColor: colors.muted }]}
+          >
+            <Ionicons name="cart-outline" size={21} color={colors.foreground} />
+            <View style={[styles.headerCartBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
+              <Text style={styles.headerCartBadgeText}>{cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
         <View style={[styles.searchBar, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
           <Ionicons name="search-outline" size={18} color={colors.mutedForeground} />
           <TextInput
@@ -118,32 +227,6 @@ export default function ServicesScreen() {
             <Ionicons name="close-circle" size={18} color={colors.mutedForeground} onPress={() => setSearch('')} />
           )}
         </View>
-      </View>
-
-      {/* Category filter */}
-      <View style={[styles.catWrap, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        {!categories ? (
-          <CategoryShimmer />
-        ) : (
-          <FlatList
-            horizontal
-            data={[{ id: null, name: 'All' } as any, ...(categories ?? [])]}
-            keyExtractor={(item) => item.id ?? 'all'}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}
-            renderItem={({ item }) => (
-              <CategoryPill
-                label={item.name}
-                selected={selectedCat === item.id}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setSelectedCat(item.id);
-                  setSelectedSubCat(null);
-                }}
-              />
-            )}
-          />
-        )}
       </View>
 
       {/* Breadcrumb: category › sub-category */}
@@ -162,33 +245,6 @@ export default function ServicesScreen() {
         </View>
       )}
 
-      {/* Subcategory chips — shown when category is selected via pill but no subcat picked yet */}
-      {selectedCat && !selectedSubCat && (subcategories?.length ?? 0) > 0 && (
-        <View style={[styles.subCatWrap, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <FlatList
-            horizontal
-            data={subcategories ?? []}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => { setSelectedSubCat(item.id); Haptics.selectionAsync(); }}
-                style={[styles.subCatChip, {
-                  backgroundColor: colors.primary,
-                  borderRadius: (colors.radius ?? 8) - 2,
-                }]}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#fff' }}>
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      )}
-
-      
       {cartOpen && cart && (
         <View style={[styles.cartPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.sectionHeader}>
@@ -292,7 +348,21 @@ export default function ServicesScreen() {
 }
 
 const styles = StyleSheet.create({
+  serviceTypePicker: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
+  serviceTypeTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
+  categoryTabsContent: { gap: 8, paddingBottom: 12 },
+  categoryTab: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryTabText: { fontSize: 12, fontWeight: '600' },
+  serviceTypeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 2 },
+  serviceTypeTile: { width: 72, alignItems: 'center', gap: 5 },
+  serviceTypeIcon: { width: 62, height: 62, borderRadius: 17, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  serviceTypeImage: { width: '100%', height: '100%' },
+  serviceTypeLabel: { fontSize: 11, lineHeight: 14, textAlign: 'center' },
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, gap: 10 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerCartButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  headerCartBadge: { position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  headerCartBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', textAlign: 'center' },
   serviceSection: { padding: 16, borderBottomWidth: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
@@ -305,9 +375,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700' },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
-  catWrap: { borderBottomWidth: 1 },
-  subCatWrap: { borderBottomWidth: 1 },
-  subCatChip: { paddingHorizontal: 12, paddingVertical: 6 },
   breadcrumb: {
     flexDirection: 'row',
     alignItems: 'center',

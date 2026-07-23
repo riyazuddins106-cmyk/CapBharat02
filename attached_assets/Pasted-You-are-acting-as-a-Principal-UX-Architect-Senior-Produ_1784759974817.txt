@@ -1,0 +1,756 @@
+You are acting as a Principal UX Architect, Senior Product Designer, Mobile App Engineer, Full Stack Engineer, Backend Engineer, and QA Engineer.
+
+I have an existing Urban Company style service marketplace application:
+
+1. Customer App
+2. Partner App
+3. Admin Panel
+
+
+I need you to redesign and improve the CUSTOMER APP SERVICE DISCOVERY FLOW.
+
+IMPORTANT:
+
+Do NOT copy Urban Company's deep navigation exactly.
+
+The current problem:
+
+The customer has to go too deep:
+
+Example:
+
+Cleaning
+
+↓
+
+Floor Cleaning
+
+↓
+
+Tiles Cleaning
+
+↓
+
+Black Tiles Cleaning
+
+↓
+
+Cleaning Type
+
+↓
+
+Package
+
+↓
+
+Booking
+
+
+This creates too many screens and poor user experience.
+
+
+Implement a better hybrid approach:
+
+Use:
+
+- Amazon/Swiggy style browsing and cart experience
+- Urban Company style backend service structure
+
+
+====================================================
+
+NEW CUSTOMER EXPERIENCE FLOW
+
+
+New flow:
+
+
+Home
+
+
+↓
+
+Category
+
+
+↓
+
+Service Listing
+
+
+↓
+
+Service Details + Options
+
+
+↓
+
+Add To Cart
+
+
+↓
+
+Cart
+
+
+↓
+
+Checkout
+
+
+↓
+
+Select Address
+
+
+↓
+
+Select Date & Time
+
+
+↓
+
+Booking Confirmed
+
+
+↓
+
+Professional Assigned
+
+
+
+====================================================
+
+CATEGORY PAGE
+
+
+Keep categories simple:
+
+
+Example:
+
+
+Cleaning
+
+Plumbing
+
+Electrical
+
+AC Repair
+
+Salon
+
+Appliance Repair
+
+
+
+====================================================
+
+SERVICE LISTING PAGE
+
+
+When customer opens a category:
+
+
+DO NOT create multiple nested pages.
+
+
+Show all available services as cards.
+
+
+Example:
+
+
+
+Cleaning
+
+
+
+--------------------------------
+
+Deep Home Cleaning
+
+
+Starting ₹1999
+
+
+⭐ 4.8 Rating
+
+
+Duration:
+3 Hours
+
+
+[+ Add]
+
+
+--------------------------------
+
+
+Floor Cleaning
+
+
+Starting ₹999
+
+
+⭐ 4.7 Rating
+
+
+Duration:
+2 Hours
+
+
+[+ Add]
+
+
+--------------------------------
+
+
+Bathroom Cleaning
+
+
+Starting ₹599
+
+
+⭐ 4.9 Rating
+
+
+Duration:
+1 Hour
+
+
+[+ Add]
+
+
+
+====================================================
+
+REMOVE DIRECT BOOK BUTTON
+
+
+Currently:
+
+Product page:
+
+BOOK NOW
+
+
+Remove this.
+
+
+
+Replace with:
+
+
+ADD TO CART
+
+
+
+====================================================
+
+SERVICE DETAIL PAGE
+
+
+When customer clicks a service card:
+
+
+Open one detail page only.
+
+
+Example:
+
+
+Floor Cleaning
+
+
+
+Images
+
+
+Description
+
+
+What's Included:
+
+
+✓ Dust removal
+
+✓ Floor washing
+
+✓ Deep cleaning
+
+
+
+Options:
+
+
+Floor Type:
+
+
+○ Marble
+
+○ Tiles
+
+○ Granite
+
+○ Wooden Floor
+
+
+
+Cleaning Type:
+
+
+○ Normal
+
+○ Deep Cleaning
+
+○ Machine Cleaning
+
+
+
+Price should update dynamically based on selected options.
+
+
+
+Button:
+
+
+ADD TO CART
+
+
+
+====================================================
+
+CART SYSTEM
+
+
+Implement shopping cart experience.
+
+
+Customer can add multiple services.
+
+
+
+Example:
+
+
+
+My Cart:
+
+
+1.
+
+Floor Cleaning
+
+₹999
+
+
+
+2.
+
+Bathroom Cleaning
+
+₹599
+
+
+
+3.
+
+Sofa Cleaning
+
+₹1200
+
+
+
+Total:
+
+₹2798
+
+
+
+Show:
+
+
+Product image
+
+Service name
+
+Selected options
+
+Quantity
+
+Price
+
+Remove option
+
+
+
+Button:
+
+
+PROCEED TO CHECKOUT
+
+
+
+====================================================
+
+CHECKOUT FLOW
+
+
+After cart:
+
+
+Step 1:
+
+
+Select Address
+
+
+
+Step 2:
+
+
+Select Booking Date
+
+
+
+Step 3:
+
+
+Select Time Slot
+
+
+
+Example:
+
+
+Today
+
+
+Tomorrow
+
+
+Custom Date
+
+
+
+Time Slots:
+
+
+9 AM - 11 AM
+
+11 AM - 1 PM
+
+2 PM - 4 PM
+
+4 PM - 6 PM
+
+
+
+Step 4:
+
+
+Booking Summary
+
+
+
+Show:
+
+
+All services
+
+Selected options
+
+Total price
+
+Address
+
+Date
+
+Time
+
+
+
+Button:
+
+
+CONFIRM BOOKING
+
+
+
+====================================================
+
+IMPORTANT BUSINESS RULE
+
+
+Admin controls all services and pricing.
+
+
+Customers only select services/options.
+
+
+Professionals do not create services or prices.
+
+
+
+====================================================
+
+ADMIN PANEL COMPATIBILITY
+
+
+Do not break existing admin service management.
+
+
+Admin should be able to create:
+
+
+Category:
+
+Cleaning
+
+
+Service:
+
+Floor Cleaning
+
+
+Options:
+
+
+Floor Type:
+
+Marble
+
+Tiles
+
+Granite
+
+
+Cleaning Type:
+
+Normal
+
+Deep
+
+
+Pricing:
+
+
+Marble + Deep:
+
+₹1200
+
+
+Tiles + Normal:
+
+₹800
+
+
+
+====================================================
+
+DATABASE REQUIREMENTS
+
+
+Support service options.
+
+
+Create/update:
+
+
+services table:
+
+
+id
+
+category_id
+
+name
+
+description
+
+image
+
+base_price
+
+duration
+
+status
+
+
+
+service_options:
+
+
+id
+
+service_id
+
+option_name
+
+option_value
+
+additional_price
+
+
+
+Example:
+
+
+Floor Cleaning
+
+Floor Type
+
+Marble
+
++₹200
+
+
+
+cart_items:
+
+
+id
+
+customer_id
+
+service_id
+
+selected_options
+
+quantity
+
+price
+
+
+
+bookings:
+
+
+id
+
+customer_id
+
+total_amount
+
+address
+
+booking_date
+
+booking_time
+
+status
+
+
+
+booking_services:
+
+
+booking_id
+
+service_id
+
+selected_options
+
+price
+
+
+
+====================================================
+
+UX RULES
+
+
+1. Maximum 3 levels before cart:
+
+Category
+
+↓
+
+Service
+
+↓
+
+Options
+
+
+
+2. Do not force customers through unnecessary pages.
+
+3. Keep Add To Cart visible.
+
+4. Show cart count floating button.
+
+5. Allow multiple services in one booking.
+
+6. Make the experience fast and simple.
+
+7. Maintain existing application design language.
+
+
+
+====================================================
+
+TEST FLOW
+
+
+Customer opens app
+
+
+↓
+
+Clicks Cleaning
+
+
+↓
+
+Sees service cards
+
+
+↓
+
+Adds Floor Cleaning
+
+
+↓
+
+Adds Bathroom Cleaning
+
+
+↓
+
+Opens Cart
+
+
+↓
+
+Checkout
+
+
+↓
+
+Select date/time
+
+
+↓
+
+Confirms booking
+
+
+↓
+
+Professionals receive job request
+
+
+↓
+
+Professional accepts
+
+
+↓
+
+Professional visits customer
+
+
+
+Implement this as a production-level modern service marketplace UX.

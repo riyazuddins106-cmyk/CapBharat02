@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
+import { CartAccess } from '@/components/CartAccess';
 
 // SplashScreen is native-only — calling it on web shows a white overlay
 // that never gets removed, leaving a permanently blank page.
@@ -81,16 +82,15 @@ export default function RootLayout() {
     ...Ionicons.font,
   });
 
-  // Safety net: on some networks/browsers, the useFonts() promise can stall
-  // indefinitely without ever resolving or rejecting (observed reliably over
-  // the public HTTPS tunnel, even though the same font requests succeed
-  // instantly via curl and the same code works fine on localhost) — leaving
-  // the app stuck on a blank white screen forever. Force the app to render
-  // with fallback fonts after a short timeout rather than hang forever.
-  const [fontTimedOut, setFontTimedOut] = React.useState(false);
+  // Safety net: useFonts() can hang indefinitely on the public HTTPS tunnel.
+  // On web, we bypass the wait entirely — system fonts are acceptable and the
+  // blank-white-screen UX is worse than rendering without custom fonts.
+  // On native, give it a 3 s grace period before forcing past the gate.
+  const [fontTimedOut, setFontTimedOut] = React.useState(Platform.OS === 'web');
   useEffect(() => {
+    if (Platform.OS === 'web') return; // already bypassed above
     if (fontsLoaded || fontError) return;
-    const timer = setTimeout(() => setFontTimedOut(true), 300);
+    const timer = setTimeout(() => setFontTimedOut(true), 3000);
     return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
@@ -123,6 +123,7 @@ export default function RootLayout() {
                 <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="help-support" options={{ animation: 'slide_from_right' }} />
               </Stack>
+              <CartAccess />
             </AuthProvider>
           </QueryClientProvider>
         </SafeAreaProvider>

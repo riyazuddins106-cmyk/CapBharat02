@@ -1,11 +1,30 @@
 import { Platform } from 'react-native';
 
 // EXPO_PUBLIC_API_URL is set by the workflow to the current Replit dev domain
-// (e.g. https://<repl-id>.sisko.replit.dev). That domain's port-5000 vite server
-// already proxies /api → the Express server on port 8000, so we never need to
-// hard-code a port number. This works on both native (Expo Go) and Expo web.
+// (e.g. https://<repl-id>.sisko.replit.dev). That domain proxies /api to the
+// Express server, so we never need to hard-code a port number.
+//
+// On web, if the env var was not baked into the bundle (empty string), API calls
+// would resolve relative to the Expo dev server port (e.g. :8080) — which serves
+// the app HTML, not JSON. We detect this at runtime and fall back to the origin
+// without the Expo dev-server port so requests reach the real API server.
 function getApiBase(): string {
-  return (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+  const envBase = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+  if (envBase) return envBase;
+
+  // Web-only runtime fallback: strip the Expo dev-server port (8080/8081/19006)
+  // so API requests go to the Replit proxy that serves the main server.
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location;
+    const expoDevPorts = new Set(['8080', '8081', '8082', '19006']);
+    if (expoDevPorts.has(port)) {
+      // Return the origin without port — Replit routes this to the main server.
+      return `${protocol}//${hostname}`;
+    }
+    return window.location.origin;
+  }
+
+  return '';
 }
 const API_BASE = getApiBase();
 export { API_BASE };

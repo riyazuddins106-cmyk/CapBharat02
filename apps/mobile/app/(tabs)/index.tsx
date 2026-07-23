@@ -194,10 +194,11 @@ export default function HomeScreen() {
   }
 
   // ── Queries ────────────────────────────────────────────
-  const { data: categories, isLoading: catsLoading } = useQuery({
+  const { data: categories, isLoading: catsLoading, isError: catsError, refetch: refetchCategories } = useQuery({
     queryKey: ['/api/categories'],
     queryFn: categoriesApi.list,
   });
+  const availableCategories = (categories ?? []).filter((category) => category.serviceCount > 0);
 
   const { data: professionals, isLoading: prosLoading, refetch } = useQuery({
     queryKey: ['/api/professionals'],
@@ -367,9 +368,16 @@ export default function HomeScreen() {
               </View>
             ))}
           </View>
+        ) : catsError ? (
+          <View style={styles.inlineError}>
+            <Text style={[styles.inlineErrorText, { color: colors.mutedForeground }]}>Services could not load.</Text>
+            <TouchableOpacity onPress={() => refetchCategories()} testID="retry-home-categories">
+              <Text style={[styles.seeAll, { color: colors.primary }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={styles.catGrid}>
-            {(categories ?? []).map((cat) => (
+            {availableCategories.map((cat) => (
               <TouchableOpacity
                 key={cat.id}
                 style={[styles.catItem]}
@@ -648,6 +656,8 @@ const styles = StyleSheet.create({
   sectionHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sectionTitle:         { fontSize: 18, fontWeight: '700' },
   seeAll:               { fontSize: 13, fontWeight: '600' },
+  inlineError:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
+  inlineErrorText:      { fontSize: 13 },
   catGrid:              { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   catItem:              { width: '22%', alignItems: 'center', gap: 6, paddingVertical: 4 },
   catIcon:              { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
