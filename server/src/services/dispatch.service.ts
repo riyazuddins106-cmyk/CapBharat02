@@ -64,8 +64,16 @@ export const dispatchService = {
   },
 
   async reject(bookingId: string, partnerId: string) {
-    await db.update(bookingPartnerRequests).set({ status: 'rejected', respondedAt: new Date() })
-      .where(and(eq(bookingPartnerRequests.bookingId, bookingId), eq(bookingPartnerRequests.partnerId, partnerId)));
+    // Only update if the request is still pending — prevents double-rejection
+    const [updated] = await db.update(bookingPartnerRequests)
+      .set({ status: 'rejected', respondedAt: new Date() })
+      .where(and(
+        eq(bookingPartnerRequests.bookingId, bookingId),
+        eq(bookingPartnerRequests.partnerId, partnerId),
+        eq(bookingPartnerRequests.status, 'pending'),
+      ))
+      .returning();
+    if (!updated) throw AppError.conflict('This job request has already been responded to or is no longer available.');
     await db.insert(bookingAssignmentLogs).values({ bookingId, partnerId, action: 'PARTNER_REJECTED' });
     const [remaining] = await db.select({ count: sql<number>`count(*)::int` }).from(bookingPartnerRequests)
       .where(and(eq(bookingPartnerRequests.bookingId, bookingId), eq(bookingPartnerRequests.status, 'pending')));

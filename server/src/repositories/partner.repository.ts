@@ -1,6 +1,6 @@
 import { db } from '../config/database.js';
-import { bookings, professionals, users, payoutRequests } from '../database/schema/index.js';
-import { eq, and, isNull, desc, sql } from 'drizzle-orm';
+import { bookings, bookingPartnerRequests, professionals, users, payoutRequests } from '../database/schema/index.js';
+import { eq, and, isNull, isNotNull, or, desc, sql } from 'drizzle-orm';
 
 export const partnerRepository = {
   /** Find the professional record linked to a user */
@@ -13,10 +13,12 @@ export const partnerRepository = {
     return pro ?? null;
   },
 
-  /** List all bookings for this professional, newest first */
+  /** List all bookings for this professional, newest first.
+   *  Includes: (a) assigned bookings where professionalId matches,
+   *  and (b) dispatched bookings where this partner has a pending request. */
   async listJobs(professionalId: string) {
     return db
-      .select({
+      .selectDistinct({
         id: bookings.id,
         customerId: bookings.customerId,
         professionalId: bookings.professionalId,
@@ -35,11 +37,29 @@ export const partnerRepository = {
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
-      .where(and(eq(bookings.professionalId, professionalId), isNull(bookings.deletedAt)))
+      .leftJoin(
+        bookingPartnerRequests,
+        and(
+          eq(bookingPartnerRequests.bookingId, bookings.id),
+          eq(bookingPartnerRequests.partnerId, professionalId),
+          eq(bookingPartnerRequests.status, 'pending'),
+        ),
+      )
+      .where(
+        and(
+          isNull(bookings.deletedAt),
+          or(
+            eq(bookings.professionalId, professionalId),
+            isNotNull(bookingPartnerRequests.id),
+          ),
+        ),
+      )
       .orderBy(desc(bookings.scheduledAt));
   },
 
-  /** Get a single job that belongs to this professional */
+  /** Get a single job visible to this professional.
+   *  Matches if: (a) this partner is the assigned professional,
+   *  OR (b) there is a pending dispatch request for this partner. */
   async findJobByIdAndProfessional(bookingId: string, professionalId: string) {
     const [job] = await db
       .select({
@@ -61,11 +81,22 @@ export const partnerRepository = {
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
+      .leftJoin(
+        bookingPartnerRequests,
+        and(
+          eq(bookingPartnerRequests.bookingId, bookings.id),
+          eq(bookingPartnerRequests.partnerId, professionalId),
+          eq(bookingPartnerRequests.status, 'pending'),
+        ),
+      )
       .where(
         and(
           eq(bookings.id, bookingId),
-          eq(bookings.professionalId, professionalId),
           isNull(bookings.deletedAt),
+          or(
+            eq(bookings.professionalId, professionalId),
+            isNotNull(bookingPartnerRequests.id),
+          ),
         ),
       )
       .limit(1);

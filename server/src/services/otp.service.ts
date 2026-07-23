@@ -53,17 +53,26 @@ export const otpService = {
       expiresAt: new Date(Date.now() + OTP_TTL_MS),
     });
 
-    const emailed = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
+    const result = await emailService.send(email, SUBJECTS[purpose], buildEmailHtml(purpose, code));
 
     // Best-effort SMS — never blocks or throws even if provider not configured
     if (phone) {
       smsService.sendOtp(phone, code).catch(() => {});
     }
 
-    if (!emailed && process.env.NODE_ENV !== 'production') {
-      logger.info(`[otp] Verification code for ${email} (${purpose}): ${code}`);
+    if (process.env.NODE_ENV !== 'production') {
+      // Always write to the dev log so developers can find the OTP and preview URL
+      // even without a terminal open.
       try {
-        fs.appendFileSync('/tmp/otp-dev.log', `${email} ${purpose} ${code}\n`);
+        const previewLine = result.previewUrl ? `  preview: ${result.previewUrl}` : '';
+        const devNote = result.sent
+          ? `[otp] Email sent for ${email} (${purpose})${previewLine ? '\n' + previewLine : ''}`
+          : `[otp] Email NOT sent for ${email} (${purpose}) — code: ${code}`;
+        logger.info(devNote);
+        fs.appendFileSync(
+          '/tmp/otp-dev.log',
+          `${new Date().toISOString()} | ${email} | ${purpose} | code=${code}${result.previewUrl ? ` | preview=${result.previewUrl}` : ''}\n`,
+        );
       } catch { /* ignore */ }
     }
 
