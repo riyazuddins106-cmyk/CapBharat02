@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "bash", "web", "postgresql-16"]
+modules = ["nodejs-20", "bash", "web"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -168,7 +168,7 @@ JWT_REFRESH_SECRET = "ServeNow_REFRESH_8qW3nVmR5tYkP2hLsX9zDfJ6cBaE7uNg"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_SECURE = "false"
-EXPO_PUBLIC_API_URL = "https://0540f7cc-b092-43e3-b0aa-abd464d24143-00-amdtopyd3qxn.sisko.replit.dev"
+EXPO_PUBLIC_API_URL = "https://9f3cffad-eb65-4305-a6e3-34ada730de66-00-2q8tyj24uzoo7.pike.replit.dev"
 
 [userenv.production]
 NODE_ENV = "production"

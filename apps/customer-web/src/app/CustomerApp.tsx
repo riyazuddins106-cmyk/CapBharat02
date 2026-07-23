@@ -1373,6 +1373,8 @@ function CustServices({
   const [catalogue, setCatalogue] = useState<ApiService[]>([]);
   const [cart, setCart] = useState<ApiCart | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync when home tab navigates here with a category pre-selected
   useEffect(() => {
@@ -1409,10 +1411,14 @@ function CustServices({
     else { setCart(null); onCartChange({ id: "", items: [], total: 0 }); }
   }, [isLoggedIn, onCartChange]);
 
-  const addToCart = async (serviceId: string) => {
+  const addToCart = async (serviceId: string, serviceName?: string) => {
     if (!isLoggedIn) return;
     const next = await cartApi.add(serviceId);
     setCart(next); onCartChange(next);
+    // Show toast
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(serviceName ? `"${serviceName}" added to cart` : "Added to cart");
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
   };
 
   const selectedCat = selectedCatId ? categories.find((c) => c.id === selectedCatId) : null;
@@ -1452,57 +1458,6 @@ function CustServices({
       </div>
 
       <div className="px-5 mt-5">
-        {catalogue.length > 0 && (
-          <section className="mb-7">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold">Book a service</h3>
-              <button onClick={() => setCartOpen(true)} className="text-xs font-bold text-violet-600">
-                Cart{cart?.items.length ? ` (${cart.items.reduce((n, item) => n + item.quantity, 0)})` : ""}
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              {catalogue.map((service) => (
-                <div key={service.id} className="group relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all">
-                  <div className="w-28 h-28 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0 relative">
-                    {service.images?.[0] ? (
-                      <img src={service.images[0]} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EDE9FD] to-[#F5F3FF]">
-                        <Sparkles size={24} color="#C4B5FD" />
-                      </div>
-                    )}
-                    {service.badge && (
-                      <div className="absolute top-0 left-0 bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] px-2 py-1 rounded-br-xl text-[10px] font-bold text-white shadow-sm">
-                        {service.badge}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                    <div>
-                      <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
-                      <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
-                    </div>
-                    <div className="flex items-end justify-between mt-2">
-                      <div>
-                        <p className="text-sm font-black text-gray-900">₹{service.customerPrice.toLocaleString("en-IN")}</p>
-                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5 flex items-center gap-1">
-                          <Clock size={10} /> {service.duration} min
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => addToCart(service.id)}
-                        disabled={!isLoggedIn}
-                        className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm"
-                      >
-                        {isLoggedIn ? "+ Add" : "Sign in"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* ── No category selected: show category icon grid ── */}
         {!selectedCatId && (
@@ -1538,7 +1493,7 @@ function CustServices({
             <h3 className="text-sm font-bold mb-3">
               {selectedCat?.name} — Pick a Service Type
             </h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-4 gap-3 mb-6">
               {/* ── All tile ── */}
               <button
                 className="flex flex-col items-center gap-1.5"
@@ -1584,10 +1539,77 @@ function CustServices({
           </>
         )}
 
-        {/* ── Category selected, no subcategories: skip the grid ── */}
+        {/* ── Service cards (filtered by selected category / subcategory) ── */}
+        {catalogue.length > 0 && (
+          <section className="mb-7">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold">Book a service</h3>
+              <button onClick={() => setCartOpen(true)} className="text-xs font-bold text-violet-600">
+                Cart{cart?.items.length ? ` (${cart.items.reduce((n, item) => n + item.quantity, 0)})` : ""}
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {catalogue.map((service) => (
+                <div key={service.id} className="group relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all">
+                  <div className="w-28 h-28 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0 relative">
+                    {service.images?.[0] ? (
+                      <img src={service.images[0]} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EDE9FD] to-[#F5F3FF]">
+                        <Sparkles size={24} color="#C4B5FD" />
+                      </div>
+                    )}
+                    {service.badge && (
+                      <div className="absolute top-0 left-0 bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] px-2 py-1 rounded-br-xl text-[10px] font-bold text-white shadow-sm">
+                        {service.badge}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                    <div>
+                      <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
+                      <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
+                    </div>
+                    <div className="flex items-end justify-between mt-2">
+                      <div>
+                        <p className="text-sm font-black text-gray-900">₹{service.customerPrice.toLocaleString("en-IN")}</p>
+                        <p className="text-[10px] font-semibold text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Clock size={10} /> {service.duration} min
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => addToCart(service.id, service.name)}
+                        disabled={!isLoggedIn}
+                        className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm"
+                      >
+                        {isLoggedIn ? "+ Add" : "Sign in"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
       </div>
-      <div className="h-6" />
+      <div className="h-24" />
+
+      {/* ── Toast: item added confirmation ── */}
+      <div
+        className="fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 pointer-events-none"
+        style={{
+          bottom: toast ? 96 : 72,
+          opacity: toast ? 1 : 0,
+          transform: `translateX(-50%) translateY(${toast ? 0 : 8}px)`,
+        }}
+      >
+        <div className="flex items-center gap-2 bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg whitespace-nowrap">
+          <Check size={13} color="#4ADE80" strokeWidth={3} />
+          {toast}
+        </div>
+      </div>
+
       {cartOpen && cart && (
         <CheckoutFlow
           cart={cart}
@@ -2385,6 +2407,9 @@ export default function CustomerApp() {
   const [addresses, setAddresses]         = useState<ApiAddress[]>([]);
   const [cart, setCart]                   = useState<ApiCart>({ id: "", items: [], total: 0 });
 
+  // Cart (global)
+  const [cartGlobalOpen, setCartGlobalOpen] = useState(false);
+
   // Location
   const [location, setLocation] = useState<string>(() => localStorage.getItem(LOC_KEY) ?? "Set your location");
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -2578,6 +2603,39 @@ export default function CustomerApp() {
           );
         })}
       </div>
+
+      {/* ── Global floating cart FAB ── */}
+      {cart.items.length > 0 && !cartGlobalOpen && (
+        <button
+          onClick={() => setCartGlobalOpen(true)}
+          className="absolute z-40 flex items-center justify-center bg-gradient-to-br from-[#5B3EF5] to-[#7C5BF8] shadow-[0_4px_20px_rgba(91,62,245,0.5)] active:scale-95 transition-transform"
+          style={{ bottom: 72, right: 16, width: 48, height: 48, borderRadius: 24 }}
+          aria-label="View cart"
+        >
+          {/* bag icon */}
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 01-8 0"/>
+          </svg>
+          {/* count badge */}
+          <span
+            className="absolute flex items-center justify-center bg-white text-[#5B3EF5] font-black"
+            style={{ top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, fontSize: 10, paddingLeft: 4, paddingRight: 4 }}
+          >
+            {cart.items.reduce((n, i) => n + i.quantity, 0)}
+          </span>
+        </button>
+      )}
+
+      {/* Global checkout flow */}
+      {cartGlobalOpen && (
+        <CheckoutFlow
+          cart={cart}
+          onClose={() => setCartGlobalOpen(false)}
+          onChange={(next) => setCart(next)}
+        />
+      )}
 
       {/* Location picker modal */}
       {showLocationPicker && (

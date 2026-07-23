@@ -348,7 +348,7 @@ export const authApi = {
     const data = await request<{ accessToken: string; refreshToken: string; user: AdminUser }>(
       '/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }
     );
-    if (data.user.role !== 'admin') throw new Error('This account does not have admin access.');
+    if (!['admin', 'operations_manager'].includes(data.user.role)) throw new Error('This account does not have admin access.');
     return data;
   },
   async refresh(refreshToken: string) {

@@ -1,0 +1,288 @@
+You are acting as a Principal Software Architect, Senior Full Stack Engineer, Senior Backend Engineer, Database Engineer, Authentication Engineer, DevOps Engineer, API Engineer, and QA Engineer.
+
+My existing application has a critical issue.
+
+DO NOT immediately start changing code.
+
+FIRST perform a complete root cause analysis of the entire project.
+
+====================================================
+
+CURRENT PROBLEMS
+
+1. Login is not working for any role.
+   - Customer login fails.
+   - Partner login fails.
+   - Admin login fails.
+
+2. Data is not loading in the application.
+   - Lists are empty.
+   - APIs appear to return no data or fail.
+   - Some pages remain blank.
+   - Customer App, Partner App, and Admin Panel are not syncing correctly.
+
+====================================================
+
+YOUR TASK
+
+Perform a complete diagnostic of the project.
+
+Check every layer of the application.
+
+====================================================
+
+STEP 1 - PROJECT ANALYSIS
+
+Analyze:
+
+- Project structure
+- Frontend architecture
+- Backend architecture
+- API routes
+- Database
+- Authentication
+- Environment variables
+- State management
+- Networking
+- API client
+- Permissions
+- Build configuration
+
+Explain how the application is supposed to work.
+
+====================================================
+
+STEP 2 - DATABASE
+
+Verify:
+
+- Database connection
+- Connection pooling
+- Environment variables
+- Database migrations
+- Missing tables
+- Missing columns
+- Foreign keys
+- Seed data
+- User records
+
+Check if queries are failing.
+
+====================================================
+
+STEP 3 - AUTHENTICATION
+
+Check:
+
+- Login API
+- JWT generation
+- JWT validation
+- Password hashing
+- Password verification
+- Session handling
+- Refresh tokens
+- Authorization middleware
+- Role-based access
+
+Verify authentication for:
+
+- Customer
+- Partner
+- Admin
+- Operations Manager
+
+====================================================
+
+STEP 4 - API CHECK
+
+Inspect every API.
+
+Verify:
+
+- Routes exist
+- Request validation
+- Response validation
+- Error handling
+- HTTP status codes
+- API URLs
+- API version
+- Base URL configuration
+
+Identify broken endpoints.
+
+====================================================
+
+STEP 5 - FRONTEND
+
+Verify:
+
+Customer App
+
+Partner App
+
+Admin Panel
+
+Check:
+
+- API calls
+- Loading states
+- Error states
+- Authentication flow
+- Navigation
+- Token storage
+- State updates
+- Data mapping
+- Null handling
+
+====================================================
+
+STEP 6 - NETWORK
+
+Check:
+
+- API URL
+- Environment variables
+- CORS
+- HTTPS
+- Proxy configuration
+- Fetch/Axios configuration
+- Authentication headers
+
+====================================================
+
+STEP 7 - DATA FLOW
+
+Trace one complete flow.
+
+Example:
+
+Login
+
+↓
+
+JWT Generated
+
+↓
+
+Token Stored
+
+↓
+
+Authenticated API Call
+
+↓
+
+Database Query
+
+↓
+
+Response
+
+↓
+
+UI Rendering
+
+Identify exactly where the flow breaks.
+
+====================================================
+
+STEP 8 - LOGGING
+
+Enable temporary debugging logs for:
+
+- Login requests
+- Database queries
+- Authentication
+- API responses
+- Exceptions
+- Network failures
+
+Identify the exact failing point.
+
+====================================================
+
+STEP 9 - ROOT CAUSE REPORT
+
+Before fixing anything, provide a report.
+
+Example:
+
+Issue #1
+Root Cause:
+Affected Files:
+Severity:
+Fix Required:
+
+Issue #2
+Root Cause:
+Affected Files:
+Severity:
+Fix Required:
+
+Continue until every issue is identified.
+
+====================================================
+
+STEP 10 - FIXES
+
+After identifying every issue:
+
+Fix them one by one.
+
+Do not introduce breaking changes.
+
+Maintain existing architecture.
+
+====================================================
+
+STEP 11 - TESTING
+
+Test:
+
+✓ Customer Login
+
+✓ Partner Login
+
+✓ Admin Login
+
+✓ Operations Manager Login
+
+✓ User Registration
+
+✓ Dashboard Loading
+
+✓ Categories
+
+✓ Services
+
+✓ Products
+
+✓ Cart
+
+✓ Bookings
+
+✓ Partner Assignment
+
+✓ Notifications
+
+✓ Admin Panel
+
+✓ Customer App
+
+✓ Partner App
+
+Ensure every API returns correct data.
+
+====================================================
+
+FINAL REQUIREMENT
+
+Do not guess.
+
+Do not make random code changes.
+
+Find the exact root cause using logs and debugging.
+
+Provide a complete diagnostic report first.
+
+Only after identifying the root causes, implement the fixes, verify every feature works, and confirm that login and data synchronization are fully functional across Customer App, Partner App, and Admin Panel.
