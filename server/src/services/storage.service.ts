@@ -1,5 +1,5 @@
 import { AppError } from '../utils/AppError.js';
-import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET, BANNER_BUCKET } from '../config/supabase.js';
+import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET, BANNER_BUCKET, DOCUMENTS_BUCKET } from '../config/supabase.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -88,6 +88,18 @@ export const storageService = {
     const { error } = await supabaseAdmin.storage.from(AVATAR_BUCKET).upload(path, file.buffer, { contentType: detected.mime, upsert: true });
     if (error) throw AppError.internal(`Failed to upload avatar: ${error.message}`);
     return supabaseAdmin.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+
+  async uploadPartnerDocument(proId: string, documentType: string, file: Express.Multer.File): Promise<string> {
+    const MAX_DOC_SIZE = 10 * 1024 * 1024; // 10 MB
+    if (file.size > MAX_DOC_SIZE) throw AppError.badRequest('Document must be smaller than 10MB.');
+    const allowedMimes = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
+    if (!allowedMimes.includes(file.mimetype)) throw AppError.badRequest('Document must be PNG, JPEG, WebP, or PDF.');
+    const ext = file.mimetype === 'application/pdf' ? 'pdf' : file.mimetype.split('/')[1];
+    const path = `pro-${proId}/${documentType}-${Date.now()}.${ext}`;
+    const { error } = await supabaseAdmin.storage.from(DOCUMENTS_BUCKET).upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+    if (error) throw AppError.internal(`Failed to upload document: ${error.message}`);
+    return supabaseAdmin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path).data.publicUrl;
   },
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {

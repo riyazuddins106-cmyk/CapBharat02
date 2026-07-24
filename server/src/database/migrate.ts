@@ -432,6 +432,23 @@ export async function runMigrations() {
   await run('index: cart_items_cart', `CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id)`);
   await run('index: booking_items_booking', `CREATE INDEX IF NOT EXISTS idx_booking_items_booking ON booking_items(booking_id)`);
 
+  // ── Partner Documents (KYC / verification) ───────────────────────────
+  await run('table: partner_documents', `
+    CREATE TABLE IF NOT EXISTS partner_documents (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      professional_id  UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      document_type    VARCHAR(64) NOT NULL,
+      document_url     TEXT NOT NULL,
+      file_name        VARCHAR(255),
+      status           VARCHAR(20) NOT NULL DEFAULT 'pending',
+      rejection_reason TEXT,
+      uploaded_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reviewed_at      TIMESTAMPTZ,
+      UNIQUE(professional_id, document_type)
+    )`);
+  await run('index: partner_documents_professional',
+    `CREATE INDEX IF NOT EXISTS idx_partner_docs_professional ON partner_documents(professional_id)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { partnerController } from '../controllers/partner.controller.js';
+import { documentController } from '../controllers/document.controller.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload    = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5  * 1024 * 1024 } });
+const docUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -24,5 +26,10 @@ router.patch('/jobs/:id/complete', partnerController.completeJob);
 router.get('/earnings', partnerController.getEarnings);
 router.post('/payouts', partnerController.requestPayout);
 router.get('/payouts', partnerController.listPayoutRequests);
+
+// KYC / verification documents
+router.get('/documents', documentController.listDocuments);
+router.post('/documents', docUpload.single('file'), documentController.uploadDocument);
+router.delete('/documents/:id', documentController.deleteDocument);
 
 export default router;

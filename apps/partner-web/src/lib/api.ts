@@ -69,6 +69,11 @@ export interface AppNotification {
   isRead: boolean; createdAt: string;
 }
 
+export interface Payout {
+  id: string; amount: number; status: string;
+  note: string | null; requestedAt: string; resolvedAt: string | null;
+}
+
 // ── Categories ─────────────────────────────────────────────
 export interface Category {
   id: string;
@@ -100,10 +105,29 @@ export const categoriesApi = {
     request<SubCategory[]>(`/api/categories/${categoryId}/subcategories`),
 };
 
+export interface PartnerDocument {
+  id: string;
+  document_type: string;
+  document_url: string;
+  file_name: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  rejection_reason: string | null;
+  uploaded_at: string;
+  reviewed_at: string | null;
+}
+
+export interface RegisterPartnerResponse { userId: string; email: string; devCode?: string; }
+
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
     request<AuthTokens>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  registerPartner: (data: { fullName: string; email: string; phone?: string; password: string; categoryId: string; title: string }) =>
+    request<RegisterPartnerResponse>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
+  verifyOtp: (email: string, code: string, purpose: 'signup' | 'login' | 'password_reset') =>
+    request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, code, purpose }) }),
+  resendOtp: (email: string) =>
+    request<{ message: string }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email }) }),
   refresh: (refreshToken: string) =>
     request<AuthTokens>('/api/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
   logout: (token: string) =>
@@ -130,6 +154,34 @@ export const partnerApi = {
   checkinJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', token }),
   getEarnings: (token: string) => request<Earnings>('/api/partner/earnings', { token }),
+  updateAvailability: (status: 'available' | 'busy' | 'offline', token: string) =>
+    request<PartnerProfile>('/api/partner/availability', { method: 'PATCH', body: JSON.stringify({ status }), token }),
+};
+
+export const payoutsApi = {
+  list: (token: string) => request<Payout[]>('/api/partner/payouts', { token }),
+  request: (amount: number, note: string, token: string) =>
+    request<Payout>('/api/partner/payouts', { method: 'POST', body: JSON.stringify({ amount, note }), token }),
+};
+
+export const documentsApi = {
+  list: (token: string) => request<PartnerDocument[]>('/api/partner/documents', { token }),
+  upload: (documentType: string, file: File, token: string): Promise<PartnerDocument> => {
+    const form = new FormData();
+    form.append('documentType', documentType);
+    form.append('file', file);
+    return fetch('/api/partner/documents', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }).then(async r => {
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new ApiError(r.status, j?.error?.message ?? 'Upload failed');
+      return j.data as PartnerDocument;
+    });
+  },
+  delete: (id: string, token: string) =>
+    request<{ message: string }>(`/api/partner/documents/${id}`, { method: 'DELETE', token }),
 };
 
 export const notificationsApi = {

@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Briefcase, DollarSign, User, Bell,
   LogOut, CheckCircle, Clock, XCircle, Loader2, TrendingUp,
   Star, RefreshCw, X, Check, AlertCircle, Pencil, Lock,
   Calendar, Phone, FileText, Menu, BarChart2, Zap,
+  Upload, Shield, ChevronRight, ArrowLeft, Eye, Trash2,
 } from 'lucide-react';
 import {
-  authApi, partnerApi, notificationsApi, categoriesApi, setRefreshHandler,
+  authApi, partnerApi, notificationsApi, categoriesApi, payoutsApi, documentsApi, setRefreshHandler,
   type Job, type JobStatus, type Earnings, type PartnerProfile, type Category,
-  type AppNotification, type AuthTokens,
+  type AppNotification, type AuthTokens, type Payout, type PartnerDocument,
 } from '@/lib/api';
 
 /* ─── Design tokens (exact match to admin panel) ──────────────────── */
@@ -149,60 +150,254 @@ function PageHeader({ title, subtitle, onRefresh }: {
   );
 }
 
-/* ─── Login ───────────────────────────────────────────────────────── */
-function Login({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
-  const [email,    setEmail]    = useState('partner@servenow.in');
-  const [password, setPassword] = useState('');
-  const [err,      setErr]      = useState('');
-  const [loading,  setLoading]  = useState(false);
+/* ─── Auth Screen (Login + Register + OTP) ────────────────────────── */
+type AuthMode = 'login' | 'register' | 'otp';
 
-  async function submit(e: React.FormEvent) {
+function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
+  const [mode, setMode] = useState<AuthMode>('login');
+  const [step, setStep] = useState(1); // register steps: 1=basic info, 2=professional details
+
+  // ── Login state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPwd,   setLoginPwd]   = useState('');
+
+  // ── Register step 1
+  const [regName,    setRegName]    = useState('');
+  const [regEmail,   setRegEmail]   = useState('');
+  const [regPhone,   setRegPhone]   = useState('');
+  const [regPwd,     setRegPwd]     = useState('');
+  const [regPwdConf, setRegPwdConf] = useState('');
+
+  // ── Register step 2
+  const [regCatId,  setRegCatId]  = useState('');
+  const [regTitle,  setRegTitle]  = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  useEffect(() => { categoriesApi.list().then(c => setCategories(c.filter((x: Category) => x.isActive))).catch(() => {}); }, []);
+
+  // ── OTP state
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode,  setOtpCode]  = useState('');
+  const [resending, setResending] = useState(false);
+
+  // ── Shared
+  const [err,     setErr]     = useState('');
+  const [loading, setLoading] = useState(false);
+
+  function ErrBanner() {
+    if (!err) return null;
+    return (
+      <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20"
+        style={{ background: 'rgba(239,68,68,0.08)' }}>
+        <AlertCircle size={14} className="inline mr-2"/>{err}
+      </div>
+    );
+  }
+
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setErr(''); setLoading(true);
     try {
-      const tokens = await authApi.login(email, password);
-      if (tokens.user.role !== 'partner') {
-        setErr('This portal is for partners only.'); setLoading(false); return;
-      }
+      const tokens = await authApi.login(loginEmail, loginPwd);
+      if (tokens.user.role !== 'partner') { setErr('This portal is for partners only.'); return; }
       onLogin(tokens);
     } catch (e: any) { setErr(e.message ?? 'Login failed'); }
     finally { setLoading(false); }
   }
 
+  function handleStep1(e: React.FormEvent) {
+    e.preventDefault(); setErr('');
+    if (regPwd !== regPwdConf) { setErr('Passwords do not match.'); return; }
+    if (regPwd.length < 8) { setErr('Password must be at least 8 characters.'); return; }
+    setStep(2);
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault(); setErr(''); setLoading(true);
+    try {
+      if (!regCatId) { setErr('Please select a service category.'); return; }
+      await authApi.registerPartner({ fullName: regName, email: regEmail, phone: regPhone || undefined, password: regPwd, categoryId: regCatId, title: regTitle });
+      setOtpEmail(regEmail);
+      setMode('otp');
+    } catch (e: any) { setErr(e.message ?? 'Registration failed'); }
+    finally { setLoading(false); }
+  }
+
+  async function handleOtp(e: React.FormEvent) {
+    e.preventDefault(); setErr(''); setLoading(true);
+    try {
+      const tokens = await authApi.verifyOtp(otpEmail, otpCode, 'signup');
+      onLogin(tokens);
+    } catch (e: any) { setErr(e.message ?? 'OTP verification failed'); }
+    finally { setLoading(false); }
+  }
+
+  async function resendOtp() {
+    setResending(true); setErr('');
+    try { await authApi.resendOtp(otpEmail); } catch (e: any) { setErr(e.message); }
+    finally { setResending(false); }
+  }
+
+  const Logo = () => (
+    <div className="flex items-center gap-3 mb-8 justify-center">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: ACCENT }}>
+        <Briefcase size={20} color="white"/>
+      </div>
+      <span className="text-white font-bold text-xl">ServeNow Partner</span>
+    </div>
+  );
+
+  const Card = ({ children }: { children: React.ReactNode }) => (
+    <div className="rounded-2xl border border-white/10 p-6" style={{ background: '#161B27' }}>
+      {children}
+    </div>
+  );
+
+  const SubmitBtn = ({ label, loadingLabel }: { label: string; loadingLabel: string }) => (
+    <button type="submit" disabled={loading}
+      className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+      style={{ background: ACCENT }}>
+      {loading && <Loader2 size={16} className="animate-spin"/>}
+      {loading ? loadingLabel : label}
+    </button>
+  );
+
+  if (mode === 'otp') return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
+      <div className="w-full max-w-sm">
+        <Logo/>
+        <Card>
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'rgba(91,62,245,0.15)' }}>
+              <Shield size={24} style={{ color: '#7C5BF8' }}/>
+            </div>
+            <h2 className="text-white font-bold text-lg mb-1">Verify your email</h2>
+            <p className="text-white/40 text-sm">We sent a 6-digit code to<br/>
+              <span className="text-white/70 font-semibold">{otpEmail}</span>
+            </p>
+          </div>
+          <ErrBanner/>
+          <form onSubmit={handleOtp} className="space-y-4">
+            <Field label="Verification Code">
+              <TextInput value={otpCode} onChange={setOtpCode} placeholder="123456"
+                type="text"/>
+            </Field>
+            <SubmitBtn label="Verify & Sign in" loadingLabel="Verifying…"/>
+          </form>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <span className="text-white/30 text-xs">Didn't receive it?</span>
+            <button onClick={resendOtp} disabled={resending}
+              className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors disabled:opacity-50">
+              {resending ? 'Sending…' : 'Resend code'}
+            </button>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+
+  if (mode === 'register') return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
+      <div className="w-full max-w-sm">
+        <Logo/>
+        <Card>
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-5">
+            {[1,2].map(s => (
+              <div key={s} className={`flex-1 h-1 rounded-full transition-all ${step >= s ? '' : 'bg-white/10'}`}
+                style={step >= s ? { background: ACCENT } : {}}/>
+            ))}
+          </div>
+
+          {step === 1 ? (
+            <>
+              <h2 className="text-white font-bold text-lg mb-1">Create your account</h2>
+              <p className="text-white/40 text-sm mb-5">Step 1 of 2 — Basic information</p>
+              <ErrBanner/>
+              <form onSubmit={handleStep1} className="space-y-4">
+                <Field label="Full Name">
+                  <TextInput value={regName} onChange={setRegName} placeholder="Your full name"/>
+                </Field>
+                <Field label="Email">
+                  <TextInput type="email" value={regEmail} onChange={setRegEmail} placeholder="you@example.com"/>
+                </Field>
+                <Field label="Phone (optional)">
+                  <TextInput type="tel" value={regPhone} onChange={setRegPhone} placeholder="+91 98765 43210"/>
+                </Field>
+                <Field label="Password">
+                  <TextInput type="password" value={regPwd} onChange={setRegPwd} placeholder="Min 8 chars, upper, lower, digit"/>
+                </Field>
+                <Field label="Confirm Password">
+                  <TextInput type="password" value={regPwdConf} onChange={setRegPwdConf} placeholder="Re-enter password"/>
+                </Field>
+                <button type="submit"
+                  className="w-full mt-2 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2"
+                  style={{ background: ACCENT }}>
+                  Next <ChevronRight size={15}/>
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setStep(1); setErr(''); }}
+                className="flex items-center gap-1.5 text-white/40 hover:text-white/70 text-xs mb-5 transition-colors">
+                <ArrowLeft size={13}/> Back
+              </button>
+              <h2 className="text-white font-bold text-lg mb-1">Professional details</h2>
+              <p className="text-white/40 text-sm mb-5">Step 2 of 2 — Your service expertise</p>
+              <ErrBanner/>
+              <form onSubmit={handleRegister} className="space-y-4">
+                <Field label="Service Category">
+                  <SelectInput value={regCatId} onChange={setRegCatId}>
+                    <option value="">— Select your category —</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </SelectInput>
+                </Field>
+                <Field label="Your Title / Specialisation">
+                  <TextInput value={regTitle} onChange={setRegTitle} placeholder="e.g. Expert Plumber, Senior Electrician"/>
+                </Field>
+                <SubmitBtn label="Create Account" loadingLabel="Creating account…"/>
+              </form>
+            </>
+          )}
+
+          <div className="flex items-center justify-center gap-1.5 mt-5">
+            <span className="text-white/30 text-xs">Already have an account?</span>
+            <button onClick={() => { setMode('login'); setErr(''); }}
+              className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors">
+              Sign in
+            </button>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+
+  // Default: login
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: ACCENT }}>
-            <Briefcase size={20} color="white"/>
-          </div>
-          <span className="text-white font-bold text-xl">ServeNow Partner</span>
-        </div>
-        <form onSubmit={submit} className="rounded-2xl border border-white/10 p-6"
-          style={{ background: '#161B27' }}>
+        <Logo/>
+        <Card>
           <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
           <p className="text-white/40 text-sm mb-6">Sign in to your partner portal</p>
-          {err && (
-            <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20"
-              style={{ background: 'rgba(239,68,68,0.08)' }}>
-              <AlertCircle size={14} className="inline mr-2"/>{err}
-            </div>
-          )}
-          <div className="space-y-4">
+          <ErrBanner/>
+          <form onSubmit={handleLogin} className="space-y-4">
             <Field label="Email">
-              <TextInput type="email" value={email} onChange={setEmail} placeholder="partner@servenow.in"/>
+              <TextInput type="email" value={loginEmail} onChange={setLoginEmail} placeholder="partner@servenow.in"/>
             </Field>
             <Field label="Password">
-              <TextInput type="password" value={password} onChange={setPassword} placeholder="••••••••"/>
+              <TextInput type="password" value={loginPwd} onChange={setLoginPwd} placeholder="••••••••"/>
             </Field>
+            <SubmitBtn label="Sign in" loadingLabel="Signing in…"/>
+          </form>
+          <div className="flex items-center justify-center gap-1.5 mt-5">
+            <span className="text-white/30 text-xs">New partner?</span>
+            <button onClick={() => { setMode('register'); setStep(1); setErr(''); }}
+              className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors">
+              Register here
+            </button>
           </div>
-          <button type="submit" disabled={loading}
-            className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
-            style={{ background: ACCENT }}>
-            {loading && <Loader2 size={16} className="animate-spin"/>}
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+        </Card>
       </div>
     </div>
   );
@@ -435,7 +630,9 @@ function Jobs({ token }: { token: string }) {
                       <td className="px-4 py-3"><StatusBadge status={j.status}/></td>
                       <td className="px-4 py-3 text-white font-bold">{fmt(j.price)}</td>
                       <td className="px-4 py-3">
-                        <button className="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors"
+                        <button
+                          onClick={e => { e.stopPropagation(); setSelected(j); }}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors hover:bg-violet-500/10"
                           style={{ borderColor: 'rgba(91,62,245,0.3)', color: '#7C5BF8' }}>
                           View
                         </button>
@@ -590,27 +787,31 @@ type SubCategory = { id: string; name: string; isActive: boolean };
 function Profile({ token, profile, setProfile }: {
   token: string; profile: PartnerProfile | null; setProfile: (p: PartnerProfile) => void;
 }) {
-  const [editProf, setEditProf] = useState(false);
-  const [editPwd,  setEditPwd]  = useState(false);
-  const [saving,   setSaving]   = useState(false);
-  const [msg,      setMsg]      = useState('');
-  const [msgOk,    setMsgOk]    = useState(true);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subCats,    setSubCats]    = useState<SubCategory[]>([]);
-  const [subLoading, setSubLoading] = useState(false);
+  const [editProf,     setEditProf]     = useState(false);
+  const [editPwd,      setEditPwd]      = useState(false);
+  const [editAcc,      setEditAcc]      = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [availLoading, setAvailLoading] = useState(false);
+  const [msg,          setMsg]          = useState('');
+  const [msgOk,        setMsgOk]        = useState(true);
+  const [categories,   setCategories]   = useState<Category[]>([]);
+  const [subCats,      setSubCats]      = useState<SubCategory[]>([]);
+  const [subLoading,   setSubLoading]   = useState(false);
 
   useEffect(() => {
     categoriesApi.list().then(c => setCategories(c.filter((x: Category) => x.isActive))).catch(() => {});
   }, []);
 
-  const [title,            setTitle]           = useState(profile?.title ?? '');
-  const [bio,              setBio]             = useState(profile?.bio ?? '');
-  const [price,            setPrice]           = useState(String(profile?.basePrice ?? ''));
-  const [tags,             setTags]            = useState((profile?.tags ?? []).join(', '));
-  const [editCatId,        setEditCatId]       = useState(profile?.categoryId ?? '');
-  const [editSubCatId,     setEditSubCatId]    = useState(profile?.subCategoryId ?? '');
-  const [curPwd,           setCurPwd]          = useState('');
-  const [newPwd,           setNewPwd]          = useState('');
+  const [title,        setTitle]       = useState(profile?.title ?? '');
+  const [bio,          setBio]         = useState(profile?.bio ?? '');
+  const [price,        setPrice]       = useState(String(profile?.basePrice ?? ''));
+  const [tags,         setTags]        = useState((profile?.tags ?? []).join(', '));
+  const [editCatId,    setEditCatId]   = useState(profile?.categoryId ?? '');
+  const [editSubCatId, setEditSubCatId]= useState(profile?.subCategoryId ?? '');
+  const [curPwd,       setCurPwd]      = useState('');
+  const [newPwd,       setNewPwd]      = useState('');
+  const [accName,      setAccName]     = useState(profile?.name ?? '');
+  const [accPhone,     setAccPhone]    = useState('');
 
   const loadSubCats = async (catId: string) => {
     if (!catId) { setSubCats([]); return; }
@@ -642,6 +843,30 @@ function Profile({ token, profile, setProfile }: {
       setMsgOk(true); setMsg('Password changed'); setEditPwd(false); setCurPwd(''); setNewPwd('');
     } catch (e: any) { setMsgOk(false); setMsg(e.message); }
     finally { setSaving(false); }
+  }
+
+  async function saveAccount() {
+    setSaving(true); setMsg('');
+    try {
+      await partnerApi.updateAccount({ fullName: accName, phone: accPhone || undefined }, token);
+      setMsgOk(true); setMsg('Account info updated'); setEditAcc(false);
+      // refresh profile to show new name
+      const updated = await partnerApi.getProfile(token);
+      setProfile(updated);
+    } catch (e: any) { setMsgOk(false); setMsg(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function toggleAvailability() {
+    if (!profile) return;
+    setAvailLoading(true); setMsg('');
+    try {
+      const newStatus = profile.isActive ? 'offline' : 'available';
+      const updated = await partnerApi.updateAvailability(newStatus, token);
+      setProfile(updated);
+      setMsgOk(true); setMsg(profile.isActive ? 'You are now offline' : 'You are now available');
+    } catch (e: any) { setMsgOk(false); setMsg(e.message); }
+    finally { setAvailLoading(false); }
   }
 
   if (!profile) return (
@@ -700,6 +925,19 @@ function Profile({ token, profile, setProfile }: {
             )}
           </div>
           <div className="px-5 pb-5 flex flex-col gap-2">
+            {/* Availability toggle */}
+            <button onClick={toggleAvailability} disabled={availLoading}
+              className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-60 border ${
+                profile.isActive
+                  ? 'border-green-500/30 text-green-400 hover:bg-green-500/10'
+                  : 'border-red-500/30 text-red-400 hover:bg-red-500/10'
+              }`}>
+              {availLoading
+                ? <Loader2 size={13} className="animate-spin"/>
+                : profile.isActive ? <CheckCircle size={13}/> : <XCircle size={13}/>
+              }
+              {profile.isActive ? 'Go Offline' : 'Go Online'}
+            </button>
             <button onClick={() => {
               setTitle(profile.title); setBio(profile.bio);
               setPrice(String(profile.basePrice)); setTags(profile.tags.join(', '));
@@ -710,6 +948,10 @@ function Profile({ token, profile, setProfile }: {
               className="w-full py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity"
               style={{ background: ACCENT }}>
               <Pencil size={13}/> Edit Profile
+            </button>
+            <button onClick={() => { setAccName(profile.name ?? ''); setAccPhone(''); setEditAcc(true); }}
+              className="w-full py-2.5 rounded-xl font-bold text-sm border border-white/10 text-white/60 hover:bg-white/5 flex items-center justify-center gap-2 transition-colors">
+              <User size={13}/> Edit Account Info
             </button>
             <button onClick={() => setEditPwd(true)}
               className="w-full py-2.5 rounded-xl font-bold text-sm border border-white/10 text-white/60 hover:bg-white/5 flex items-center justify-center gap-2 transition-colors">
@@ -819,6 +1061,28 @@ function Profile({ token, profile, setProfile }: {
           </div>
         </Modal>
       )}
+
+      {/* Edit Account Info Modal */}
+      {editAcc && (
+        <Modal title="Edit Account Info" onClose={() => setEditAcc(false)}>
+          <div className="space-y-4">
+            <Field label="Full Name">
+              <TextInput value={accName} onChange={setAccName} placeholder="Your full name"/>
+            </Field>
+            <Field label="Phone Number">
+              <TextInput value={accPhone} onChange={setAccPhone} type="tel" placeholder="+91 99999 99999"/>
+            </Field>
+            <div className="flex gap-3 mt-6">
+              <button onClick={saveAccount} disabled={saving}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                style={{ background: ACCENT }}>
+                {saving ? <><Loader2 size={14} className="animate-spin"/>Saving…</> : <><Check size={14}/>Save changes</>}
+              </button>
+              <GhostBtn onClick={() => setEditAcc(false)}>Cancel</GhostBtn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -912,24 +1176,344 @@ function Notifications({ token }: { token: string }) {
   );
 }
 
+/* ─── Payouts ─────────────────────────────────────────────────────── */
+function Payouts({ token }: { token: string }) {
+  const [payouts,  setPayouts]  = useState<Payout[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [amount,   setAmount]   = useState('');
+  const [note,     setNote]     = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [msg,      setMsg]      = useState('');
+  const [msgOk,    setMsgOk]    = useState(true);
+
+  const PAYOUT_STATUS: Record<string, { color: string; label: string }> = {
+    pending:  { color: '#F59E0B', label: 'Pending'  },
+    approved: { color: '#16A34A', label: 'Approved' },
+    rejected: { color: '#EF4444', label: 'Rejected' },
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setPayouts(await payoutsApi.list(token)); } finally { setLoading(false); }
+  }, [token]);
+  useEffect(() => { load(); }, [load]);
+
+  async function requestPayout() {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { setMsgOk(false); setMsg('Enter a valid amount'); return; }
+    setSubmitting(true); setMsg('');
+    try {
+      const p = await payoutsApi.request(amt, note, token);
+      setPayouts(prev => [p, ...prev]);
+      setAmount(''); setNote('');
+      setMsgOk(true); setMsg('Payout request submitted');
+    } catch (e: any) { setMsgOk(false); setMsg(e.message); }
+    finally { setSubmitting(false); }
+  }
+
+  return (
+    <div>
+      {msg && (
+        <div className={`mb-5 px-4 py-3 rounded-xl text-sm border ${
+          msgOk ? 'text-green-400 border-green-400/20' : 'text-red-400 border-red-400/20'
+        }`} style={{ background: msgOk ? 'rgba(22,163,74,0.08)' : 'rgba(239,68,68,0.08)' }}>
+          {msgOk ? <CheckCircle size={14} className="inline mr-2"/> : <AlertCircle size={14} className="inline mr-2"/>}
+          {msg}
+        </div>
+      )}
+
+      {/* Request form */}
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden mb-5" style={CARD}>
+        <div className="px-5 py-4 border-b border-white/[0.07]">
+          <h3 className="text-white font-bold text-sm">Request a Payout</h3>
+          <p className="text-white/40 text-xs mt-0.5">Withdraw your earned balance</p>
+        </div>
+        <div className="px-5 py-5 space-y-4">
+          <Field label="Amount (₹)">
+            <TextInput value={amount} onChange={setAmount} type="number" placeholder="e.g. 500"/>
+          </Field>
+          <Field label="Note (optional)">
+            <TextInput value={note} onChange={setNote} placeholder="e.g. Weekly withdrawal"/>
+          </Field>
+          <PrimaryBtn onClick={requestPayout} loading={submitting} disabled={!amount}>
+            <FileText size={14}/> Request Payout
+          </PrimaryBtn>
+        </div>
+      </div>
+
+      {/* Payout history */}
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="px-5 py-4 border-b border-white/[0.07]">
+          <h3 className="text-white font-bold text-sm">Payout History</h3>
+        </div>
+        {loading
+          ? <div className="flex items-center justify-center h-32"><Loader2 size={22} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
+          : payouts.length === 0
+            ? <div className="flex flex-col items-center justify-center py-16 text-white/20">
+                <DollarSign size={36} className="mb-3"/>
+                <p className="text-sm">No payout requests yet</p>
+              </div>
+            : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    {['Amount', 'Note', 'Status', 'Requested'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {payouts.map(p => {
+                    const s = PAYOUT_STATUS[p.status] ?? { color: '#6B7280', label: p.status };
+                    return (
+                      <tr key={p.id} className="border-b border-white/[0.04] last:border-0">
+                        <td className="px-4 py-3 text-white font-bold">{fmt(p.amount)}</td>
+                        <td className="px-4 py-3 text-white/50 text-xs">{p.note ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                            style={{ background: s.color + '20', color: s.color }}>
+                            {s.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-white/40 text-xs">{fmtDate(p.requestedAt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ─── Documents (KYC / Verification) ─────────────────────────────── */
+const DOC_META: Record<string, { label: string; desc: string; emoji: string; required: boolean }> = {
+  aadhaar_front:       { label: 'Aadhaar Card (Front)', desc: 'Front side of your Aadhaar card',                 emoji: '🪪', required: true  },
+  aadhaar_back:        { label: 'Aadhaar Card (Back)',  desc: 'Back side of your Aadhaar card',                  emoji: '🪪', required: true  },
+  pan_card:            { label: 'PAN Card',             desc: 'Your PAN card (Income Tax ID)',                    emoji: '💳', required: true  },
+  profile_photo:       { label: 'Profile Photo',        desc: 'Clear passport-size face photo',                   emoji: '📸', required: true  },
+  address_proof:       { label: 'Address Proof',        desc: 'Utility bill, bank statement, or rent agreement',  emoji: '🏠', required: true  },
+  bank_passbook:       { label: 'Bank Passbook / Cheque', desc: 'Cancelled cheque or passbook first page',        emoji: '🏦', required: true  },
+  police_verification: { label: 'Police Verification',  desc: 'Police clearance certificate',                     emoji: '👮', required: false },
+  service_certificate: { label: 'Service Certificate',  desc: 'Skill certificate or trade diploma',               emoji: '🎓', required: false },
+};
+const DOC_TYPES = Object.keys(DOC_META);
+
+const DOC_STATUS: Record<string, { color: string; label: string; bg: string }> = {
+  pending:  { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  label: 'Under Review' },
+  approved: { color: '#16A34A', bg: 'rgba(22,163,74,0.12)',   label: 'Approved'     },
+  rejected: { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   label: 'Rejected'     },
+};
+
+function Documents({ token }: { token: string }) {
+  const [docs,    setDocs]    = useState<PartnerDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [deleting,  setDeleting]  = useState<string | null>(null);
+  const [msg,     setMsg]     = useState('');
+  const [msgOk,   setMsgOk]   = useState(true);
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setDocs(await documentsApi.list(token)); } finally { setLoading(false); }
+  }, [token]);
+  useEffect(() => { load(); }, [load]);
+
+  const docByType = Object.fromEntries(docs.map(d => [d.document_type, d]));
+
+  async function handleFileChange(docType: string, file: File) {
+    setUploading(docType); setMsg('');
+    try {
+      const updated = await documentsApi.upload(docType, file, token);
+      setDocs(prev => {
+        const without = prev.filter(d => d.document_type !== docType);
+        return [...without, updated];
+      });
+      setMsgOk(true); setMsg(`${DOC_META[docType]?.label ?? docType} uploaded successfully`);
+    } catch (e: any) { setMsgOk(false); setMsg(e.message ?? 'Upload failed'); }
+    finally { setUploading(null); }
+  }
+
+  async function handleDelete(doc: PartnerDocument) {
+    setDeleting(doc.id); setMsg('');
+    try {
+      await documentsApi.delete(doc.id, token);
+      setDocs(prev => prev.filter(d => d.id !== doc.id));
+      setMsgOk(true); setMsg('Document removed');
+    } catch (e: any) { setMsgOk(false); setMsg(e.message ?? 'Delete failed'); }
+    finally { setDeleting(null); }
+  }
+
+  const required = DOC_TYPES.filter(t => DOC_META[t].required);
+  const optional = DOC_TYPES.filter(t => !DOC_META[t].required);
+  const approvedCount = docs.filter(d => d.status === 'approved').length;
+  const requiredCount = required.length;
+  const progress = Math.round((approvedCount / requiredCount) * 100);
+
+  function DocCard({ docType }: { docType: string }) {
+    const meta = DOC_META[docType];
+    const existing = docByType[docType];
+    const isUploading = uploading === docType;
+    const status = existing ? DOC_STATUS[existing.status] ?? DOC_STATUS['pending'] : null;
+
+    return (
+      <div className="rounded-2xl border overflow-hidden transition-all"
+        style={{ background: CARD.background, borderColor: existing?.status === 'approved' ? 'rgba(22,163,74,0.3)' : existing?.status === 'rejected' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)' }}>
+        <div className="p-4">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-white font-semibold text-sm">{meta.label}</p>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${meta.required ? 'text-amber-400 bg-amber-400/10' : 'text-white/30 bg-white/5'}`}>
+                  {meta.required ? 'REQUIRED' : 'OPTIONAL'}
+                </span>
+              </div>
+              <p className="text-white/40 text-xs mt-0.5 leading-snug">{meta.desc}</p>
+            </div>
+          </div>
+
+          {existing ? (
+            <>
+              {/* Status badge */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                  style={{ background: status!.bg, color: status!.color }}>
+                  {existing.status === 'approved' && <CheckCircle size={11}/>}
+                  {existing.status === 'pending'  && <Clock size={11}/>}
+                  {existing.status === 'rejected' && <XCircle size={11}/>}
+                  {status!.label}
+                </span>
+                <span className="text-white/25 text-[10px]">
+                  {new Date(existing.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+
+              {/* Rejection reason */}
+              {existing.status === 'rejected' && existing.rejection_reason && (
+                <div className="mb-3 px-3 py-2 rounded-xl text-xs text-red-300 border border-red-400/15" style={{ background: 'rgba(239,68,68,0.06)' }}>
+                  <AlertCircle size={11} className="inline mr-1.5"/>{existing.rejection_reason}
+                </div>
+              )}
+
+              {/* File name + actions */}
+              <div className="flex items-center gap-2">
+                {existing.document_url && (
+                  <a href={existing.document_url} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] text-violet-400 hover:bg-violet-500/10 border border-violet-400/20 transition-colors truncate">
+                    <Eye size={11}/> <span className="truncate">{existing.file_name ?? 'View file'}</span>
+                  </a>
+                )}
+                <button onClick={() => fileRefs.current[docType]?.click()} disabled={isUploading}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-bold border border-white/10 text-white/50 hover:bg-white/5 transition-colors disabled:opacity-50">
+                  {isUploading ? <Loader2 size={11} className="animate-spin"/> : <Upload size={11}/>}
+                  Re-upload
+                </button>
+                {existing.status !== 'approved' && (
+                  <button onClick={() => handleDelete(existing)} disabled={deleting === existing.id}
+                    className="p-2 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors border border-white/[0.06] disabled:opacity-50">
+                    {deleting === existing.id ? <Loader2 size={11} className="animate-spin"/> : <Trash2 size={11}/>}
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Upload area */
+            <button onClick={() => fileRefs.current[docType]?.click()} disabled={isUploading}
+              className="w-full py-3.5 rounded-xl border-2 border-dashed text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:bg-white/[0.03] disabled:opacity-50"
+              style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.35)' }}>
+              {isUploading
+                ? <><Loader2 size={14} className="animate-spin"/> Uploading…</>
+                : <><Upload size={14}/> Upload document</>
+              }
+            </button>
+          )}
+
+          {/* Hidden file input */}
+          <input
+            ref={el => { fileRefs.current[docType] = el; }}
+            type="file" accept="image/png,image/jpeg,image/webp,application/pdf"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileChange(docType, f); e.target.value = ''; }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {msg && (
+        <div className={`mb-5 px-4 py-3 rounded-xl text-sm border ${msgOk ? 'text-green-400 border-green-400/20' : 'text-red-400 border-red-400/20'}`}
+          style={{ background: msgOk ? 'rgba(22,163,74,0.08)' : 'rgba(239,68,68,0.08)' }}>
+          {msgOk ? <CheckCircle size={14} className="inline mr-2"/> : <AlertCircle size={14} className="inline mr-2"/>}
+          {msg}
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {!loading && (
+        <div className="rounded-2xl p-4 border border-white/[0.07] mb-6" style={CARD}>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-white font-bold text-sm">Verification Progress</p>
+              <p className="text-white/40 text-xs mt-0.5">{approvedCount} of {requiredCount} required documents approved</p>
+            </div>
+            <span className="text-white font-bold text-lg">{progress}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${progress}%`, background: ACCENT }}/>
+          </div>
+          {approvedCount === requiredCount && (
+            <p className="text-green-400 text-xs mt-2 flex items-center gap-1">
+              <CheckCircle size={12}/> All required documents verified — you're ready to accept bookings!
+            </p>
+          )}
+        </div>
+      )}
+
+      {loading
+        ? <div className="flex items-center justify-center h-48"><Loader2 size={24} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
+        : (
+          <>
+            <div className="mb-4">
+              <p className="text-white font-bold text-sm mb-1">Required Documents</p>
+              <p className="text-white/40 text-xs">These documents are needed to start accepting bookings</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {required.map(t => <DocCard key={t} docType={t}/>)}
+            </div>
+
+            <div className="mb-4">
+              <p className="text-white font-bold text-sm mb-1">Optional Documents</p>
+              <p className="text-white/40 text-xs">These improve your profile and trust score</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {optional.map(t => <DocCard key={t} docType={t}/>)}
+            </div>
+          </>
+        )
+      }
+    </div>
+  );
+}
+
 /* ─── Root App ────────────────────────────────────────────────────── */
-type Page = 'dashboard' | 'jobs' | 'earnings' | 'profile' | 'notifications';
+type Page = 'dashboard' | 'jobs' | 'earnings' | 'payouts' | 'notifications' | 'documents' | 'profile';
 
 const NAV: { id: Page; label: string; Icon: React.ElementType }[] = [
   { id: 'dashboard',     label: 'Dashboard',    Icon: LayoutDashboard },
   { id: 'jobs',          label: 'My Jobs',       Icon: Briefcase       },
   { id: 'earnings',      label: 'Earnings',      Icon: DollarSign      },
+  { id: 'payouts',       label: 'Payouts',       Icon: FileText        },
+  { id: 'documents',     label: 'Documents',     Icon: Shield          },
   { id: 'notifications', label: 'Notifications', Icon: Bell            },
   { id: 'profile',       label: 'Profile',       Icon: User            },
 ];
-
-const PAGE_SUBTITLE: Record<Page, string> = {
-  dashboard:     'ServeNow Partner Portal',
-  jobs:          'ServeNow Partner Portal',
-  earnings:      'ServeNow Partner Portal',
-  notifications: 'ServeNow Partner Portal',
-  profile:       'ServeNow Partner Portal',
-};
 
 export default function App() {
   const [auth,    setAuth]    = useState<AuthTokens | null>(() => {
@@ -1078,6 +1662,7 @@ export default function App() {
           {page === 'dashboard'     && <Dashboard     key={refreshKey} token={auth.accessToken} profile={profile}/>}
           {page === 'jobs'          && <Jobs          key={refreshKey} token={auth.accessToken}/>}
           {page === 'earnings'      && <Earnings      key={refreshKey} token={auth.accessToken}/>}
+          {page === 'payouts'       && <Payouts       key={refreshKey} token={auth.accessToken}/>}
           {page === 'notifications' && <Notifications key={refreshKey} token={auth.accessToken}/>}
           {page === 'profile'       && <Profile       key={refreshKey} token={auth.accessToken} profile={profile} setProfile={setProfile}/>}
         </div>
