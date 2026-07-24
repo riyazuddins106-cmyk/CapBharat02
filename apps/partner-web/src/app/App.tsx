@@ -152,11 +152,12 @@ function PageHeader({ title, subtitle, onRefresh }: {
 }
 
 /* ─── Auth Screen (Login + Register + OTP) ────────────────────────── */
-type AuthMode = 'login' | 'register' | 'otp';
+type AuthMode = 'login' | 'register' | 'otp' | 'docs';
 
 function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [step, setStep] = useState(1); // register steps: 1=basic info, 2=professional details
+  const [docsToken, setDocsToken] = useState<AuthTokens | null>(null);
 
   // ── Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -226,7 +227,8 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     e.preventDefault(); setErr(''); setLoading(true);
     try {
       const tokens = await authApi.verifyOtp(otpEmail, otpCode, 'signup');
-      onLogin(tokens);
+      setDocsToken(tokens);
+      setMode('docs');
     } catch (e: any) { setErr(e.message ?? 'OTP verification failed'); }
     finally { setLoading(false); }
   }
@@ -292,6 +294,36 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
             </button>
           </div>
         </Card>
+      </div>
+    </div>
+  );
+
+  if (mode === 'docs') return (
+    <div className="min-h-screen p-6" style={{ background: '#0f1117' }}>
+      <div className="max-w-2xl mx-auto">
+        <Logo/>
+        <div className="rounded-2xl border border-white/10 p-6 mb-4" style={{ background: '#161B27' }}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-white font-bold text-lg mb-1">Upload Verification Documents</h2>
+              <p className="text-white/40 text-sm">Upload your KYC documents to start accepting bookings. You can skip and do this from your profile later.</p>
+            </div>
+            <button onClick={() => docsToken && onLogin(docsToken)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold text-white whitespace-nowrap"
+              style={{ background: ACCENT }}>
+              Skip <ChevronRight size={14}/>
+            </button>
+          </div>
+        </div>
+        {docsToken && <Documents token={docsToken.accessToken}/>}
+        <div className="mt-6 text-center">
+          <button onClick={() => docsToken && onLogin(docsToken)}
+            className="px-8 py-3 rounded-xl font-bold text-sm text-white"
+            style={{ background: ACCENT }}>
+            Continue to Dashboard →
+          </button>
+          <p className="text-white/25 text-xs mt-3">Documents can be managed anytime from Profile → Documents</p>
+        </div>
       </div>
     </div>
   );
@@ -1290,52 +1322,71 @@ function Payouts({ token }: { token: string }) {
 }
 
 /* ─── Documents (KYC / Verification) ─────────────────────────────── */
-const DOC_META: Record<string, { label: string; desc: string; emoji: string; required: boolean }> = {
-  aadhaar_front:       { label: 'Aadhaar Card (Front)', desc: 'Front side of your Aadhaar card',                 emoji: '🪪', required: true  },
-  aadhaar_back:        { label: 'Aadhaar Card (Back)',  desc: 'Back side of your Aadhaar card',                  emoji: '🪪', required: true  },
-  pan_card:            { label: 'PAN Card',             desc: 'Your PAN card (Income Tax ID)',                    emoji: '💳', required: true  },
-  profile_photo:       { label: 'Profile Photo',        desc: 'Clear passport-size face photo',                   emoji: '📸', required: true  },
-  address_proof:       { label: 'Address Proof',        desc: 'Utility bill, bank statement, or rent agreement',  emoji: '🏠', required: true  },
-  bank_passbook:       { label: 'Bank Passbook / Cheque', desc: 'Cancelled cheque or passbook first page',        emoji: '🏦', required: true  },
-  police_verification: { label: 'Police Verification',  desc: 'Police clearance certificate',                     emoji: '👮', required: false },
-  service_certificate: { label: 'Service Certificate',  desc: 'Skill certificate or trade diploma',               emoji: '🎓', required: false },
+const DOC_STATUS_STYLES: Record<string, { color: string; label: string; bg: string; icon: React.ReactNode }> = {
+  pending:            { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  label: 'Pending',           icon: <Clock size={11}/> },
+  under_review:       { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'Under Review',       icon: <BarChart2 size={11}/> },
+  approved:           { color: '#16A34A', bg: 'rgba(22,163,74,0.12)',  label: 'Approved',           icon: <CheckCircle size={11}/> },
+  rejected:           { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  label: 'Rejected',           icon: <XCircle size={11}/> },
+  re_upload_required: { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'Re-upload Required', icon: <AlertCircle size={11}/> },
+  expired:            { color: '#6B7280', bg: 'rgba(107,114,128,0.12)',label: 'Expired',            icon: <Clock size={11}/> },
 };
-const DOC_TYPES = Object.keys(DOC_META);
 
-const DOC_STATUS: Record<string, { color: string; label: string; bg: string }> = {
-  pending:  { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  label: 'Under Review' },
-  approved: { color: '#16A34A', bg: 'rgba(22,163,74,0.12)',   label: 'Approved'     },
-  rejected: { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   label: 'Rejected'     },
-};
+function borderForStatus(status?: string) {
+  if (status === 'approved') return 'rgba(22,163,74,0.3)';
+  if (status === 'rejected' || status === 're_upload_required') return 'rgba(239,68,68,0.2)';
+  if (status === 'expired') return 'rgba(107,114,128,0.2)';
+  return 'rgba(255,255,255,0.07)';
+}
 
 function Documents({ token }: { token: string }) {
-  const [docs,    setDocs]    = useState<PartnerDocument[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [docTypes, setDocTypes] = useState<DocumentTypeConfig[]>([]);
+  const [docs,     setDocs]     = useState<PartnerDocument[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [deleting,  setDeleting]  = useState<string | null>(null);
   const [msg,     setMsg]     = useState('');
   const [msgOk,   setMsgOk]   = useState(true);
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  // History modal
+  const [histType,    setHistType]    = useState<string | null>(null);
+  const [histItems,   setHistItems]   = useState<PartnerDocumentHistory[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setDocs(await documentsApi.list(token)); } finally { setLoading(false); }
+    try {
+      const [types, userDocs] = await Promise.all([
+        documentsApi.listTypes(token),
+        documentsApi.list(token),
+      ]);
+      setDocTypes(types);
+      setDocs(userDocs);
+    } finally { setLoading(false); }
   }, [token]);
   useEffect(() => { load(); }, [load]);
 
   const docByType = Object.fromEntries(docs.map(d => [d.document_type, d]));
+  const required  = docTypes.filter(t => t.is_mandatory);
+  const optional  = docTypes.filter(t => !t.is_mandatory);
+  const approvedCount  = docs.filter(d => required.some(r => r.type_key === d.document_type) && d.status === 'approved').length;
+  const requiredCount  = required.length;
+  const progress = requiredCount > 0 ? Math.round((approvedCount / requiredCount) * 100) : 0;
 
-  async function handleFileChange(docType: string, file: File) {
-    setUploading(docType); setMsg('');
+  async function handleFile(docType: string, file: File) {
+    const LIMIT = 10 * 1024 * 1024;
+    if (file.size > LIMIT) { setMsgOk(false); setMsg('File too large — max 10 MB.'); return; }
+    setUploading(docType); setMsg(''); setUploadProgress(p => ({ ...p, [docType]: 0 }));
     try {
-      const updated = await documentsApi.upload(docType, file, token);
-      setDocs(prev => {
-        const without = prev.filter(d => d.document_type !== docType);
-        return [...without, updated];
+      const updated = await documentsApi.upload(docType, file, token, pct => {
+        setUploadProgress(p => ({ ...p, [docType]: pct }));
       });
-      setMsgOk(true); setMsg(`${DOC_META[docType]?.label ?? docType} uploaded successfully`);
+      setDocs(prev => [...prev.filter(d => d.document_type !== docType), updated]);
+      const label = docTypes.find(t => t.type_key === docType)?.label ?? docType;
+      setMsgOk(true); setMsg(`${label} uploaded successfully ✓`);
     } catch (e: any) { setMsgOk(false); setMsg(e.message ?? 'Upload failed'); }
-    finally { setUploading(null); }
+    finally { setUploading(null); setUploadProgress(p => { const n = { ...p }; delete n[docType]; return n; }); }
   }
 
   async function handleDelete(doc: PartnerDocument) {
@@ -1348,70 +1399,104 @@ function Documents({ token }: { token: string }) {
     finally { setDeleting(null); }
   }
 
-  const required = DOC_TYPES.filter(t => DOC_META[t].required);
-  const optional = DOC_TYPES.filter(t => !DOC_META[t].required);
-  const approvedCount = docs.filter(d => d.status === 'approved').length;
-  const requiredCount = required.length;
-  const progress = Math.round((approvedCount / requiredCount) * 100);
+  async function openHistory(docType: string) {
+    setHistType(docType); setHistItems([]); setHistLoading(true);
+    try { setHistItems(await documentsApi.getHistory(docType, token)); }
+    catch { setHistItems([]); }
+    finally { setHistLoading(false); }
+  }
 
-  function DocCard({ docType }: { docType: string }) {
-    const meta = DOC_META[docType];
-    const existing = docByType[docType];
-    const isUploading = uploading === docType;
-    const status = existing ? DOC_STATUS[existing.status] ?? DOC_STATUS['pending'] : null;
+  function DocCard({ dt }: { dt: DocumentTypeConfig }) {
+    const existing = docByType[dt.type_key];
+    const isUp = uploading === dt.type_key;
+    const pct  = uploadProgress[dt.type_key] ?? 0;
+    const isDrag = dragOver === dt.type_key;
+    const st   = existing ? DOC_STATUS_STYLES[existing.status] ?? DOC_STATUS_STYLES['pending'] : null;
+
+    function onDrop(e: React.DragEvent) {
+      e.preventDefault(); setDragOver(null);
+      const f = e.dataTransfer.files?.[0];
+      if (f) handleFile(dt.type_key, f);
+    }
 
     return (
       <div className="rounded-2xl border overflow-hidden transition-all"
-        style={{ background: CARD.background, borderColor: existing?.status === 'approved' ? 'rgba(22,163,74,0.3)' : existing?.status === 'rejected' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)' }}>
+        style={{ background: CARD.background, borderColor: isDrag ? '#7C5BF8' : borderForStatus(existing?.status) }}
+        onDragOver={e => { e.preventDefault(); setDragOver(dt.type_key); }}
+        onDragLeave={() => setDragOver(null)}
+        onDrop={onDrop}>
         <div className="p-4">
+          {/* Header */}
           <div className="flex items-start gap-3 mb-3">
-            <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
+            <span className="text-2xl flex-shrink-0">{dt.emoji}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-white font-semibold text-sm">{meta.label}</p>
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${meta.required ? 'text-amber-400 bg-amber-400/10' : 'text-white/30 bg-white/5'}`}>
-                  {meta.required ? 'REQUIRED' : 'OPTIONAL'}
+                <p className="text-white font-semibold text-sm">{dt.label}</p>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${dt.is_mandatory ? 'text-amber-400 bg-amber-400/10' : 'text-white/30 bg-white/5'}`}>
+                  {dt.is_mandatory ? 'REQUIRED' : 'OPTIONAL'}
                 </span>
               </div>
-              <p className="text-white/40 text-xs mt-0.5 leading-snug">{meta.desc}</p>
+              {dt.description && <p className="text-white/40 text-xs mt-0.5 leading-snug">{dt.description}</p>}
             </div>
+            {/* History button */}
+            {existing && (
+              <button onClick={() => openHistory(dt.type_key)} title="View history"
+                className="flex-shrink-0 p-1.5 rounded-lg text-white/20 hover:text-white/50 hover:bg-white/5 transition-colors">
+                <HistoryIcon size={13}/>
+              </button>
+            )}
           </div>
 
-          {existing ? (
+          {/* Upload progress bar */}
+          {isUp && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-white/40 text-[10px]">Uploading…</span>
+                <span className="text-white/40 text-[10px]">{pct}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: ACCENT }}/>
+              </div>
+            </div>
+          )}
+
+          {existing && !isUp ? (
             <>
-              {/* Status badge */}
+              {/* Status badge + date */}
               <div className="flex items-center justify-between mb-3">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
-                  style={{ background: status!.bg, color: status!.color }}>
-                  {existing.status === 'approved' && <CheckCircle size={11}/>}
-                  {existing.status === 'pending'  && <Clock size={11}/>}
-                  {existing.status === 'rejected' && <XCircle size={11}/>}
-                  {status!.label}
+                  style={{ background: st!.bg, color: st!.color }}>
+                  {st!.icon}{st!.label}
                 </span>
                 <span className="text-white/25 text-[10px]">
-                  {new Date(existing.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                  {new Date(existing.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {existing.version > 1 && <> · v{existing.version}</>}
                 </span>
               </div>
 
-              {/* Rejection reason */}
-              {existing.status === 'rejected' && existing.rejection_reason && (
+              {/* Reason banner */}
+              {(existing.status === 'rejected' || existing.status === 're_upload_required') && existing.rejection_reason && (
                 <div className="mb-3 px-3 py-2 rounded-xl text-xs text-red-300 border border-red-400/15" style={{ background: 'rgba(239,68,68,0.06)' }}>
                   <AlertCircle size={11} className="inline mr-1.5"/>{existing.rejection_reason}
                 </div>
               )}
+              {existing.status === 'expired' && (
+                <div className="mb-3 px-3 py-2 rounded-xl text-xs text-gray-400 border border-gray-400/15" style={{ background: 'rgba(107,114,128,0.08)' }}>
+                  <Clock size={11} className="inline mr-1.5"/>This document has expired. Please upload a new one.
+                </div>
+              )}
 
-              {/* File name + actions */}
+              {/* Actions */}
               <div className="flex items-center gap-2">
                 {existing.document_url && (
                   <a href={existing.document_url} target="_blank" rel="noopener noreferrer"
                     className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] text-violet-400 hover:bg-violet-500/10 border border-violet-400/20 transition-colors truncate">
-                    <Eye size={11}/> <span className="truncate">{existing.file_name ?? 'View file'}</span>
+                    <Eye size={11}/><span className="truncate">{existing.file_name ?? 'View file'}</span>
                   </a>
                 )}
-                <button onClick={() => fileRefs.current[docType]?.click()} disabled={isUploading}
+                <button onClick={() => fileRefs.current[dt.type_key]?.click()} disabled={isUp}
                   className="flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-bold border border-white/10 text-white/50 hover:bg-white/5 transition-colors disabled:opacity-50">
-                  {isUploading ? <Loader2 size={11} className="animate-spin"/> : <Upload size={11}/>}
-                  Re-upload
+                  <Upload size={11}/>Re-upload
                 </button>
                 {existing.status !== 'approved' && (
                   <button onClick={() => handleDelete(existing)} disabled={deleting === existing.id}
@@ -1421,42 +1506,41 @@ function Documents({ token }: { token: string }) {
                 )}
               </div>
             </>
-          ) : (
-            /* Upload area */
-            <button onClick={() => fileRefs.current[docType]?.click()} disabled={isUploading}
-              className="w-full py-3.5 rounded-xl border-2 border-dashed text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:bg-white/[0.03] disabled:opacity-50"
-              style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.35)' }}>
-              {isUploading
-                ? <><Loader2 size={14} className="animate-spin"/> Uploading…</>
-                : <><Upload size={14}/> Upload document</>
-              }
+          ) : !isUp ? (
+            /* Drop / click to upload */
+            <button onClick={() => fileRefs.current[dt.type_key]?.click()}
+              className="w-full py-4 rounded-xl border-2 border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+              style={{ borderColor: isDrag ? '#7C5BF8' : 'rgba(255,255,255,0.12)', color: isDrag ? '#7C5BF8' : 'rgba(255,255,255,0.35)', background: isDrag ? 'rgba(124,91,248,0.06)' : undefined }}>
+              <Upload size={18}/>
+              <span>Click to upload or drag & drop</span>
+              <span className="text-[10px] opacity-60">PNG, JPG, WEBP, PDF · max 10 MB</span>
             </button>
-          )}
+          ) : null}
 
-          {/* Hidden file input */}
-          <input
-            ref={el => { fileRefs.current[docType] = el; }}
-            type="file" accept="image/png,image/jpeg,image/webp,application/pdf"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileChange(docType, f); e.target.value = ''; }}
-          />
+          <input ref={el => { fileRefs.current[dt.type_key] = el; }}
+            type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(dt.type_key, f); e.target.value = ''; }}/>
         </div>
       </div>
     );
   }
 
+  // History modal
+  const histLabel = docTypes.find(t => t.type_key === histType)?.label ?? histType ?? '';
+
   return (
     <div>
       {msg && (
-        <div className={`mb-5 px-4 py-3 rounded-xl text-sm border ${msgOk ? 'text-green-400 border-green-400/20' : 'text-red-400 border-red-400/20'}`}
+        <div className={`mb-5 px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${msgOk ? 'text-green-400 border-green-400/20' : 'text-red-400 border-red-400/20'}`}
           style={{ background: msgOk ? 'rgba(22,163,74,0.08)' : 'rgba(239,68,68,0.08)' }}>
-          {msgOk ? <CheckCircle size={14} className="inline mr-2"/> : <AlertCircle size={14} className="inline mr-2"/>}
-          {msg}
+          {msgOk ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
+          <span className="flex-1">{msg}</span>
+          <button onClick={() => setMsg('')} className="opacity-50 hover:opacity-100"><X size={13}/></button>
         </div>
       )}
 
-      {/* Progress bar */}
-      {!loading && (
+      {/* Verification progress */}
+      {!loading && requiredCount > 0 && (
         <div className="rounded-2xl p-4 border border-white/[0.07] mb-6" style={CARD}>
           <div className="flex items-center justify-between mb-2">
             <div>
@@ -1466,8 +1550,7 @@ function Documents({ token }: { token: string }) {
             <span className="text-white font-bold text-lg">{progress}%</span>
           </div>
           <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: ACCENT }}/>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: ACCENT }}/>
           </div>
           {approvedCount === requiredCount && (
             <p className="text-green-400 text-xs mt-2 flex items-center gap-1">
@@ -1477,28 +1560,86 @@ function Documents({ token }: { token: string }) {
         </div>
       )}
 
-      {loading
-        ? <div className="flex items-center justify-center h-48"><Loader2 size={24} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
-        : (
-          <>
-            <div className="mb-4">
-              <p className="text-white font-bold text-sm mb-1">Required Documents</p>
-              <p className="text-white/40 text-xs">These documents are needed to start accepting bookings</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {required.map(t => <DocCard key={t} docType={t}/>)}
-            </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48"><Loader2 size={24} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
+      ) : (
+        <>
+          {required.length > 0 && (
+            <>
+              <div className="mb-4">
+                <p className="text-white font-bold text-sm mb-1">Required Documents</p>
+                <p className="text-white/40 text-xs">These are needed before you can accept bookings</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {required.map(dt => <DocCard key={dt.type_key} dt={dt}/>)}
+              </div>
+            </>
+          )}
+          {optional.length > 0 && (
+            <>
+              <div className="mb-4">
+                <p className="text-white font-bold text-sm mb-1">Optional Documents</p>
+                <p className="text-white/40 text-xs">These improve your profile and trust score</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {optional.map(dt => <DocCard key={dt.type_key} dt={dt}/>)}
+              </div>
+            </>
+          )}
+        </>
+      )}
 
-            <div className="mb-4">
-              <p className="text-white font-bold text-sm mb-1">Optional Documents</p>
-              <p className="text-white/40 text-xs">These improve your profile and trust score</p>
+      {/* History modal */}
+      {histType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
+          <div className="w-full max-w-md rounded-2xl border border-white/10 p-6 max-h-[80vh] flex flex-col" style={MODAL_BG}>
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <div>
+                <p className="text-white font-bold text-sm">Document History</p>
+                <p className="text-white/40 text-xs mt-0.5">{histLabel}</p>
+              </div>
+              <button onClick={() => setHistType(null)} className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition-colors">
+                <X size={16}/>
+              </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {optional.map(t => <DocCard key={t} docType={t}/>)}
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {histLoading ? (
+                <div className="flex items-center justify-center h-24"><Loader2 size={20} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
+              ) : histItems.length === 0 ? (
+                <p className="text-white/30 text-sm text-center py-8">No previous versions found</p>
+              ) : histItems.map(h => {
+                const st = DOC_STATUS_STYLES[h.status] ?? DOC_STATUS_STYLES['pending'];
+                return (
+                  <div key={h.id} className="p-3 rounded-xl border border-white/[0.07]" style={CARD}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold" style={{ background: st.bg, color: st.color }}>
+                        {st.icon}{st.label}
+                      </span>
+                      <span className="text-white/25 text-[10px]">v{h.version}</span>
+                    </div>
+                    <p className="text-white/30 text-xs">
+                      Uploaded: {new Date(h.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                    {h.reviewed_at && <p className="text-white/20 text-xs">Reviewed: {new Date(h.reviewed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
+                    {h.archived_at && <p className="text-white/20 text-xs">Archived: {new Date(h.archived_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
+                    {h.rejection_reason && (
+                      <p className="text-red-300 text-xs mt-2 px-2 py-1 rounded border border-red-400/15" style={{ background: 'rgba(239,68,68,0.06)' }}>
+                        {h.rejection_reason}
+                      </p>
+                    )}
+                    {h.document_url && (
+                      <a href={h.document_url} target="_blank" rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-violet-400 text-xs hover:underline">
+                        <Eye size={10}/> View file
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </>
-        )
-      }
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1553,7 +1694,7 @@ export default function App() {
     if (p === 'notifications') setUnread(0);
   }
 
-  if (!auth) return <Login onLogin={onLogin}/>;
+  if (!auth) return <AuthScreen onLogin={onLogin}/>;
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">

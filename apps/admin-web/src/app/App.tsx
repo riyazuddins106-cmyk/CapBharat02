@@ -8,7 +8,7 @@ import {
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
-  AlertCircle, History as HistoryIcon,
+  AlertCircle, History as HistoryIcon, X,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
@@ -712,6 +712,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <EmailConfigView accessToken={accessToken} adminEmail={user.email} />
           ) : activeSection === "sms-config" ? (
             <SmsConfigView accessToken={accessToken} />
+          ) : activeSection === "documents" ? (
+            <DocumentVerificationView accessToken={accessToken} />
           ) : (
             <SettingsView user={user} />
           )}
@@ -3926,6 +3928,509 @@ function SmsConfigView({ accessToken }: { accessToken: string }) {
           Save Configuration
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DOCUMENT VERIFICATION
+═══════════════════════════════════════════════════════════════════ */
+
+const DOC_STATUS_STYLES: Record<string, { color: string; bg: string; label: string }> = {
+  pending:            { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  label: 'Pending'          },
+  under_review:       { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  label: 'Under Review'     },
+  approved:           { color: '#16A34A', bg: 'rgba(22,163,74,0.12)',   label: 'Approved'         },
+  rejected:           { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   label: 'Rejected'         },
+  re_upload_required: { color: '#F97316', bg: 'rgba(249,115,22,0.12)',  label: 'Re-upload Needed' },
+  expired:            { color: '#6B7280', bg: 'rgba(107,114,128,0.12)', label: 'Expired'          },
+};
+
+function DocumentVerificationView({ accessToken }: { accessToken: string }) {
+  const [tab, setTab] = useState<'review' | 'types'>('review');
+
+  // ─── Review tab state
+  const [docs,         setDocs]         = useState<PartnerDocumentRow[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [partnerSearch,setPartnerSearch]= useState('');
+  const [previewDoc,   setPreviewDoc]   = useState<PartnerDocumentRow | null>(null);
+  const [actionDoc,    setActionDoc]    = useState<PartnerDocumentRow | null>(null);
+  const [actionStatus, setActionStatus] = useState<DocumentStatus | ''>('');
+  const [actionReason, setActionReason] = useState('');
+  const [saving,       setSaving]       = useState(false);
+  const [historyDoc,   setHistoryDoc]   = useState<PartnerDocumentRow | null>(null);
+  const [history,      setHistory]      = useState<PartnerDocumentHistoryRow[]>([]);
+  const [histLoading,  setHistLoading]  = useState(false);
+  const [msg,          setMsg]          = useState('');
+  const [msgOk,        setMsgOk]        = useState(true);
+
+  // ─── Types tab state
+  const [docTypes,     setDocTypes]     = useState<DocumentTypeConfigRow[]>([]);
+  const [typesLoading, setTypesLoading] = useState(false);
+  const [typeModal,    setTypeModal]    = useState(false);
+  const [editType,     setEditType]     = useState<DocumentTypeConfigRow | null>(null);
+  const [typeKey,      setTypeKey]      = useState('');
+  const [typeLabel,    setTypeLabel]    = useState('');
+  const [typeDesc,     setTypeDesc]     = useState('');
+  const [typeEmoji,    setTypeEmoji]    = useState('📄');
+  const [typeMandatory,setTypeMandatory]= useState(false);
+  const [typeSaving,   setTypeSaving]   = useState(false);
+
+  const loadDocs = useCallback(async () => {
+    setLoading(true);
+    try { setDocs(await adminApi.getDocuments(accessToken)); }
+    finally { setLoading(false); }
+  }, [accessToken]);
+
+  const loadTypes = useCallback(async () => {
+    setTypesLoading(true);
+    try { setDocTypes(await adminApi.getDocumentTypes(accessToken)); }
+    finally { setTypesLoading(false); }
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (tab === 'review') loadDocs();
+    else loadTypes();
+  }, [tab, loadDocs, loadTypes]);
+
+  const filtered = docs.filter(d => {
+    if (statusFilter && d.status !== statusFilter) return false;
+    if (partnerSearch) {
+      const q = partnerSearch.toLowerCase();
+      if (!d.partner_name?.toLowerCase().includes(q) && !d.partner_email?.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  async function handleAction() {
+    if (!actionDoc || !actionStatus) return;
+    if (['rejected', 're_upload_required'].includes(actionStatus) && !actionReason.trim()) {
+      setMsg('Please provide a reason for the decision.'); setMsgOk(false); return;
+    }
+    setSaving(true);
+    try {
+      await adminApi.updateDocumentStatus(actionDoc.id, actionStatus, actionReason.trim() || null, accessToken);
+      setDocs(prev => prev.map(d => d.id === actionDoc.id ? { ...d, status: actionStatus as DocumentStatus } : d));
+      setActionDoc(null); setActionReason(''); setActionStatus('');
+      setMsg('Document status updated successfully.'); setMsgOk(true);
+    } catch (e: any) { setMsg(e.message ?? 'Update failed'); setMsgOk(false); }
+    finally { setSaving(false); }
+  }
+
+  async function openHistory(doc: PartnerDocumentRow) {
+    setHistoryDoc(doc); setHistory([]); setHistLoading(true);
+    try { setHistory(await adminApi.getDocumentHistory(doc.id, accessToken)); }
+    catch { setHistory([]); }
+    finally { setHistLoading(false); }
+  }
+
+  function openTypeModal(t?: DocumentTypeConfigRow) {
+    if (t) {
+      setEditType(t); setTypeKey(t.type_key); setTypeLabel(t.label);
+      setTypeDesc(t.description ?? ''); setTypeEmoji(t.emoji); setTypeMandatory(t.is_mandatory);
+    } else {
+      setEditType(null); setTypeKey(''); setTypeLabel(''); setTypeDesc(''); setTypeEmoji('📄'); setTypeMandatory(false);
+    }
+    setTypeModal(true);
+  }
+
+  async function saveType() {
+    setTypeSaving(true);
+    try {
+      if (editType) {
+        const updated = await adminApi.updateDocumentType(editType.id, {
+          label: typeLabel, description: typeDesc, emoji: typeEmoji, isMandatory: typeMandatory,
+        }, accessToken);
+        setDocTypes(prev => prev.map(t => t.id === editType.id ? updated : t));
+      } else {
+        const created = await adminApi.createDocumentType({
+          typeKey, label: typeLabel, description: typeDesc, emoji: typeEmoji, isMandatory: typeMandatory,
+        }, accessToken);
+        setDocTypes(prev => [...prev, created]);
+      }
+      setTypeModal(false);
+    } catch (e: any) { setMsg(e.message ?? 'Save failed'); setMsgOk(false); }
+    finally { setTypeSaving(false); }
+  }
+
+  async function toggleTypeActive(t: DocumentTypeConfigRow) {
+    try {
+      const updated = await adminApi.updateDocumentType(t.id, { isActive: !t.is_active }, accessToken);
+      setDocTypes(prev => prev.map(x => x.id === t.id ? updated : x));
+    } catch (e: any) { setMsg(e.message ?? 'Failed'); setMsgOk(false); }
+  }
+
+  async function deleteType(t: DocumentTypeConfigRow) {
+    if (!confirm(`Delete document type "${t.label}"? This cannot be undone.`)) return;
+    try {
+      await adminApi.deleteDocumentType(t.id, accessToken);
+      setDocTypes(prev => prev.filter(x => x.id !== t.id));
+    } catch (e: any) { setMsg(e.message ?? 'Delete failed'); setMsgOk(false); }
+  }
+
+  function isImageUrl(url: string) {
+    return /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
+  }
+
+  return (
+    <div>
+      {/* Banner */}
+      {msg && (
+        <div className={`mb-5 px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${msgOk ? 'text-green-400 border-green-400/20' : 'text-red-400 border-red-400/20'}`}
+          style={{ background: msgOk ? 'rgba(22,163,74,0.08)' : 'rgba(239,68,68,0.08)' }}>
+          {msgOk ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
+          <span className="flex-1">{msg}</span>
+          <button onClick={() => setMsg('')} className="opacity-50 hover:opacity-100 transition-opacity"><X size={13}/></button>
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <div className="flex gap-2 mb-6">
+        {(['review', 'types'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === t ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+            style={tab === t ? { background: 'linear-gradient(135deg,#5b3ef5,#7c5bf8)' } : { background: 'rgba(255,255,255,0.04)' }}>
+            {t === 'review' ? '📋 Review Documents' : '⚙️ Document Types'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'review' ? (
+        <>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-5">
+            <input value={partnerSearch} onChange={e => setPartnerSearch(e.target.value)}
+              placeholder="Search partner name or email…"
+              className="flex-1 min-w-48 px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
+              style={INPUT_STYLE}/>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
+              style={INPUT_STYLE as React.CSSProperties}>
+              <option value="">All statuses</option>
+              {Object.entries(DOC_STATUS_STYLES).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+            <button onClick={loadDocs} title="Refresh"
+              className="px-3 py-2 rounded-xl text-white/40 hover:text-white border border-white/10 transition-colors"
+              style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <RefreshCw size={14}/>
+            </button>
+          </div>
+
+          <p className="text-white/30 text-xs mb-4">{filtered.length} document{filtered.length !== 1 ? 's' : ''}</p>
+
+          {loading ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 size={24} className="animate-spin" style={{ color: '#5B3EF5' }}/>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-white/20">
+              <ShieldCheck size={32} className="mb-3"/>
+              <p className="text-sm">No documents found</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map(doc => {
+                const st = DOC_STATUS_STYLES[doc.status] ?? DOC_STATUS_STYLES['pending'];
+                return (
+                  <div key={doc.id} className="rounded-2xl border border-white/[0.07] p-4 flex flex-wrap gap-4 items-start" style={CARD}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-white font-semibold text-sm">{doc.partner_name}</span>
+                        {doc.partner_email && <span className="text-white/30 text-xs">{doc.partner_email}</span>}
+                      </div>
+                      <p className="text-white/50 text-xs mb-2 capitalize">{doc.document_type.replace(/_/g, ' ')}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold"
+                          style={{ background: st.bg, color: st.color }}>
+                          {st.label}
+                        </span>
+                        <span className="text-white/25 text-[10px]">v{doc.version}</span>
+                        <span className="text-white/25 text-[10px]">
+                          {new Date(doc.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                        {doc.reviewer_name && (
+                          <span className="text-white/25 text-[10px]">· reviewed by {doc.reviewer_name}</span>
+                        )}
+                      </div>
+                      {doc.rejection_reason && (
+                        <p className="mt-2 text-xs text-red-300 border border-red-400/15 px-2 py-1.5 rounded-lg"
+                          style={{ background: 'rgba(239,68,68,0.06)' }}>
+                          <AlertCircle size={10} className="inline mr-1"/>{doc.rejection_reason}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                      {doc.document_url && (
+                        <button onClick={() => setPreviewDoc(doc)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-violet-400/25 text-violet-400 hover:bg-violet-500/10 transition-colors">
+                          <Eye size={12}/> Preview
+                        </button>
+                      )}
+                      <button onClick={() => openHistory(doc)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors">
+                        <HistoryIcon size={12}/> History
+                      </button>
+                      <button onClick={() => { setActionDoc(doc); setActionStatus(doc.status); setActionReason(doc.rejection_reason ?? ''); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/10 text-white/70 hover:bg-white/5 transition-colors">
+                        <Pencil size={12}/> Review
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex justify-between items-center mb-5">
+            <p className="text-white/40 text-sm">Configure which documents partners must upload to accept bookings</p>
+            <button onClick={() => openTypeModal()}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg,#5b3ef5,#7c5bf8)' }}>
+              <Plus size={14}/> Add Type
+            </button>
+          </div>
+          {typesLoading ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 size={24} className="animate-spin" style={{ color: '#5B3EF5' }}/>
+            </div>
+          ) : docTypes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-white/20">
+              <Shield size={32} className="mb-3"/>
+              <p className="text-sm">No document types configured yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {docTypes.sort((a, b) => a.sort_order - b.sort_order).map(t => (
+                <div key={t.id} className="rounded-2xl border border-white/[0.07] p-4 flex items-center gap-4" style={CARD}>
+                  <span className="text-2xl flex-shrink-0">{t.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <p className="text-white font-semibold text-sm">{t.label}</p>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${t.is_mandatory ? 'text-amber-400 bg-amber-400/10' : 'text-white/30 bg-white/5'}`}>
+                        {t.is_mandatory ? 'REQUIRED' : 'OPTIONAL'}
+                      </span>
+                      {!t.is_active && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-red-400 bg-red-400/10">INACTIVE</span>
+                      )}
+                    </div>
+                    <p className="text-white/30 text-[11px]">{t.type_key}</p>
+                    {t.description && <p className="text-white/40 text-xs mt-0.5">{t.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => toggleTypeActive(t)}
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors">
+                      {t.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button onClick={() => openTypeModal(t)}
+                      className="p-2 rounded-xl text-white/40 hover:text-white/70 hover:bg-white/5 border border-white/10 transition-colors">
+                      <Pencil size={13}/>
+                    </button>
+                    <button onClick={() => deleteType(t)}
+                      className="p-2 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-500/10 border border-white/[0.06] transition-colors">
+                      <Trash2 size={13}/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.85)' }}>
+          <div className="w-full max-w-2xl rounded-2xl border border-white/10 overflow-hidden flex flex-col" style={{ ...MODAL_BG, maxHeight: '90vh' }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] flex-shrink-0">
+              <div>
+                <p className="text-white font-bold text-sm">
+                  {previewDoc.partner_name} — <span className="capitalize font-normal text-white/60">{previewDoc.document_type.replace(/_/g, ' ')}</span>
+                </p>
+                <p className="text-white/30 text-xs mt-0.5">
+                  v{previewDoc.version} · uploaded {new Date(previewDoc.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={previewDoc.document_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs border border-violet-400/25 text-violet-400 hover:bg-violet-500/10 transition-colors">
+                  <ExternalLink size={11}/> Open
+                </a>
+                <button onClick={() => setPreviewDoc(null)}
+                  className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition-colors">
+                  <X size={16}/>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center" style={{ minHeight: '300px' }}>
+              {isImageUrl(previewDoc.document_url)
+                ? <img src={previewDoc.document_url} alt="document preview" className="max-w-full max-h-[55vh] rounded-xl object-contain"/>
+                : <iframe src={previewDoc.document_url} className="w-full rounded-xl border-0" style={{ height: '55vh' }} title="document preview"/>
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action (Review) Modal */}
+      {actionDoc && (
+        <Modal title={`Review Document — ${actionDoc.partner_name}`} onClose={() => setActionDoc(null)}>
+          <p className="text-white/40 text-sm mb-4 capitalize">{actionDoc.document_type.replace(/_/g, ' ')} · v{actionDoc.version}</p>
+          <p className="text-white/50 text-xs mb-3 font-semibold uppercase tracking-wide">Set Status</p>
+          <div className="space-y-2 mb-5">
+            {(['approved', 'under_review', 'rejected', 're_upload_required', 'expired'] as const).map(s => {
+              const st = DOC_STATUS_STYLES[s];
+              return (
+                <label key={s}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${actionStatus === s ? 'border-violet-500/50' : 'border-white/[0.07] hover:border-white/15'}`}
+                  style={{ background: actionStatus === s ? 'rgba(91,62,245,0.1)' : 'rgba(255,255,255,0.03)' }}>
+                  <input type="radio" className="hidden" checked={actionStatus === s} onChange={() => setActionStatus(s)}/>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: actionStatus === s ? '#7C5BF8' : 'rgba(255,255,255,0.15)' }}/>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          {['rejected', 're_upload_required'].includes(actionStatus) && (
+            <div className="mb-5">
+              <label className="text-white/50 text-xs block mb-1.5">
+                Reason <span className="text-red-400">*</span>
+              </label>
+              <textarea value={actionReason} onChange={e => setActionReason(e.target.value)}
+                rows={3} placeholder="Explain why the document was rejected or needs re-upload…"
+                className="w-full px-3 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50 resize-none"
+                style={{ background: 'rgba(255,255,255,0.05)' }}/>
+            </div>
+          )}
+          {actionStatus === 'approved' && (
+            <div className="mb-5 px-3 py-2.5 rounded-xl border border-green-400/20 text-green-400 text-xs flex items-center gap-2"
+              style={{ background: 'rgba(22,163,74,0.08)' }}>
+              <CheckCircle size={12}/>Partner will be notified that this document is approved.
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={() => setActionDoc(null)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white/50 border border-white/10 hover:bg-white/5 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleAction} disabled={saving || !actionStatus}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg,#5b3ef5,#7c5bf8)' }}>
+              {saving ? <Loader2 size={14} className="animate-spin"/> : 'Save Decision'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* History Modal */}
+      {historyDoc && (
+        <Modal title={`Document History — ${historyDoc.partner_name}`} onClose={() => setHistoryDoc(null)}>
+          <p className="text-white/40 text-sm mb-4 capitalize">{historyDoc.document_type.replace(/_/g, ' ')}</p>
+          {histLoading ? (
+            <div className="flex items-center justify-center h-24">
+              <Loader2 size={20} className="animate-spin" style={{ color: '#5B3EF5' }}/>
+            </div>
+          ) : history.length === 0 ? (
+            <p className="text-white/30 text-sm text-center py-8">No previous versions found</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map(h => {
+                const st = DOC_STATUS_STYLES[h.status] ?? DOC_STATUS_STYLES['pending'];
+                return (
+                  <div key={h.id} className="p-3 rounded-xl border border-white/[0.07]" style={CARD}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold"
+                        style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                      <span className="text-white/25 text-[10px]">v{h.version}</span>
+                    </div>
+                    <p className="text-white/30 text-xs">
+                      Uploaded: {new Date(h.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                    {h.reviewed_at && (
+                      <p className="text-white/20 text-xs">
+                        Reviewed: {new Date(h.reviewed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    )}
+                    {h.archived_at && (
+                      <p className="text-white/20 text-xs">
+                        Archived: {new Date(h.archived_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    )}
+                    {h.rejection_reason && (
+                      <p className="text-red-300 text-xs mt-1.5 border border-red-400/15 px-2 py-1 rounded-lg"
+                        style={{ background: 'rgba(239,68,68,0.06)' }}>
+                        {h.rejection_reason}
+                      </p>
+                    )}
+                    {h.document_url && (
+                      <a href={h.document_url} target="_blank" rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-violet-400 text-xs hover:underline">
+                        <ExternalLink size={10}/> View file
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* Document Type Modal */}
+      {typeModal && (
+        <Modal title={editType ? 'Edit Document Type' : 'Add Document Type'} onClose={() => setTypeModal(false)}>
+          <div className="space-y-4 mb-5">
+            {!editType && (
+              <div>
+                <label className="text-white/50 text-xs block mb-1.5">
+                  Type Key <span className="text-white/25 font-normal">(snake_case, e.g. gst_certificate)</span>
+                </label>
+                <input value={typeKey} onChange={e => setTypeKey(e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''))}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
+                  style={{ background: 'rgba(255,255,255,0.05)' }} placeholder="gst_certificate"/>
+              </div>
+            )}
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">Label</label>
+              <input value={typeLabel} onChange={e => setTypeLabel(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
+                style={{ background: 'rgba(255,255,255,0.05)' }} placeholder="GST Certificate"/>
+            </div>
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">Emoji</label>
+              <input value={typeEmoji} onChange={e => setTypeEmoji(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
+                style={{ background: 'rgba(255,255,255,0.05)' }} placeholder="📄" maxLength={2}/>
+            </div>
+            <div>
+              <label className="text-white/50 text-xs block mb-1.5">Description <span className="font-normal text-white/25">(optional)</span></label>
+              <input value={typeDesc} onChange={e => setTypeDesc(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
+                style={{ background: 'rgba(255,255,255,0.05)' }} placeholder="Short description shown to partners"/>
+            </div>
+            <label className="flex items-center gap-3 cursor-pointer" onClick={() => setTypeMandatory(m => !m)}>
+              <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${typeMandatory ? 'bg-violet-600' : 'bg-white/10'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${typeMandatory ? 'translate-x-5' : 'translate-x-0.5'}`}/>
+              </div>
+              <span className="text-sm text-white/70">Required for all partners</span>
+            </label>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setTypeModal(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white/50 border border-white/10 hover:bg-white/5 transition-colors">
+              Cancel
+            </button>
+            <button onClick={saveType} disabled={typeSaving || !typeLabel.trim() || (!editType && !typeKey.trim())}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg,#5b3ef5,#7c5bf8)' }}>
+              {typeSaving ? <Loader2 size={14} className="animate-spin"/> : editType ? 'Save Changes' : 'Add Type'}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
