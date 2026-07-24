@@ -12,24 +12,27 @@ const router = Router();
 
 router.use(authenticate, requireRole('partner', 'admin'));
 
-router.get('/profile', partnerController.getProfile);
-router.patch('/profile', partnerController.updateProfile);
-router.post('/profile/avatar', upload.single('avatar'), partnerController.uploadAvatar);
-router.patch('/account', partnerController.updateAccount);
-router.patch('/availability', partnerController.updateAvailability);
-router.get('/jobs', partnerController.listJobs);
-router.get('/jobs/:id', partnerController.getJob);
-router.patch('/jobs/:id/accept', partnerController.acceptJob);
-router.patch('/jobs/:id/reject', partnerController.rejectJob);
-router.patch('/jobs/:id/checkin', partnerController.checkIn);
+router.get('/profile',             partnerController.getProfile);
+router.patch('/profile',           partnerController.updateProfile);
+router.post('/profile/avatar',     upload.single('avatar'), partnerController.uploadAvatar);
+router.patch('/account',           partnerController.updateAccount);
+router.patch('/availability',      partnerController.updateAvailability);
+router.get('/jobs',                partnerController.listJobs);
+router.get('/jobs/:id',            partnerController.getJob);
+router.patch('/jobs/:id/accept',   partnerController.acceptJob);
+router.patch('/jobs/:id/reject',   partnerController.rejectJob);
+router.patch('/jobs/:id/checkin',  partnerController.checkIn);
 router.patch('/jobs/:id/complete', partnerController.completeJob);
-router.get('/earnings', partnerController.getEarnings);
-router.post('/payouts', partnerController.requestPayout);
-router.get('/payouts', partnerController.listPayoutRequests);
+router.get('/earnings',            partnerController.getEarnings);
+router.post('/payouts',            partnerController.requestPayout);
+router.get('/payouts',             partnerController.listPayoutRequests);
 
 // KYC / verification documents
-router.get('/documents', documentController.listDocuments);
-router.post('/documents', docUpload.single('file'), documentController.uploadDocument);
-router.delete('/documents/:id', documentController.deleteDocument);
+// NOTE: specific routes must come before /:id to avoid conflicts
+router.get('/documents/types',             documentController.listDocumentTypes);
+router.get('/documents',                   documentController.listDocuments);
+router.post('/documents',                  docUpload.single('file'), documentController.uploadDocument);
+router.get('/documents/:docType/history',  documentController.getDocumentHistory);
+router.delete('/documents/:id',            documentController.deleteDocument);
 
 export default router;

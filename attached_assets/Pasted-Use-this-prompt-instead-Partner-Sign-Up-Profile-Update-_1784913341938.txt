@@ -1,0 +1,101 @@
+Use this prompt instead:
+
+---
+
+## Partner Sign Up & Profile Update – Add Urban Company Style Document Verification
+
+The Partner Web App and Mobile App are already built. **Do not redesign, rebuild, or change the existing UI or workflow.** Only enhance the existing Partner Sign Up and Profile Update functionality by adding a complete document management and verification system similar to Urban Company.
+
+### Sign Up
+
+During partner registration, add a **Documents** step where partners can upload the required verification documents.
+
+Mandatory documents (configurable from Admin):
+
+* Aadhaar Card (Front & Back)
+* PAN Card
+* Bank Passbook or Cancelled Cheque
+* Profile Photo
+
+Optional documents (configurable):
+
+* Driving License
+* Police Verification Certificate
+* GST Certificate
+* Trade License
+* Experience/Skill Certificates
+* Any other document defined by Admin
+
+Each document should support:
+
+* Upload from device
+* Drag & drop (Web)
+* Camera/Gallery (Mobile)
+* Image or PDF upload
+* Preview before submission
+* Replace uploaded document
+* Delete before final submission
+* Upload progress indicator
+* File type and size validation
+
+### Profile Update
+
+Partners should be able to update their documents anytime from their profile.
+
+When a document is replaced:
+
+* Keep the previous version in history.
+* The new document should be marked **Pending Verification**.
+* The old approved document remains valid until the new one is reviewed (configurable).
+
+### Document Verification Status
+
+Each document should display a status:
+
+* Pending
+* Under Review
+* Approved
+* Rejected
+* Re-upload Required
+* Expired
+
+Show the status with clear badges/icons.
+
+### Admin Verification
+
+The Admin Panel should allow administrators to:
+
+* View uploaded documents.
+* Preview images/PDFs.
+* Approve documents.
+* Reject documents.
+* Request re-upload with a mandatory rejection reason.
+* View document history and previous uploads.
+* See upload date, verification date, and verifier.
+
+### Partner Notifications
+
+Notify the partner whenever:
+
+* A document is approved.
+* A document is rejected.
+* A re-upload is requested.
+* All mandatory documents are verified.
+
+Display these notifications in the app and through the existing notification system.
+
+### Business Rules
+
+* Partners can complete registration even if documents are pending.
+* Partners **cannot receive or accept service bookings until all mandatory documents are approved** (configurable).
+* If an approved document expires, the partner should be prompted to upload a new one and, if required by business rules, be temporarily restricted from accepting new jobs until re-approved.
+
+### Technical Requirements
+
+* Integrate with the existing React Web App, Mobile App, backend, authentication, and database.
+* Reuse existing components and styling.
+* Do not break any existing functionality.
+* Store document metadata (type, upload date, status, remarks, version history).
+* Make mandatory documents configurable from the Admin Panel so new document types can be added in the future without code changes.
+
+**Important:** This is an enhancement to the existing application only. Do not redesign the application or modify unrelated features. Preserve the current UI/UX and architecture while seamlessly integrating this functionality.

@@ -9,6 +9,7 @@ import { getSettings, upsertSettings, testEmail } from '../controllers/platformS
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { serviceController } from '../controllers/service.controller.js';
+import { documentController } from '../controllers/document.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
@@ -105,5 +106,16 @@ router.delete('/services/:id', serviceController.adminDelete);
 router.get('/settings/:key',        getSettings);
 router.put('/settings/:key',        upsertSettings);
 router.post('/settings/email/test', testEmail);
+
+// Partner document review (admin)
+router.get('/documents',                    documentController.adminListDocuments);
+router.get('/documents/:id/history',        documentController.adminGetDocumentHistory);
+router.patch('/documents/:id/status',       documentController.adminUpdateStatus);
+
+// Document type configuration (admin)
+router.get('/document-types',               documentController.adminListDocumentTypes);
+router.post('/document-types',              documentController.adminCreateDocumentType);
+router.patch('/document-types/:id',         documentController.adminUpdateDocumentType);
+router.delete('/document-types/:id',        documentController.adminDeleteDocumentType);
 
 export default router;

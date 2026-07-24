@@ -449,6 +449,70 @@ export async function runMigrations() {
   await run('index: partner_documents_professional',
     `CREATE INDEX IF NOT EXISTS idx_partner_docs_professional ON partner_documents(professional_id)`);
 
+  // ── Document verification enhancements ─────────────────────────────────
+  await run('column: partner_documents.reviewed_by',
+    `ALTER TABLE partner_documents ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+  await run('column: partner_documents.version',
+    `ALTER TABLE partner_documents ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1`);
+  await run('column: partner_documents.expiry_date',
+    `ALTER TABLE partner_documents ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMPTZ`);
+
+  await run('table: document_type_configs', `
+    CREATE TABLE IF NOT EXISTS document_type_configs (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      type_key    VARCHAR(64) NOT NULL UNIQUE,
+      label       VARCHAR(255) NOT NULL,
+      description TEXT,
+      emoji       VARCHAR(16) NOT NULL DEFAULT '📄',
+      is_mandatory BOOLEAN NOT NULL DEFAULT true,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      is_active   BOOLEAN NOT NULL DEFAULT true,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: document_type_configs_key',
+    `CREATE INDEX IF NOT EXISTS idx_doc_type_configs_key ON document_type_configs(type_key)`);
+
+  await run('table: partner_document_history', `
+    CREATE TABLE IF NOT EXISTS partner_document_history (
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      professional_id UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      document_type   VARCHAR(64) NOT NULL,
+      document_url    TEXT NOT NULL,
+      file_name       VARCHAR(255),
+      status          VARCHAR(20) NOT NULL,
+      rejection_reason TEXT,
+      reviewed_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+      version         INTEGER NOT NULL DEFAULT 1,
+      uploaded_at     TIMESTAMPTZ NOT NULL,
+      reviewed_at     TIMESTAMPTZ,
+      archived_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: partner_document_history_pro',
+    `CREATE INDEX IF NOT EXISTS idx_pdh_professional ON partner_document_history(professional_id)`);
+  await run('index: partner_document_history_type',
+    `CREATE INDEX IF NOT EXISTS idx_pdh_type ON partner_document_history(professional_id, document_type)`);
+
+  // Seed default document types (idempotent)
+  const defaultTypes = [
+    { key: 'aadhaar_front',       label: 'Aadhaar Card (Front)',     desc: 'Front side of your Aadhaar card',           emoji: '🪪', mandatory: true,  order: 1  },
+    { key: 'aadhaar_back',        label: 'Aadhaar Card (Back)',      desc: 'Back side of your Aadhaar card',            emoji: '🪪', mandatory: true,  order: 2  },
+    { key: 'pan_card',            label: 'PAN Card',                 desc: 'Your PAN card (Income Tax ID)',              emoji: '💳', mandatory: true,  order: 3  },
+    { key: 'bank_passbook',       label: 'Bank Passbook / Cheque',   desc: 'Cancelled cheque or passbook first page',   emoji: '🏦', mandatory: true,  order: 4  },
+    { key: 'profile_photo',       label: 'Profile Photo',            desc: 'Clear passport-size face photo',            emoji: '📸', mandatory: true,  order: 5  },
+    { key: 'driving_license',     label: 'Driving License',          desc: 'Valid driving license',                     emoji: '🚗', mandatory: false, order: 6  },
+    { key: 'police_verification', label: 'Police Verification',      desc: 'Police clearance certificate',              emoji: '👮', mandatory: false, order: 7  },
+    { key: 'gst_certificate',     label: 'GST Certificate',          desc: 'GST registration certificate',              emoji: '📋', mandatory: false, order: 8  },
+    { key: 'trade_license',       label: 'Trade License',            desc: 'Trade or business license',                 emoji: '🏪', mandatory: false, order: 9  },
+    { key: 'service_certificate', label: 'Service Certificate',      desc: 'Skill certificate or trade diploma',        emoji: '🎓', mandatory: false, order: 10 },
+  ];
+  for (const dt of defaultTypes) {
+    await run(`seed: document_type ${dt.key}`,
+      `INSERT INTO document_type_configs (type_key, label, description, emoji, is_mandatory, sort_order)
+       VALUES ('${dt.key}', '${dt.label.replace(/'/g, "''")}', '${dt.desc.replace(/'/g, "''")}', '${dt.emoji}', ${dt.mandatory}, ${dt.order})
+       ON CONFLICT (type_key) DO NOTHING`);
+  }
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

@@ -8,6 +8,7 @@ import {
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
+  AlertCircle, History as HistoryIcon,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
@@ -15,6 +16,7 @@ import type {
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
   DispatchRequestRow, EligiblePartner,
+  PartnerDocumentRow, PartnerDocumentHistoryRow, DocumentTypeConfigRow, DocumentStatus,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -273,6 +275,7 @@ const ADMIN_SIDEBAR = [
   { id: "payment-config", icon: CreditCard,  label: "Payment Config"    },
   { id: "email-config",   icon: Mail,        label: "Email Config"      },
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config"        },
+  { id: "documents",      icon: ShieldCheck, label: "Document Verification" },
   { id: "settings",       icon: Settings,    label: "Settings"          },
 ];
 

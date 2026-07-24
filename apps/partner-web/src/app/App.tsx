@@ -4,12 +4,13 @@ import {
   LogOut, CheckCircle, Clock, XCircle, Loader2, TrendingUp,
   Star, RefreshCw, X, Check, AlertCircle, Pencil, Lock,
   Calendar, Phone, FileText, Menu, BarChart2, Zap,
-  Upload, Shield, ChevronRight, ArrowLeft, Eye, Trash2,
+  Upload, Shield, ChevronRight, ArrowLeft, Eye, Trash2, History as HistoryIcon,
 } from 'lucide-react';
 import {
   authApi, partnerApi, notificationsApi, categoriesApi, payoutsApi, documentsApi, setRefreshHandler,
   type Job, type JobStatus, type Earnings, type PartnerProfile, type Category,
   type AppNotification, type AuthTokens, type Payout, type PartnerDocument,
+  type DocumentTypeConfig, type PartnerDocumentHistory,
 } from '@/lib/api';
 
 /* ─── Design tokens (exact match to admin panel) ──────────────────── */

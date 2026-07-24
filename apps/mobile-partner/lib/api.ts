@@ -262,6 +262,92 @@ export const partnerApi = {
     request<Earnings>('/api/partner/earnings', { token }),
 };
 
+// ── Documents ──────────────────────────────────────────────
+export type DocumentStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 're_upload_required' | 'expired';
+
+export interface DocumentTypeConfig {
+  id: string;
+  type_key: string;
+  label: string;
+  description: string | null;
+  emoji: string;
+  is_mandatory: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface PartnerDocument {
+  id: string;
+  document_type: string;
+  document_url: string;
+  file_name: string | null;
+  status: DocumentStatus;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  version: number;
+  expiry_date: string | null;
+  uploaded_at: string;
+  reviewed_at: string | null;
+}
+
+export interface PartnerDocumentHistory {
+  id: string;
+  document_type: string;
+  document_url: string;
+  file_name: string | null;
+  status: DocumentStatus;
+  rejection_reason: string | null;
+  version: number;
+  uploaded_at: string;
+  reviewed_at: string | null;
+  archived_at: string;
+}
+
+async function uploadDocument<T>(
+  path: string,
+  fields: Record<string, string>,
+  uri: string,
+  mimeType: string,
+  token: string,
+): Promise<T> {
+  const formData = new FormData();
+  Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+  if (Platform.OS === 'web') {
+    const blobRes = await fetch(uri);
+    const blob = await blobRes.blob();
+    const name = uri.split('/').pop() ?? 'document';
+    formData.append('file', blob, name);
+  } else {
+    const name = uri.split('/').pop() ?? 'document';
+    formData.append('file', { uri, name, type: mimeType } as any);
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, json?.error?.message ?? 'Upload failed');
+  return json.data as T;
+}
+
+export const documentsApi = {
+  listTypes: (token: string) =>
+    request<DocumentTypeConfig[]>('/api/partner/documents/types', { token }),
+
+  list: (token: string) =>
+    request<PartnerDocument[]>('/api/partner/documents', { token }),
+
+  getHistory: (docType: string, token: string) =>
+    request<PartnerDocumentHistory[]>(`/api/partner/documents/${encodeURIComponent(docType)}/history`, { token }),
+
+  upload: (documentType: string, uri: string, mimeType: string, token: string) =>
+    uploadDocument<PartnerDocument>('/api/partner/documents', { documentType }, uri, mimeType, token),
+
+  delete: (id: string, token: string) =>
+    request<{ message: string }>(`/api/partner/documents/${id}`, { method: 'DELETE', token }),
+};
+
 // ── Notifications ──────────────────────────────────────────
 export interface AppNotification {
   id: string;

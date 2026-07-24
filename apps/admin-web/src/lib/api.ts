@@ -275,6 +275,52 @@ export interface EligiblePartner {
   currentBookingStatus: string;
 }
 
+export type DocumentStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 're_upload_required' | 'expired';
+
+export interface PartnerDocumentRow {
+  id: string;
+  professional_id: string;
+  document_type: string;
+  document_url: string;
+  file_name: string | null;
+  status: DocumentStatus;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewer_name: string | null;
+  version: number;
+  expiry_date: string | null;
+  uploaded_at: string;
+  reviewed_at: string | null;
+  partner_name: string;
+  partner_email: string | null;
+}
+
+export interface PartnerDocumentHistoryRow {
+  id: string;
+  document_type: string;
+  document_url: string;
+  file_name: string | null;
+  status: DocumentStatus;
+  rejection_reason: string | null;
+  version: number;
+  uploaded_at: string;
+  reviewed_at: string | null;
+  archived_at: string;
+}
+
+export interface DocumentTypeConfigRow {
+  id: string;
+  type_key: string;
+  label: string;
+  description: string | null;
+  emoji: string;
+  is_mandatory: boolean;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ServiceInput = {
   name: string;
   categoryId: string;
@@ -583,4 +629,34 @@ export const adminApi = {
     request<{ message: string }>('/notifications/read-all', { method: 'PATCH', token }),
   deleteNotification: (id: string, token: string) =>
     request<{ message: string }>(`/notifications/${id}`, { method: 'DELETE', token }),
+
+  // Partner document review
+  getDocuments: (token: string, params?: { status?: string; proId?: string }) => {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString()
+      : '';
+    return request<PartnerDocumentRow[]>(`/admin/documents${qs}`, { token });
+  },
+  getDocumentHistory: (docId: string, token: string) =>
+    request<PartnerDocumentHistoryRow[]>(`/admin/documents/${docId}/history`, { token }),
+  updateDocumentStatus: (docId: string, status: string, reason: string | null, token: string) =>
+    request<{ id: string; status: string }>(`/admin/documents/${docId}/status`, {
+      method: 'PATCH', token, body: JSON.stringify({ status, reason }),
+    }),
+
+  // Document type configuration
+  getDocumentTypes: (token: string) =>
+    request<DocumentTypeConfigRow[]>('/admin/document-types', { token }),
+  createDocumentType: (data: {
+    typeKey: string; label: string; description?: string;
+    emoji?: string; isMandatory?: boolean; sortOrder?: number;
+  }, token: string) =>
+    request<DocumentTypeConfigRow>('/admin/document-types', { method: 'POST', token, body: JSON.stringify(data) }),
+  updateDocumentType: (id: string, data: Partial<{
+    label: string; description: string; emoji: string;
+    isMandatory: boolean; sortOrder: number; isActive: boolean;
+  }>, token: string) =>
+    request<DocumentTypeConfigRow>(`/admin/document-types/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  deleteDocumentType: (id: string, token: string) =>
+    request<{ message: string }>(`/admin/document-types/${id}`, { method: 'DELETE', token }),
 };

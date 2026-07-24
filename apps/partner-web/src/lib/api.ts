@@ -105,15 +105,44 @@ export const categoriesApi = {
     request<SubCategory[]>(`/api/categories/${categoryId}/subcategories`),
 };
 
+export type DocumentStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 're_upload_required' | 'expired';
+
 export interface PartnerDocument {
   id: string;
   document_type: string;
   document_url: string;
   file_name: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: DocumentStatus;
   rejection_reason: string | null;
+  reviewed_by: string | null;
+  version: number;
+  expiry_date: string | null;
   uploaded_at: string;
   reviewed_at: string | null;
+}
+
+export interface DocumentTypeConfig {
+  id: string;
+  type_key: string;
+  label: string;
+  description: string | null;
+  emoji: string;
+  is_mandatory: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface PartnerDocumentHistory {
+  id: string;
+  document_type: string;
+  document_url: string;
+  file_name: string | null;
+  status: DocumentStatus;
+  rejection_reason: string | null;
+  version: number;
+  uploaded_at: string;
+  reviewed_at: string | null;
+  archived_at: string;
 }
 
 export interface RegisterPartnerResponse { userId: string; email: string; devCode?: string; }
@@ -165,19 +194,34 @@ export const payoutsApi = {
 };
 
 export const documentsApi = {
-  list: (token: string) => request<PartnerDocument[]>('/api/partner/documents', { token }),
-  upload: (documentType: string, file: File, token: string): Promise<PartnerDocument> => {
-    const form = new FormData();
-    form.append('documentType', documentType);
-    form.append('file', file);
-    return fetch('/api/partner/documents', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    }).then(async r => {
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new ApiError(r.status, j?.error?.message ?? 'Upload failed');
-      return j.data as PartnerDocument;
+  listTypes: (token: string) =>
+    request<DocumentTypeConfig[]>('/api/partner/documents/types', { token }),
+  list: (token: string) =>
+    request<PartnerDocument[]>('/api/partner/documents', { token }),
+  getHistory: (docType: string, token: string) =>
+    request<PartnerDocumentHistory[]>(`/api/partner/documents/${encodeURIComponent(docType)}/history`, { token }),
+  upload: (documentType: string, file: File, token: string, onProgress?: (pct: number) => void): Promise<PartnerDocument> => {
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append('documentType', documentType);
+      form.append('file', file);
+      const xhr = new XMLHttpRequest();
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', e => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        });
+      }
+      xhr.open('POST', '/api/partner/documents');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.onload = () => {
+        try {
+          const j = JSON.parse(xhr.responseText);
+          if (xhr.status >= 400) { reject(new ApiError(xhr.status, j?.error?.message ?? 'Upload failed')); return; }
+          resolve(j.data as PartnerDocument);
+        } catch { reject(new ApiError(xhr.status, 'Upload failed')); }
+      };
+      xhr.onerror = () => reject(new ApiError(0, 'Network error'));
+      xhr.send(form);
     });
   },
   delete: (id: string, token: string) =>
