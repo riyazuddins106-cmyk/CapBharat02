@@ -1151,7 +1151,7 @@ function CustHome({
       <div className="px-5 mt-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-foreground">Our Services</h2>
-          <button className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>See all</button>
+          <button className="text-xs font-semibold" style={{ color: "#5B3EF5" }} onClick={() => onCategorySelect("")}>See all</button>
         </div>
         {categories.length === 0 ? (
           <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3 animate-pulse">
@@ -2359,6 +2359,173 @@ const CUST_TABS = [
 
 const LOC_KEY = "sn_location";
 
+/* ── Sidebar (module-level — prevents full remount on every CustomerApp re-render) ── */
+interface AppSidebarProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  location: string;
+  onLocationPress: () => void;
+  isLoggedIn: boolean;
+  user: ApiUser | null;
+  onLogout: () => void;
+}
+function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLoggedIn, user, onLogout }: AppSidebarProps) {
+  return (
+    <aside className="flex flex-col flex-shrink-0"
+      style={{ width: 220, background: "linear-gradient(180deg,#5b3ef5 0%,#4424b4 100%)" }}>
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-white/[0.12]">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/20">
+            <Sparkles size={20} color="white" />
+          </div>
+          <div>
+            <p className="text-white font-bold text-sm leading-tight">ServeNow</p>
+            <p className="text-white/60 text-xs">Customer Portal</p>
+          </div>
+        </div>
+      </div>
+      {/* Nav */}
+      <nav className="flex-1 p-3 flex flex-col gap-1">
+        {CUST_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left"
+              style={{
+                background: active ? "rgba(255,255,255,0.18)" : "transparent",
+                color:      active ? "#ffffff"                 : "rgba(255,255,255,0.65)",
+              }}>
+              <Icon size={18} />
+              {tab.label}
+            </button>
+          );
+        })}
+        {/* Location shortcut */}
+        <button onClick={onLocationPress}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mt-1"
+          style={{ color: "rgba(255,255,255,0.5)" }}>
+          <MapPin size={18} />
+          <span className="truncate max-w-[120px]">{location}</span>
+        </button>
+      </nav>
+      {/* User footer */}
+      <div className="p-4 border-t border-white/[0.12]">
+        {isLoggedIn && user ? (
+          <>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#5b3ef5] bg-white flex-shrink-0">
+                {user.fullName?.[0]?.toUpperCase() ?? "U"}
+              </div>
+              <div className="min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{user.fullName}</p>
+                <p className="text-white/60 text-[10px]">Active</p>
+              </div>
+            </div>
+            <button onClick={onLogout}
+              className="flex items-center gap-2 text-white/60 hover:text-white text-xs font-semibold transition-colors">
+              <LogOut size={14} /> Sign out
+            </button>
+          </>
+        ) : (
+          <button onClick={() => onTabChange("profile")}
+            className="w-full py-2.5 rounded-xl text-sm font-bold transition-opacity hover:opacity-90 bg-white"
+            style={{ color: "#5b3ef5" }}>
+            Sign in
+          </button>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+/* ── Shell (module-level — prevents full remount on every CustomerApp re-render) ── */
+interface AppShellProps {
+  title: string;
+  children: React.ReactNode;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  location: string;
+  onLocationPress: () => void;
+  isLoggedIn: boolean;
+  user: ApiUser | null;
+  onLogout: () => void;
+  cartCount: number;
+  onCartOpen: () => void;
+  cartOpen: boolean;
+  cart: ApiCart;
+  onCartClose: () => void;
+  onCartChange: (c: ApiCart) => void;
+  locationPickerOpen: boolean;
+  addresses: ApiAddress[];
+  onLocationSelect: (loc: string) => void;
+  onLocationPickerClose: () => void;
+}
+function AppShell({
+  title, children,
+  activeTab, onTabChange, location, onLocationPress, isLoggedIn, user, onLogout,
+  cartCount, onCartOpen,
+  cartOpen, cart, onCartClose, onCartChange,
+  locationPickerOpen, addresses, onLocationSelect, onLocationPickerClose,
+}: AppShellProps) {
+  return (
+    <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#f7f8fa" }}>
+      <AppSidebar
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        location={location}
+        onLocationPress={onLocationPress}
+        isLoggedIn={isLoggedIn}
+        user={user}
+        onLogout={onLogout}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.07] flex-shrink-0 bg-white">
+          <div>
+            <h1 className="font-bold text-xl" style={{ color: "#0f1117" }}>{title}</h1>
+            <p className="text-gray-400 text-sm">ServeNow Customer</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {cartCount > 0 && (
+              <button onClick={onCartOpen}
+                className="relative flex items-center justify-center w-9 h-9 rounded-xl"
+                style={{ background: "rgba(91,62,245,0.10)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B3EF5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-black text-white flex items-center justify-center"
+                  style={{ background: "#5B3EF5" }}>
+                  {cartCount}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Scrollable content */}
+        <main className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "none", background: "#f7f8fa" }}>
+          {children}
+        </main>
+      </div>
+      {/* Modals */}
+      {cartOpen && (
+        <CheckoutFlow cart={cart} onClose={onCartClose} onChange={onCartChange} />
+      )}
+      {locationPickerOpen && (
+        <LocationPickerModal
+          current={location}
+          addresses={addresses}
+          onSelect={onLocationSelect}
+          onClose={onLocationPickerClose}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function CustomerApp() {
   // Auth
   const [user, setUser] = useState<ApiUser | null>(() => auth.getUser());
@@ -2488,7 +2655,6 @@ export default function CustomerApp() {
 
   const cartCount = cart.items.reduce((n, i) => n + i.quantity, 0);
 
-  /* ── Shared top navbar ── */
   const PAGE_TITLE: Record<string, string> = {
     home:     "Home",
     services: "Services",
@@ -2496,161 +2662,57 @@ export default function CustomerApp() {
     profile:  "Profile",
   };
 
-  const ACCENT = "linear-gradient(135deg,#5b3ef5,#7c5bf8)";
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    setProfileScreen("main");
+  }, []);
 
-  /* ── Shared sidebar ── */
-  const Sidebar = () => (
-    <aside className="flex flex-col flex-shrink-0"
-      style={{ width: 220, background: "linear-gradient(180deg,#5b3ef5 0%,#4424b4 100%)" }}>
-
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/[0.12]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/20">
-            <Sparkles size={20} color="white" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-tight">ServeNow</p>
-            <p className="text-white/60 text-xs">Customer Portal</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 p-3 flex flex-col gap-1">
-        {CUST_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setProfileScreen("main"); }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left"
-              style={{
-                background: active ? "rgba(255,255,255,0.18)" : "transparent",
-                color:      active ? "#ffffff"                 : "rgba(255,255,255,0.65)",
-              }}>
-              <Icon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
-
-        {/* Location shortcut */}
-        <button onClick={() => setShowLocationPicker(true)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mt-1"
-          style={{ color: "rgba(255,255,255,0.5)" }}>
-          <MapPin size={18} />
-          <span className="truncate max-w-[120px]">{location}</span>
-        </button>
-      </nav>
-
-      {/* User footer */}
-      <div className="p-4 border-t border-white/[0.12]">
-        {isLoggedIn && user ? (
-          <>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#5b3ef5] bg-white flex-shrink-0">
-                {user.fullName?.[0]?.toUpperCase() ?? "U"}
-              </div>
-              <div className="min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{user.fullName}</p>
-                <p className="text-white/60 text-[10px]">Active</p>
-              </div>
-            </div>
-            <button onClick={handleLogout}
-              className="flex items-center gap-2 text-white/60 hover:text-white text-xs font-semibold transition-colors">
-              <LogOut size={14} /> Sign out
-            </button>
-          </>
-        ) : (
-          <button onClick={() => setActiveTab("profile")}
-            className="w-full py-2.5 rounded-xl text-sm font-bold transition-opacity hover:opacity-90 bg-white"
-            style={{ color: "#5b3ef5" }}>
-            Sign in
-          </button>
-        )}
-      </div>
-    </aside>
-  );
-
-  /* ── Shared shell ── */
-  const Shell = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#f7f8fa" }}>
-      <Sidebar />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.07] flex-shrink-0 bg-white">
-          <div>
-            <h1 className="font-bold text-xl" style={{ color: "#0f1117" }}>{title}</h1>
-            <p className="text-gray-400 text-sm">ServeNow Customer</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Cart */}
-            {cartCount > 0 && (
-              <button onClick={() => setCartGlobalOpen(true)}
-                className="relative flex items-center justify-center w-9 h-9 rounded-xl"
-                style={{ background: "rgba(91,62,245,0.10)" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B3EF5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-black text-white flex items-center justify-center"
-                  style={{ background: "#5B3EF5" }}>
-                  {cartCount}
-                </span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "none", background: "#f7f8fa" }}>
-          {children}
-        </main>
-      </div>
-
-      {/* Modals */}
-      {cartGlobalOpen && (
-        <CheckoutFlow cart={cart} onClose={() => setCartGlobalOpen(false)} onChange={setCart} />
-      )}
-      {showLocationPicker && (
-        <LocationPickerModal
-          current={location}
-          addresses={addresses}
-          onSelect={handleSelectLocation}
-          onClose={() => setShowLocationPicker(false)}
-        />
-      )}
-    </div>
-  );
+  const shellProps = {
+    activeTab,
+    onTabChange: handleTabChange,
+    location,
+    onLocationPress: () => setShowLocationPicker(true),
+    isLoggedIn,
+    user,
+    onLogout: handleLogout,
+    cartCount,
+    onCartOpen: () => setCartGlobalOpen(true),
+    cartOpen: cartGlobalOpen,
+    cart,
+    onCartClose: () => setCartGlobalOpen(false),
+    onCartChange: setCart,
+    locationPickerOpen: showLocationPicker,
+    addresses,
+    onLocationSelect: handleSelectLocation,
+    onLocationPickerClose: () => setShowLocationPicker(false),
+  };
 
   /* ── Login gate ── */
   if (!isLoggedIn && (activeTab === "bookings" || activeTab === "profile")) {
     return (
-      <Shell title="Sign In">
+      <AppShell title="Sign In" {...shellProps}>
         <div className="max-w-sm mx-auto">
           <LoginScreen onLogin={handleLogin} />
         </div>
-      </Shell>
+      </AppShell>
     );
   }
 
   /* ── Addresses sub-screen ── */
   if (activeTab === "profile" && profileScreen === "addresses" && user) {
     return (
-      <Shell title="Saved Addresses">
+      <AppShell title="Saved Addresses" {...shellProps}>
         <SavedAddressesScreen
           addresses={addresses}
           onBack={() => setProfileScreen("main")}
           onChange={setAddresses}
         />
-      </Shell>
+      </AppShell>
     );
   }
 
   return (
-    <Shell title={PAGE_TITLE[activeTab] ?? "Home"}>
+    <AppShell title={PAGE_TITLE[activeTab] ?? "Home"} {...shellProps}>
       {activeTab === "home" && (
         <CustHome
           featuredServices={featuredServices}
@@ -2696,6 +2758,6 @@ export default function CustomerApp() {
           }}
         />
       )}
-    </Shell>
+    </AppShell>
   );
 }
