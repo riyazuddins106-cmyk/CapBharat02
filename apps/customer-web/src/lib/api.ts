@@ -203,6 +203,10 @@ export const profileApi = {
     const { data } = await client.patch('/profile/me', payload);
     return data.data as ApiUser;
   },
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    await client.post('/profile/me/change-password', { currentPassword, newPassword });
+  },
 };
 
 // ─── Categories API ──────────────────────────────────────────────────────────
@@ -395,6 +399,36 @@ export const reelsApi = {
   async listActive() {
     const { data } = await client.get('/reels');
     return data.data as ApiReel[];
+  },
+};
+
+// ─── Notifications API ────────────────────────────────────────────────────────
+export interface ApiNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export const notificationsApi = {
+  async list() {
+    const { data } = await client.get('/notifications');
+    return data.data as ApiNotification[];
+  },
+  async markRead(id: string) {
+    await client.patch(`/notifications/${id}/read`);
+  },
+  async markAllRead() {
+    await client.patch('/notifications/read-all');
+  },
+  async delete(id: string) {
+    await client.delete(`/notifications/${id}`);
+  },
+  async unreadCount() {
+    const { data } = await client.get('/notifications/unread-count');
+    return data.data as { count: number };
   },
 };
 

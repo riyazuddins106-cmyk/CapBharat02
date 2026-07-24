@@ -335,6 +335,9 @@ function Jobs({ token }: { token: string }) {
   const [loading,   setLoading]   = useState(true);
   const [selected,  setSelected]  = useState<Job | null>(null);
   const [completing,setCompleting]= useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [checkingIn,setCheckingIn]= useState(false);
   const [filter,    setFilter]    = useState<JobStatus | 'all'>('all');
 
   const load = useCallback(async () => {
@@ -349,6 +352,30 @@ function Jobs({ token }: { token: string }) {
       const j = await partnerApi.completeJob(id, token);
       setJobs(prev => prev.map(x => x.id === id ? j : x)); setSelected(j);
     } finally { setCompleting(false); }
+  }
+
+  async function accept(id: string) {
+    setAccepting(true);
+    try {
+      const j = await partnerApi.acceptJob(id, token);
+      setJobs(prev => prev.map(x => x.id === id ? j : x)); setSelected(j);
+    } finally { setAccepting(false); }
+  }
+
+  async function reject(id: string) {
+    setRejecting(true);
+    try {
+      const j = await partnerApi.rejectJob(id, token);
+      setJobs(prev => prev.map(x => x.id === id ? j : x)); setSelected(j);
+    } finally { setRejecting(false); }
+  }
+
+  async function checkin(id: string) {
+    setCheckingIn(true);
+    try {
+      const j = await partnerApi.checkinJob(id, token);
+      setJobs(prev => prev.map(x => x.id === id ? j : x)); setSelected(j);
+    } finally { setCheckingIn(false); }
   }
 
   const statuses: (JobStatus | 'all')[] = ['all', 'upcoming', 'in_progress', 'pending', 'completed', 'cancelled'];
@@ -443,6 +470,25 @@ function Jobs({ token }: { token: string }) {
               <div className="rounded-xl p-3 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <p className="text-white/40 text-xs mb-1">Notes</p>
                 <p className="text-white text-sm leading-relaxed">{selected.notes}</p>
+              </div>
+            )}
+            {selected.status === 'pending' && (
+              <div className="flex gap-3 mt-2">
+                <PrimaryBtn loading={accepting} onClick={() => accept(selected.id)} className="flex-1 justify-center">
+                  <Check size={14}/> Accept Job
+                </PrimaryBtn>
+                <button onClick={() => reject(selected.id)} disabled={rejecting}
+                  className="flex-1 py-2.5 rounded-xl border text-sm font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 hover:bg-red-500/5"
+                  style={{ borderColor: 'rgba(239,68,68,0.35)', color: '#EF4444' }}>
+                  {rejecting ? <Loader2 size={14} className="animate-spin"/> : <XCircle size={14}/>} Reject
+                </button>
+              </div>
+            )}
+            {selected.status === 'upcoming' && (
+              <div className="flex gap-3 mt-2">
+                <PrimaryBtn loading={checkingIn} onClick={() => checkin(selected.id)} className="flex-1 justify-center">
+                  <TrendingUp size={14}/> Check In / Start Job
+                </PrimaryBtn>
               </div>
             )}
             {selected.status === 'in_progress' && (

@@ -123,6 +123,12 @@ export const partnerApi = {
   getJob: (id: string, token: string) => request<Job>(`/api/partner/jobs/${id}`, { token }),
   completeJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/complete`, { method: 'PATCH', token }),
+  acceptJob: (id: string, token: string) =>
+    request<Job>(`/api/partner/jobs/${id}/accept`, { method: 'PATCH', token }),
+  rejectJob: (id: string, token: string) =>
+    request<Job>(`/api/partner/jobs/${id}/reject`, { method: 'PATCH', token }),
+  checkinJob: (id: string, token: string) =>
+    request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', token }),
   getEarnings: (token: string) => request<Earnings>('/api/partner/earnings', { token }),
 };
 
