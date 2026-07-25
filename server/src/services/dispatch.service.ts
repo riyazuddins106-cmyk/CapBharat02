@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import {
-  bookingAssignmentLogs, bookingPartnerRequests, bookings, professionals, partnerServices,
-  services, users, addresses,
+  bookingAssignmentLogs, bookingItems, bookingPartnerRequests, bookings, professionals, partnerServices,
+  users, addresses,
 } from '../database/schema/index.js';
 
 const MAX_RADIUS_KM = 30;
@@ -152,14 +152,23 @@ export const dispatchService = {
   async eligiblePartners(bookingId: string) {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
     if (!booking) throw AppError.notFound('Booking not found.');
-    const [firstItem] = await db.select({ serviceId: services.id }).from(services)
-      .where(eq(services.name, booking.serviceName)).limit(1);
+
+    // Derive eligible service IDs from booking_items (handles single and multi-item bookings).
+    // Fallback: if no items found, return all active partners so admin always has options.
+    const items = await db.select({ serviceId: bookingItems.serviceId })
+      .from(bookingItems)
+      .where(eq(bookingItems.bookingId, bookingId));
+
     // Return ALL active partners (any status) so admin can see who's busy/free and decide
     const rows = await db.select({ pro: professionals })
       .from(professionals)
       .where(and(eq(professionals.isActive, true), isNull(professionals.deletedAt)));
-    if (!firstItem) return rows.map(({ pro }) => pro);
-    const mapped = await db.select({ partnerId: partnerServices.partnerId }).from(partnerServices).where(eq(partnerServices.serviceId, firstItem.serviceId));
+    if (!items.length) return rows.map(({ pro }) => pro);
+
+    // A partner is eligible if they offer ANY of the booked services
+    const serviceIdList = items.map((i) => i.serviceId);
+    const mapped = await db.select({ partnerId: partnerServices.partnerId }).from(partnerServices)
+      .where(inArray(partnerServices.serviceId, serviceIdList));
     const ids = new Set(mapped.map((r) => r.partnerId));
     // Sort: available first, then busy, then offline
     const filtered = rows.filter(({ pro }) => ids.has(pro.id)).map(({ pro }) => pro);

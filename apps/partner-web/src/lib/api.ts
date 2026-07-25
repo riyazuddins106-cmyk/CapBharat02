@@ -155,12 +155,17 @@ export const authApi = {
     request<RegisterPartnerResponse>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
   verifyOtp: (email: string, code: string, purpose: 'signup' | 'login' | 'password_reset') =>
     request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, code, purpose }) }),
-  resendOtp: (email: string) =>
-    request<{ message: string }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email }) }),
+  resendOtp: (email: string, purpose: 'signup' | 'login' | 'password_reset') =>
+    request<{ message: string }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email, purpose }) }),
   refresh: (refreshToken: string) =>
     request<AuthTokens>('/api/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
-  logout: (token: string) =>
-    request<void>('/api/auth/logout', { method: 'POST', token }),
+  // Server expects { refreshToken } in body, not a Bearer header
+  logout: (refreshToken: string) =>
+    request<void>('/api/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
+  forgotPassword: (email: string) =>
+    request<{ message: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    request<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, code, newPassword }) }),
 };
 
 // ── Partner ────────────────────────────────────────────────

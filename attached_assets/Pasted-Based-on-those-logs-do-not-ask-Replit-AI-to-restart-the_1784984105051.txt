@@ -1,0 +1,207 @@
+Based on those logs, **do not ask Replit AI to restart the audit**. It has already spent 17+ minutes analyzing the project and has internal context about what it was fixing.
+
+Your next prompt should tell it to **continue from the current execution state**, verify the fixes, and then proceed with the remaining phases.
+
+Use this prompt:
+
+---
+
+# Continue From Current Audit State (Do Not Restart)
+
+You are currently in the middle of a complete end-to-end application audit and implementation.
+
+The previous audit has already:
+
+* Discovered the project structure.
+* Analyzed the architecture.
+* Identified issues.
+* Started implementing fixes.
+* Added new features.
+* Fixed TypeScript errors.
+* Updated APIs.
+* Modified frontend and backend code.
+* Worked on Admin, Partner, Customer, Mobile, and Server modules.
+
+**Do NOT restart the audit.**
+
+Do NOT repeat the discovery phase.
+
+Do NOT re-analyze files that have already been completed unless verification detects a regression.
+
+---
+
+## Step 1 — Analyze Current Progress
+
+Inspect the current project state and determine:
+
+* Which tasks are fully completed.
+* Which tasks are partially completed.
+* Which files were modified.
+* Which fixes are still pending.
+* Whether any compilation errors remain.
+* Whether any TODOs or placeholders still exist.
+
+Use the current codebase as the source of truth.
+
+---
+
+## Step 2 — Continue From Last Progress
+
+Resume exactly where the previous execution stopped.
+
+Continue implementing every remaining feature, fix, and integration that has not yet been completed.
+
+Do not skip any unfinished work.
+
+---
+
+## Step 3 — Verify Every Previous Fix
+
+For every change already implemented:
+
+* Verify it compiles.
+* Verify it works correctly.
+* Verify it is connected to the frontend.
+* Verify it is connected to the backend.
+* Verify it updates the database correctly.
+* Verify it does not introduce regressions.
+* Verify related modules remain synchronized.
+
+If a previous fix is incomplete, finish it before continuing.
+
+---
+
+## Step 4 — Continue the Remaining Audit
+
+Continue auditing every remaining module until completion.
+
+Inspect:
+
+* Frontend
+* Backend
+* Mobile Apps
+* Web Apps
+* Admin Panel
+* APIs
+* Database
+* Authentication
+* Authorization
+* Forms
+* Validation
+* Navigation
+* Notifications
+* Search
+* Filters
+* Reports
+* Dashboards
+* File Uploads
+* Workflows
+* Permissions
+* Performance
+* Security
+* Responsive Design
+
+Do not assume anything is correct.
+
+Verify everything.
+
+---
+
+## Step 5 — End-to-End Verification
+
+After each completed fix, verify the complete workflow from:
+
+User Interface
+
+↓
+
+API
+
+↓
+
+Business Logic
+
+↓
+
+Database
+
+↓
+
+Notifications
+
+↓
+
+Related Modules
+
+↓
+
+Reports
+
+↓
+
+Dashboards
+
+↓
+
+Mobile Apps
+
+↓
+
+Web Apps
+
+Ensure every workflow remains synchronized.
+
+---
+
+## Step 6 — Compile & Runtime Verification
+
+Before considering any task complete:
+
+* Resolve all TypeScript errors.
+* Resolve all build errors.
+* Resolve all lint issues (if configured).
+* Resolve runtime exceptions.
+* Remove unused imports.
+* Remove dead code.
+* Ensure the application compiles successfully.
+
+---
+
+## Step 7 — Continue Until 100% Complete
+
+Do not stop after fixing one issue.
+
+Continue automatically through every remaining module until:
+
+* Every discovered issue is resolved.
+* Every workflow has been verified.
+* Every feature is mapped correctly.
+* Every API is connected.
+* Every screen is functional.
+* Every database relationship is verified.
+* No unfinished implementations remain.
+
+---
+
+## Final Report
+
+Only after the audit is fully complete, generate a report showing:
+
+* Completed modules.
+* Fixed issues.
+* Remaining issues (if any).
+* Files modified.
+* Build status.
+* Production readiness status.
+* Overall completion percentage.
+
+## Critical Rules
+
+* **Do not restart from Phase 1.**
+* **Resume from the current codebase and current progress.**
+* **Do not duplicate work already completed.**
+* **Verify every previous fix before moving forward.**
+* **Continue automatically until the entire audit and implementation are complete.**
+* **If the work exceeds a single execution window, complete it in logical phases and preserve progress so the next continuation can resume seamlessly from the last completed task without redoing earlier work.**
+
+This prompt is tailored to the log you shared and tells Replit AI to pick up from its current state instead of wasting time rediscovering the project.

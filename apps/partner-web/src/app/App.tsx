@@ -152,7 +152,7 @@ function PageHeader({ title, subtitle, onRefresh }: {
 }
 
 /* ─── Auth Screen (Login + Register + OTP) ────────────────────────── */
-type AuthMode = 'login' | 'register' | 'otp' | 'docs';
+type AuthMode = 'login' | 'register' | 'otp' | 'docs' | 'forgot' | 'reset';
 
 function Logo() {
   return (
@@ -217,9 +217,15 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   useEffect(() => { categoriesApi.list().then(c => setCategories(c.filter((x: Category) => x.isActive))).catch(() => {}); }, []);
 
   // ── OTP state
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpCode,  setOtpCode]  = useState('');
-  const [resending, setResending] = useState(false);
+  const [otpEmail,   setOtpEmail]   = useState('');
+  const [otpCode,    setOtpCode]    = useState('');
+  const [otpPurpose, setOtpPurpose] = useState<'signup' | 'login' | 'password_reset'>('signup');
+  const [resending,  setResending]  = useState(false);
+
+  // ── Forgot / reset password state
+  const [forgotEmail,  setForgotEmail]  = useState('');
+  const [resetCode,    setResetCode]    = useState('');
+  const [resetNewPwd,  setResetNewPwd]  = useState('');
 
   // ── Shared
   const [err,     setErr]     = useState('');
@@ -247,7 +253,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     try {
       if (!regCatId) { setErr('Please select a service category.'); return; }
       await authApi.registerPartner({ fullName: regName, email: regEmail, phone: regPhone || undefined, password: regPwd, categoryId: regCatId, title: regTitle });
-      setOtpEmail(regEmail);
+      setOtpEmail(regEmail); setOtpPurpose('signup');
       setMode('otp');
     } catch (e: any) { setErr(e.message ?? 'Registration failed'); }
     finally { setLoading(false); }
@@ -256,7 +262,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   async function handleOtp(e: React.FormEvent) {
     e.preventDefault(); setErr(''); setLoading(true);
     try {
-      const tokens = await authApi.verifyOtp(otpEmail, otpCode, 'signup');
+      const tokens = await authApi.verifyOtp(otpEmail, otpCode, otpPurpose);
       setDocsToken(tokens);
       setMode('docs');
     } catch (e: any) { setErr(e.message ?? 'OTP verification failed'); }
@@ -265,8 +271,29 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
 
   async function resendOtp() {
     setResending(true); setErr('');
-    try { await authApi.resendOtp(otpEmail); } catch (e: any) { setErr(e.message); }
+    try { await authApi.resendOtp(otpEmail, otpPurpose); } catch (e: any) { setErr(e.message); }
     finally { setResending(false); }
+  }
+
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault(); setErr(''); setLoading(true);
+    try {
+      await authApi.forgotPassword(forgotEmail);
+      setOtpEmail(forgotEmail);
+      setMode('reset');
+    } catch (e: any) { setErr(e.message ?? 'Failed to send reset code'); }
+    finally { setLoading(false); }
+  }
+
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault(); setErr(''); setLoading(true);
+    try {
+      await authApi.resetPassword(forgotEmail, resetCode, resetNewPwd);
+      setErr('');
+      setMode('login');
+      setForgotEmail(''); setResetCode(''); setResetNewPwd('');
+    } catch (e: any) { setErr(e.message ?? 'Password reset failed'); }
+    finally { setLoading(false); }
   }
 
   if (mode === 'otp') return (
@@ -411,6 +438,55 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     </div>
   );
 
+  if (mode === 'forgot') return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
+      <div className="w-full max-w-sm">
+        <Logo/>
+        <AuthCard>
+          <button onClick={() => { setMode('login'); setErr(''); }}
+            className="flex items-center gap-1.5 text-white/40 hover:text-white/70 text-xs mb-5 transition-colors">
+            <ArrowLeft size={13}/> Back to login
+          </button>
+          <h2 className="text-white font-bold text-lg mb-1">Reset your password</h2>
+          <p className="text-white/40 text-sm mb-5">Enter your email and we'll send a reset code</p>
+          <ErrBanner err={err}/>
+          <form onSubmit={handleForgot} className="space-y-4">
+            <Field label="Email">
+              <TextInput type="email" value={forgotEmail} onChange={setForgotEmail} placeholder="partner@servenow.in"/>
+            </Field>
+            <SubmitBtn label="Send reset code" loadingLabel="Sending…" loading={loading}/>
+          </form>
+        </AuthCard>
+      </div>
+    </div>
+  );
+
+  if (mode === 'reset') return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
+      <div className="w-full max-w-sm">
+        <Logo/>
+        <AuthCard>
+          <button onClick={() => { setMode('forgot'); setErr(''); }}
+            className="flex items-center gap-1.5 text-white/40 hover:text-white/70 text-xs mb-5 transition-colors">
+            <ArrowLeft size={13}/> Back
+          </button>
+          <h2 className="text-white font-bold text-lg mb-1">Enter new password</h2>
+          <p className="text-white/40 text-sm mb-5">We sent a code to <span className="text-white/70">{forgotEmail}</span></p>
+          <ErrBanner err={err}/>
+          <form onSubmit={handleReset} className="space-y-4">
+            <Field label="Reset Code">
+              <TextInput value={resetCode} onChange={setResetCode} placeholder="6-digit code"/>
+            </Field>
+            <Field label="New Password">
+              <TextInput type="password" value={resetNewPwd} onChange={setResetNewPwd} placeholder="Min 8 chars"/>
+            </Field>
+            <SubmitBtn label="Reset password" loadingLabel="Resetting…" loading={loading}/>
+          </form>
+        </AuthCard>
+      </div>
+    </div>
+  );
+
   // Default: login
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
@@ -429,11 +505,17 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
             </Field>
             <SubmitBtn label="Sign in" loadingLabel="Signing in…" loading={loading}/>
           </form>
-          <div className="flex items-center justify-center gap-1.5 mt-5">
-            <span className="text-white/30 text-xs">New partner?</span>
-            <button onClick={() => { setMode('register'); setStep(1); setErr(''); }}
-              className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors">
-              Register here
+          <div className="flex items-center justify-between mt-5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/30 text-xs">New partner?</span>
+              <button onClick={() => { setMode('register'); setStep(1); setErr(''); }}
+                className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors">
+                Register here
+              </button>
+            </div>
+            <button onClick={() => { setForgotEmail(loginEmail); setMode('forgot'); setErr(''); }}
+              className="text-white/40 text-xs hover:text-violet-300 transition-colors">
+              Forgot password?
             </button>
           </div>
         </AuthCard>
@@ -844,6 +926,7 @@ function Profile({ token, profile, setProfile }: {
   const [title,        setTitle]       = useState(profile?.title ?? '');
   const [bio,          setBio]         = useState(profile?.bio ?? '');
   const [price,        setPrice]       = useState(String(profile?.basePrice ?? ''));
+  const [priceUnit,    setPriceUnit]   = useState(profile?.priceUnit ?? 'visit');
   const [tags,         setTags]        = useState((profile?.tags ?? []).join(', '));
   const [editCatId,    setEditCatId]   = useState(profile?.categoryId ?? '');
   const [editSubCatId, setEditSubCatId]= useState(profile?.subCategoryId ?? '');
@@ -866,6 +949,7 @@ function Profile({ token, profile, setProfile }: {
     try {
       const updated = await partnerApi.updateProfile({
         title, bio, basePrice: Number(price),
+        priceUnit: priceUnit.trim() || 'visit',
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         categoryId: editCatId || undefined,
         subCategoryId: editSubCatId || null,
@@ -989,7 +1073,8 @@ function Profile({ token, profile, setProfile }: {
             </button>
             <button onClick={() => {
               setTitle(profile.title); setBio(profile.bio);
-              setPrice(String(profile.basePrice)); setTags(profile.tags.join(', '));
+              setPrice(String(profile.basePrice)); setPriceUnit(profile.priceUnit ?? 'visit');
+              setTags(profile.tags.join(', '));
               const cid = profile.categoryId ?? '';
               setEditCatId(cid); setEditSubCatId(profile.subCategoryId ?? '');
               if (cid) loadSubCats(cid); setEditProf(true);
@@ -1057,9 +1142,14 @@ function Profile({ token, profile, setProfile }: {
                 className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors resize-none"
                 style={INPUT_STY}/>
             </Field>
-            <Field label="Base Price (₹)">
-              <TextInput value={price} onChange={setPrice} type="number" placeholder="500"/>
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Base Price (₹)">
+                <TextInput value={price} onChange={setPrice} type="number" placeholder="500"/>
+              </Field>
+              <Field label="Price Unit">
+                <TextInput value={priceUnit} onChange={setPriceUnit} placeholder="visit"/>
+              </Field>
+            </div>
             <Field label="Category">
               <SelectInput value={editCatId} onChange={v => { setEditCatId(v); setEditSubCatId(''); loadSubCats(v); }}>
                 <option value="">— Select category —</option>
@@ -1779,7 +1869,7 @@ export default function App() {
     setAuth(tokens); localStorage.setItem('partner_auth', JSON.stringify(tokens));
   }
   function logout() {
-    if (auth) authApi.logout(auth.accessToken).catch(() => {});
+    if (auth) authApi.logout(auth.refreshToken).catch(() => {});
     setAuth(null); localStorage.removeItem('partner_auth');
   }
   function navigate(p: Page) {
