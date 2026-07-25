@@ -5,7 +5,21 @@ import { Platform } from 'react-native';
 // already proxies /api → the Express server on port 8000, so we never need to
 // hard-code a port number. This works on both native (Expo Go) and Expo web.
 function getApiBase(): string {
-  return (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+  const envBase = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+  if (envBase) return envBase;
+
+  // Web-only fallback: strip Expo dev-server port (8080/8082/19006) so API
+  // requests reach the Replit proxy rather than the Metro HTML server.
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location;
+    const expoDevPorts = new Set(['8080', '8081', '8082', '8099', '19006']);
+    if (expoDevPorts.has(port)) {
+      return `${protocol}//${hostname}`;
+    }
+    return window.location.origin;
+  }
+
+  return '';
 }
 const API_BASE = getApiBase();
 
@@ -209,7 +223,7 @@ export const authApi = {
   resendOtp: (data: { email: string; purpose: string }) =>
     request<void>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
 
-  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string }) =>
+  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) =>
     request<{ userId: string; email: string; devCode?: string }>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
 
   verifyOtp: (data: { email: string; code: string; purpose: string }) =>

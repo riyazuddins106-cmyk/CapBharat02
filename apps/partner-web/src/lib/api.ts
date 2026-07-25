@@ -151,7 +151,7 @@ export interface RegisterPartnerResponse { userId: string; email: string; devCod
 export const authApi = {
   login: (email: string, password: string) =>
     request<AuthTokens>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  registerPartner: (data: { fullName: string; email: string; phone?: string; password: string; categoryId: string; title: string }) =>
+  registerPartner: (data: { fullName: string; email: string; phone?: string; password: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) =>
     request<RegisterPartnerResponse>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
   verifyOtp: (email: string, code: string, purpose: 'signup' | 'login' | 'password_reset') =>
     request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, code, purpose }) }),

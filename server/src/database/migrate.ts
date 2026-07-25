@@ -513,6 +513,13 @@ export async function runMigrations() {
        ON CONFLICT (type_key) DO NOTHING`);
   }
 
+  await run('column: professionals.city',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS city VARCHAR(128)`);
+  await run('column: professionals.area',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS area VARCHAR(128)`);
+  await run('column: professionals.pincode',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS pincode VARCHAR(16)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

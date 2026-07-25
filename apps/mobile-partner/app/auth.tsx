@@ -39,6 +39,9 @@ export default function AuthScreen() {
   const [regPassword, setRegPassword] = useState('');
   const [regTitle, setRegTitle] = useState('');
   const [regCategoryId, setRegCategoryId] = useState('');
+  const [regCity, setRegCity] = useState('');
+  const [regArea, setRegArea] = useState('');
+  const [regPincode, setRegPincode] = useState('');
   const [showRegPass, setShowRegPass] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [catsLoading, setCatsLoading] = useState(false);
@@ -106,7 +109,7 @@ export default function AuthScreen() {
 
   const doRegister = async () => {
     clearMessages();
-    if (!regName || !regEmail || !regPassword || !regCategoryId || !regTitle) {
+    if (!regName || !regEmail || !regPassword || !regCategoryId || !regTitle || !regCity) {
       return setError('Please fill in all required fields');
     }
     setLoading(true);
@@ -118,6 +121,9 @@ export default function AuthScreen() {
         phone: regPhone.trim() || undefined,
         categoryId: regCategoryId,
         title: regTitle.trim(),
+        city: regCity.trim(),
+        area: regArea.trim() || undefined,
+        pincode: regPincode.trim() || undefined,
       });
       setPendingEmail(result.email);
       setSuccessMsg('Account created! Enter the 6-digit code sent to your email.');
@@ -389,6 +395,39 @@ export default function AuthScreen() {
                   style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
                 />
               </View>
+
+              {/* ── Service Location ── */}
+              <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 2, marginTop: 4, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1 }]}>
+                Service Location
+              </Text>
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>City *</Text>
+                <TextInput
+                  value={regCity} onChangeText={setRegCity}
+                  autoCapitalize="words" placeholder="e.g. Mumbai, Delhi, Bangalore"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
+              </View>
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>Area / Locality</Text>
+                <TextInput
+                  value={regArea} onChangeText={setRegArea}
+                  autoCapitalize="words" placeholder="e.g. Andheri West, Koramangala"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
+              </View>
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>Pincode</Text>
+                <TextInput
+                  value={regPincode} onChangeText={t => setRegPincode(t.replace(/\D/g, '').slice(0, 6))}
+                  keyboardType="number-pad" maxLength={6} placeholder="6-digit pincode"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
+              </View>
+
               <TouchableOpacity
                 onPress={doRegister} disabled={loading}
                 style={[styles.btn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: loading ? 0.7 : 1 }]}

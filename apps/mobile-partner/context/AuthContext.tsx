@@ -17,7 +17,7 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   resendOtp: (email: string, purpose: string) => Promise<void>;
-  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string }) => Promise<{ email: string; devCode?: string }>;
+  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) => Promise<{ email: string; devCode?: string }>;
   verifySignupOtp: (email: string, code: string) => Promise<void>;
 }
 

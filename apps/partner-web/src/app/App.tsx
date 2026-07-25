@@ -211,8 +211,11 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   const [regPwdConf, setRegPwdConf] = useState('');
 
   // ── Register step 2
-  const [regCatId,  setRegCatId]  = useState('');
-  const [regTitle,  setRegTitle]  = useState('');
+  const [regCatId,   setRegCatId]   = useState('');
+  const [regTitle,   setRegTitle]   = useState('');
+  const [regCity,    setRegCity]    = useState('');
+  const [regArea,    setRegArea]    = useState('');
+  const [regPincode, setRegPincode] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   useEffect(() => { categoriesApi.list().then(c => setCategories(c.filter((x: Category) => x.isActive))).catch(() => {}); }, []);
 
@@ -252,7 +255,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     e.preventDefault(); setErr(''); setLoading(true);
     try {
       if (!regCatId) { setErr('Please select a service category.'); return; }
-      await authApi.registerPartner({ fullName: regName, email: regEmail, phone: regPhone || undefined, password: regPwd, categoryId: regCatId, title: regTitle });
+      await authApi.registerPartner({ fullName: regName, email: regEmail, phone: regPhone || undefined, password: regPwd, categoryId: regCatId, title: regTitle, city: regCity, area: regArea || undefined, pincode: regPincode || undefined });
       setOtpEmail(regEmail); setOtpPurpose('signup');
       setMode('otp');
     } catch (e: any) { setErr(e.message ?? 'Registration failed'); }
@@ -421,6 +424,23 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
                 <Field label="Your Title / Specialisation">
                   <TextInput value={regTitle} onChange={setRegTitle} placeholder="e.g. Expert Plumber, Senior Electrician"/>
                 </Field>
+
+                {/* ── Service address (Urban Company style) ── */}
+                <div className="pt-1">
+                  <p className="text-white/40 text-xs mb-3 font-medium uppercase tracking-wide">Service Location</p>
+                  <div className="space-y-3">
+                    <Field label="City *">
+                      <TextInput value={regCity} onChange={setRegCity} placeholder="e.g. Mumbai, Delhi, Bangalore"/>
+                    </Field>
+                    <Field label="Area / Locality">
+                      <TextInput value={regArea} onChange={setRegArea} placeholder="e.g. Andheri West, Koramangala"/>
+                    </Field>
+                    <Field label="Pincode">
+                      <TextInput value={regPincode} onChange={v => setRegPincode(v.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit pincode" type="text" inputMode="numeric"/>
+                    </Field>
+                  </div>
+                </div>
+
                 <SubmitBtn label="Create Account" loadingLabel="Creating account…" loading={loading}/>
               </form>
             </>

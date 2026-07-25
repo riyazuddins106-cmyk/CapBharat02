@@ -59,6 +59,9 @@ export const registerPartnerSchema = z.object({
     .regex(/[0-9]/, 'Password must contain a number'),
   categoryId: z.string().uuid('Invalid category'),
   title: z.string().trim().min(2, 'Title must be at least 2 characters').max(255),
+  city: z.string().trim().min(2, 'City is required').max(128),
+  area: z.string().trim().max(128).optional(),
+  pincode: z.string().trim().regex(/^\d{6}$/, 'Pincode must be 6 digits').optional().or(z.literal('')),
 });
 
 export type RegisterPartnerInput = z.infer<typeof registerPartnerSchema>;

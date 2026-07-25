@@ -74,6 +74,9 @@ export const authService = {
       title: input.title,
       basePrice: 0,
       priceUnit: '/visit',
+      city: input.city,
+      area: input.area ?? null,
+      pincode: input.pincode || null,
     });
 
     const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
