@@ -73,6 +73,15 @@ export const partnerController = {
     res.json({ success: true, data });
   }),
 
+  updateLocation: asyncHandler(async (req: Request, res: Response) => {
+    const { latitude, longitude } = req.body as { latitude?: number; longitude?: number };
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      throw AppError.badRequest('latitude and longitude (numbers) are required.');
+    }
+    const data = await partnerService.updateLocation(req.user!.userId, latitude, longitude);
+    res.json({ success: true, data });
+  }),
+
   uploadAvatar: asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw AppError.badRequest('No file uploaded. Use the "avatar" field.');
     const avatarUrl = await storageService.uploadAvatar(req.user!.userId, req.file);

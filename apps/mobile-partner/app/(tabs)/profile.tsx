@@ -9,10 +9,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { partnerApi, categoriesApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
+
+/** Silently push current GPS to the server — fires and forgets. */
+async function pushLocationToServer(token: string) {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return;
+    const pos = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    await partnerApi.updateLocation(pos.coords.latitude, pos.coords.longitude, token);
+  } catch {
+    // Non-fatal — dispatch falls back to all-partners if location is missing
+  }
+}
 
 // ── Web-safe helpers ────────────────────────────────────────────────────────
 const isWeb = Platform.OS === 'web';
@@ -65,9 +80,13 @@ export default function ProfileScreen() {
   const availabilityMutation = useMutation({
     mutationFn: (status: 'available' | 'busy' | 'offline') =>
       partnerApi.updateAvailability(status, accessToken!),
-    onSuccess: () => {
+    onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/profile'] });
       refetch();
+      // When going available, push current GPS so dispatch can find nearest partners
+      if (status === 'available' && accessToken) {
+        pushLocationToServer(accessToken);
+      }
     },
     onError: (e: any) => showAlert('Availability update failed', e.message ?? 'Please try again.'),
   });

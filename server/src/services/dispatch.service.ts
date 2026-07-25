@@ -2,8 +2,22 @@ import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import {
   bookingAssignmentLogs, bookingPartnerRequests, bookings, professionals, partnerServices,
-  services, users,
+  services, users, addresses,
 } from '../database/schema/index.js';
+
+const MAX_RADIUS_KM = 30;
+
+/** Haversine distance in km between two lat/lng points */
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 import { AppError } from '../utils/AppError.js';
 import { notificationDbService } from './notificationDb.service.js';
 import { notificationService } from './notification.service.js';
@@ -20,7 +34,7 @@ async function notifyPartner(pro: { userId: string | null; name: string }, booki
 
 export const dispatchService = {
   async broadcast(booking: typeof bookings.$inferSelect, serviceId: string) {
-    const candidates = await db.select({ pro: professionals, user: users })
+    const allCandidates = await db.select({ pro: professionals, user: users })
       .from(partnerServices)
       .innerJoin(professionals, eq(partnerServices.partnerId, professionals.id))
       .leftJoin(users, eq(professionals.userId, users.id))
@@ -31,7 +45,49 @@ export const dispatchService = {
         eq(professionals.currentBookingStatus, 'available'),
         isNull(professionals.deletedAt),
       ));
-    if (!candidates.length) return [];
+    if (!allCandidates.length) return [];
+
+    // ── GPS-based proximity filtering ──────────────────────────────────────
+    // Try to get the booking's address coordinates for distance sorting.
+    let bookingLat: number | null = null;
+    let bookingLng: number | null = null;
+    if (booking.addressId) {
+      const [addr] = await db
+        .select({ latitude: addresses.latitude, longitude: addresses.longitude })
+        .from(addresses)
+        .where(eq(addresses.id, booking.addressId))
+        .limit(1);
+      bookingLat = addr?.latitude ?? null;
+      bookingLng = addr?.longitude ?? null;
+    }
+
+    let candidates = allCandidates;
+
+    if (bookingLat !== null && bookingLng !== null) {
+      // Annotate each candidate with their distance (partners without GPS go last)
+      const withDistance = allCandidates.map((c) => {
+        const { latitude: pLat, longitude: pLng } = c.pro;
+        const distance =
+          pLat !== null && pLng !== null
+            ? haversineKm(bookingLat!, bookingLng!, pLat, pLng)
+            : Infinity;
+        return { ...c, distance };
+      });
+
+      // Sort nearest first
+      withDistance.sort((a, b) => a.distance - b.distance);
+
+      // Prefer partners within MAX_RADIUS_KM; fall back to all if none qualify
+      const nearby = withDistance.filter((c) => c.distance <= MAX_RADIUS_KM);
+      candidates = (nearby.length > 0 ? nearby : withDistance).map(({ distance: _d, ...c }) => c);
+
+      console.log(
+        `[dispatch] booking=${booking.id} address=(${bookingLat},${bookingLng}) ` +
+        `candidates=${allCandidates.length} within${MAX_RADIUS_KM}km=${nearby.length}`,
+      );
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     await db.insert(bookingPartnerRequests).values(candidates.map(({ pro }) => ({
       bookingId: booking.id, partnerId: pro.id, status: 'pending',
     })));

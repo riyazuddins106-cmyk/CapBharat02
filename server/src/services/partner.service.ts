@@ -157,6 +157,12 @@ export const partnerService = {
     });
   },
 
+  async updateLocation(userId: string, latitude: number, longitude: number) {
+    const pro = await partnerRepository.findProfessionalByUserId(userId);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+    return professionalRepository.update(pro.id, { latitude, longitude });
+  },
+
   async checkIn(userId: string, bookingId: string, qrToken: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');

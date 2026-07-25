@@ -904,6 +904,16 @@ function Profile({ token, profile, setProfile }: {
       const updated = await partnerApi.updateAvailability(newStatus, token);
       setProfile(updated);
       setMsgOk(true); setMsg(profile.isActive ? 'You are now offline' : 'You are now available');
+      // When going available, push current GPS to server so dispatch can find nearby partners
+      if (newStatus === 'available' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            partnerApi.updateLocation(coords.latitude, coords.longitude, token).catch(() => {});
+          },
+          () => { /* silently ignore if browser denies */ },
+          { timeout: 8000, maximumAge: 60000 },
+        );
+      }
     } catch (e: any) { setMsgOk(false); setMsg(e.message); }
     finally { setAvailLoading(false); }
   }

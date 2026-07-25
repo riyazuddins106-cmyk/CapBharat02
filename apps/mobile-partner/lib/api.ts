@@ -228,6 +228,13 @@ export const partnerApi = {
       token,
     }),
 
+  updateLocation: (latitude: number, longitude: number, token: string) =>
+    request<PartnerProfile>('/api/partner/location', {
+      method: 'PATCH',
+      body: JSON.stringify({ latitude, longitude }),
+      token,
+    }),
+
   updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
 

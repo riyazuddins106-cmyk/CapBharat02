@@ -17,6 +17,7 @@ router.patch('/profile',           partnerController.updateProfile);
 router.post('/profile/avatar',     upload.single('avatar'), partnerController.uploadAvatar);
 router.patch('/account',           partnerController.updateAccount);
 router.patch('/availability',      partnerController.updateAvailability);
+router.patch('/location',          partnerController.updateLocation);
 router.get('/jobs',                partnerController.listJobs);
 router.get('/jobs/:id',            partnerController.getJob);
 router.patch('/jobs/:id/accept',   partnerController.acceptJob);

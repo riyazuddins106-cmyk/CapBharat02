@@ -185,6 +185,8 @@ export const partnerApi = {
   getEarnings: (token: string) => request<Earnings>('/api/partner/earnings', { token }),
   updateAvailability: (status: 'available' | 'busy' | 'offline', token: string) =>
     request<PartnerProfile>('/api/partner/availability', { method: 'PATCH', body: JSON.stringify({ status }), token }),
+  updateLocation: (latitude: number, longitude: number, token: string) =>
+    request<PartnerProfile>('/api/partner/location', { method: 'PATCH', body: JSON.stringify({ latitude, longitude }), token }),
 };
 
 export const payoutsApi = {

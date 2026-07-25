@@ -159,9 +159,9 @@ export default function DocumentsScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
+          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Documents & Verification</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Documents & Verification</Text>
         <View style={{ width: 38 }}/>
       </View>
 
@@ -170,9 +170,9 @@ export default function DocumentsScreen() {
         <View style={[styles.root, { backgroundColor: colors.background }]}>
           <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity onPress={() => setHistoryType(null)} style={styles.backBtn} hitSlop={12}>
-              <Ionicons name="close" size={22} color={colors.text} />
+              <Ionicons name="close" size={22} color={colors.foreground} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>
               {histTypeMeta?.label ?? historyType ?? 'History'}
             </Text>
             <View style={{ width: 38 }}/>
@@ -181,19 +181,19 @@ export default function DocumentsScreen() {
             {histLoading ? (
               <ActivityIndicator color="#5B3EF5" style={{ marginTop: 40 }}/>
             ) : historyData.length === 0 ? (
-              <Text style={[styles.empty, { color: colors.textSecondary }]}>No previous versions.</Text>
+              <Text style={[styles.empty, { color: colors.mutedForeground }]}>No previous versions.</Text>
             ) : historyData.map(h => {
               const si = STATUS[h.status] ?? STATUS.pending;
               return (
-                <View key={h.id} style={[styles.historyCard, { backgroundColor: colors.surface }]}>
+                <View key={h.id} style={[styles.historyCard, { backgroundColor: colors.card }]}>
                   <View style={styles.row}>
-                    <Text style={[styles.histVersion, { color: colors.textSecondary }]}>v{h.version}</Text>
+                    <Text style={[styles.histVersion, { color: colors.mutedForeground }]}>v{h.version}</Text>
                     <View style={[styles.badge, { backgroundColor: si.color + '22' }]}>
                       <Ionicons name={si.icon as any} size={11} color={si.color}/>
                       <Text style={[styles.badgeText, { color: si.color }]}>{si.label}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.histDate, { color: colors.textSecondary }]}>
+                  <Text style={[styles.histDate, { color: colors.mutedForeground }]}>
                     Uploaded {new Date(h.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </Text>
                   {h.rejection_reason && (
@@ -212,21 +212,21 @@ export default function DocumentsScreen() {
           <View style={[styles.msgBox, { backgroundColor: msg.ok ? '#16A34A18' : '#EF444418', borderColor: msg.ok ? '#16A34A40' : '#EF444440' }]}>
             <Ionicons name={msg.ok ? 'checkmark-circle' : 'alert-circle'} size={16} color={msg.ok ? '#16A34A' : '#EF4444'}/>
             <Text style={[styles.msgText, { color: msg.ok ? '#16A34A' : '#EF4444' }]}>{msg.text}</Text>
-            <TouchableOpacity onPress={() => setMsg(null)} hitSlop={8}><Ionicons name="close" size={14} color={colors.textSecondary}/></TouchableOpacity>
+            <TouchableOpacity onPress={() => setMsg(null)} hitSlop={8}><Ionicons name="close" size={14} color={colors.mutedForeground}/></TouchableOpacity>
           </View>
         )}
 
         {/* Progress */}
         {!isLoading && required.length > 0 && (
-          <View style={[styles.progressCard, { backgroundColor: colors.surface }]}>
+          <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
             <View style={styles.progressRow}>
               <View>
-                <Text style={[styles.progressTitle, { color: colors.text }]}>Verification Progress</Text>
-                <Text style={[styles.progressSub, { color: colors.textSecondary }]}>
+                <Text style={[styles.progressTitle, { color: colors.foreground }]}>Verification Progress</Text>
+                <Text style={[styles.progressSub, { color: colors.mutedForeground }]}>
                   {approvedRequired} of {required.length} required documents approved
                 </Text>
               </View>
-              <Text style={[styles.progressPct, { color: colors.text }]}>{progress}%</Text>
+              <Text style={[styles.progressPct, { color: colors.foreground }]}>{progress}%</Text>
             </View>
             <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
               <View style={[styles.progressFill, { width: `${progress}%` as any }]}/>
@@ -240,18 +240,18 @@ export default function DocumentsScreen() {
         {isLoading ? (
           <ActivityIndicator color="#5B3EF5" style={{ marginTop: 40 }}/>
         ) : types.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.textSecondary }]}>No document types configured.</Text>
+          <Text style={[styles.empty, { color: colors.mutedForeground }]}>No document types configured.</Text>
         ) : (
           <>
             {required.length > 0 && (
               <>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Required Documents</Text>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Required Documents</Text>
                 {required.map(t => <DocCard key={t.type_key} docType={t} doc={docByType[t.type_key]} isUploading={uploadingType === t.type_key} onUpload={promptUpload} onDelete={confirmDelete} onHistory={openHistory} colors={colors}/>)}
               </>
             )}
             {optional.length > 0 && (
               <>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Optional Documents</Text>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Optional Documents</Text>
                 {optional.map(t => <DocCard key={t.type_key} docType={t} doc={docByType[t.type_key]} isUploading={uploadingType === t.type_key} onUpload={promptUpload} onDelete={confirmDelete} onHistory={openHistory} colors={colors}/>)}
               </>
             )}
@@ -277,19 +277,19 @@ function DocCard({
   const si = doc ? (STATUS[doc.status] ?? STATUS.pending) : null;
 
   return (
-    <View style={[styles.docCard, { backgroundColor: colors.surface, borderColor: doc?.status === 'approved' ? '#16A34A30' : doc?.status === 'rejected' || doc?.status === 're_upload_required' ? '#EF444430' : colors.border }]}>
+    <View style={[styles.docCard, { backgroundColor: colors.card, borderColor: doc?.status === 'approved' ? '#16A34A30' : doc?.status === 'rejected' || doc?.status === 're_upload_required' ? '#EF444430' : colors.border }]}>
       <View style={styles.docHeader}>
         <Text style={styles.docEmoji}>{docType.emoji}</Text>
         <View style={styles.docHeaderText}>
           <View style={styles.row}>
-            <Text style={[styles.docLabel, { color: colors.text }]}>{docType.label}</Text>
+            <Text style={[styles.docLabel, { color: colors.foreground }]}>{docType.label}</Text>
             <View style={[styles.badge, { backgroundColor: docType.is_mandatory ? '#F59E0B22' : '#6B728022' }]}>
               <Text style={[styles.badgeText, { color: docType.is_mandatory ? '#F59E0B' : '#9CA3AF', fontSize: 9 }]}>
                 {docType.is_mandatory ? 'REQUIRED' : 'OPTIONAL'}
               </Text>
             </View>
           </View>
-          {docType.description && <Text style={[styles.docDesc, { color: colors.textSecondary }]}>{docType.description}</Text>}
+          {docType.description && <Text style={[styles.docDesc, { color: colors.mutedForeground }]}>{docType.description}</Text>}
         </View>
       </View>
 
@@ -301,7 +301,7 @@ function DocCard({
               <Text style={[styles.badgeText, { color: si!.color }]}>{si!.label}</Text>
             </View>
             <TouchableOpacity onPress={() => onHistory(docType.type_key)} hitSlop={8} style={styles.histBtn}>
-              <Ionicons name="time-outline" size={14} color={colors.textSecondary}/>
+              <Ionicons name="time-outline" size={14} color={colors.mutedForeground}/>
             </TouchableOpacity>
           </View>
           {(doc.status === 'rejected' || doc.status === 're_upload_required') && doc.rejection_reason && (
@@ -325,7 +325,7 @@ function DocCard({
         <TouchableOpacity onPress={() => onUpload(docType.type_key)} disabled={isUploading} style={[styles.uploadBtn, { borderColor: colors.border }]}>
           {isUploading
             ? <ActivityIndicator size="small" color="#5B3EF5"/>
-            : <><Ionicons name="cloud-upload-outline" size={18} color={colors.textSecondary}/><Text style={[styles.uploadBtnText, { color: colors.textSecondary }]}>Upload or take photo</Text></>
+            : <><Ionicons name="cloud-upload-outline" size={18} color={colors.mutedForeground}/><Text style={[styles.uploadBtnText, { color: colors.mutedForeground }]}>Upload or take photo</Text></>
           }
         </TouchableOpacity>
       )}
