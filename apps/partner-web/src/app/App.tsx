@@ -154,6 +154,46 @@ function PageHeader({ title, subtitle, onRefresh }: {
 /* ─── Auth Screen (Login + Register + OTP) ────────────────────────── */
 type AuthMode = 'login' | 'register' | 'otp' | 'docs';
 
+function Logo() {
+  return (
+    <div className="flex items-center gap-3 mb-8 justify-center">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: ACCENT }}>
+        <Briefcase size={20} color="white"/>
+      </div>
+      <span className="text-white font-bold text-xl">ServeNow Partner</span>
+    </div>
+  );
+}
+
+function AuthCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-white/10 p-6" style={{ background: '#161B27' }}>
+      {children}
+    </div>
+  );
+}
+
+function ErrBanner({ err }: { err: string }) {
+  if (!err) return null;
+  return (
+    <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20"
+      style={{ background: 'rgba(239,68,68,0.08)' }}>
+      <AlertCircle size={14} className="inline mr-2"/>{err}
+    </div>
+  );
+}
+
+function SubmitBtn({ label, loadingLabel, loading }: { label: string; loadingLabel: string; loading: boolean }) {
+  return (
+    <button type="submit" disabled={loading}
+      className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+      style={{ background: ACCENT }}>
+      {loading && <Loader2 size={16} className="animate-spin"/>}
+      {loading ? loadingLabel : label}
+    </button>
+  );
+}
+
 function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [step, setStep] = useState(1); // register steps: 1=basic info, 2=professional details
@@ -184,16 +224,6 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   // ── Shared
   const [err,     setErr]     = useState('');
   const [loading, setLoading] = useState(false);
-
-  function ErrBanner() {
-    if (!err) return null;
-    return (
-      <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20"
-        style={{ background: 'rgba(239,68,68,0.08)' }}>
-        <AlertCircle size={14} className="inline mr-2"/>{err}
-      </div>
-    );
-  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setErr(''); setLoading(true);
@@ -239,35 +269,11 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     finally { setResending(false); }
   }
 
-  const Logo = () => (
-    <div className="flex items-center gap-3 mb-8 justify-center">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: ACCENT }}>
-        <Briefcase size={20} color="white"/>
-      </div>
-      <span className="text-white font-bold text-xl">ServeNow Partner</span>
-    </div>
-  );
-
-  const Card = ({ children }: { children: React.ReactNode }) => (
-    <div className="rounded-2xl border border-white/10 p-6" style={{ background: '#161B27' }}>
-      {children}
-    </div>
-  );
-
-  const SubmitBtn = ({ label, loadingLabel }: { label: string; loadingLabel: string }) => (
-    <button type="submit" disabled={loading}
-      className="w-full mt-6 py-3 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
-      style={{ background: ACCENT }}>
-      {loading && <Loader2 size={16} className="animate-spin"/>}
-      {loading ? loadingLabel : label}
-    </button>
-  );
-
   if (mode === 'otp') return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
       <div className="w-full max-w-sm">
         <Logo/>
-        <Card>
+        <AuthCard>
           <div className="text-center mb-6">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
               style={{ background: 'rgba(91,62,245,0.15)' }}>
@@ -278,13 +284,13 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
               <span className="text-white/70 font-semibold">{otpEmail}</span>
             </p>
           </div>
-          <ErrBanner/>
+          <ErrBanner err={err}/>
           <form onSubmit={handleOtp} className="space-y-4">
             <Field label="Verification Code">
               <TextInput value={otpCode} onChange={setOtpCode} placeholder="123456"
                 type="text"/>
             </Field>
-            <SubmitBtn label="Verify & Sign in" loadingLabel="Verifying…"/>
+            <SubmitBtn label="Verify & Sign in" loadingLabel="Verifying…" loading={loading}/>
           </form>
           <div className="flex items-center justify-center gap-2 mt-4">
             <span className="text-white/30 text-xs">Didn't receive it?</span>
@@ -293,7 +299,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
               {resending ? 'Sending…' : 'Resend code'}
             </button>
           </div>
-        </Card>
+        </AuthCard>
       </div>
     </div>
   );
@@ -332,7 +338,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
       <div className="w-full max-w-sm">
         <Logo/>
-        <Card>
+        <AuthCard>
           {/* Step indicator */}
           <div className="flex items-center gap-2 mb-5">
             {[1,2].map(s => (
@@ -345,7 +351,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
             <>
               <h2 className="text-white font-bold text-lg mb-1">Create your account</h2>
               <p className="text-white/40 text-sm mb-5">Step 1 of 2 — Basic information</p>
-              <ErrBanner/>
+              <ErrBanner err={err}/>
               <form onSubmit={handleStep1} className="space-y-4">
                 <Field label="Full Name">
                   <TextInput value={regName} onChange={setRegName} placeholder="Your full name"/>
@@ -377,7 +383,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
               </button>
               <h2 className="text-white font-bold text-lg mb-1">Professional details</h2>
               <p className="text-white/40 text-sm mb-5">Step 2 of 2 — Your service expertise</p>
-              <ErrBanner/>
+              <ErrBanner err={err}/>
               <form onSubmit={handleRegister} className="space-y-4">
                 <Field label="Service Category">
                   <SelectInput value={regCatId} onChange={setRegCatId}>
@@ -388,7 +394,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
                 <Field label="Your Title / Specialisation">
                   <TextInput value={regTitle} onChange={setRegTitle} placeholder="e.g. Expert Plumber, Senior Electrician"/>
                 </Field>
-                <SubmitBtn label="Create Account" loadingLabel="Creating account…"/>
+                <SubmitBtn label="Create Account" loadingLabel="Creating account…" loading={loading}/>
               </form>
             </>
           )}
@@ -400,7 +406,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
               Sign in
             </button>
           </div>
-        </Card>
+        </AuthCard>
       </div>
     </div>
   );
@@ -410,10 +416,10 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0f1117' }}>
       <div className="w-full max-w-sm">
         <Logo/>
-        <Card>
+        <AuthCard>
           <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
           <p className="text-white/40 text-sm mb-6">Sign in to your partner portal</p>
-          <ErrBanner/>
+          <ErrBanner err={err}/>
           <form onSubmit={handleLogin} className="space-y-4">
             <Field label="Email">
               <TextInput type="email" value={loginEmail} onChange={setLoginEmail} placeholder="partner@servenow.in"/>
@@ -421,7 +427,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
             <Field label="Password">
               <TextInput type="password" value={loginPwd} onChange={setLoginPwd} placeholder="••••••••"/>
             </Field>
-            <SubmitBtn label="Sign in" loadingLabel="Signing in…"/>
+            <SubmitBtn label="Sign in" loadingLabel="Signing in…" loading={loading}/>
           </form>
           <div className="flex items-center justify-center gap-1.5 mt-5">
             <span className="text-white/30 text-xs">New partner?</span>
@@ -430,7 +436,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
               Register here
             </button>
           </div>
-        </Card>
+        </AuthCard>
       </div>
     </div>
   );
@@ -1338,6 +1344,133 @@ function borderForStatus(status?: string) {
   return 'rgba(255,255,255,0.07)';
 }
 
+interface DocCardProps {
+  dt: DocumentTypeConfig;
+  docByType: Record<string, PartnerDocument>;
+  uploading: string | null;
+  uploadProgress: Record<string, number>;
+  dragOver: string | null;
+  setDragOver: (v: string | null) => void;
+  handleFile: (docType: string, file: File) => void;
+  fileRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
+  deleting: string | null;
+  handleDelete: (doc: PartnerDocument) => void;
+  openHistory: (docType: string) => void;
+}
+
+function DocCard({ dt, docByType, uploading, uploadProgress, dragOver, setDragOver, handleFile, fileRefs, deleting, handleDelete, openHistory }: DocCardProps) {
+  const existing = docByType[dt.type_key];
+  const isUp = uploading === dt.type_key;
+  const pct  = uploadProgress[dt.type_key] ?? 0;
+  const isDrag = dragOver === dt.type_key;
+  const st   = existing ? DOC_STATUS_STYLES[existing.status] ?? DOC_STATUS_STYLES['pending'] : null;
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragOver(null);
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleFile(dt.type_key, f);
+  }
+
+  return (
+    <div className="rounded-2xl border overflow-hidden transition-all"
+      style={{ background: CARD.background, borderColor: isDrag ? '#7C5BF8' : borderForStatus(existing?.status) }}
+      onDragOver={e => { e.preventDefault(); setDragOver(dt.type_key); }}
+      onDragLeave={() => setDragOver(null)}
+      onDrop={onDrop}>
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start gap-3 mb-3">
+          <span className="text-2xl flex-shrink-0">{dt.emoji}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-white font-semibold text-sm">{dt.label}</p>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${dt.is_mandatory ? 'text-amber-400 bg-amber-400/10' : 'text-white/30 bg-white/5'}`}>
+                {dt.is_mandatory ? 'REQUIRED' : 'OPTIONAL'}
+              </span>
+            </div>
+            {dt.description && <p className="text-white/40 text-xs mt-0.5 leading-snug">{dt.description}</p>}
+          </div>
+          {existing && (
+            <button onClick={() => openHistory(dt.type_key)} title="View history"
+              className="flex-shrink-0 p-1.5 rounded-lg text-white/20 hover:text-white/50 hover:bg-white/5 transition-colors">
+              <HistoryIcon size={13}/>
+            </button>
+          )}
+        </div>
+
+        {isUp && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-white/40 text-[10px]">Uploading…</span>
+              <span className="text-white/40 text-[10px]">{pct}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: ACCENT }}/>
+            </div>
+          </div>
+        )}
+
+        {existing && !isUp ? (
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                style={{ background: st!.bg, color: st!.color }}>
+                {st!.icon}{st!.label}
+              </span>
+              <span className="text-white/25 text-[10px]">
+                {new Date(existing.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {existing.version > 1 && <> · v{existing.version}</>}
+              </span>
+            </div>
+
+            {(existing.status === 'rejected' || existing.status === 're_upload_required') && existing.rejection_reason && (
+              <div className="mb-3 px-3 py-2 rounded-xl text-xs text-red-300 border border-red-400/15" style={{ background: 'rgba(239,68,68,0.06)' }}>
+                <AlertCircle size={11} className="inline mr-1.5"/>{existing.rejection_reason}
+              </div>
+            )}
+            {existing.status === 'expired' && (
+              <div className="mb-3 px-3 py-2 rounded-xl text-xs text-gray-400 border border-gray-400/15" style={{ background: 'rgba(107,114,128,0.08)' }}>
+                <Clock size={11} className="inline mr-1.5"/>This document has expired. Please upload a new one.
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              {existing.document_url && (
+                <a href={existing.document_url} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] text-violet-400 hover:bg-violet-500/10 border border-violet-400/20 transition-colors truncate">
+                  <Eye size={11}/><span className="truncate">{existing.file_name ?? 'View file'}</span>
+                </a>
+              )}
+              <button onClick={() => fileRefs.current[dt.type_key]?.click()} disabled={isUp}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-bold border border-white/10 text-white/50 hover:bg-white/5 transition-colors disabled:opacity-50">
+                <Upload size={11}/>Re-upload
+              </button>
+              {existing.status !== 'approved' && (
+                <button onClick={() => handleDelete(existing)} disabled={deleting === existing.id}
+                  className="p-2 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors border border-white/[0.06] disabled:opacity-50">
+                  {deleting === existing.id ? <Loader2 size={11} className="animate-spin"/> : <Trash2 size={11}/>}
+                </button>
+              )}
+            </div>
+          </>
+        ) : !isUp ? (
+          <button onClick={() => fileRefs.current[dt.type_key]?.click()}
+            className="w-full py-4 rounded-xl border-2 border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+            style={{ borderColor: isDrag ? '#7C5BF8' : 'rgba(255,255,255,0.12)', color: isDrag ? '#7C5BF8' : 'rgba(255,255,255,0.35)', background: isDrag ? 'rgba(124,91,248,0.06)' : undefined }}>
+            <Upload size={18}/>
+            <span>Click to upload or drag & drop</span>
+            <span className="text-[10px] opacity-60">PNG, JPG, WEBP, PDF · max 10 MB</span>
+          </button>
+        ) : null}
+
+        <input ref={el => { fileRefs.current[dt.type_key] = el; }}
+          type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(dt.type_key, f); e.target.value = ''; }}/>
+      </div>
+    </div>
+  );
+}
+
 function Documents({ token }: { token: string }) {
   const [docTypes, setDocTypes] = useState<DocumentTypeConfig[]>([]);
   const [docs,     setDocs]     = useState<PartnerDocument[]>([]);
@@ -1406,125 +1539,6 @@ function Documents({ token }: { token: string }) {
     finally { setHistLoading(false); }
   }
 
-  function DocCard({ dt }: { dt: DocumentTypeConfig }) {
-    const existing = docByType[dt.type_key];
-    const isUp = uploading === dt.type_key;
-    const pct  = uploadProgress[dt.type_key] ?? 0;
-    const isDrag = dragOver === dt.type_key;
-    const st   = existing ? DOC_STATUS_STYLES[existing.status] ?? DOC_STATUS_STYLES['pending'] : null;
-
-    function onDrop(e: React.DragEvent) {
-      e.preventDefault(); setDragOver(null);
-      const f = e.dataTransfer.files?.[0];
-      if (f) handleFile(dt.type_key, f);
-    }
-
-    return (
-      <div className="rounded-2xl border overflow-hidden transition-all"
-        style={{ background: CARD.background, borderColor: isDrag ? '#7C5BF8' : borderForStatus(existing?.status) }}
-        onDragOver={e => { e.preventDefault(); setDragOver(dt.type_key); }}
-        onDragLeave={() => setDragOver(null)}
-        onDrop={onDrop}>
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex items-start gap-3 mb-3">
-            <span className="text-2xl flex-shrink-0">{dt.emoji}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-white font-semibold text-sm">{dt.label}</p>
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${dt.is_mandatory ? 'text-amber-400 bg-amber-400/10' : 'text-white/30 bg-white/5'}`}>
-                  {dt.is_mandatory ? 'REQUIRED' : 'OPTIONAL'}
-                </span>
-              </div>
-              {dt.description && <p className="text-white/40 text-xs mt-0.5 leading-snug">{dt.description}</p>}
-            </div>
-            {/* History button */}
-            {existing && (
-              <button onClick={() => openHistory(dt.type_key)} title="View history"
-                className="flex-shrink-0 p-1.5 rounded-lg text-white/20 hover:text-white/50 hover:bg-white/5 transition-colors">
-                <HistoryIcon size={13}/>
-              </button>
-            )}
-          </div>
-
-          {/* Upload progress bar */}
-          {isUp && (
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-white/40 text-[10px]">Uploading…</span>
-                <span className="text-white/40 text-[10px]">{pct}%</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: ACCENT }}/>
-              </div>
-            </div>
-          )}
-
-          {existing && !isUp ? (
-            <>
-              {/* Status badge + date */}
-              <div className="flex items-center justify-between mb-3">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
-                  style={{ background: st!.bg, color: st!.color }}>
-                  {st!.icon}{st!.label}
-                </span>
-                <span className="text-white/25 text-[10px]">
-                  {new Date(existing.uploaded_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {existing.version > 1 && <> · v{existing.version}</>}
-                </span>
-              </div>
-
-              {/* Reason banner */}
-              {(existing.status === 'rejected' || existing.status === 're_upload_required') && existing.rejection_reason && (
-                <div className="mb-3 px-3 py-2 rounded-xl text-xs text-red-300 border border-red-400/15" style={{ background: 'rgba(239,68,68,0.06)' }}>
-                  <AlertCircle size={11} className="inline mr-1.5"/>{existing.rejection_reason}
-                </div>
-              )}
-              {existing.status === 'expired' && (
-                <div className="mb-3 px-3 py-2 rounded-xl text-xs text-gray-400 border border-gray-400/15" style={{ background: 'rgba(107,114,128,0.08)' }}>
-                  <Clock size={11} className="inline mr-1.5"/>This document has expired. Please upload a new one.
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center gap-2">
-                {existing.document_url && (
-                  <a href={existing.document_url} target="_blank" rel="noopener noreferrer"
-                    className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] text-violet-400 hover:bg-violet-500/10 border border-violet-400/20 transition-colors truncate">
-                    <Eye size={11}/><span className="truncate">{existing.file_name ?? 'View file'}</span>
-                  </a>
-                )}
-                <button onClick={() => fileRefs.current[dt.type_key]?.click()} disabled={isUp}
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-bold border border-white/10 text-white/50 hover:bg-white/5 transition-colors disabled:opacity-50">
-                  <Upload size={11}/>Re-upload
-                </button>
-                {existing.status !== 'approved' && (
-                  <button onClick={() => handleDelete(existing)} disabled={deleting === existing.id}
-                    className="p-2 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors border border-white/[0.06] disabled:opacity-50">
-                    {deleting === existing.id ? <Loader2 size={11} className="animate-spin"/> : <Trash2 size={11}/>}
-                  </button>
-                )}
-              </div>
-            </>
-          ) : !isUp ? (
-            /* Drop / click to upload */
-            <button onClick={() => fileRefs.current[dt.type_key]?.click()}
-              className="w-full py-4 rounded-xl border-2 border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-50"
-              style={{ borderColor: isDrag ? '#7C5BF8' : 'rgba(255,255,255,0.12)', color: isDrag ? '#7C5BF8' : 'rgba(255,255,255,0.35)', background: isDrag ? 'rgba(124,91,248,0.06)' : undefined }}>
-              <Upload size={18}/>
-              <span>Click to upload or drag & drop</span>
-              <span className="text-[10px] opacity-60">PNG, JPG, WEBP, PDF · max 10 MB</span>
-            </button>
-          ) : null}
-
-          <input ref={el => { fileRefs.current[dt.type_key] = el; }}
-            type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(dt.type_key, f); e.target.value = ''; }}/>
-        </div>
-      </div>
-    );
-  }
-
   // History modal
   const histLabel = docTypes.find(t => t.type_key === histType)?.label ?? histType ?? '';
 
@@ -1571,7 +1585,7 @@ function Documents({ token }: { token: string }) {
                 <p className="text-white/40 text-xs">These are needed before you can accept bookings</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {required.map(dt => <DocCard key={dt.type_key} dt={dt}/>)}
+                {required.map(dt => <DocCard key={dt.type_key} dt={dt} docByType={docByType} uploading={uploading} uploadProgress={uploadProgress} dragOver={dragOver} setDragOver={setDragOver} handleFile={handleFile} fileRefs={fileRefs} deleting={deleting} handleDelete={handleDelete} openHistory={openHistory}/>)}
               </div>
             </>
           )}
@@ -1582,7 +1596,7 @@ function Documents({ token }: { token: string }) {
                 <p className="text-white/40 text-xs">These improve your profile and trust score</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {optional.map(dt => <DocCard key={dt.type_key} dt={dt}/>)}
+                {optional.map(dt => <DocCard key={dt.type_key} dt={dt} docByType={docByType} uploading={uploading} uploadProgress={uploadProgress} dragOver={dragOver} setDragOver={setDragOver} handleFile={handleFile} fileRefs={fileRefs} deleting={deleting} handleDelete={handleDelete} openHistory={openHistory}/>)}
               </div>
             </>
           )}
@@ -1657,46 +1671,16 @@ const NAV: { id: Page; label: string; Icon: React.ElementType }[] = [
   { id: 'profile',       label: 'Profile',       Icon: User            },
 ];
 
-export default function App() {
-  const [auth,    setAuth]    = useState<AuthTokens | null>(() => {
-    try { const s = localStorage.getItem('partner_auth'); return s ? JSON.parse(s) : null; } catch { return null; }
-  });
-  const [profile, setProfile] = useState<PartnerProfile | null>(null);
-  const [page,    setPage]    = useState<Page>('dashboard');
-  const [unread,  setUnread]  = useState(0);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  function triggerRefresh() { setRefreshKey(k => k + 1); }
+interface SidebarContentProps {
+  page: Page;
+  navigate: (p: Page) => void;
+  unread: number;
+  profile: PartnerProfile | null;
+  logout: () => void;
+}
 
-  useEffect(() => {
-    if (!auth) return;
-    setRefreshHandler(async () => {
-      try {
-        const t = await authApi.refresh(auth.refreshToken);
-        const next = { ...auth, accessToken: t.accessToken, refreshToken: t.refreshToken };
-        setAuth(next); localStorage.setItem('partner_auth', JSON.stringify(next));
-        return t.accessToken;
-      } catch { return null; }
-    });
-    partnerApi.getProfile(auth.accessToken).then(setProfile).catch(() => {});
-    notificationsApi.unreadCount(auth.accessToken).then(r => setUnread(r.count)).catch(() => {});
-  }, [auth]);
-
-  function onLogin(tokens: AuthTokens) {
-    setAuth(tokens); localStorage.setItem('partner_auth', JSON.stringify(tokens));
-  }
-  function logout() {
-    if (auth) authApi.logout(auth.accessToken).catch(() => {});
-    setAuth(null); localStorage.removeItem('partner_auth');
-  }
-  function navigate(p: Page) {
-    setPage(p); setMobileOpen(false);
-    if (p === 'notifications') setUnread(0);
-  }
-
-  if (!auth) return <AuthScreen onLogin={onLogin}/>;
-
-  const SidebarContent = () => (
+function SidebarContent({ page, navigate, unread, profile, logout }: SidebarContentProps) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5">
@@ -1754,6 +1738,46 @@ export default function App() {
       )}
     </div>
   );
+}
+
+export default function App() {
+  const [auth,    setAuth]    = useState<AuthTokens | null>(() => {
+    try { const s = localStorage.getItem('partner_auth'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [profile, setProfile] = useState<PartnerProfile | null>(null);
+  const [page,    setPage]    = useState<Page>('dashboard');
+  const [unread,  setUnread]  = useState(0);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  function triggerRefresh() { setRefreshKey(k => k + 1); }
+
+  useEffect(() => {
+    if (!auth) return;
+    setRefreshHandler(async () => {
+      try {
+        const t = await authApi.refresh(auth.refreshToken);
+        const next = { ...auth, accessToken: t.accessToken, refreshToken: t.refreshToken };
+        setAuth(next); localStorage.setItem('partner_auth', JSON.stringify(next));
+        return t.accessToken;
+      } catch { return null; }
+    });
+    partnerApi.getProfile(auth.accessToken).then(setProfile).catch(() => {});
+    notificationsApi.unreadCount(auth.accessToken).then(r => setUnread(r.count)).catch(() => {});
+  }, [auth]);
+
+  function onLogin(tokens: AuthTokens) {
+    setAuth(tokens); localStorage.setItem('partner_auth', JSON.stringify(tokens));
+  }
+  function logout() {
+    if (auth) authApi.logout(auth.accessToken).catch(() => {});
+    setAuth(null); localStorage.removeItem('partner_auth');
+  }
+  function navigate(p: Page) {
+    setPage(p); setMobileOpen(false);
+    if (p === 'notifications') setUnread(0);
+  }
+
+  if (!auth) return <AuthScreen onLogin={onLogin}/>;
 
   const currentNav = NAV.find(n => n.id === page)!;
 
@@ -1762,7 +1786,7 @@ export default function App() {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-[200px] border-r border-white/[0.07] flex-shrink-0"
         style={{ background: '#161B27' }}>
-        <SidebarContent/>
+        <SidebarContent page={page} navigate={navigate} unread={unread} profile={profile} logout={logout}/>
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -1771,7 +1795,7 @@ export default function App() {
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)}/>
           <div className="relative w-56 flex flex-col border-r border-white/[0.07] h-full"
             style={{ background: '#161B27' }}>
-            <SidebarContent/>
+            <SidebarContent page={page} navigate={navigate} unread={unread} profile={profile} logout={logout}/>
           </div>
         </div>
       )}
