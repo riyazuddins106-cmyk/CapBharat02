@@ -60,6 +60,35 @@ export const documentController = {
     res.json({ success: true, data });
   }),
 
+  adminListPartners: asyncHandler(async (req: Request, res: Response) => {
+    const data = await documentService.adminListPartners();
+    res.json({ success: true, data });
+  }),
+
+  adminGetPartnerDocuments: asyncHandler(async (req: Request, res: Response) => {
+    const { partnerId } = req.params as { partnerId: string };
+    const data = await documentService.adminGetPartnerDocuments(partnerId);
+    res.json({ success: true, data });
+  }),
+
+  adminGetReviewQueue: asyncHandler(async (req: Request, res: Response) => {
+    const { status, search, sort } = req.query as { status?: string; search?: string; sort?: string };
+    const data = await documentService.adminGetReviewQueue({ status, search, sort });
+    res.json({ success: true, data });
+  }),
+
+  adminReviewDocument: asyncHandler(async (req: Request, res: Response) => {
+    const { status, reason } = req.body as { status?: string; reason?: string };
+    if (!status) throw AppError.badRequest('status is required.');
+    const data = await documentService.adminUpdateDocumentStatus(
+      req.params.id,
+      status as any,
+      reason?.trim() || null,
+      req.user!.userId,
+    );
+    res.json({ success: true, data });
+  }),
+
   // Admin: Document type config CRUD
 
   adminListDocumentTypes: asyncHandler(async (req: Request, res: Response) => {

@@ -321,6 +321,46 @@ export interface DocumentTypeConfigRow {
   updated_at: string;
 }
 
+export interface PartnerDocSummaryRow {
+  professional_id: string;
+  partner_name: string;
+  partner_email: string | null;
+  partner_phone: string | null;
+  category_name: string | null;
+  registered_at: string;
+  total_required: number;
+  uploaded_count: number;
+  approved_count: number;
+  pending_count: number;
+  rejected_count: number;
+  re_upload_count: number;
+  under_review_count: number;
+  expired_count: number;
+  overall_status: 'approved' | 'pending' | 'action_required' | 'rejected' | 'no_documents';
+  last_updated: string | null;
+}
+
+export interface PartnerWithDocuments {
+  partner: {
+    professional_id: string;
+    partner_name: string;
+    partner_email: string | null;
+    partner_phone: string | null;
+    category_name: string | null;
+    registered_at: string;
+    overall_status: string;
+  };
+  documents: PartnerDocumentRow[];
+  document_types: DocumentTypeConfigRow[];
+}
+
+export interface ReviewQueueRow extends PartnerDocumentRow {
+  partner_phone: string | null;
+  professional_id: string;
+  document_label: string | null;
+  document_emoji: string | null;
+}
+
 export type ServiceInput = {
   name: string;
   categoryId: string;
@@ -629,6 +669,26 @@ export const adminApi = {
     request<{ message: string }>('/notifications/read-all', { method: 'PATCH', token }),
   deleteNotification: (id: string, token: string) =>
     request<{ message: string }>(`/notifications/${id}`, { method: 'DELETE', token }),
+
+  // Partner Documents overview (one row per partner)
+  getPartnersDocumentsSummary: (token: string) =>
+    request<PartnerDocSummaryRow[]>('/admin/partners/documents', { token }),
+
+  // Partner Document Details (all docs for one partner)
+  getPartnerDocuments: (partnerId: string, token: string) =>
+    request<PartnerWithDocuments>(`/admin/partners/${partnerId}/documents`, { token }),
+
+  // Review Queue
+  getDocumentReviewQueue: (token: string, params?: { status?: string; search?: string; sort?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString() : '';
+    return request<ReviewQueueRow[]>(`/admin/documents/review-queue${qs}`, { token });
+  },
+
+  // Review document (alias for updateDocumentStatus with /review route)
+  reviewDocument: (docId: string, data: { status: string; reason?: string | null }, token: string) =>
+    request<{ id: string; status: string }>(`/admin/documents/${docId}/review`, {
+      method: 'PATCH', token, body: JSON.stringify(data),
+    }),
 
   // Partner document review
   getDocuments: (token: string, params?: { status?: string; proId?: string }) => {

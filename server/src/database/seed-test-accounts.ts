@@ -8,7 +8,9 @@ import 'dotenv/config';
 import postgres from 'postgres';
 import bcrypt from 'bcryptjs';
 
-const sql = postgres(process.env.SUPABASE_DATABASE_URL!, { ssl: 'require', max: 1 });
+const _dbUrl = process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
+if (!_dbUrl) throw new Error('DATABASE_URL is not set');
+const sql = postgres(_dbUrl, { ssl: 'require', max: 1 });
 
 const ACCOUNTS = [
   { email: 'admin@servenow.in',    password: 'Admin@1234',    fullName: 'Super Admin',    role: 'admin'    },

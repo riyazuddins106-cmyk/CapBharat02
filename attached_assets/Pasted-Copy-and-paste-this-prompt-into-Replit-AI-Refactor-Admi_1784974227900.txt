@@ -1,0 +1,518 @@
+Copy and paste this prompt into Replit AI:
+
+---
+
+# Refactor Admin Panel - Partner Documents & Document Review System
+
+You are acting as a Principal Software Architect, Senior React Engineer, Senior Backend Engineer, Senior Database Architect, Senior UI/UX Engineer, and Senior QA Engineer.
+
+## Objective
+
+Completely redesign the **Admin → Document Verification** module to follow a professional enterprise workflow.
+
+The current implementation is incorrect because it displays one row for every uploaded document, causing the same partner to appear multiple times.
+
+Example of current behavior (incorrect):
+
+```
+Rajesh - Aadhaar
+Rajesh - PAN
+Rajesh - Driving License
+Rajesh - Police Verification
+Rajesh - Profile Photo
+```
+
+This should be replaced with a partner-based document management system.
+
+---
+
+# Create Two Separate Sections
+
+```
+Admin Panel
+
+Document Verification
+    ├── Partner Documents
+    └── Review Queue
+```
+
+These are different pages with different purposes.
+
+---
+
+# 1. Partner Documents (Main Page)
+
+This page should display **one unique row per partner**.
+
+Do NOT display one row per document.
+
+Display columns:
+
+* Partner Name
+* Partner ID
+* Mobile Number
+* Email
+* Service Category
+* Total Required Documents
+* Uploaded Documents Count
+* Verification Progress
+* Overall Verification Status
+* Last Updated
+* Action
+
+Example:
+
+| Partner | Category    | Documents | Status             | Action         |
+| ------- | ----------- | --------- | ------------------ | -------------- |
+| Rajesh  | Electrician | 5/6       | Pending            | View Documents |
+| Amit    | Plumber     | 6/6       | Approved           | View Documents |
+| Rahul   | Cleaner     | 4/6       | Re-upload Required | View Documents |
+
+Only one row should exist for each partner.
+
+---
+
+# View Documents
+
+Clicking **View Documents** must open a dedicated page.
+
+Example route:
+
+```
+/admin/document-verification/partner/:partnerId
+```
+
+Do NOT use a modal.
+
+---
+
+# Partner Documents Page
+
+Display complete partner information.
+
+Example:
+
+```
+Partner Name
+Partner ID
+Email
+Mobile Number
+Category
+Registration Date
+Overall Verification Status
+```
+
+Below that display every document uploaded by that partner.
+
+Each document should appear as its own card.
+
+Example:
+
+```
+Aadhaar Card
+
+Status
+Version
+Upload Date
+Verified By
+Remarks
+
+Buttons
+
+Preview
+Download
+History
+Approve
+Reject
+Mark Under Review
+Request Re-upload
+Mark Expired
+```
+
+Repeat for every document.
+
+Supported document types include:
+
+* Aadhaar
+* PAN
+* Driving License
+* Police Verification
+* Profile Photo
+* Bank Document
+* GST
+* Service License
+* Any future document types
+
+Do NOT hardcode document types.
+
+Load dynamically.
+
+---
+
+# Document Actions
+
+Each document card must support:
+
+👁 Preview
+
+* Images open inside viewer
+* PDFs open in PDF viewer
+
+⬇ Download
+
+Download filename:
+
+```
+PartnerName_DocumentType.extension
+```
+
+🕐 History
+
+Display:
+
+* Version number
+* Upload date
+* Previous reviewer
+* Previous status
+* Previous rejection reason
+
+✏ Review
+
+Open Review Modal.
+
+---
+
+# Review Modal
+
+Allow admin to select status.
+
+Supported statuses:
+
+* Pending
+* Under Review
+* Approved
+* Rejected
+* Re-upload Required
+* Expired
+
+Business Rules
+
+Approved
+
+* No reason required
+
+Under Review
+
+* No reason required
+
+Rejected
+
+* Reason is mandatory
+
+Re-upload Required
+
+* Reason is mandatory
+
+Expired
+
+* No reason required
+
+Save reviewer name.
+
+Save review timestamp.
+
+Save remarks.
+
+Update status immediately.
+
+---
+
+# Overall Partner Status
+
+Partner verification status should be calculated automatically.
+
+Example:
+
+If every required document is approved
+
+```
+Approved
+```
+
+If one document is pending
+
+```
+Pending Verification
+```
+
+If one document requires re-upload
+
+```
+Action Required
+```
+
+If one document is rejected
+
+```
+Rejected
+```
+
+Do not manually maintain overall status.
+
+Calculate it dynamically.
+
+---
+
+# 2. Review Queue
+
+Create another page.
+
+Menu
+
+```
+Document Verification
+
+    Partner Documents
+
+    Review Queue
+```
+
+Purpose:
+
+Display only documents that require admin attention.
+
+Display:
+
+* Partner Name
+* Partner ID
+* Email
+* Document Type
+* Status Badge
+* Version
+* Upload Date
+* Reviewer Name
+
+Filters
+
+* Pending
+* Under Review
+* Approved
+* Rejected
+* Re-upload Required
+* Expired
+
+Search
+
+* Partner Name
+* Email
+* Mobile
+* Partner ID
+* Document Type
+
+Sorting
+
+* Latest Upload
+* Oldest Upload
+* Status
+* Partner Name
+
+Actions
+
+👁 Preview
+
+⬇ Download
+
+🕐 History
+
+✏ Review
+
+After reviewing, automatically update both the Review Queue and the Partner Documents page.
+
+---
+
+# Backend Requirements
+
+Create proper APIs.
+
+Partner Documents
+
+```
+GET /api/admin/partners/documents
+```
+
+Returns one record per partner.
+
+Partner Document Details
+
+```
+GET /api/admin/partners/:partnerId/documents
+```
+
+Returns every document uploaded by that partner.
+
+Review Queue
+
+```
+GET /api/admin/documents/review-queue
+```
+
+Returns documents requiring review.
+
+Update Review
+
+```
+PATCH /api/admin/documents/:documentId/review
+```
+
+Updates:
+
+* Status
+* Reviewer
+* Reason
+* Timestamp
+
+---
+
+# Database Requirements
+
+Documents must belong to Partner.
+
+One Partner
+
+↓
+
+Many Documents
+
+Each document must maintain:
+
+* Document ID
+* Partner ID
+* Document Type
+* Current Status
+* Current Version
+* File URL
+* Upload Date
+* Reviewer
+* Review Date
+* Remarks
+* Rejection Reason
+
+Create document version history.
+
+Never overwrite previous uploads.
+
+Each new upload creates a new version.
+
+---
+
+# UI Requirements
+
+Use modern professional admin UI.
+
+Responsive.
+
+Loading states.
+
+Skeleton loaders.
+
+Pagination.
+
+Status badges with colors.
+
+Document count badges.
+
+Image preview.
+
+PDF preview.
+
+Confirmation dialogs before approving or rejecting.
+
+Toast notifications.
+
+Error handling.
+
+Search debounce.
+
+Optimized API calls.
+
+No duplicate partner rows.
+
+Reusable React components.
+
+Clean routing.
+
+Proper state management.
+
+---
+
+# Expected Final Workflow
+
+```
+Admin Panel
+
+↓
+
+Document Verification
+
+↓
+
+Partner Documents
+
+↓
+
+One row per partner
+
+↓
+
+Click "View Documents"
+
+↓
+
+Partner Document Details Page
+
+↓
+
+Review all documents for that partner
+
+↓
+
+Approve / Reject / Request Re-upload
+
+↓
+
+Status updates automatically
+
+-------------------------------------
+
+Admin Panel
+
+↓
+
+Document Verification
+
+↓
+
+Review Queue
+
+↓
+
+Only documents needing review
+
+↓
+
+Preview
+
+↓
+
+Review
+
+↓
+
+Approve / Reject
+
+↓
+
+Queue updates automatically
+```
+
+**Important:** Do not remove any existing document upload functionality. Refactor the module to follow this new architecture while maintaining backward compatibility with the current database and APIs wherever possible. Use scalable, reusable components so new document types can be added in the future without code changes.

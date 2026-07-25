@@ -11,8 +11,8 @@ const PARTNER_USER_ID = '4f96622c-43d6-4bc2-8b03-1d32913d3973'; // partner@serve
 const PRO_ID = '86858cf6-4a2e-409c-88de-8344237d1a6a'; // Rajan Verma
 
 async function main() {
-  const dbUrl = process.env.SUPABASE_DATABASE_URL;
-  if (!dbUrl) throw new Error('SUPABASE_DATABASE_URL is not set');
+  const dbUrl = process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error('DATABASE_URL is not set');
 
   // Fail closed: block unless --allow-prod is explicitly passed when the URL
   // looks like a production Supabase project (contains ".supabase.co" and is not

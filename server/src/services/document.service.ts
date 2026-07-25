@@ -43,6 +43,28 @@ async function getDocTypeLabel(docType: string): Promise<string> {
   return row?.label ?? docType.replace(/_/g, ' ');
 }
 
+function _computeOverallStatus(r: {
+  approved_count: number | string; pending_count: number | string;
+  rejected_count: number | string; re_upload_count: number | string;
+  under_review_count: number | string; expired_count?: number | string;
+  uploaded_count: number | string; total_required: number | string;
+}): string {
+  const approved    = Number(r.approved_count    ?? 0);
+  const rejected    = Number(r.rejected_count    ?? 0);
+  const reUpload    = Number(r.re_upload_count   ?? 0);
+  const pending     = Number(r.pending_count     ?? 0);
+  const underReview = Number(r.under_review_count ?? 0);
+  const uploaded    = Number(r.uploaded_count    ?? 0);
+  const required    = Number(r.total_required    ?? 0);
+
+  if (uploaded === 0)                        return 'no_documents';
+  if (rejected > 0)                          return 'rejected';
+  if (reUpload > 0)                          return 'action_required';
+  if (required > 0 && approved >= required)  return 'approved';
+  if (underReview > 0 || pending > 0)        return 'pending';
+  return 'pending';
+}
+
 export const documentService = {
   // ── Partner: Document Types ──────────────────────────────────────────────
 
@@ -356,5 +378,144 @@ export const documentService = {
   async adminDeleteDocumentType(id: string) {
     const { db, sql } = await getDb();
     await db.execute(sql`DELETE FROM document_type_configs WHERE id = ${id}`);
+  },
+
+  // ── Admin: Partner Documents Overview (one row per partner) ─────────────────
+
+  async adminListPartners() {
+    const { db, sql } = await getDb();
+    const rows = await db.execute(sql`
+      SELECT
+        p.id                                                            AS professional_id,
+        p.name                                                          AS partner_name,
+        u.email                                                         AS partner_email,
+        u.phone                                                         AS partner_phone,
+        sc.name                                                         AS category_name,
+        p.created_at                                                    AS registered_at,
+        (SELECT COUNT(*) FROM document_type_configs
+         WHERE is_mandatory = true AND is_active = true)               AS total_required,
+        COUNT(pd.id)                                                    AS uploaded_count,
+        COUNT(CASE WHEN pd.status = 'approved'           THEN 1 END)  AS approved_count,
+        COUNT(CASE WHEN pd.status = 'pending'            THEN 1 END)  AS pending_count,
+        COUNT(CASE WHEN pd.status = 'rejected'           THEN 1 END)  AS rejected_count,
+        COUNT(CASE WHEN pd.status = 're_upload_required' THEN 1 END)  AS re_upload_count,
+        COUNT(CASE WHEN pd.status = 'under_review'       THEN 1 END)  AS under_review_count,
+        COUNT(CASE WHEN pd.status = 'expired'            THEN 1 END)  AS expired_count,
+        MAX(pd.uploaded_at)                                            AS last_updated
+      FROM professionals p
+      JOIN users u ON u.id = p.user_id
+      LEFT JOIN service_categories sc ON sc.id = p.category_id
+      LEFT JOIN partner_documents pd ON pd.professional_id = p.id
+      GROUP BY p.id, p.name, u.email, u.phone, sc.name, p.created_at
+      ORDER BY p.name ASC
+    `);
+    const data = (rows as any).rows ?? (rows as any) as any[];
+    return data.map((r: any) => ({ ...r, overall_status: _computeOverallStatus(r) }));
+  },
+
+  // ── Admin: Partner Document Details (all docs for one partner) ──────────────
+
+  async adminGetPartnerDocuments(proId: string) {
+    const { db, sql } = await getDb();
+
+    const pRows = await db.execute(sql`
+      SELECT p.id AS professional_id, p.name AS partner_name, p.created_at AS registered_at,
+             u.email AS partner_email, u.phone AS partner_phone, sc.name AS category_name
+      FROM professionals p
+      JOIN users u ON u.id = p.user_id
+      LEFT JOIN service_categories sc ON sc.id = p.category_id
+      WHERE p.id = ${proId}
+      LIMIT 1
+    `);
+    const partner = (pRows as any).rows?.[0] ?? (pRows as any)[0];
+    if (!partner) throw AppError.notFound('Partner not found.');
+
+    const docRows = await db.execute(sql`
+      SELECT pd.id, pd.document_type, pd.document_url, pd.file_name, pd.status,
+             pd.rejection_reason, pd.reviewed_by, pd.version, pd.expiry_date,
+             pd.uploaded_at, pd.reviewed_at,
+             p.name AS partner_name,
+             u.email AS partner_email,
+             ru.full_name AS reviewer_name
+      FROM partner_documents pd
+      JOIN professionals p ON p.id = pd.professional_id
+      LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN users ru ON ru.id = pd.reviewed_by
+      WHERE pd.professional_id = ${proId}
+      ORDER BY pd.uploaded_at DESC
+    `);
+    const documents = (docRows as any).rows ?? (docRows as any) as any[];
+    const document_types = await documentService.getDocumentTypes();
+
+    // Compute counts for overall status
+    const counts = {
+      approved_count:      documents.filter((d: any) => d.status === 'approved').length,
+      pending_count:       documents.filter((d: any) => d.status === 'pending').length,
+      rejected_count:      documents.filter((d: any) => d.status === 'rejected').length,
+      re_upload_count:     documents.filter((d: any) => d.status === 're_upload_required').length,
+      under_review_count:  documents.filter((d: any) => d.status === 'under_review').length,
+      expired_count:       documents.filter((d: any) => d.status === 'expired').length,
+      uploaded_count:      documents.length,
+      total_required:      document_types.filter((t: any) => t.is_mandatory).length,
+    };
+
+    return {
+      partner: { ...partner, overall_status: _computeOverallStatus(counts) },
+      documents,
+      document_types,
+    };
+  },
+
+  // ── Admin: Review Queue ─────────────────────────────────────────────────────
+
+  async adminGetReviewQueue(filter: { status?: string; search?: string; sort?: string } = {}) {
+    const { db, sql } = await getDb();
+    const rows = await db.execute(sql`
+      SELECT pd.id, pd.professional_id, pd.document_type, pd.document_url, pd.file_name,
+             pd.status, pd.rejection_reason, pd.reviewed_by, pd.version, pd.expiry_date,
+             pd.uploaded_at, pd.reviewed_at,
+             p.name  AS partner_name,
+             u.email AS partner_email,
+             u.phone AS partner_phone,
+             ru.full_name AS reviewer_name,
+             dtc.label AS document_label,
+             dtc.emoji AS document_emoji
+      FROM partner_documents pd
+      JOIN professionals p ON p.id = pd.professional_id
+      JOIN users u ON u.id = p.user_id
+      LEFT JOIN users ru ON ru.id = pd.reviewed_by
+      LEFT JOIN document_type_configs dtc ON dtc.type_key = pd.document_type
+      ORDER BY
+        CASE pd.status
+          WHEN 'pending'            THEN 1
+          WHEN 'under_review'       THEN 2
+          WHEN 're_upload_required' THEN 3
+          WHEN 'rejected'           THEN 4
+          WHEN 'expired'            THEN 5
+          WHEN 'approved'           THEN 6
+          ELSE 7
+        END,
+        pd.uploaded_at DESC
+    `);
+    let all = (rows as any).rows ?? (rows as any) as any[];
+
+    // Apply filters in JS
+    if (filter.status) all = all.filter((d: any) => d.status === filter.status);
+    if (filter.search) {
+      const q = filter.search.toLowerCase();
+      all = all.filter((d: any) =>
+        d.partner_name?.toLowerCase().includes(q) ||
+        d.partner_email?.toLowerCase().includes(q) ||
+        d.partner_phone?.toLowerCase().includes(q) ||
+        d.document_type?.toLowerCase().includes(q) ||
+        d.document_label?.toLowerCase().includes(q) ||
+        d.professional_id?.toLowerCase().includes(q)
+      );
+    }
+    if (filter.sort === 'oldest') all = all.reverse();
+    else if (filter.sort === 'name') all = all.sort((a: any, b: any) => a.partner_name.localeCompare(b.partner_name));
+    else if (filter.sort === 'status') all = all.sort((a: any, b: any) => a.status.localeCompare(b.status));
+
+    return all;
   },
 };

@@ -107,10 +107,18 @@ router.get('/settings/:key',        getSettings);
 router.put('/settings/:key',        upsertSettings);
 router.post('/settings/email/test', testEmail);
 
-// Partner document review (admin)
+// Partner document overview (one row per partner)
+router.get('/partners/documents',                    documentController.adminListPartners);
+router.get('/partners/:partnerId/documents',          documentController.adminGetPartnerDocuments);
+
+// Document review queue
+router.get('/documents/review-queue',               documentController.adminGetReviewQueue);
+
+// Per-document actions (keep existing routes for backward compat + add /review alias)
 router.get('/documents',                    documentController.adminListDocuments);
 router.get('/documents/:id/history',        documentController.adminGetDocumentHistory);
 router.patch('/documents/:id/status',       documentController.adminUpdateStatus);
+router.patch('/documents/:id/review',       documentController.adminReviewDocument);
 
 // Document type configuration (admin)
 router.get('/document-types',               documentController.adminListDocumentTypes);
