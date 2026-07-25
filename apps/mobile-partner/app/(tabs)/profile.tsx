@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -49,6 +50,7 @@ function showAlert(title: string, message: string) {
 export default function ProfileScreen() {
   const colors   = useColors();
   const insets   = useSafeAreaInsets();
+  const router   = useRouter();
   const { user, logout, accessToken } = useAuth();
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const [uploading, setUploading] = useState(false);
@@ -368,6 +370,24 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
+
+          {/* ── Documents & Verification card ── */}
+          <TouchableOpacity
+            onPress={() => router.push('/documents')}
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}
+            activeOpacity={0.7}
+          >
+            <View style={styles.securityRow}>
+              <View style={[styles.securityIcon, { backgroundColor: '#5B3EF515' }]}>
+                <Ionicons name="document-text-outline" size={16} color="#5B3EF5" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.securityLabel, { color: colors.foreground }]}>Documents & Verification</Text>
+                <Text style={[styles.securitySub, { color: colors.mutedForeground }]}>Upload KYC documents for verification</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+            </View>
+          </TouchableOpacity>
 
           {/* ── Sign Out ── */}
           <TouchableOpacity

@@ -1839,6 +1839,7 @@ export default function App() {
           {page === 'jobs'          && <Jobs          key={refreshKey} token={auth.accessToken}/>}
           {page === 'earnings'      && <Earnings      key={refreshKey} token={auth.accessToken}/>}
           {page === 'payouts'       && <Payouts       key={refreshKey} token={auth.accessToken}/>}
+          {page === 'documents'     && <Documents     key={refreshKey} token={auth.accessToken}/>}
           {page === 'notifications' && <Notifications key={refreshKey} token={auth.accessToken}/>}
           {page === 'profile'       && <Profile       key={refreshKey} token={auth.accessToken} profile={profile} setProfile={setProfile}/>}
         </div>

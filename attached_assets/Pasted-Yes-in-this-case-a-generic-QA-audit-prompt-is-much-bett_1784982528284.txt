@@ -1,0 +1,312 @@
+Yes, in this case a **generic QA audit prompt** is much better. Instead of telling Replit AI what features to check, instruct it to **discover the application's features first** and then verify them. That makes it reusable for any project.
+
+Copy this prompt:
+
+---
+
+# Complete End-to-End Application Audit, Testing & Production Readiness Review
+
+You are acting as a Principal Software Architect, Principal QA Engineer, Principal UI/UX Engineer, Senior Frontend Engineer, Senior Backend Engineer, Senior Database Architect, Senior DevOps Engineer, Senior Security Engineer, and Product Owner.
+
+## Objective
+
+Perform a **complete end-to-end audit** of the entire application.
+
+Do not rely on assumptions or predefined features.
+
+First, analyze the application to understand its architecture, modules, business logic, database, APIs, workflows, permissions, and user roles.
+
+Then perform a complete verification of everything that exists in the project.
+
+Treat this as a production readiness audit.
+
+---
+
+# Phase 1 – Discover the Application
+
+Before making any changes:
+
+* Analyze the complete project structure.
+* Discover all modules.
+* Discover all user roles.
+* Discover all pages and screens.
+* Discover all routes.
+* Discover all APIs.
+* Discover all database tables and relationships.
+* Discover all forms.
+* Discover all workflows.
+* Discover all notifications.
+* Discover all integrations.
+* Discover all background jobs.
+* Discover all scheduled tasks.
+* Discover all uploaded assets.
+* Discover all configuration files.
+* Discover all environment variables.
+
+Create an internal understanding of how the application is intended to work before testing.
+
+---
+
+# Phase 2 – Functional Audit
+
+Inspect every discovered feature.
+
+Verify that every feature:
+
+* Works correctly.
+* Is fully implemented.
+* Is connected to the backend.
+* Stores and retrieves data correctly.
+* Updates the UI correctly.
+* Produces the expected result.
+* Handles success and failure scenarios.
+* Has proper validations.
+* Displays meaningful error messages.
+* Handles loading states.
+* Handles empty states.
+* Prevents duplicate actions.
+* Handles unexpected user input gracefully.
+
+---
+
+# Phase 3 – End-to-End Workflow Verification
+
+For every workflow discovered in the application:
+
+* Verify every step.
+* Verify every transition.
+* Verify every status update.
+* Verify all related records update correctly.
+* Verify every affected module stays synchronized.
+* Verify every notification, log, and database update occurs correctly.
+* Ensure no workflow breaks at any stage.
+
+Follow every workflow from start to finish exactly as a real user would.
+
+---
+
+# Phase 4 – UI/UX Audit
+
+Inspect every screen.
+
+Verify:
+
+* Navigation works.
+* Buttons function correctly.
+* Links are valid.
+* Forms are complete.
+* Inputs exist where required.
+* Labels are correct.
+* Placeholders are meaningful.
+* Icons render correctly.
+* Images load correctly.
+* Responsive layouts work.
+* Text is readable.
+* No overlapping elements.
+* No broken layouts.
+* No missing pages.
+* No dead-end navigation.
+* Consistent spacing, alignment, fonts, and colors.
+* Professional user experience.
+
+---
+
+# Phase 5 – Backend Audit
+
+Inspect every backend feature.
+
+Verify:
+
+* APIs function correctly.
+* Authentication works.
+* Authorization is enforced.
+* Business logic is complete.
+* Database operations are correct.
+* Transactions are safe.
+* Exceptions are handled.
+* Logging is present.
+* Performance is acceptable.
+* No unnecessary queries.
+* No missing API endpoints.
+* No broken integrations.
+
+---
+
+# Phase 6 – Database Audit
+
+Inspect the database.
+
+Verify:
+
+* Table relationships.
+* Foreign keys.
+* Constraints.
+* Indexes.
+* Required fields.
+* Data consistency.
+* Duplicate prevention.
+* Orphan records.
+* Soft deletes.
+* Audit history.
+* Data integrity.
+
+---
+
+# Phase 7 – Security Audit
+
+Verify:
+
+* Authentication.
+* Authorization.
+* Role permissions.
+* Session handling.
+* Token handling.
+* Input validation.
+* File upload security.
+* SQL Injection protection.
+* XSS protection.
+* CSRF protection.
+* Sensitive data handling.
+* API security.
+* Access restrictions.
+
+---
+
+# Phase 8 – Performance Audit
+
+Verify:
+
+* Slow pages.
+* Slow APIs.
+* Large database queries.
+* Unnecessary re-renders.
+* Memory leaks.
+* Inefficient state management.
+* Image optimization.
+* Lazy loading.
+* Pagination.
+* Caching opportunities.
+
+---
+
+# Phase 9 – Cross-Module Synchronization
+
+Whenever one module changes data, verify every dependent module updates correctly.
+
+Ensure:
+
+* Dashboards remain accurate.
+* Reports update correctly.
+* Notifications remain synchronized.
+* Search results remain accurate.
+* Lists refresh correctly.
+* Statistics update correctly.
+* Status changes propagate correctly.
+* No stale or inconsistent data exists.
+
+---
+
+# Phase 10 – Edge Case Testing
+
+Test:
+
+* Empty data.
+* Invalid data.
+* Duplicate submissions.
+* Network failures.
+* Permission restrictions.
+* Concurrent users.
+* Large datasets.
+* Session expiration.
+* Unexpected navigation.
+* Browser refreshes.
+* Mobile and desktop behavior.
+
+---
+
+# Phase 11 – Missing Feature Detection
+
+Do not only test existing functionality.
+
+Actively identify:
+
+* Missing implementations.
+* Incomplete features.
+* Placeholder screens.
+* Unused components.
+* Missing validations.
+* Missing database mappings.
+* Missing API integrations.
+* Missing UI elements.
+* Missing workflows.
+* Missing notifications.
+* Broken relationships.
+* Broken navigation.
+* Inconsistent business logic.
+
+Whenever a feature appears incomplete, determine what is missing and complete it using the existing application architecture and coding patterns.
+
+---
+
+# Phase 12 – Code Quality Audit
+
+Review the codebase for:
+
+* Duplicate code.
+* Dead code.
+* Unused files.
+* Unused APIs.
+* Unused components.
+* Naming inconsistencies.
+* Poor architecture.
+* Code smells.
+* Maintainability.
+* Reusability.
+* Scalability.
+
+Refactor where appropriate without changing business behavior.
+
+---
+
+# Phase 13 – Automatic Fixes
+
+Where possible:
+
+* Fix issues automatically.
+* Preserve existing functionality.
+* Avoid introducing regressions.
+* Follow existing project architecture.
+* Keep backward compatibility.
+* Do not remove working features.
+
+---
+
+# Final Deliverables
+
+At the end of the audit, generate a comprehensive report containing:
+
+1. Summary of the application architecture.
+2. List of every discovered module.
+3. Features tested.
+4. Issues found.
+5. Root cause of each issue.
+6. Severity (Critical / High / Medium / Low).
+7. Fixes applied.
+8. Remaining recommendations.
+9. Production readiness assessment.
+10. A final checklist showing every module as:
+
+* ✅ Passed
+* ⚠️ Needs Attention
+* ❌ Failed
+
+## Important Instructions
+
+* Do not assume functionality based on names alone.
+* Discover the application first, then test it.
+* Validate every workflow from the user interface through the backend and database.
+* Think like a QA engineer, software architect, security engineer, and end user simultaneously.
+* Leave no page, API, database table, workflow, role, permission, form, or integration untested.
+* If any inconsistency, missing implementation, broken mapping, or incomplete functionality is found, fix it using the project's existing architecture and coding standards, then verify the fix before marking it complete.
+
+This prompt is intentionally generic, so you can reuse it for almost any web, mobile, or full-stack application, regardless of the specific features it contains.

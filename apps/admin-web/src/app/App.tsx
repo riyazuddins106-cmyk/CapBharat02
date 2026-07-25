@@ -278,6 +278,7 @@ const ADMIN_SIDEBAR = [
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config"        },
   { id: "otp-settings",   icon: KeyRound,    label: "OTP Settings"      },
   { id: "documents",      icon: ShieldCheck, label: "Document Verification" },
+  { id: "payouts",        icon: Wallet,      label: "Partner Payouts"   },
   { id: "settings",       icon: Settings,    label: "Settings"          },
 ];
 
@@ -718,6 +719,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <OtpSettingsView accessToken={accessToken} />
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
+          ) : activeSection === "payouts" ? (
+            <PayoutsAdminView accessToken={accessToken} />
           ) : (
             <SettingsView user={user} />
           )}
@@ -4157,6 +4160,118 @@ function OtpSettingsView({ accessToken }: { accessToken: string }) {
           Save OTP Settings
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PARTNER PAYOUTS (Admin)
+═══════════════════════════════════════════════════════════════════ */
+
+function PayoutsAdminView({ accessToken }: { accessToken: string }) {
+  const [payouts, setPayouts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await adminApi.getPayouts(accessToken);
+      setPayouts(data.payouts ?? []);
+    } catch { setPayouts([]); }
+    finally { setLoading(false); }
+  }
+
+  async function resolve(id: string, status: 'paid' | 'rejected') {
+    setResolving(id);
+    try {
+      await adminApi.resolvePayout(id, status, accessToken);
+      setMsg({ text: status === 'paid' ? 'Payout marked as paid.' : 'Payout rejected.', ok: status === 'paid' });
+      await load();
+    } catch (e: any) {
+      setMsg({ text: e.message ?? 'Action failed.', ok: false });
+    } finally { setResolving(null); }
+  }
+
+  const STATUS_COLOR: Record<string, string> = {
+    pending: '#F59E0B', paid: '#16A34A', rejected: '#EF4444',
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-white font-bold text-base">Partner Payouts</h2>
+        <button onClick={load} className="text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw size={16}/>
+        </button>
+      </div>
+
+      {msg && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm border ${msg.ok ? 'border-emerald-500/30 text-emerald-400' : 'border-red-500/30 text-red-400'}`}
+          style={{ background: msg.ok ? 'rgba(22,163,74,0.1)' : 'rgba(239,68,68,0.1)' }}>
+          {msg.ok ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
+          {msg.text}
+          <button onClick={() => setMsg(null)} className="ml-auto opacity-50 hover:opacity-100"><X size={13}/></button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-violet-400"/></div>
+      ) : payouts.length === 0 ? (
+        <div className="rounded-2xl p-8 text-center border border-white/[0.07]" style={CARD}>
+          <Wallet size={32} className="mx-auto mb-3 text-white/20"/>
+          <p className="text-white/40 text-sm">No payout requests yet.</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.07]">
+                {["Partner", "Amount", "Note", "Requested", "Status", "Actions"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {payouts.map((p: any) => (
+                <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                  <td className="px-4 py-3 text-white font-medium">{p.partner_name ?? p.partnerId?.slice(0, 8)}</td>
+                  <td className="px-4 py-3 text-emerald-400 font-semibold">{fmt(p.amount)}</td>
+                  <td className="px-4 py-3 text-white/50 max-w-[160px] truncate">{p.note ?? '—'}</td>
+                  <td className="px-4 py-3 text-white/40 text-xs">{new Date(p.createdAt ?? p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                      style={{ background: (STATUS_COLOR[p.status] ?? '#6B7280') + '22', color: STATUS_COLOR[p.status] ?? '#6B7280' }}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => resolve(p.id, 'paid')}
+                          disabled={resolving === p.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors disabled:opacity-40">
+                          {resolving === p.id ? <Loader2 size={11} className="animate-spin"/> : <CheckCircle size={11}/>} Pay
+                        </button>
+                        <button
+                          onClick={() => resolve(p.id, 'rejected')}
+                          disabled={resolving === p.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-colors disabled:opacity-40">
+                          <XCircle size={11}/> Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

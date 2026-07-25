@@ -7,6 +7,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { bookingItems, cartItems, carts, serviceCategories, services, bookings } from '../database/schema/index.js';
 import { dispatchService } from '../services/dispatch.service.js';
 import { AppError } from '../utils/AppError.js';
+import { logger } from '../utils/logger.js';
 
 export const bookingController = {
   list: asyncHandler(async (req: Request, res: Response) => {
@@ -65,7 +66,12 @@ export const bookingController = {
       await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
       return [created];
     });
-    await dispatchService.broadcast(booking, first.service.id);
+    try {
+      await dispatchService.broadcast(booking, first.service.id);
+    } catch (err) {
+      // Non-fatal: booking is created; dispatch failure just means no partner notified yet
+      logger.warn(`[checkout] dispatch broadcast failed for booking ${booking.id}`, err);
+    }
     res.status(201).json({ success: true, data: booking });
   }),
 

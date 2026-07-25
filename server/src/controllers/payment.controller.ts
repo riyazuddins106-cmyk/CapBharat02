@@ -11,6 +11,16 @@ import { platformSettings } from '../database/schema/platformSettings.js';
 import { eq, and } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
+import { pointsService } from '../services/points.service.js';
+
+/** Award loyalty points for a paid booking — non-fatal, swallowed on error */
+async function awardPoints(customerId: string, bookingId: string, priceRupees: number) {
+  try {
+    await pointsService.earnForBooking(customerId, bookingId, priceRupees);
+  } catch (err) {
+    logger.warn(`[payments] points award failed for booking ${bookingId}`, err);
+  }
+}
 
 /* ── Helpers to load gateway config from DB ─────────────────────────────── */
 
@@ -263,6 +273,10 @@ export const razorpayCallback = asyncHandler(async (req: Request, res: Response)
 
   logger.info('[razorpay] Payment verified and recorded for booking %s', booking_id);
 
+  // Award loyalty points (idempotent, non-fatal)
+  const [bk] = await db.select().from(bookings).where(eq(bookings.id, booking_id)).limit(1);
+  if (bk) void awardPoints(bk.customerId, booking_id, bk.price ?? 0);
+
   // Redirect to deep link so mobile WebView can detect success
   res.redirect(302, `servenow://payment-success?bookingId=${booking_id}&paymentId=${razorpay_payment_id}&gateway=razorpay`);
 });
@@ -380,6 +394,11 @@ export const stripeSuccess = asyncHandler(async (req: Request, res: Response) =>
   }
 
   logger.info('[stripe] Payment verified for booking %s', booking_id);
+
+  // Award loyalty points (idempotent, non-fatal)
+  const [sbk] = await db.select().from(bookings).where(eq(bookings.id, booking_id)).limit(1);
+  if (sbk) void awardPoints(sbk.customerId, booking_id, sbk.price ?? 0);
+
   res.redirect(302, `servenow://payment-success?bookingId=${booking_id}&gateway=stripe`);
 });
 
@@ -460,6 +479,9 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
     }).returning();
     paymentRecord = created;
   }
+
+  // Award loyalty points (idempotent, non-fatal)
+  void awardPoints(userId, bookingId, booking.price ?? 0);
 
   sendSuccess(res, paymentRecord, 200);
 });
