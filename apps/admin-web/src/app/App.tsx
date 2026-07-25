@@ -8,7 +8,7 @@ import {
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
-  AlertCircle, History as HistoryIcon, X,
+  AlertCircle, History as HistoryIcon, X, KeyRound,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
@@ -275,6 +275,7 @@ const ADMIN_SIDEBAR = [
   { id: "payment-config", icon: CreditCard,  label: "Payment Config"    },
   { id: "email-config",   icon: Mail,        label: "Email Config"      },
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config"        },
+  { id: "otp-settings",   icon: KeyRound,    label: "OTP Settings"      },
   { id: "documents",      icon: ShieldCheck, label: "Document Verification" },
   { id: "settings",       icon: Settings,    label: "Settings"          },
 ];
@@ -712,6 +713,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <EmailConfigView accessToken={accessToken} adminEmail={user.email} />
           ) : activeSection === "sms-config" ? (
             <SmsConfigView accessToken={accessToken} />
+          ) : activeSection === "otp-settings" ? (
+            <OtpSettingsView accessToken={accessToken} />
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
           ) : (
@@ -3926,6 +3929,231 @@ function SmsConfigView({ accessToken }: { accessToken: string }) {
         >
           {saving && <Loader2 size={15} className="animate-spin" />}
           Save Configuration
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OTP SETTINGS
+═══════════════════════════════════════════════════════════════════ */
+
+interface OtpCfg {
+  channels: { email: boolean; sms: boolean };
+  expiryMinutes: number;
+  maxAttempts: number;
+  codeLength: 4 | 6;
+}
+
+const DEFAULT_OTP_CFG: OtpCfg = {
+  channels: { email: true, sms: true },
+  expiryMinutes: 10,
+  maxAttempts: 5,
+  codeLength: 6,
+};
+
+function OtpSettingsView({ accessToken }: { accessToken: string }) {
+  const [cfg, setCfg]         = useState<OtpCfg>(DEFAULT_OTP_CFG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi.getSettings("otp_config", accessToken)
+      .then(res => setCfg(prev => ({ ...prev, ...(res.value as Partial<OtpCfg>) })))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  const showMsg = (text: string, type: "success" | "error") => {
+    setMsg({ text, type });
+    setTimeout(() => setMsg(null), 5000);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.saveSettings("otp_config", cfg, accessToken);
+      showMsg("OTP settings saved successfully.", "success");
+    } catch {
+      showMsg("Failed to save. Please try again.", "error");
+    } finally { setSaving(false); }
+  };
+
+  const setChannel = (ch: "email" | "sms", val: boolean) =>
+    setCfg(c => ({ ...c, channels: { ...c.channels, [ch]: val } }));
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <Loader2 size={28} className="animate-spin text-violet-500" />
+    </div>
+  );
+
+  return (
+    <div className="max-w-xl space-y-5">
+      <div className="mb-1">
+        <h2 className="text-white font-bold text-base">OTP Settings</h2>
+        <p className="text-white/40 text-xs mt-0.5">
+          Control how one-time passwords are delivered and validated across the platform.
+        </p>
+      </div>
+
+      {/* ── Delivery Channels ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5" style={CARD}>
+        <h3 className="text-white text-sm font-semibold flex items-center gap-2 mb-4">
+          <KeyRound size={15} className="text-violet-400" /> Delivery Channels
+        </h3>
+        <p className="text-white/40 text-xs mb-4 -mt-2">
+          Choose how OTP codes are sent to users. Enable email, SMS, or both simultaneously.
+        </p>
+
+        {/* Email channel */}
+        <div className="flex items-center justify-between py-3 border-b border-white/[0.05]">
+          <div>
+            <p className="text-white/80 text-sm font-medium flex items-center gap-2">
+              <Mail size={13} className="text-violet-400" /> Send via Email
+            </p>
+            <p className="text-white/40 text-xs mt-0.5">
+              OTP sent to the user's registered email address. Requires Email Config to be set up.
+            </p>
+          </div>
+          <ToggleSwitch checked={cfg.channels.email} onChange={v => setChannel("email", v)} />
+        </div>
+
+        {/* SMS channel */}
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <p className="text-white/80 text-sm font-medium flex items-center gap-2">
+              <Smartphone size={13} className="text-violet-400" /> Send via SMS
+            </p>
+            <p className="text-white/40 text-xs mt-0.5">
+              OTP sent to the user's mobile number. Requires SMS Config (Fast2SMS) to be set up.
+            </p>
+          </div>
+          <ToggleSwitch checked={cfg.channels.sms} onChange={v => setChannel("sms", v)} />
+        </div>
+
+        {/* Both on */}
+        {cfg.channels.email && cfg.channels.sms && (
+          <div className="mt-3 rounded-xl border border-green-500/20 bg-green-500/5 px-3 py-2 text-xs text-green-300">
+            <CheckCircle size={11} className="inline mr-1.5" />
+            OTP will be sent to both email and mobile number at the same time. SMS requires a Fast2SMS API key in SMS Config.
+          </div>
+        )}
+
+        {/* Email only */}
+        {cfg.channels.email && !cfg.channels.sms && (
+          <div className="mt-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-300">
+            <Mail size={11} className="inline mr-1.5" />
+            OTP will be sent via email only. SMS is disabled.
+          </div>
+        )}
+
+        {/* SMS only */}
+        {!cfg.channels.email && cfg.channels.sms && (
+          <div className="mt-3 rounded-xl border border-orange-500/20 bg-orange-500/5 px-3 py-2 text-xs text-orange-300">
+            <Smartphone size={11} className="inline mr-1.5" />
+            OTP will be sent via SMS only. Email is disabled. Requires Fast2SMS API key.
+          </div>
+        )}
+
+        {/* Both off — hard block */}
+        {!cfg.channels.email && !cfg.channels.sms && (
+          <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/8 px-3 py-2 text-xs text-red-300">
+            <AlertCircle size={11} className="inline mr-1.5" />
+            <strong>Cannot save</strong> — at least one channel must be enabled. Users would receive no OTP and could not log in or register.
+          </div>
+        )}
+      </div>
+
+      {/* ── OTP Behaviour ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold mb-1">OTP Behaviour</h3>
+
+        {/* Expiry */}
+        <div>
+          <Field label="Code Expiry (minutes)">
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={2} max={30} step={1}
+                value={cfg.expiryMinutes}
+                onChange={e => setCfg(c => ({ ...c, expiryMinutes: Number(e.target.value) }))}
+                className="flex-1 accent-violet-500"
+              />
+              <span className="text-white font-bold text-sm w-12 text-right">
+                {cfg.expiryMinutes} min
+              </span>
+            </div>
+          </Field>
+          <p className="text-white/30 text-xs mt-1">
+            OTP codes expire after this many minutes. Default: 10 minutes.
+          </p>
+        </div>
+
+        {/* Max attempts */}
+        <div>
+          <Field label="Max Wrong Attempts">
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={1} max={10} step={1}
+                value={cfg.maxAttempts}
+                onChange={e => setCfg(c => ({ ...c, maxAttempts: Number(e.target.value) }))}
+                className="flex-1 accent-violet-500"
+              />
+              <span className="text-white font-bold text-sm w-12 text-right">
+                {cfg.maxAttempts}×
+              </span>
+            </div>
+          </Field>
+          <p className="text-white/30 text-xs mt-1">
+            After this many wrong entries the code is locked and user must request a new one. Default: 5.
+          </p>
+        </div>
+
+        {/* Code length */}
+        <div>
+          <p className="text-white/60 text-xs font-medium mb-2">OTP Code Length</p>
+          <div className="flex gap-3">
+            {([4, 6] as const).map(len => (
+              <button
+                key={len}
+                type="button"
+                onClick={() => setCfg(c => ({ ...c, codeLength: len }))}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${cfg.codeLength === len ? "border-violet-500 text-violet-400 bg-violet-500/10" : "border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"}`}
+              >
+                {len} digits
+              </button>
+            ))}
+          </div>
+          <p className="text-white/30 text-xs mt-2">Default: 6 digits.</p>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 text-xs text-violet-300 space-y-1">
+        <p className="font-semibold text-violet-400">How it works</p>
+        <p>• When both channels are on, the same OTP code is sent to email AND SMS simultaneously.</p>
+        <p>• Users can enter the code from either channel — both are the same code.</p>
+        <p>• SMS failures are silent — if SMS is on but Fast2SMS fails, email OTP still works.</p>
+        <p>• Changes take effect immediately for all new OTP requests.</p>
+      </div>
+
+      {msg && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium border ${msg.type === "success" ? "text-green-400 bg-green-500/10 border-green-500/20" : "text-red-400 bg-red-500/10 border-red-500/20"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+        >
+          {saving && <Loader2 size={15} className="animate-spin" />}
+          Save OTP Settings
         </button>
       </div>
     </div>

@@ -81,11 +81,19 @@ function SlideEditor() {
           return;
         }
         if (consumesArrowKeys(event.target)) return;
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        if (
+          event.key === 'ArrowLeft' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'PageUp'
+        ) {
           event.preventDefault();
           postNav('retreatSlide');
         }
-        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        if (
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowDown' ||
+          event.key === 'PageDown'
+        ) {
           event.preventDefault();
           postNav('advanceSlide');
         }
@@ -95,7 +103,9 @@ function SlideEditor() {
         event.preventDefault();
       }
       if (
-        (event.key === 'ArrowLeft' || event.key === 'ArrowUp') &&
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'PageUp') &&
         currentIndex > 0
       ) {
         navigate(`/slide${slides[currentIndex - 1].position}`);
@@ -103,6 +113,7 @@ function SlideEditor() {
       if (
         (event.key === 'ArrowRight' ||
           event.key === 'ArrowDown' ||
+          event.key === 'PageDown' ||
           event.key === ' ') &&
         currentIndex < slides.length - 1
       ) {
@@ -233,6 +244,8 @@ function SlideViewer() {
       if (
         event.key !== 'ArrowLeft' &&
         event.key !== 'ArrowRight' &&
+        event.key !== 'PageUp' &&
+        event.key !== 'PageDown' &&
         event.key !== ' '
       )
         return;

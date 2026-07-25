@@ -84,6 +84,7 @@ if (result.success) {
 These existing callbacks are useful during debugging:
 
 - `fetchDeploymentLogs({ afterTimestamp?, beforeTimestamp?, message? })` — fetch runtime/production logs (see `references/deployment-logs.md`). Use to check what happens after the app starts in production.
+- `explainSchemaDiff()` (build agent only) — fetch the read-only development→production schema diff publishing would apply (from the main deployment skill). Use when a build or promote failure looks database-related, or to explain why publishing is prompting for schema changes before the user publishes. Treat its statements and destructive flags as a worst case: they resolve conflicts non-interactively as drop/create, so a reported data loss may actually be a rename the publish dialog can migrate without losing data.
 - `viewEnvVars({ environment: "development" | "production" })` — compare env var names between dev and prod (from `environment-secrets` skill). Use to find missing production secrets.
 - `deployConfig({ deploymentTarget, run?, build?, publicDir? })` — reconfigure deployment settings (from the main deployment skill). Use to fix run commands and build commands.
 - `SuggestUserAction({ action: "deploy", message: "The app is ready to publish." })` — prompt the user to click Publish after making fixes.

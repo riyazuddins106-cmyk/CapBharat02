@@ -137,6 +137,10 @@ if (!info.success) {
 
 Fetch and analyze deployment logs. See `.local/skills/deployment/references/deployment-logs.md` for full documentation.
 
+### explainSchemaDiff() (build agent only)
+
+Explain the development→production database schema diff that publishing surfaces (why publishing wants to change the production schema, and whether it is destructive). Only the build agent can call it. See `.local/skills/deployment/references/explain-schema-diff.md` (available to the build agent) for parameters, return shape, and usage.
+
 ## Webhooks and external services reaching the app
 
 When the user wants an external service to call their app -- a webhook sender (Stripe, GitHub, Slack), a CI pipeline, an uptime monitor, or any other automated caller -- you must hand them a URL that the service can actually reach, and tell them up front whether the app's privacy will block that traffic. Do not assume the caller can reach the app.

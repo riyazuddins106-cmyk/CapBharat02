@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import nodemailer from 'nodemailer';
 
 /* ── Allowed setting keys ─────────────────────────────────────────── */
-const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config']);
+const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config']);
 
 /* ── GET /admin/settings/:key ─────────────────────────────────────── */
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -131,10 +131,18 @@ function getDefaults(key: string): object {
   }
   if (key === 'contact_config') {
     return {
-      email:       'support@servenow.in',
-      phone:       '+91 98765 43210',
-      hours:       'Mon–Sat, 9am–6pm IST',
-      docsUrl:     'docs.servenow.in',
+      email:   'support@servenow.in',
+      phone:   '+91 98765 43210',
+      hours:   'Mon–Sat, 9am–6pm IST',
+      docsUrl: 'docs.servenow.in',
+    };
+  }
+  if (key === 'otp_config') {
+    return {
+      channels:      { email: true, sms: true },
+      expiryMinutes: 10,
+      maxAttempts:   5,
+      codeLength:    6,
     };
   }
   return {};
