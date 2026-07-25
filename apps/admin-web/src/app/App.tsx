@@ -8,7 +8,7 @@ import {
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
-  AlertCircle, History as HistoryIcon, X, KeyRound,
+  AlertCircle, History as HistoryIcon, X, KeyRound, Download,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import type {
@@ -4300,6 +4300,25 @@ function DocumentVerificationView({ accessToken }: { accessToken: string }) {
     return /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
   }
 
+  async function downloadDoc(url: string, docType: string, partnerName: string) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const ext = url.split('?')[0].split('.').pop() ?? 'jpg';
+      const filename = `${partnerName.replace(/\s+/g, '_')}_${docType}.${ext}`;
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  }
+
   return (
     <div>
       {/* Banner */}
@@ -4396,6 +4415,12 @@ function DocumentVerificationView({ accessToken }: { accessToken: string }) {
                           <Eye size={12}/> Preview
                         </button>
                       )}
+                      {doc.document_url && (
+                        <button onClick={() => downloadDoc(doc.document_url, doc.document_type, doc.partner_name)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-emerald-400/25 text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                          <Download size={12}/> Download
+                        </button>
+                      )}
                       <button onClick={() => openHistory(doc)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors">
                         <HistoryIcon size={12}/> History
@@ -4487,6 +4512,11 @@ function DocumentVerificationView({ accessToken }: { accessToken: string }) {
                   className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs border border-violet-400/25 text-violet-400 hover:bg-violet-500/10 transition-colors">
                   <ExternalLink size={11}/> Open
                 </a>
+                <button
+                  onClick={() => downloadDoc(previewDoc.document_url, previewDoc.document_type, previewDoc.partner_name)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs border border-emerald-400/25 text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                  <Download size={11}/> Download
+                </button>
                 <button onClick={() => setPreviewDoc(null)}
                   className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition-colors">
                   <X size={16}/>

@@ -14,7 +14,7 @@ export const registerSchema = z.object({
 
 export const verifyOtpSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  code: z.string().trim().length(6, 'OTP must be 6 digits'),
+  code: z.string().trim().min(4, 'OTP must be 4–6 digits').max(6, 'OTP must be 4–6 digits'),
   purpose: z.enum(['signup', 'login', 'password_reset']),
 });
 
@@ -38,7 +38,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  code: z.string().trim().length(6, 'OTP must be 6 digits'),
+  code: z.string().trim().min(4, 'OTP must be 4–6 digits').max(6, 'OTP must be 4–6 digits'),
   newPassword: z
     .string()
     .min(8, 'Password must be at least 8 characters')
