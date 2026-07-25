@@ -94,10 +94,10 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"
     exec 9<>"$_FIFO"       # O_RDWR: non-blocking, holds write-end open → Expo never sees EOF
-    # Send down-arrow + enter after 3 s to select "Proceed anonymously"
-    ( sleep 3 && printf '\033[B\r' >&9 ) 2>/dev/null &
-    _KEYPRESS_PID=$!
-    pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
+    # EXPO_NO_INTERACTIVE=1 makes Expo auto-proceed anonymously, no keypress needed
+    export EXPO_NO_INTERACTIVE=1
+    export CI=1
+    pnpm exec expo start --tunnel --port "$PORT" --non-interactive "$@" < "$_FIFO"
     EXIT_CODE=$?
     exec 9>&-              # Close our fd; FIFO is now fully released
     kill "$_KEYPRESS_PID" 2>/dev/null || true

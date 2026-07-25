@@ -48,3 +48,15 @@ id = "fa_HV9YGqe6aeN2iZrz4A"
 uri = "file://SERVENOW_DOCUMENTATION.md"
 type = "text"
 title = "ServeNow — Complete Technical Documentation"
+
+[[outputs]]
+id = "w7AOGu4l_ereOchHZjQ3L"
+uri = "file://tmp-qr/qr-customer.png"
+type = "image"
+title = "Customer App QR — scan with Expo Go"
+
+[[outputs]]
+id = "N7Qeb3RyxSBAkzIoE6uja"
+uri = "file://tmp-qr/qr-partner.png"
+type = "image"
+title = "Partner App QR — scan with Expo Go"
