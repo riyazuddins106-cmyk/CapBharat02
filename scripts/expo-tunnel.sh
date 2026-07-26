@@ -83,37 +83,24 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     export NGROK_AUTHTOKEN="$AUTHTOKEN_VALUE"
   fi
 
-  REPLIT_MAX_RETRIES=5
-  REPLIT_RETRY_DELAY=30
-  for attempt in $(seq 1 $REPLIT_MAX_RETRIES); do
-    echo "=== Tunnel attempt $attempt/$REPLIT_MAX_RETRIES ==="
-    set +e
-    # Use a FIFO so we can keep Expo's stdin open (preventing EOF) without
-    # a `sleep 999999` that would block the pipe and prevent retries.
-    # Open with <> (O_RDWR) — does NOT block, unlike write-only open.
-    _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
-    mkfifo "$_FIFO"
-    exec 9<>"$_FIFO"       # O_RDWR: non-blocking, holds write-end open → Expo never sees EOF
-    # EXPO_NO_INTERACTIVE=1 makes Expo auto-proceed anonymously, no keypress needed
-    export EXPO_NO_INTERACTIVE=1
-    export CI=1
-    pnpm exec expo start --tunnel --port "$PORT" --non-interactive "$@" < "$_FIFO"
-    EXIT_CODE=$?
-    exec 9>&-              # Close our fd; FIFO is now fully released
-    kill "$_KEYPRESS_PID" 2>/dev/null || true
-    wait "$_KEYPRESS_PID" 2>/dev/null || true
-    rm -f "$_FIFO"
-    set -e
-    if [[ $EXIT_CODE -eq 0 ]]; then
-      exit 0
-    fi
-    if [[ $attempt -lt $REPLIT_MAX_RETRIES ]]; then
-      echo "Tunnel exited (code $EXIT_CODE). Retrying in ${REPLIT_RETRY_DELAY}s…"
-      sleep "$REPLIT_RETRY_DELAY"
-    fi
-  done
-  echo "All $REPLIT_MAX_RETRIES tunnel attempts failed."
-  exit 1
+  # Use --host lan so Metro serves on the local network interface.
+  # Setting REACT_NATIVE_PACKAGER_HOSTNAME to the Replit public domain makes
+  # the QR code encode the public URL (exp://<replit-domain>:<port>) so Expo Go
+  # on a phone can reach Metro through Replit's HTTP proxy — no ngrok needed.
+  # DO NOT export CI=1 here: when EXPO_TOKEN is set Expo treats CI=1 as a
+  # "robot user" session and blocks tunnel/ngrok usage even in lan mode.
+  export EXPO_NO_INTERACTIVE=1
+  export REACT_NATIVE_PACKAGER_HOSTNAME="$REPLIT_DEV_DOMAIN"
+  echo "Starting Expo (--host lan) — QR will use $REPLIT_DEV_DOMAIN:$PORT"
+
+  _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
+  mkfifo "$_FIFO"
+  exec 9<>"$_FIFO"
+  pnpm exec expo start --host lan --port "$PORT" "$@" < "$_FIFO"
+  EXIT_CODE=$?
+  exec 9>&-
+  rm -f "$_FIFO"
+  exit $EXIT_CODE
 fi
 
 # ── ngrok fallback (outside Replit) ──────────────────────────────────────────
