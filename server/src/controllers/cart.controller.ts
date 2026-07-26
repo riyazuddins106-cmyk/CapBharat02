@@ -38,6 +38,7 @@ export const cartController = {
     const itemId = String(req.params.itemId);
     const quantity = Number(req.body.quantity);
     if (!Number.isInteger(quantity) || quantity < 1) throw AppError.badRequest('Quantity must be a positive integer.');
+    if (quantity > 20) throw AppError.badRequest('Quantity cannot exceed 20 per item.');
     const [cart] = await db.select().from(carts).where(eq(carts.customerId, req.user!.userId)).limit(1);
     if (!cart) throw AppError.notFound('Cart not found.');
     await db.update(cartItems).set({ quantity, updatedAt: new Date() }).where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cart.id)));

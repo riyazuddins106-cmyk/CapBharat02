@@ -34,7 +34,7 @@ export default function NotificationsScreen() {
   const { accessToken } = useAuth();
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
-  const { data: items = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: items = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['/api/notifications', accessToken],
     queryFn: () => notificationsApi.list(accessToken!),
     enabled: !!accessToken,
@@ -73,6 +73,15 @@ export default function NotificationsScreen() {
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedForeground} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground, marginTop: 12 }]}>Couldn't load notifications</Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground, marginBottom: 16 }]}>Check your connection and try again.</Text>
+          <TouchableOpacity onPress={() => refetch()} style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 24, paddingVertical: 10 }}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : items.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="notifications-outline" size={52} color={colors.mutedForeground} />

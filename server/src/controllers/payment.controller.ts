@@ -306,9 +306,19 @@ export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) 
     const paymentId = event.payload?.payment?.entity?.id;
     const orderId   = event.payload?.payment?.entity?.order_id;
     if (paymentId && orderId) {
-      await db.update(payments)
-        .set({ status: 'paid', razorpayPaymentId: paymentId, updatedAt: new Date() })
-        .where(eq(payments.razorpayOrderId, orderId));
+      // Idempotency guard: skip if already marked paid to prevent double side-effects
+      const [existing] = await db.select({ id: payments.id, status: payments.status, bookingId: payments.bookingId, customerId: payments.customerId })
+        .from(payments).where(eq(payments.razorpayOrderId, orderId)).limit(1);
+      if (existing?.status !== 'paid') {
+        await db.update(payments)
+          .set({ status: 'paid', razorpayPaymentId: paymentId, updatedAt: new Date() })
+          .where(eq(payments.razorpayOrderId, orderId));
+        // Award points (idempotent — points service deduplicates by bookingId)
+        if (existing?.bookingId) {
+          const [bk] = await db.select().from(bookings).where(eq(bookings.id, existing.bookingId)).limit(1);
+          if (bk) void awardPoints(bk.customerId, existing.bookingId, bk.price ?? 0);
+        }
+      }
     }
   }
 

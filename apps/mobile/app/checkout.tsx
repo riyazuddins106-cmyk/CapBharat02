@@ -252,8 +252,14 @@ export default function CheckoutScreen() {
               <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Add New Address</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => setStep(2)} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-              <Text style={styles.primaryBtnText}>Continue →</Text>
+            <TouchableOpacity
+              onPress={() => selectedAddressId && setStep(2)}
+              style={[styles.primaryBtn, { backgroundColor: selectedAddressId ? colors.primary : colors.muted }]}
+              disabled={!selectedAddressId}
+            >
+              <Text style={[styles.primaryBtnText, { color: selectedAddressId ? '#fff' : colors.mutedForeground }]}>
+                {selectedAddressId ? 'Continue →' : 'Select an address to continue'}
+              </Text>
             </TouchableOpacity>
           </>
         )}

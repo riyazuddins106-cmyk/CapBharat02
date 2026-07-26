@@ -117,6 +117,14 @@ export default function DocumentsScreen() {
 
     const asset = result.assets[0];
     const mime = asset.mimeType ?? 'image/jpeg';
+
+    // Client-side size guard: reject files over 10 MB before attempting upload
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (asset.fileSize && asset.fileSize > MAX_BYTES) {
+      showAlert('File too large', 'Please choose an image smaller than 10 MB.');
+      return;
+    }
+
     setUploadingType(docType);
     try {
       await documentsApi.upload(docType, asset.uri, mime, accessToken!);

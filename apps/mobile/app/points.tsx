@@ -31,7 +31,7 @@ export default function PointsScreen() {
   const [redeemModal, setRedeemModal] = useState(false);
   const [redeemAmount, setRedeemAmount] = useState('');
 
-  const { data: summary, isLoading, refetch, isFetching } = useQuery({
+  const { data: summary, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['/api/points', accessToken],
     queryFn: () => pointsApi.getSummary(accessToken!),
     enabled: !!accessToken,
@@ -76,6 +76,15 @@ export default function PointsScreen() {
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedForeground} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground, marginTop: 12 }]}>Couldn't load points</Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground, marginBottom: 16 }]}>Check your connection and try again.</Text>
+          <TouchableOpacity onPress={() => refetch()} style={[styles.redeemBtn, { backgroundColor: colors.primary }]}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={items}

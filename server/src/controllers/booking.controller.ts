@@ -39,6 +39,18 @@ export const bookingController = {
     if (!rows.length) throw AppError.badRequest('Your cart is empty.');
     const total = rows.reduce((sum, row) => sum + row.item.quantity * row.service.customerPrice, 0);
     const first = rows[0];
+
+    // Duplicate guard: block if this customer already has an active booking created
+    // in the last 5 minutes that is still searching for a partner (prevents double-submit).
+    const { sql: drizzleSql } = await import('drizzle-orm');
+    const [recentDup] = await db.select({ id: bookings.id }).from(bookings).where(
+      drizzleSql`customer_id = ${req.user!.userId}
+        AND status = 'pending'
+        AND dispatch_status = 'searching_partner'
+        AND created_at > NOW() - INTERVAL '5 minutes'`
+    ).limit(1);
+    if (recentDup) throw AppError.conflict('You already have a booking in progress. Please wait a moment before placing another.');
+
     const [booking] = await db.transaction(async (tx) => {
       const [created] = await tx.insert(bookings).values({
         customerId: req.user!.userId,

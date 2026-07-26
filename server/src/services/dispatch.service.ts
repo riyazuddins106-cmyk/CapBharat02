@@ -45,7 +45,38 @@ export const dispatchService = {
         eq(professionals.currentBookingStatus, 'available'),
         isNull(professionals.deletedAt),
       ));
-    if (!allCandidates.length) return [];
+
+    // ── Document verification gate ─────────────────────────────────────────
+    // Only dispatch to partners who have all mandatory docs approved.
+    const mandatoryRows = await db.execute(
+      sql`SELECT type_key FROM document_type_configs WHERE is_mandatory = true AND is_active = true`
+    );
+    const mandatoryKeys: string[] = ((mandatoryRows as any).rows ?? (mandatoryRows as any)).map((r: any) => r.type_key);
+
+    let verifiedCandidates = allCandidates;
+    if (mandatoryKeys.length > 0) {
+      const candidateIds = allCandidates.map(c => c.pro.id);
+      if (candidateIds.length > 0) {
+        const approvedRows = await db.execute(
+          sql`SELECT professional_id, document_type FROM partner_documents
+              WHERE professional_id = ANY(${candidateIds}) AND status = 'approved'`
+        );
+        const approvedByPro = new Map<string, Set<string>>();
+        for (const r of ((approvedRows as any).rows ?? (approvedRows as any)) as any[]) {
+          if (!approvedByPro.has(r.professional_id)) approvedByPro.set(r.professional_id, new Set());
+          approvedByPro.get(r.professional_id)!.add(r.document_type);
+        }
+        verifiedCandidates = allCandidates.filter(({ pro }) => {
+          const approved = approvedByPro.get(pro.id) ?? new Set();
+          return mandatoryKeys.every(k => approved.has(k));
+        });
+        if (verifiedCandidates.length < allCandidates.length) {
+          console.log(`[dispatch] booking=${booking.id} filtered out ${allCandidates.length - verifiedCandidates.length} partner(s) with incomplete documents`);
+        }
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────────
+    if (!verifiedCandidates.length) return [];
 
     // ── GPS-based proximity filtering ──────────────────────────────────────
     // Try to get the booking's address coordinates for distance sorting.
@@ -61,11 +92,11 @@ export const dispatchService = {
       bookingLng = addr?.longitude ?? null;
     }
 
-    let candidates = allCandidates;
+    let candidates = verifiedCandidates;
 
     if (bookingLat !== null && bookingLng !== null) {
       // Annotate each candidate with their distance (partners without GPS go last)
-      const withDistance = allCandidates.map((c) => {
+      const withDistance = verifiedCandidates.map((c) => {
         const { latitude: pLat, longitude: pLng } = c.pro;
         const distance =
           pLat !== null && pLng !== null
@@ -83,7 +114,7 @@ export const dispatchService = {
 
       console.log(
         `[dispatch] booking=${booking.id} address=(${bookingLat},${bookingLng}) ` +
-        `candidates=${allCandidates.length} within${MAX_RADIUS_KM}km=${nearby.length}`,
+        `candidates=${verifiedCandidates.length} within${MAX_RADIUS_KM}km=${nearby.length}`,
       );
     }
     // ────────────────────────────────────────────────────────────────────────

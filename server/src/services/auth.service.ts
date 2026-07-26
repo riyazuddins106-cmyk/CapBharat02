@@ -80,7 +80,7 @@ export const authService = {
     });
 
     const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
-    return { userId: user.id, email: user.email, devCode: code };
+    return { userId: user.id, email: user.email, devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
   },
 
   async register(input: RegisterInput) {
@@ -99,7 +99,7 @@ export const authService = {
 
     const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
 
-    return { userId: user.id, email: user.email, devCode: code };
+    return { userId: user.id, email: user.email, devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
   },
 
   async verifySignupOtp(email: string, code: string) {
@@ -123,7 +123,7 @@ export const authService = {
       throw AppError.notFound('Account not found.');
     }
     const code = await otpService.issue(email, purpose, user.id, user.phone ?? undefined);
-    return { devCode: code };
+    return { devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
   },
 
   async login(input: LoginInput) {
@@ -202,7 +202,7 @@ export const authService = {
       return {};
     }
     const code = await otpService.issue(email, 'password_reset', user.id, user.phone ?? undefined);
-    return { devCode: code };
+    return { devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
   },
 
   async resetPassword(input: ResetPasswordInput) {

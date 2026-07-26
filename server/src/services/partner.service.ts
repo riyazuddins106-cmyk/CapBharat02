@@ -151,6 +151,33 @@ export const partnerService = {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
     if (!['available', 'busy', 'offline'].includes(status)) throw AppError.badRequest('Invalid availability status.');
+
+    // Block going "available" unless all mandatory documents are approved
+    if (status === 'available') {
+      const { db } = await import('../config/database.js');
+      const { sql } = await import('drizzle-orm');
+
+      const mandatoryRows = await db.execute(
+        sql`SELECT type_key FROM document_type_configs WHERE is_mandatory = true AND is_active = true`
+      );
+      const mandatoryKeys: string[] = ((mandatoryRows as any).rows ?? (mandatoryRows as any)).map((r: any) => r.type_key);
+
+      if (mandatoryKeys.length > 0) {
+        const approvedRows = await db.execute(
+          sql`SELECT document_type FROM partner_documents WHERE professional_id = ${pro.id} AND status = 'approved'`
+        );
+        const approvedTypes = new Set<string>(
+          ((approvedRows as any).rows ?? (approvedRows as any)).map((r: any) => r.document_type)
+        );
+        const missing = mandatoryKeys.filter(k => !approvedTypes.has(k));
+        if (missing.length > 0) {
+          throw AppError.forbidden(
+            `You cannot go available until all mandatory documents are approved. Missing or not yet approved: ${missing.join(', ')}.`
+          );
+        }
+      }
+    }
+
     return professionalRepository.update(pro.id, {
       availabilityStatus: status,
       currentBookingStatus: status === 'available' ? 'available' : status === 'busy' ? 'busy' : 'available',

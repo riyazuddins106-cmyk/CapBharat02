@@ -250,7 +250,8 @@ export const adminController = {
       passwordHash,
       phone: phone?.trim() || null,
       role: 'partner',
-      emailVerifiedAt: new Date(),
+      // Admin-created partners must still verify their email before resetting passwords.
+      // Do NOT pre-verify — leave emailVerifiedAt null so OTP verification is required.
     }).returning();
 
     // Create professional profile

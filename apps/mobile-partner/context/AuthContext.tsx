@@ -94,6 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAccessToken(tokens.accessToken);
         return tokens.accessToken;
       } catch {
+        // Refresh token is invalid or expired — force logout so user sees the login screen
+        await clearTokens();
+        setUser(null);
+        setAccessToken(null);
+        queryClient.clear();
+        setRefreshHandler(null);
         return null;
       }
     });
