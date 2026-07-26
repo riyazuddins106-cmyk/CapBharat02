@@ -1106,7 +1106,7 @@ function CustHome({
                       className="mt-1 bg-white text-xs font-bold px-4 py-2 rounded-full self-start"
                       style={{ color: offer.bgColor || "#5B3EF5" }}
                     >
-                      {offer.ctaText || "Book Now"}
+                      {offer.ctaText || "Explore"}
                     </button>
                   </div>
                   <div className="text-6xl opacity-20 select-none"></div>
@@ -1498,7 +1498,7 @@ function CustServices({
         {catalogue.length > 0 && (
           <section className="mb-7">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold">Book a service</h3>
+              <h3 className="text-sm font-bold">Explore services</h3>
               <button onClick={() => setCartOpen(true)} className="text-xs font-bold text-violet-600">
                 Cart{cart?.items.length ? ` (${cart.items.reduce((n, item) => n + item.quantity, 0)})` : ""}
               </button>

@@ -342,7 +342,7 @@ export default function HomeScreen() {
             <Text style={styles.bannerTitle}>40% Off Your{'\n'}First Booking!</Text>
             <TouchableOpacity style={styles.bannerBtn} activeOpacity={0.85}
               onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/services'); }}>
-              <Text style={[styles.bannerBtnText, { color: colors.primary }]}>Book Now</Text>
+              <Text style={[styles.bannerBtnText, { color: colors.primary }]}>Explore</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.bannerDecor}>
@@ -445,7 +445,7 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                   <View style={[styles.bookBtn, { backgroundColor: '#F5F3FF' }]}>
-                    <Text style={styles.bookBtnText}>Book</Text>
+                    <Text style={styles.bookBtnText}>Explore</Text>
                   </View>
                 </View>
               </View>

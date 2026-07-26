@@ -80,7 +80,7 @@ export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, co
             activeOpacity={0.85}
             style={[styles.bookBtn, { backgroundColor: colors.primary, borderRadius: colors.radius - 2 }]}
           >
-            <Text style={styles.bookBtnText}>Book Now</Text>
+            <Text style={styles.bookBtnText}>Explore</Text>
           </TouchableOpacity>
         )}
       </View>
