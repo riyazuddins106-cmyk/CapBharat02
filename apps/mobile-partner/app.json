@@ -48,20 +48,8 @@
       "expo-font",
       "expo-notifications"
     ],
-    "updates": {
-      "url": "https://u.expo.dev/fc3c1dd9-f990-4f39-8320-29e970317f82"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "fc3c1dd9-f990-4f39-8320-29e970317f82"
-      }
-    },
-    "owner": "riyazuddinss-team"
+    }
   }
 }

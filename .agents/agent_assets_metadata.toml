@@ -72,3 +72,15 @@ id = "LqTiiW5EecDIbc8JLFp_L"
 uri = "file://screenshots/qr-partner.png"
 type = "image"
 title = "Partner App — Scan with Expo Go"
+
+[[outputs]]
+id = "A8dmyaHfINoyBam9Smdkz"
+uri = "file://screenshots/customer-qr.png"
+type = "image"
+title = "📱 Customer App QR"
+
+[[outputs]]
+id = "Wfm1Lwk1TppOP7hGESs-N"
+uri = "file://screenshots/partner-qr.png"
+type = "image"
+title = "📱 Partner App QR — update fix applied"

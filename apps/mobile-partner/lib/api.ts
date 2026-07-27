@@ -39,21 +39,27 @@ export function setRefreshHandler(fn: (() => Promise<string | null>) | null) {
   _refreshHandler = fn;
 }
 
+const REQUEST_TIMEOUT_MS = 8000;
+
 async function request<T>(
   path: string,
   options: RequestInit & { token?: string } = {},
 ): Promise<T> {
   const { token, ...init } = options;
 
-  const doFetch = (t: string | undefined) =>
-    fetch(`${API_BASE}${path}`, {
+  const doFetch = (t: string | undefined) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return fetch(`${API_BASE}${path}`, {
       ...init,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(t ? { Authorization: `Bearer ${t}` } : {}),
         ...init.headers,
       },
-    });
+    }).finally(() => clearTimeout(timer));
+  };
 
   let res = await doFetch(token);
 
