@@ -513,6 +513,15 @@ export async function runMigrations() {
        ON CONFLICT (type_key) DO NOTHING`);
   }
 
+  await run('table: service_wishlists',
+    `CREATE TABLE IF NOT EXISTS service_wishlists (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT service_wishlists_customer_service_unique UNIQUE(customer_id, service_id)
+    )`);
+
   await run('column: professionals.city',
     `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS city VARCHAR(128)`);
   await run('column: professionals.area',

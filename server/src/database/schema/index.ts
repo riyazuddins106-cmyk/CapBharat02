@@ -24,3 +24,4 @@ export * from './bookingPartnerRequests.js';
 export * from './bookingAssignmentLogs.js';
 export * from './carts.js';
 export * from './bookingItems.js';
+export * from './serviceWishlists.js';

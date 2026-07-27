@@ -94,9 +94,10 @@ export interface ApiProfessional {
 export interface ApiBooking {
   id: string;
   serviceName: string;
-  proName: string;
+  proName: string | null;
   scheduledAt: string;
   status: 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+  dispatchStatus: 'searching_partner' | 'assigned' | 'no_partner_found' | null;
   price: number;
   notes: string | null;
   professionalId: string | null;
@@ -429,6 +430,62 @@ export const notificationsApi = {
   async unreadCount() {
     const { data } = await client.get('/notifications/unread-count');
     return data.data as { count: number };
+  },
+};
+
+// ─── Service Wishlist API ─────────────────────────────────────────────────────
+export interface ApiWishlistedService {
+  id: string;
+  name: string;
+  description: string | null;
+  images: string[];
+  customerPrice: number;
+  duration: number;
+  badge: string | null;
+  categoryId: string;
+  isWishlisted: boolean;
+}
+
+export const serviceWishlistApi = {
+  async list() {
+    const { data } = await client.get('/service-wishlist');
+    return data.data as ApiWishlistedService[];
+  },
+  async toggle(serviceId: string) {
+    const { data } = await client.post(`/service-wishlist/${serviceId}`);
+    return data.data as { isWishlisted: boolean };
+  },
+  async getIds() {
+    const { data } = await client.get('/service-wishlist/ids');
+    return data.data as { ids: string[] };
+  },
+};
+
+// ─── Points API ───────────────────────────────────────────────────────────────
+export interface ApiPointsTransaction {
+  id: string;
+  type: 'earn' | 'redeem';
+  points: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface ApiPointsSummary {
+  balance: number;
+  totalEarned: number;
+  totalRedeemed: number;
+  redeemableValue: number;
+  transactions: ApiPointsTransaction[];
+}
+
+export const pointsApi = {
+  async getSummary() {
+    const { data } = await client.get('/points');
+    return data.data as ApiPointsSummary;
+  },
+  async redeem(points: number) {
+    const { data } = await client.post('/points/redeem', { points });
+    return data.data as { newBalance: number };
   },
 };
 

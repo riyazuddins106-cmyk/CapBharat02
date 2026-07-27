@@ -20,6 +20,7 @@ import paymentRoutes from './payment.routes.js';
 import serviceRoutes from './service.routes.js';
 import cartRoutes from './cart.routes.js';
 import dispatchRoutes from './dispatch.routes.js';
+import serviceWishlistRoutes from './serviceWishlist.routes.js';
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.use('/payments', paymentRoutes);
 router.use('/services', serviceRoutes);
 router.use('/cart', cartRoutes);
 router.use('/operations/dispatch', dispatchRoutes);
+router.use('/service-wishlist', serviceWishlistRoutes);
 
 export default router;

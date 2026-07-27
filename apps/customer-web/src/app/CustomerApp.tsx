@@ -3,7 +3,7 @@ import {
   Search, MapPin, Star, ChevronRight, Bell, Heart, Home, Grid, BookOpen,
   User, Clock, Shield, Sparkles, Wrench, Scissors, Zap, Droplets, Paintbrush,
   Wind, ChevronLeft, X, Calendar, ArrowRight, Plus, Trash2, Pencil,
-  Navigation, Check, LogOut,
+  Navigation, Check, LogOut, Coins, RefreshCw, Award, Repeat2,
   // Sub-category icons
   Flame, Lightbulb, Battery, Camera, Truck, Thermometer, Building2,
   Sofa, Shirt, Package, WashingMachine, Tag, Waves, Banknote, Smartphone, CreditCard,
@@ -11,8 +11,10 @@ import {
 import {
   auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
   addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig, servicesApi, cartApi,
+  notificationsApi, pointsApi, serviceWishlistApi,
   type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
   type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment, type ApiService, type ApiCart,
+  type ApiNotification, type ApiPointsSummary, type ApiWishlistedService,
 } from "../lib/api";
 
 /* ─────────────────────────── Category icon map ─────────────────── */
@@ -409,6 +411,283 @@ function ProCard({ pro, wishlisted, onWishlist }: {
           <span className="text-xs text-gray-400">{pro.priceUnit}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WISHLIST SCREEN  (saved services)
+═══════════════════════════════════════════════════════════════ */
+function WishlistScreen({ onBack }: { onBack: () => void }) {
+  const [items, setItems] = useState<ApiWishlistedService[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    serviceWishlistApi.list().then(setItems).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  async function handleRemove(id: string) {
+    await serviceWishlistApi.toggle(id);
+    setItems((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="px-5 pt-3 pb-4 bg-white border-b border-black/[0.08] flex items-center gap-3">
+        <button onClick={onBack} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
+          <ChevronLeft size={18} color="#5B3EF5" />
+        </button>
+        <h2 className="text-lg font-bold">My Wishlist</h2>
+        {items.length > 0 && <span className="text-xs font-semibold text-violet-500 ml-1">{items.length} saved</span>}
+      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-16">
+          <Heart size={40} color="#E5E7EB" className="mx-auto mb-3" />
+          <p className="text-sm font-bold text-gray-700">No saved services yet</p>
+          <p className="text-xs text-gray-400 mt-1">Tap the ♡ on any service to save it here</p>
+        </div>
+      ) : (
+        <div className="px-5 mt-4 flex flex-col gap-3">
+          {items.map((s) => (
+            <div key={s.id} className="bg-white rounded-2xl border border-black/[0.08] shadow-sm p-3 flex gap-3 items-start">
+              <div className="w-20 h-20 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0">
+                {s.images?.[0] ? (
+                  <img src={s.images[0]} alt={s.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Sparkles size={20} color="#C4B5FD" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold leading-snug line-clamp-2">{s.name}</p>
+                {s.description && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{s.description}</p>}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm font-black text-gray-900">₹{s.customerPrice.toLocaleString("en-IN")}</span>
+                  <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock size={9} /> {s.duration} min</span>
+                </div>
+              </div>
+              <button onClick={() => handleRemove(s.id)} className="p-2 rounded-xl flex-shrink-0 mt-0.5" style={{ background: "#FEF2F2" }}>
+                <Heart size={15} fill="#EF4444" color="#EF4444" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="h-6" />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTIFICATIONS SCREEN
+═══════════════════════════════════════════════════════════════ */
+function NotificationsScreen({ onBack }: { onBack: () => void }) {
+  const [notifications, setNotifications] = useState<ApiNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    notificationsApi.list().then(setNotifications).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  async function handleMarkAll() {
+    await notificationsApi.markAllRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  }
+
+  async function handleDelete(id: string) {
+    await notificationsApi.delete(id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }
+
+  async function handleMarkRead(id: string) {
+    await notificationsApi.markRead(id);
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+  }
+
+  const unread = notifications.filter((n) => !n.isRead).length;
+
+  return (
+    <div className="flex flex-col">
+      <div className="px-5 pt-3 pb-4 bg-white border-b border-black/[0.08] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
+            <ChevronLeft size={18} color="#5B3EF5" />
+          </button>
+          <h2 className="text-lg font-bold">Notifications {unread > 0 && <span className="text-sm font-bold text-violet-500">({unread} new)</span>}</h2>
+        </div>
+        {unread > 0 && (
+          <button onClick={handleMarkAll} className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>Mark all read</button>
+        )}
+      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+      ) : notifications.length === 0 ? (
+        <div className="text-center py-16">
+          <Bell size={40} color="#E5E7EB" className="mx-auto mb-3" />
+          <p className="text-sm font-bold text-gray-700">No notifications yet</p>
+          <p className="text-xs text-gray-400 mt-1">We'll notify you about bookings and offers</p>
+        </div>
+      ) : (
+        <div className="px-5 mt-4 flex flex-col gap-2">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              onClick={() => !n.isRead && handleMarkRead(n.id)}
+              className="bg-white rounded-2xl border border-black/[0.08] shadow-sm p-4 flex items-start gap-3 cursor-pointer"
+              style={{ background: n.isRead ? "#fff" : "#F5F3FF" }}
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: n.isRead ? "#F3F4F6" : "#EDE9FD" }}>
+                <Bell size={16} color={n.isRead ? "#9CA3AF" : "#5B3EF5"} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900">{n.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+                <p className="text-[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); handleDelete(n.id); }} className="p-1.5 rounded-lg hover:bg-red-50 flex-shrink-0">
+                <Trash2 size={13} color="#EF4444" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="h-6" />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POINTS & REWARDS SCREEN
+═══════════════════════════════════════════════════════════════ */
+function PointsScreen({ onBack }: { onBack: () => void }) {
+  const [summary, setSummary] = useState<ApiPointsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemInput, setRedeemInput] = useState("");
+  const [redeemMsg, setRedeemMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    pointsApi.getSummary().then(setSummary).catch(() => setError("Could not load points")).finally(() => setLoading(false));
+  }, []);
+
+  async function handleRedeem() {
+    const pts = parseInt(redeemInput, 10);
+    if (!pts || pts < 100) { setRedeemMsg("Minimum redemption is 100 points"); return; }
+    if (summary && pts > summary.balance) { setRedeemMsg("Not enough points"); return; }
+    setRedeeming(true);
+    setRedeemMsg(null);
+    try {
+      const res = await pointsApi.redeem(pts);
+      setSummary((prev) => prev ? { ...prev, balance: res.newBalance, totalRedeemed: prev.totalRedeemed + pts } : prev);
+      setRedeemMsg(`✓ Redeemed ${pts} points = ₹${pts} wallet credit!`);
+      setRedeemInput("");
+    } catch {
+      setRedeemMsg("Redemption failed. Try again.");
+    } finally {
+      setRedeeming(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="px-5 pt-3 pb-4 bg-white border-b border-black/[0.08] flex items-center gap-3">
+        <button onClick={onBack} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
+          <ChevronLeft size={18} color="#5B3EF5" />
+        </button>
+        <h2 className="text-lg font-bold">Points & Rewards</h2>
+      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+      ) : error ? (
+        <div className="text-center py-16">
+          <p className="text-sm text-red-500">{error}</p>
+        </div>
+      ) : summary ? (
+        <div className="px-5 mt-4 flex flex-col gap-4">
+          {/* Balance card */}
+          <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Coins size={18} color="rgba(255,255,255,0.8)" />
+              <span className="text-xs font-semibold text-white/70 uppercase tracking-wide">Available Balance</span>
+            </div>
+            <p className="text-4xl font-black">{summary.balance} <span className="text-xl font-bold text-white/70">pts</span></p>
+            <p className="text-sm text-white/70 mt-1">Worth ₹{summary.redeemableValue} · 1 pt = ₹1</p>
+            <div className="flex gap-4 mt-4 pt-4 border-t border-white/20">
+              <div>
+                <p className="text-xs text-white/60">Total Earned</p>
+                <p className="text-base font-bold">{summary.totalEarned} pts</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Total Redeemed</p>
+                <p className="text-base font-bold">{summary.totalRedeemed} pts</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Earn info */}
+          <div className="bg-amber-50 rounded-2xl p-4 flex items-start gap-3 border border-amber-100">
+            <Award size={20} color="#D97706" className="flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-amber-800">How to earn points</p>
+              <p className="text-xs text-amber-600 mt-1">Earn 1 point for every ₹10 spent on bookings. Minimum 100 points needed to redeem.</p>
+            </div>
+          </div>
+
+          {/* Redeem */}
+          {summary.balance >= 100 && (
+            <div className="bg-white rounded-2xl border border-black/[0.08] shadow-sm p-4">
+              <p className="text-sm font-bold mb-3">Redeem Points</p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={100}
+                  max={summary.balance}
+                  value={redeemInput}
+                  onChange={(e) => setRedeemInput(e.target.value)}
+                  placeholder={`Min 100, max ${summary.balance}`}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-violet-400"
+                />
+                <button
+                  onClick={handleRedeem}
+                  disabled={redeeming || !redeemInput}
+                  className="px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}
+                >
+                  {redeeming ? "…" : "Redeem"}
+                </button>
+              </div>
+              {redeemMsg && (
+                <p className={`text-xs mt-2 font-medium ${redeemMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>{redeemMsg}</p>
+              )}
+            </div>
+          )}
+
+          {/* Transaction history */}
+          {summary.transactions.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">History</p>
+              <div className="flex flex-col gap-2">
+                {summary.transactions.map((t) => (
+                  <div key={t.id} className="bg-white rounded-2xl border border-black/[0.08] shadow-sm px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{t.description}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    <span className={`text-sm font-black ${t.type === 'earn' ? 'text-green-600' : 'text-violet-600'}`}>
+                      {t.type === 'earn' ? '+' : '-'}{t.points} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+      <div className="h-6" />
     </div>
   );
 }
@@ -1023,18 +1302,20 @@ function ProfileEditModal({ user, onSave, onClose }: {
    HOME TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
-  user, categories, professionals, featuredServices, favoriteIds, offers, reels, location,
-  onToggleFavorite, onCategorySelect, onLocationPress, isLoggedIn, addToCart,
+  user, categories, professionals, featuredServices, favoriteIds, wishlistIds, offers, reels, location,
+  onToggleFavorite, onToggleWishlist, onCategorySelect, onLocationPress, isLoggedIn, addToCart,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
   professionals: ApiProfessional[];
   featuredServices: ApiService[];
   favoriteIds: Set<string>;
+  wishlistIds: Set<string>;
   offers: ApiOffer[];
   reels: ApiReel[];
   location: string;
   onToggleFavorite: (id: string) => void;
+  onToggleWishlist: (id: string) => void;
   onCategorySelect: (id: string) => void;
   onLocationPress: () => void;
   isLoggedIn: boolean;
@@ -1253,9 +1534,14 @@ function CustHome({
                   )}
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                  <div>
-                    <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
-                    <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Expert service"}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
+                      <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Expert service"}</p>
+                    </div>
+                    <button onClick={() => onToggleWishlist(service.id)} className="flex-shrink-0 p-1 -mt-0.5">
+                      <Heart size={15} fill={wishlistIds.has(service.id) ? "#EF4444" : "none"} color={wishlistIds.has(service.id) ? "#EF4444" : "#D1D5DB"} />
+                    </button>
                   </div>
                   <div className="flex items-end justify-between mt-2">
                     <div>
@@ -1307,11 +1593,13 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, favoriteIds, onToggleFavorite, initialCategoryId, isLoggedIn, onCartChange,
+  categories, favoriteIds, wishlistIds, onToggleFavorite, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange,
 }: {
   categories: ApiCategory[];
   favoriteIds: Set<string>;
+  wishlistIds: Set<string>;
   onToggleFavorite: (id: string) => void;
+  onToggleWishlist: (id: string) => void;
   initialCategoryId?: string | null;
   isLoggedIn: boolean;
   onCartChange: (cart: ApiCart) => void;
@@ -1518,9 +1806,14 @@ function CustServices({
                     )}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                    <div>
-                      <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
-                      <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
+                        <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
+                      </div>
+                      <button onClick={() => onToggleWishlist(service.id)} className="flex-shrink-0 p-1 -mt-0.5">
+                        <Heart size={15} fill={wishlistIds.has(service.id) ? "#EF4444" : "none"} color={wishlistIds.has(service.id) ? "#EF4444" : "#D1D5DB"} />
+                      </button>
                     </div>
                     <div className="flex items-end justify-between mt-2">
                       <div>
@@ -1973,30 +2266,42 @@ function CheckoutFlow({ cart, onClose, onChange }: {
                 </svg>
               </div>
               <h3 className="text-lg font-bold mb-1">Booking Confirmed!</h3>
-              <p className="text-xs text-gray-400 text-center mb-5">
-                We're finding the best professional for your service.
+              <p className="text-xs text-gray-500 text-center mb-4">
+                Your booking is placed. We're finding the best available professional near you.
               </p>
-              <div className="w-full bg-gray-50 rounded-2xl p-4 mb-5 text-left">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Details</p>
-                <p className="text-xs text-gray-700 mb-1">
-                  <span className="font-bold">Date: </span>{selectedDate} · {selectedSlot}
-                </p>
-                {selectedAddress && (
-                  <p className="text-xs text-gray-700 mb-1">
-                    <span className="font-bold">Address: </span>
-                    {selectedAddress.line1}, {selectedAddress.city}
-                  </p>
-                )}
-                <p className="text-xs mt-2">
-                  Status: <span className="font-bold text-orange-500">Searching Professional</span>
-                </p>
+
+              {/* Status timeline */}
+              <div className="w-full bg-gray-50 rounded-2xl p-4 mb-4 text-left">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">What happens next</p>
+                {[
+                  { icon: "🔍", label: "Finding a partner", sub: "We're matching a verified pro near you", active: true },
+                  { icon: "✅", label: "Partner accepts", sub: "You'll see their name in My Bookings", active: false },
+                  { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + selectedSlot, active: false },
+                  { icon: "💳", label: "Pay after service", sub: "Cash, UPI, or card — your choice", active: false },
+                ].map((s, i) => (
+                  <div key={i} className="flex items-start gap-3 mb-2 last:mb-0">
+                    <span className="text-base w-6 flex-shrink-0">{s.icon}</span>
+                    <div>
+                      <p className={`text-xs font-bold ${s.active ? "text-violet-600" : "text-gray-700"}`}>{s.label}</p>
+                      <p className="text-[10px] text-gray-400">{s.sub}</p>
+                    </div>
+                    {s.active && <span className="ml-auto flex-shrink-0 text-[10px] font-bold text-violet-500 animate-pulse">Now</span>}
+                  </div>
+                ))}
               </div>
+
+              {selectedAddress && (
+                <p className="text-xs text-gray-500 mb-4 w-full text-left">
+                  📍 <span className="font-semibold">{selectedAddress.line1}, {selectedAddress.city}</span>
+                </p>
+              )}
+
               <button
                 onClick={onClose}
                 className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
                 style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
               >
-                Done
+                View My Bookings
               </button>
             </div>
           )}
@@ -2153,10 +2458,11 @@ function PaymentModal({ booking, onClose, onPaid }: {
   );
 }
 
-function CustBookings({ bookings, onCancel, onRefresh }: {
+function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
   bookings: ApiBooking[];
   onCancel: (id: string) => void;
   onRefresh: () => void;
+  onRebook: (categoryId: string) => void;
 }) {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -2226,6 +2532,13 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
                 {b.status === "completed" && (
                   <button className="flex-1 py-2 rounded-xl text-xs font-bold border border-black/[0.08]">Rate Service</button>
                 )}
+                {(b.status === "completed" || b.status === "cancelled") && b.categoryId && (
+                  <button
+                    onClick={() => onRebook(b.categoryId)}
+                    className="flex items-center justify-center gap-1 flex-1 py-2 rounded-xl text-xs font-bold border border-violet-200 text-violet-600">
+                    <Repeat2 size={12} /> Book Again
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -2255,21 +2568,24 @@ function CustBookings({ bookings, onCancel, onRefresh }: {
    PROFILE TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustProfile({
-  user, onLogout, onShowAddresses, onEditProfile,
+  user, onLogout, onShowAddresses, onEditProfile, onShowWishlist, onShowNotifications, onShowPoints,
 }: {
   user: ApiUser;
   onLogout: () => void;
   onShowAddresses: () => void;
   onEditProfile: (u: ApiUser) => void;
+  onShowWishlist: () => void;
+  onShowNotifications: () => void;
+  onShowPoints: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
 
   const menuItems = [
     { icon: MapPin,  label: "Saved Addresses",    action: onShowAddresses },
-    { icon: Heart,   label: "Wishlist",            action: () => {} },
+    { icon: Heart,   label: "Wishlist",            action: onShowWishlist },
+    { icon: Coins,   label: "Points & Rewards",    action: onShowPoints },
+    { icon: Bell,    label: "Notifications",       action: onShowNotifications },
     { icon: Shield,  label: "Privacy & Security",  action: () => {} },
-    { icon: Bell,    label: "Notifications",       action: () => {} },
-    { icon: Star,    label: "Rate the App",        action: () => {} },
   ];
 
   return (
@@ -2350,7 +2666,7 @@ interface AppSidebarProps {
 }
 function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLoggedIn, user, onLogout }: AppSidebarProps) {
   return (
-    <aside className="flex flex-col flex-shrink-0"
+    <aside className="hidden md:flex flex-col flex-shrink-0"
       style={{ width: 220, background: "linear-gradient(180deg,#5b3ef5 0%,#4424b4 100%)" }}>
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/[0.12]">
@@ -2451,6 +2767,7 @@ function AppShell({
 }: AppShellProps) {
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#f7f8fa" }}>
+      {/* Desktop sidebar */}
       <AppSidebar
         activeTab={activeTab}
         onTabChange={onTabChange}
@@ -2462,12 +2779,25 @@ function AppShell({
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.07] flex-shrink-0 bg-white">
-          <div>
-            <h1 className="font-bold text-xl" style={{ color: "#0f1117" }}>{title}</h1>
-            <p className="text-gray-400 text-sm">ServeNow Customer</p>
-          </div>
+        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-black/[0.07] flex-shrink-0 bg-white">
           <div className="flex items-center gap-3">
+            {/* Mobile logo */}
+            <div className="flex md:hidden items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+                <Sparkles size={14} color="white" />
+              </div>
+              <span className="font-bold text-sm" style={{ color: "#5b3ef5" }}>ServeNow</span>
+            </div>
+            <div>
+              <h1 className="font-bold text-lg md:text-xl" style={{ color: "#0f1117" }}>{title}</h1>
+              <p className="hidden md:block text-gray-400 text-sm">ServeNow Customer</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onLocationPress} className="flex md:hidden items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200 max-w-[100px]">
+              <MapPin size={11} color="#5B3EF5" />
+              <span className="truncate">{location === "Set your location" ? "Location" : location}</span>
+            </button>
             {cartCount > 0 && (
               <button onClick={onCartOpen}
                 className="relative flex items-center justify-center w-9 h-9 rounded-xl"
@@ -2484,11 +2814,30 @@ function AppShell({
             )}
           </div>
         </div>
-        {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "none", background: "#f7f8fa" }}>
+        {/* Scrollable content — extra bottom padding on mobile for nav bar */}
+        <main className="flex-1 overflow-y-auto p-3 md:p-6 pb-20 md:pb-6" style={{ scrollbarWidth: "none", background: "#f7f8fa" }}>
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom nav bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-black/[0.08] flex items-stretch"
+        style={{ boxShadow: "0 -2px 12px rgba(0,0,0,0.06)" }}>
+        {CUST_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button key={tab.id} onClick={() => onTabChange(tab.id)}
+              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors"
+              style={{ color: active ? "#5B3EF5" : "#9CA3AF" }}>
+              <Icon size={20} />
+              <span className="text-[10px] font-semibold">{tab.label}</span>
+              {active && <div className="w-1 h-1 rounded-full mt-0.5" style={{ background: "#5B3EF5" }} />}
+            </button>
+          );
+        })}
+      </nav>
+
       {/* Modals */}
       {cartOpen && (
         <CheckoutFlow cart={cart} onClose={onCartClose} onChange={onCartChange} />
@@ -2512,19 +2861,20 @@ export default function CustomerApp() {
 
   // Navigation
   const [activeTab, setActiveTab] = useState("home");
-  const [profileScreen, setProfileScreen] = useState<"main" | "addresses">("main");
+  const [profileScreen, setProfileScreen] = useState<"main" | "addresses" | "wishlist" | "notifications" | "points">("main");
 
   // Data
-  const [categories, setCategories]       = useState<ApiCategory[]>([]);
+  const [categories, setCategories]           = useState<ApiCategory[]>([]);
   const [servicesInitCatId, setServicesInitCatId] = useState<string | null>(null);
-  const [professionals, setProfessionals] = useState<ApiProfessional[]>([]);
+  const [professionals, setProfessionals]     = useState<ApiProfessional[]>([]);
   const [featuredServices, setFeaturedServices] = useState<ApiService[]>([]);
-  const [bookings, setBookings]           = useState<ApiBooking[]>([]);
-  const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
-  const [offers, setOffers]               = useState<ApiOffer[]>([]);
-  const [reels, setReels]                 = useState<ApiReel[]>([]);
-  const [addresses, setAddresses]         = useState<ApiAddress[]>([]);
-  const [cart, setCart]                   = useState<ApiCart>({ id: "", items: [], total: 0 });
+  const [bookings, setBookings]               = useState<ApiBooking[]>([]);
+  const [favoriteIds, setFavoriteIds]         = useState<Set<string>>(new Set());
+  const [wishlistIds, setWishlistIds]         = useState<Set<string>>(new Set());
+  const [offers, setOffers]                   = useState<ApiOffer[]>([]);
+  const [reels, setReels]                     = useState<ApiReel[]>([]);
+  const [addresses, setAddresses]             = useState<ApiAddress[]>([]);
+  const [cart, setCart]                       = useState<ApiCart>({ id: "", items: [], total: 0 });
 
   // Cart (global)
   const [cartGlobalOpen, setCartGlobalOpen] = useState(false);
@@ -2556,6 +2906,7 @@ export default function CustomerApp() {
       setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
     }).catch(console.error);
     addressesApi.list().then(setAddresses).catch(console.error);
+    serviceWishlistApi.getIds().then(({ ids }) => setWishlistIds(new Set(ids))).catch(console.error);
   }, [isLoggedIn]);
 
   const handleLogin = useCallback((u: ApiUser, accessToken: string, refreshToken: string) => {
@@ -2572,11 +2923,35 @@ export default function CustomerApp() {
     setIsLoggedIn(false);
     setBookings([]);
     setFavoriteIds(new Set());
+    setWishlistIds(new Set());
     setAddresses([]);
     setCart({ id: "", items: [], total: 0 });
     setActiveTab("home");
     setProfileScreen("main");
   }, []);
+
+  const handleToggleWishlist = useCallback(async (serviceId: string) => {
+    if (!isLoggedIn) { setActiveTab("profile"); return; }
+    setWishlistIds((prev) => {
+      const next = new Set(prev);
+      next.has(serviceId) ? next.delete(serviceId) : next.add(serviceId);
+      return next;
+    });
+    try {
+      const { isWishlisted } = await serviceWishlistApi.toggle(serviceId);
+      setWishlistIds((prev) => {
+        const next = new Set(prev);
+        isWishlisted ? next.add(serviceId) : next.delete(serviceId);
+        return next;
+      });
+    } catch {
+      setWishlistIds((prev) => {
+        const next = new Set(prev);
+        next.has(serviceId) ? next.delete(serviceId) : next.add(serviceId);
+        return next;
+      });
+    }
+  }, [isLoggedIn]);
 
   const handleToggleFavorite = useCallback(async (id: string) => {
     if (!isLoggedIn) { setActiveTab("profile"); return; }
@@ -2607,6 +2982,11 @@ export default function CustomerApp() {
 
   const handleCategorySelect = useCallback((id: string) => {
     setServicesInitCatId(id);
+    setActiveTab("services");
+  }, []);
+
+  const handleRebook = useCallback((categoryId: string) => {
+    setServicesInitCatId(categoryId);
     setActiveTab("services");
   }, []);
 
@@ -2676,7 +3056,7 @@ export default function CustomerApp() {
     );
   }
 
-  /* ── Addresses sub-screen ── */
+  /* ── Profile sub-screens ── */
   if (activeTab === "profile" && profileScreen === "addresses" && user) {
     return (
       <AppShell title="Saved Addresses" {...shellProps}>
@@ -2685,6 +3065,27 @@ export default function CustomerApp() {
           onBack={() => setProfileScreen("main")}
           onChange={setAddresses}
         />
+      </AppShell>
+    );
+  }
+  if (activeTab === "profile" && profileScreen === "wishlist" && user) {
+    return (
+      <AppShell title="Wishlist" {...shellProps}>
+        <WishlistScreen onBack={() => setProfileScreen("main")} />
+      </AppShell>
+    );
+  }
+  if (activeTab === "profile" && profileScreen === "notifications" && user) {
+    return (
+      <AppShell title="Notifications" {...shellProps}>
+        <NotificationsScreen onBack={() => setProfileScreen("main")} />
+      </AppShell>
+    );
+  }
+  if (activeTab === "profile" && profileScreen === "points" && user) {
+    return (
+      <AppShell title="Points & Rewards" {...shellProps}>
+        <PointsScreen onBack={() => setProfileScreen("main")} />
       </AppShell>
     );
   }
@@ -2723,6 +3124,7 @@ export default function CustomerApp() {
           bookings={bookings}
           onCancel={handleCancelBooking}
           onRefresh={refreshBookings}
+          onRebook={handleRebook}
         />
       )}
       {activeTab === "profile" && user && (
@@ -2730,6 +3132,9 @@ export default function CustomerApp() {
           user={user}
           onLogout={handleLogout}
           onShowAddresses={() => setProfileScreen("addresses")}
+          onShowWishlist={() => setProfileScreen("wishlist")}
+          onShowNotifications={() => setProfileScreen("notifications")}
+          onShowPoints={() => setProfileScreen("points")}
           onEditProfile={(updated) => {
             setUser(updated);
             auth.store(auth.getToken()!, auth.getRefreshToken()!, updated);
