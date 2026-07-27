@@ -229,12 +229,25 @@ export default function HomeScreen() {
 
   function getYouTubeEmbedUrl(url: string): string {
     try {
-      const u = new URL(url);
-      let id = '';
-      if (u.hostname === 'youtu.be') id = u.pathname.slice(1);
-      else if (u.pathname.startsWith('/shorts/')) id = u.pathname.split('/shorts/')[1].split('/')[0];
-      else id = u.searchParams.get('v') ?? '';
-      return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1` : url;
+      // Avoid new URL() — not reliably available on all RN/JSC builds without a polyfill.
+      // Use regex-based parsing instead, which works on every JS engine.
+      let videoId = '';
+      // youtu.be/<id>
+      const shortMatch = url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
+      if (shortMatch) { videoId = shortMatch[1]; }
+      // /shorts/<id>
+      if (!videoId) {
+        const shortsMatch = url.match(/\/shorts\/([A-Za-z0-9_-]{11})/);
+        if (shortsMatch) videoId = shortsMatch[1];
+      }
+      // youtube.com/watch?v=<id>
+      if (!videoId) {
+        const watchMatch = url.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+        if (watchMatch) videoId = watchMatch[1];
+      }
+      return videoId
+        ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1`
+        : url;
     } catch { return url; }
   }
   const offersRef = useRef<FlatList<Offer>>(null);

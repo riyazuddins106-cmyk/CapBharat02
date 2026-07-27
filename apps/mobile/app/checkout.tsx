@@ -22,11 +22,20 @@ function buildScheduledAt(dateLabel: string, slotLabel: string): string {
   if (dateLabel === 'Tomorrow') {
     base.setDate(base.getDate() + 1);
   } else if (dateLabel !== 'Today') {
-    const match = dateLabel.match(/(\d+)\s+(\w+)/);
-    if (match) {
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const day = parseInt(match[1]);
-      const monthIdx = months.indexOf(match[2]);
+    // toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' })
+    // returns strings like "Wed, 26 Mar" or "Wed 26 Mar" depending on platform.
+    // Extract the first run of digits (day) and the first 3-letter word that is a month abbreviation.
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dayMatch = dateLabel.match(/\b(\d{1,2})\b/);
+    const monthMatch = dateLabel.match(/\b([A-Za-z]{3})\b/g);
+    if (dayMatch && monthMatch) {
+      const day = parseInt(dayMatch[1]);
+      // Find the first token that is a valid month abbreviation (case-insensitive)
+      let monthIdx = -1;
+      for (const token of monthMatch) {
+        const idx = months.findIndex(m => m.toLowerCase() === token.toLowerCase());
+        if (idx !== -1) { monthIdx = idx; break; }
+      }
       if (monthIdx !== -1) {
         const year = base.getFullYear();
         const proposed = new Date(year, monthIdx, day);

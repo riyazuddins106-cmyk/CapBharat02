@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authApi.resendOtp({ email, purpose });
   }, []);
 
-  const registerPartner = useCallback(async (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string }) => {
+  const registerPartner = useCallback(async (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) => {
     const result = await authApi.registerPartner(data);
     return { email: result.email, devCode: result.devCode };
   }, []);

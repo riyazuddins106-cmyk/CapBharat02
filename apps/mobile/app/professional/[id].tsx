@@ -64,6 +64,20 @@ export default function ProfessionalScreen() {
     enabled: !!id,
   });
 
+  // Sync initial favourite state from the user's favourites list
+  const { data: favList } = useQuery({
+    queryKey: ['/api/favorites', accessToken],
+    queryFn: () => favoritesApi.list(accessToken!),
+    enabled: !!accessToken,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (favList) {
+      setIsFav(favList.some((p) => p.id === id));
+    }
+  }, [favList, id]);
+
   const favMutation = useMutation({
     mutationFn: () => favoritesApi.toggle(id, accessToken!),
     onSuccess: (data) => setIsFav(data.isFavorite),
