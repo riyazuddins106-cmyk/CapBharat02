@@ -12,7 +12,7 @@ import {
 import {
   auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
   addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig, servicesApi, cartApi,
-  notificationsApi, pointsApi, serviceWishlistApi, supportTicketsApi, platformPoliciesApi,
+  notificationsApi, pointsApi, serviceWishlistApi, supportTicketsApi, platformPoliciesApi, reviewsApi,
   type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
   type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment, type ApiService, type ApiCart,
   type ApiNotification, type ApiPointsSummary, type ApiWishlistedService,
@@ -2469,6 +2469,12 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
   const [tab, setTab] = useState<"searching" | "upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [payBooking, setPayBooking] = useState<ApiBooking | null>(null);
+  const [reviewBooking, setReviewBooking] = useState<ApiBooking | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewErr, setReviewErr] = useState("");
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
   const searchingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings  = bookings.filter((b) => ["upcoming", "in_progress"].includes(b.status));
@@ -2483,6 +2489,17 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
     } finally {
       setCancelling(null);
     }
+  }
+
+  async function handleReviewSubmit() {
+    if (!reviewBooking) return;
+    setReviewLoading(true); setReviewErr("");
+    try {
+      await reviewsApi.create(reviewBooking.id, reviewRating, reviewComment.trim() || undefined);
+      setReviewedIds((prev) => new Set([...prev, reviewBooking.id]));
+      setReviewBooking(null); setReviewComment(""); setReviewRating(5);
+    } catch (e: any) { setReviewErr(e.message ?? "Failed to submit review."); }
+    finally { setReviewLoading(false); }
   }
 
   return (
@@ -2560,8 +2577,15 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
                     Pay Now
                   </button>
                 )}
-                {b.status === "completed" && (
-                  <button className="flex-1 py-2 rounded-xl text-xs font-bold border border-black/[0.08]">Rate Service</button>
+                {b.status === "completed" && !reviewedIds.has(b.id) && (
+                  <button
+                    onClick={() => { setReviewBooking(b); setReviewRating(5); setReviewComment(""); setReviewErr(""); }}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold border border-violet-200 text-violet-600">
+                    Rate Service ⭐
+                  </button>
+                )}
+                {b.status === "completed" && reviewedIds.has(b.id) && (
+                  <span className="flex-1 py-2 rounded-xl text-xs font-bold text-center text-green-600 border border-green-200">✓ Reviewed</span>
                 )}
                 {(b.status === "completed" || b.status === "cancelled") && b.categoryId && (
                   <button
@@ -2596,6 +2620,48 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
         onClose={() => setPayBooking(null)}
         onPaid={() => { setPayBooking(null); onRefresh(); }}
       />
+    )}
+
+    {/* Review Modal */}
+    {reviewBooking && (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4" onClick={() => setReviewBooking(null)}>
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-base font-bold">Rate Your Experience</h3>
+            <button onClick={() => setReviewBooking(null)} className="text-gray-400 hover:text-gray-600">
+              <X size={18} />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">{reviewBooking.serviceName} · {reviewBooking.proName ?? "Professional"}</p>
+
+          {/* Star rating */}
+          <div className="flex justify-center gap-2 mb-4">
+            {[1,2,3,4,5].map((s) => (
+              <button key={s} onClick={() => setReviewRating(s)} className="text-2xl focus:outline-none">
+                <span style={{ color: s <= reviewRating ? "#FBBF24" : "#D1D5DB" }}>★</span>
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder="Share your experience (optional)..."
+            rows={3}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm resize-none outline-none focus:border-violet-400 mb-3"
+          />
+
+          {reviewErr && <p className="text-xs text-red-500 mb-2">{reviewErr}</p>}
+
+          <button
+            onClick={handleReviewSubmit}
+            disabled={reviewLoading}
+            className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
+            {reviewLoading ? "Submitting…" : "Submit Review"}
+          </button>
+        </div>
+      </div>
     )}
     </>
   );
@@ -2776,7 +2842,7 @@ function PoliciesScreen({ onBack }: { onBack: () => void }) {
 
 function CustProfile({
   user, onLogout, onShowAddresses, onEditProfile, onShowWishlist, onShowNotifications, onShowPoints,
-  onShowSupport, onShowPolicies,
+  onShowSupport, onShowPolicies, onShowPrivacy,
 }: {
   user: ApiUser;
   onLogout: () => void;
@@ -2787,6 +2853,7 @@ function CustProfile({
   onShowPoints: () => void;
   onShowSupport: () => void;
   onShowPolicies: () => void;
+  onShowPrivacy: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
 
@@ -2797,7 +2864,7 @@ function CustProfile({
     { icon: Bell,        label: "Notifications",       action: onShowNotifications },
     { icon: HelpCircle,  label: "Help & Support",      action: onShowSupport },
     { icon: FileText,    label: "Policies",            action: onShowPolicies },
-    { icon: Shield,      label: "Privacy & Security",  action: () => {} },
+    { icon: Shield,      label: "Privacy & Security",  action: onShowPrivacy },
   ];
 
   return (
@@ -3066,6 +3133,127 @@ function AppShell({
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   PRIVACY & SECURITY SCREEN
+═══════════════════════════════════════════════════════════════ */
+function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; onBack: () => void; onUserUpdate: (u: ApiUser) => void }) {
+  const [tab, setTab] = useState<"profile" | "password">("profile");
+
+  // Profile update
+  const [fullName, setFullName] = useState(user.fullName ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // Password change
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  async function handleProfileSave() {
+    if (!fullName.trim()) { setProfileMsg({ text: "Full name is required.", ok: false }); return; }
+    setProfileLoading(true); setProfileMsg(null);
+    try {
+      const updated = await profileApi.update({ fullName: fullName.trim(), ...(phone.trim() ? { phone: phone.trim() } : {}) });
+      onUserUpdate(updated);
+      setProfileMsg({ text: "Profile updated successfully.", ok: true });
+    } catch (e: any) { setProfileMsg({ text: e.message ?? "Update failed.", ok: false }); }
+    finally { setProfileLoading(false); }
+  }
+
+  async function handlePasswordChange() {
+    if (!currentPassword || !newPassword) { setPwMsg({ text: "All fields are required.", ok: false }); return; }
+    if (newPassword.length < 8) { setPwMsg({ text: "New password must be at least 8 characters.", ok: false }); return; }
+    if (newPassword !== confirmPassword) { setPwMsg({ text: "New passwords do not match.", ok: false }); return; }
+    setPwLoading(true); setPwMsg(null);
+    try {
+      await profileApi.changePassword(currentPassword, newPassword);
+      setPwMsg({ text: "Password changed successfully.", ok: true });
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    } catch (e: any) { setPwMsg({ text: e.message ?? "Failed to change password.", ok: false }); }
+    finally { setPwLoading(false); }
+  }
+
+  return (
+    <div className="flex flex-col pb-8">
+      {/* Back header */}
+      <div className="flex items-center gap-3 px-5 pt-4 pb-4 border-b border-black/[0.07]">
+        <button onClick={onBack} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
+          <ChevronLeft size={18} color="#5B3EF5" />
+        </button>
+        <h2 className="font-bold text-base">Privacy & Security</h2>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex mx-5 mt-4 bg-gray-100 rounded-xl p-1 gap-0.5 mb-5">
+        {(["profile", "password"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+            className="flex-1 py-2 rounded-lg text-xs font-bold"
+            style={{ background: tab === t ? "#fff" : "transparent", color: tab === t ? "#5B3EF5" : "#9CA3AF",
+              boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
+            {t === "profile" ? "Edit Profile" : "Change Password"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "profile" && (
+        <div className="px-5 flex flex-col gap-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">Full Name</label>
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">Phone (optional)</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">Email</label>
+            <input value={user.email} readOnly
+              className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-400 cursor-not-allowed" />
+          </div>
+          {profileMsg && (
+            <p className={`text-xs font-medium ${profileMsg.ok ? "text-green-600" : "text-red-500"}`}>{profileMsg.text}</p>
+          )}
+          <button onClick={handleProfileSave} disabled={profileLoading}
+            className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
+            {profileLoading ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      )}
+
+      {tab === "password" && (
+        <div className="px-5 flex flex-col gap-4">
+          {[
+            { label: "Current Password", value: currentPassword, set: setCurrentPassword },
+            { label: "New Password", value: newPassword, set: setNewPassword },
+            { label: "Confirm New Password", value: confirmPassword, set: setConfirmPassword },
+          ].map(({ label, value, set }) => (
+            <div key={label}>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">{label}</label>
+              <input value={value} onChange={(e) => set(e.target.value)} type="password"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
+            </div>
+          ))}
+          {pwMsg && (
+            <p className={`text-xs font-medium ${pwMsg.ok ? "text-green-600" : "text-red-500"}`}>{pwMsg.text}</p>
+          )}
+          <button onClick={handlePasswordChange} disabled={pwLoading}
+            className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
+            {pwLoading ? "Changing…" : "Change Password"}
+          </button>
+          <p className="text-xs text-gray-400 text-center">Minimum 8 characters required</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CustomerApp() {
   // Auth
   const [user, setUser] = useState<ApiUser | null>(() => auth.getUser());
@@ -3073,7 +3261,7 @@ export default function CustomerApp() {
 
   // Navigation
   const [activeTab, setActiveTab] = useState("home");
-  const [profileScreen, setProfileScreen] = useState<"main" | "addresses" | "wishlist" | "notifications" | "points" | "support" | "policies">("main");
+  const [profileScreen, setProfileScreen] = useState<"main" | "addresses" | "wishlist" | "notifications" | "points" | "support" | "policies" | "privacy">("main");
 
   // Data
   const [categories, setCategories]           = useState<ApiCategory[]>([]);
@@ -3315,6 +3503,13 @@ export default function CustomerApp() {
       </AppShell>
     );
   }
+  if (activeTab === "profile" && profileScreen === "privacy" && user) {
+    return (
+      <AppShell title="Privacy & Security" {...shellProps}>
+        <PrivacySecurityScreen user={user} onBack={() => setProfileScreen("main")} onUserUpdate={(u) => { auth.store(auth.getToken()!, auth.getRefreshToken()!, u); setUser(u); }} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={PAGE_TITLE[activeTab] ?? "Home"} {...shellProps}>
@@ -3367,6 +3562,7 @@ export default function CustomerApp() {
           onShowPoints={() => setProfileScreen("points")}
           onShowSupport={() => setProfileScreen("support")}
           onShowPolicies={() => setProfileScreen("policies")}
+          onShowPrivacy={() => setProfileScreen("privacy")}
           onEditProfile={(updated) => {
             setUser(updated);
             auth.store(auth.getToken()!, auth.getRefreshToken()!, updated);

@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Platform, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
@@ -54,6 +54,8 @@ export default function DashboardScreen() {
   const { user, accessToken } = useAuth();
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
+  const queryClient = useQueryClient();
+
   const { data: jobs, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['/api/partner/jobs', accessToken],
     queryFn: () => partnerApi.listJobs(accessToken!),
@@ -65,6 +67,33 @@ export default function DashboardScreen() {
     queryFn: () => partnerApi.getEarnings(accessToken!),
     enabled: !!accessToken,
   });
+
+  const { data: profile } = useQuery({
+    queryKey: ['/api/partner/profile', accessToken],
+    queryFn: () => partnerApi.getProfile(accessToken!),
+    enabled: !!accessToken,
+  });
+
+  const availabilityStatus = profile?.availabilityStatus ?? 'available';
+
+  const availabilityMutation = useMutation({
+    mutationFn: (status: 'available' | 'offline' | 'busy') =>
+      partnerApi.updateAvailability(status, accessToken!),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['/api/partner/profile', accessToken], updated);
+    },
+    onError: () => Alert.alert('Error', 'Could not update availability. Try again.'),
+  });
+
+  const cycleAvailability = () => {
+    const next: Record<string, 'available' | 'offline' | 'busy'> = {
+      available: 'busy',
+      busy: 'offline',
+      offline: 'available',
+    };
+    const nextStatus = next[availabilityStatus] ?? 'available';
+    availabilityMutation.mutate(nextStatus);
+  };
 
   const { data: unreadData } = useQuery({
     queryKey: ['/api/notifications/unread-count', accessToken],
@@ -103,10 +132,44 @@ export default function DashboardScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <View style={[styles.onlineBadge, { backgroundColor: '#dcfce7' }]}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Online</Text>
-          </View>
+          <TouchableOpacity
+            onPress={cycleAvailability}
+            activeOpacity={0.8}
+            disabled={availabilityMutation.isPending}
+            style={[
+              styles.onlineBadge,
+              {
+                backgroundColor:
+                  availabilityStatus === 'available' ? '#dcfce7'
+                  : availabilityStatus === 'busy' ? '#fef3c7'
+                  : '#f3f4f6',
+                opacity: availabilityMutation.isPending ? 0.6 : 1,
+              },
+            ]}
+          >
+            <View style={[
+              styles.onlineDot,
+              {
+                backgroundColor:
+                  availabilityStatus === 'available' ? '#16a34a'
+                  : availabilityStatus === 'busy' ? '#d97706'
+                  : '#6b7280',
+              },
+            ]} />
+            <Text style={[
+              styles.onlineText,
+              {
+                color:
+                  availabilityStatus === 'available' ? '#16a34a'
+                  : availabilityStatus === 'busy' ? '#d97706'
+                  : '#6b7280',
+              },
+            ]}>
+              {availabilityStatus === 'available' ? 'Online'
+                : availabilityStatus === 'busy' ? 'Busy'
+                : 'Offline'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 

@@ -34,7 +34,18 @@ References:
 
 When the user asks for a NEW slide deck, run this flow BEFORE creating the slides artifact. Ask the user for any direction they haven't given before doing anything else. Do not scaffold, research, outline, or write files first -- `createArtifact` comes only at the end of this flow (see "Create the artifact only when ready to build"). This is required.
 
-- **Deck length** -- unless the user gave a rough length, slide count, or per-slide outline, ask with the generic `AskQuestion` model tool. Call `AskQuestion` directly as a tool -- it is NOT a CodeExecution callback, so never `await` it inside a code block. A topic, audience, or subject is not a length, and don't pick a slide count yourself to skip it. Use a single `singleSelect` field with exactly these options (the auto-attached "Additional comments" box collects an exact count if they want one):
+First judge what the user already gave -- length and style independently, having one doesn't let you skip the other. A topic, audience, or subject is not a length or a style, and don't pick a slide count yourself to skip a question. A detailed outline settles length and content but not style. Then ask for exactly what's missing, all in a single turn:
+
+- **Both length and style missing** -- call `requestSlideStyleDirection` with `askDeckLength: true`. One form asks both: deck length (Brief 3-6 / Standard 7-12 / Exhaustive 15-20, plus an "Exact number of slides" box) and the visual-theme picker. Do NOT also call `AskQuestion` for length -- the combined form covers it.
+
+  ```js
+  await requestSlideStyleDirection({
+    slidesTopic: "A pitch deck for a fintech startup",
+    askDeckLength: true,
+  });
+  ```
+- **Only style missing** -- call `requestSlideStyleDirection` with just `slidesTopic` (omit `askDeckLength`): a short sentence naming the deck's subject; it ranks visual templates and shows the user a picker.
+- **Only length missing** -- ask with the generic `AskQuestion` model tool. Call `AskQuestion` directly as a tool -- it is NOT a CodeExecution callback, so never `await` it inside a code block. Use a single `singleSelect` field with exactly these options (the auto-attached "Additional comments" box collects an exact count if they want one):
   - `Brief (3-6 slides)`
   - `Standard (7-12 slides)`
   - `Exhaustive (15-20 slides)`
@@ -60,11 +71,9 @@ When the user asks for a NEW slide deck, run this flow BEFORE creating the slide
     ]
   }
   ```
-- **Visual style** -- unless the user gave a clear visual style or theme, call `requestSlideStyleDirection`. A topic is not a style. Pass the required `slidesTopic` argument with a short sentence naming the deck's subject; it ranks visual templates and shows the user a picker.
+- **Neither missing** -- ask nothing and move on.
 
-Judge length and style independently. Having one doesn't let you skip the other. A detailed outline settles length and content but not style, so still call `requestSlideStyleDirection` if no style was given.
-
-Ask one detail per turn: ask one question, wait for the answer, then ask the next if needed. Don't outline, create the artifact, or build until both length and style are known. Skip these questions only for edits to existing decks, imports/conversions, or when the user asks to skip the questions.
+Ask everything you need in one turn: when both length and style are missing, the single combined form covers both -- never split them into two back-to-back questions. Wait for the user's answer before continuing. The content outline review is always its own later step; never bundle it with these questions. Don't outline, create the artifact, or build until both length and style are known. Skip these questions only for edits to existing decks, imports/conversions, or when the user asks to skip the questions.
 
 ### Using the Selected Template
 
@@ -145,7 +154,7 @@ Call `createArtifact({ artifactType: "slides", ... })` as described in the `arti
 <clarifying_questions>
 **If a `.pptx` is attached, do not ask anything -- go straight to `importPptx` per "PPTX Import -- Handle First".**
 
-Deck length and visual style are governed only by "Template Selection and Pre-Generation Flow" -- including its edit/import/opt-out skips and one-question-per-turn rule. When either is missing for a new deck, ask with the matching mechanism there (length via `AskQuestion`, style via `requestSlideStyleDirection`). Do not apply the ambiguity test below to length or style.
+Deck length and visual style are governed only by "Template Selection and Pre-Generation Flow" -- including its edit/import/opt-out skips. When either is missing for a new deck, ask with the matching mechanism there (both missing: `requestSlideStyleDirection` with `askDeckLength: true`; only style: `requestSlideStyleDirection`; only length: `AskQuestion`). Do not apply the ambiguity test below to length or style.
 
 This section governs only short clarifying questions other than deck length and visual style. For those other details, do not re-ask what the user already gave:
 
@@ -162,7 +171,7 @@ This section governs only short clarifying Q&A. It doesn't override the Content 
 <first_build>
 When building a new slide deck for the first time, follow this exact sequence. Steps 0--3 happen BEFORE the slides artifact exists -- do not create it early:
 
-0. **Resolve pre-generation direction** -- run "Template Selection and Pre-Generation Flow" before outlining or building; it is the source of truth for missing length/style, the ask mechanism for each, the one-question-per-turn rule, and the skip conditions.
+0. **Resolve pre-generation direction** -- run "Template Selection and Pre-Generation Flow" before outlining or building; it is the source of truth for missing length/style, the ask mechanism for each combination of missing details, and the skip conditions.
 1. **Research brand** (real companies only): **Skip this step entirely if the user already supplied the brand source of truth** -- attached brand guide, exact hex codes, approved fonts, design system file, sibling artifact CSS, etc. Use what they gave you. Otherwise, for real companies, prefer the Firecrawl-backed tools -- they return real, structured data. The order is: `extractBranding` -- `webFetch` on official pages -- `webSearch` only as a last resort.
    - Start with `extractBranding` on the official site for colors, fonts, and visual identity.
    - Use `webFetch` on the homepage, about page, or key product pages for real company copy and positioning.
@@ -183,7 +192,7 @@ When building a new slide deck for the first time, follow this exact sequence. S
 9. **Take the cover screenshot** -- one `screenshot` call with `source: { "type": "appPreview", "artifactDirName": "<deck dir>", "path": "/slide1" }`. This screenshot becomes the deck's cover image on the home screen and on saved templates -- without it the deck shows a generic placeholder icon -- and it confirms the deck actually renders (no blank screen, no error overlay). Do not screenshot the other slides. Take this shot after validation and the visual QA pass are complete; if slide 1 or the deck-wide theme changes afterward for any reason (a defect the shot itself reveals, a late repair), retake it after the fix -- the stored cover is always the newest screenshot.
 
 Do NOT restart workflow until all slides are written. Do NOT read files you just scaffolded -- they are already in your context.
-A quick seamless build is what you are aiming for. If the user gave you an exact slide count (in their prompt or the "Exact number of slides" box on the `deckLength` question), use that exact number. If they picked a length range, pick a slide count that feels right inside that range. If the length question was skipped (opt-out, edit, or import), default to around 6 -- don't go longer unless the user asked for it.
+A quick seamless build is what you are aiming for. If the user gave you an exact slide count (in their prompt, or the "Exact number of slides" box on the `AskQuestion` deck-length form or the combined `requestSlideStyleDirection` form), use that exact number. If they picked a length range, pick a slide count that feels right inside that range. If the length question was skipped (opt-out, edit, or import), default to around 6 -- don't go longer unless the user asked for it.
 Do not screenshot-iterate during the build -- `validate-slides` is your layout QA loop, and you have two priorities: speed and design. The only screenshots a first build needs are the slide 1 template-fidelity check (when a template reference image exists) and the cover screenshot in step 9.
 </first_build>
 

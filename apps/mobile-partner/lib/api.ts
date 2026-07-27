@@ -287,6 +287,16 @@ export const partnerApi = {
 
   getEarnings: (token: string) =>
     request<Earnings>('/api/partner/earnings', { token }),
+
+  requestPayout: (amount: number, token: string) =>
+    request<{ id: string; amount: number; status: string }>('/api/partner/payouts', {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+      token,
+    }),
+
+  listPayouts: (token: string) =>
+    request<{ id: string; amount: number; status: string; createdAt: string }[]>('/api/partner/payouts', { token }),
 };
 
 // ── Documents ──────────────────────────────────────────────

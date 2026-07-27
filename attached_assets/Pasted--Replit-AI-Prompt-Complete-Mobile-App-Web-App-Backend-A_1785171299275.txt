@@ -1,0 +1,536 @@
+
+# Replit AI Prompt – Complete Mobile App, Web App & Backend Analysis, Missing Module Detection, End-to-End Testing & Production Readiness
+
+## Role
+
+Act as a **Principal Software Architect, Senior Full Stack Developer, Mobile App Developer, Web Application Developer, Backend Engineer, Database Architect, QA Automation Engineer, DevOps Engineer, Security Engineer, and Business Analyst**.
+
+Your responsibility is to perform a **complete production-level audit** of the entire project.
+
+Do **not** assume any feature is working simply because the UI exists.
+
+Analyze, verify, fix, integrate, and test the entire platform.
+
+---
+
+# PROJECT SCOPE
+
+Analyze every part of the project, including:
+
+### Customer Mobile App
+
+* Every screen
+* Every button
+* Every form
+* Every workflow
+* Every API integration
+* Every database interaction
+* Navigation
+* State management
+* Performance
+* Offline handling
+* Real-time updates
+* Notifications
+
+---
+
+### Partner Mobile App
+
+* Registration
+* Login
+* Profile
+* Document management
+* Dashboard
+* Booking management
+* Availability
+* Earnings
+* Wallet
+* Notifications
+* Settings
+* Complete work lifecycle
+* API integration
+* Database synchronization
+* Real-time updates
+
+---
+
+### Admin Web Application
+
+Analyze every page and module.
+
+Verify:
+
+* Dashboard
+* Customer Management
+* Partner Management
+* Service Management
+* Category Management
+* Booking Management
+* Payments
+* Wallet
+* Reports
+* Reviews
+* Notifications
+* Settings
+* Roles & Permissions
+* Documents
+* Analytics
+* Support
+* Configuration
+* Logs
+* Search
+* Filters
+* CRUD operations
+* Export/Import
+* API integration
+
+---
+
+### Backend
+
+Analyze:
+
+* APIs
+* Business Logic
+* Authentication
+* Authorization
+* Database Queries
+* Validation
+* Error Handling
+* Logging
+* Security
+* Performance
+* Background Jobs
+* Scheduled Tasks
+* Notifications
+* Real-time Events
+* File Uploads
+* Storage
+
+---
+
+### Database
+
+Inspect completely.
+
+Verify:
+
+* Tables
+* Relationships
+* Constraints
+* Foreign Keys
+* Indexes
+* Data Integrity
+* Duplicate Records
+* Missing Records
+* Transactions
+* Performance
+* Audit Logs
+
+---
+
+# COMPLETE PROJECT ANALYSIS
+
+Inspect the entire codebase.
+
+Identify:
+
+* Missing modules
+* Incomplete modules
+* Placeholder implementations
+* Mock data
+* Missing APIs
+* Missing backend logic
+* Missing frontend integration
+* Missing database integration
+* Missing validations
+* Missing permissions
+* Missing navigation
+* Missing notifications
+* Missing reports
+* Missing dashboards
+* Missing settings
+* Missing business logic
+* Missing loading states
+* Missing empty states
+* Missing error handling
+* Missing success handling
+* Broken functionality
+* Unused code
+* Duplicate code
+
+Do not leave any module unanalyzed.
+
+---
+
+# CROSS-PLATFORM WORKFLOW ANALYSIS
+
+Verify complete synchronization between:
+
+Customer Mobile App
+
+↓
+
+Backend
+
+↓
+
+Database
+
+↓
+
+Partner Mobile App
+
+↓
+
+Admin Web Application
+
+Every action performed in one application must correctly update every other application where applicable.
+
+Examples:
+
+* Customer actions should reflect in the Partner Mobile App and Admin Web Application.
+* Partner actions should reflect in the Customer Mobile App and Admin Web Application.
+* Admin actions should update both Mobile Apps immediately.
+* Database changes should remain synchronized across all platforms.
+* Notifications should reach the correct users.
+* Status updates should remain consistent everywhere.
+
+If any workflow is incomplete or broken, identify the root cause and implement the missing functionality.
+
+---
+
+# COMPLETE FUNCTIONAL TESTING
+
+Perform complete testing of:
+
+## Customer Mobile App
+
+Test every feature and user journey.
+
+## Partner Mobile App
+
+Test every feature and user journey.
+
+## Admin Web Application
+
+Test every module and administrative workflow.
+
+For every platform:
+
+* Open every screen
+* Click every button
+* Test every menu
+* Submit every form
+* Upload files
+* Create records
+* Edit records
+* Delete records
+* Search
+* Filter
+* Sort
+* Navigate
+* Verify permissions
+* Verify API calls
+* Verify database updates
+* Verify notifications
+* Verify real-time synchronization
+* Verify loading states
+* Verify empty states
+* Verify error handling
+* Verify success messages
+
+Nothing should remain untested.
+
+---
+
+# END-TO-END USER JOURNEY TESTING
+
+Simulate complete real-world workflows across all applications.
+
+Validate complete journeys such as:
+
+* Registration
+* Login
+* Profile Management
+* Service Discovery
+* Booking Lifecycle
+* Partner Assignment
+* Work Progress
+* Completion
+* Payments
+* Wallet Updates
+* Reviews
+* Notifications
+* Reports
+* Admin Management
+* Support
+* Settings
+
+Do not assume any workflow is complete.
+
+Validate every step.
+
+---
+
+# API AUDIT
+
+Inspect every API.
+
+Verify:
+
+* Authentication
+* Authorization
+* Validation
+* Response format
+* Status codes
+* Error handling
+* Pagination
+* Filtering
+* Search
+* Sorting
+* Logging
+* Performance
+
+Fix inconsistencies.
+
+---
+
+# UI / UX REVIEW
+
+Review both Mobile Apps and the Admin Web Application.
+
+Identify:
+
+* Missing screens
+* Broken navigation
+* Layout issues
+* Responsiveness
+* Accessibility
+* Missing feedback
+* Design inconsistencies
+* Broken animations
+* Poor user experience
+* Missing images
+* Missing icons
+* Alignment issues
+* Spacing issues
+
+Improve while maintaining the existing design language.
+
+---
+
+# PERFORMANCE REVIEW
+
+Analyze:
+
+* Mobile App performance
+* Web App performance
+* Backend performance
+* Database performance
+* API response times
+* Bundle size
+* Memory leaks
+* Unnecessary re-renders
+* Duplicate requests
+* Slow queries
+* Unused packages
+* Unused components
+
+Optimize where appropriate.
+
+---
+
+# SECURITY REVIEW
+
+Verify:
+
+* Authentication
+* Authorization
+* Role-based access
+* Session handling
+* Secure storage
+* Password security
+* API security
+* File upload validation
+* Input validation
+* SQL Injection protection
+* XSS protection
+* CSRF protection
+* Rate limiting
+* Environment variables
+* Secret management
+
+Fix security weaknesses.
+
+---
+
+# CODE QUALITY REVIEW
+
+Review the complete codebase.
+
+Identify:
+
+* Dead code
+* Duplicate code
+* Poor architecture
+* Technical debt
+* Tight coupling
+* Poor folder structure
+* Naming inconsistencies
+* Missing documentation
+* Refactoring opportunities
+
+Improve maintainability without breaking functionality.
+
+---
+
+# AUTOMATED END-TO-END VERIFICATION
+
+Run complete end-to-end testing across:
+
+* Customer Mobile App
+* Partner Mobile App
+* Admin Web Application
+* Backend APIs
+* Database
+
+If any step fails:
+
+* Identify the root cause.
+* Fix the issue.
+* Re-test the entire workflow.
+* Continue until all critical workflows pass.
+
+Do not stop after fixing only one issue.
+
+---
+
+# FINAL REPORT
+
+Generate a comprehensive report including:
+
+1. Overall project health.
+2. Missing modules.
+3. Incomplete modules.
+4. Broken workflows.
+5. Bugs identified.
+6. Root cause analysis.
+7. Fixes implemented.
+8. Mobile App improvements.
+9. Web App improvements.
+10. Backend improvements.
+11. Database improvements.
+12. API improvements.
+13. UI/UX improvements.
+14. Security improvements.
+15. Performance improvements.
+16. Code quality improvements.
+17. End-to-end testing results for Customer Mobile App.
+18. End-to-end testing results for Partner Mobile App.
+19. End-to-end testing results for Admin Web Application.
+20. Remaining recommendations.
+21. Production readiness checklist.
+
+Classify every feature and module as:
+
+* ✅ Complete
+* ⚠️ Partially Implemented
+* ❌ Missing
+
+Do not consider this task complete until the **Customer Mobile App, Partner Mobile App, Admin Web Application, Backend, APIs, and Database** have all been fully analyzed, integrated, corrected where possible, and verified through comprehensive end-to-end testing.
+Both Web / Mobile App Do
+
+15 minutes ago
+
+3 actions
+This is a full production audit across all 5 apps + backend. I'll explore the entire codebase in parallel first, then implement all fixes systematically.
+
+
+8 actions
+Let me get the complete audit reports from all subagents before planning fixes.
+
+
+2 actions
+Let me read the key problem files to understand exactly what needs fixing before I start implementing.
+
+
+8 actions
+Let me read the critical source files in parallel to understand the exact code before making targeted fixes.
+
+
+5 actions
+Let me read the remaining key files in parallel to complete the audit picture.
+
+
+5 actions
+Let me read the admin and partner web apps in sections to understand their issues.
+
+
+4 actions
+Let me explore the large admin and partner web apps in parallel via subagents while reading targeted sections of the remaining mobile screens.
+
+
+6 actions
+Now I have a complete picture. Let me implement all fixes in parallel across the codebase. I'll tackle the highest-impact issues first.
+
+
+5 actions
+I have enough context now. Let me implement all fixes in parallel across all apps.
+
+
+5 actions
+Let me read the remaining sections I need before implementing all fixes in parallel.
+
+
+4 actions
+Let me check what's available in the customer web API lib before writing the Privacy screen.
+
+
+4 actions
+Let me check the customer web API for the methods I need, then implement all fixes in parallel.
+
+
+8 actions
+Now I have everything I need. Let me implement all fixes in parallel across all apps.
+
+
+3 actions
+Now I'll implement all fixes in parallel across all apps.
+
+Implementing parallel system fixes
+
+Implementing parallel system fixes
+Now I'll implement all fixes in parallel across all apps.
+
+
+4 actions
+Continuing with the remaining fixes in parallel.
+
+
+4 actions
+Now I'll implement all remaining Customer Web fixes in parallel - Privacy & Security screen, proper loading/empty states, and route wiring.
+
+
+4 actions
+Now I'll add the PrivacySecurityScreen component and wire up all the remaining Customer Web changes in parallel.
+
+
+4 actions
+Continuing with the remaining Customer Web wiring in parallel.
+
+
+6 actions
+Let me restart the app to verify my changes compile, while simultaneously implementing the remaining mobile partner fixes.
+
+
+8 actions
+The customer web is hot-updating cleanly. Let me add loading indicators to the mobile partner screens and take a screenshot to verify the Privacy & Security fix, all in parallel.
+
+
+4 actions
+App is healthy. Let me finish the loading indicator UI for both mobile partner screens in parallel.
+
+
+3 actions
+I need to close the conditional block in earnings.tsx and add the loading UI to jobs.tsx.
