@@ -28,9 +28,9 @@ class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ErrorBoundary] caught:', error.message);
-    console.error('[ErrorBoundary] stack:', error.stack);
-    console.error('[ErrorBoundary] componentStack:', info.componentStack);
+    console.error('[CRASH] ErrorBoundary caught error:', error.message);
+    console.error('[CRASH] stack:', error.stack);
+    console.error('[CRASH] componentStack:', info.componentStack);
   }
 
   render() {
@@ -74,6 +74,8 @@ function WebPhoneFrame({ children }: { children: ReactNode }) {
 }
 
 export default function RootLayout() {
+  console.log('[RootLayout] mounting, Platform.OS =', Platform.OS);
+
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -88,19 +90,28 @@ export default function RootLayout() {
   // On native, give it a 3 s grace period before forcing past the gate.
   const [fontTimedOut, setFontTimedOut] = React.useState(Platform.OS === 'web');
   useEffect(() => {
-    if (Platform.OS === 'web') return; // already bypassed above
+    if (Platform.OS === 'web') return;
     if (fontsLoaded || fontError) return;
-    const timer = setTimeout(() => setFontTimedOut(true), 3000);
+    const timer = setTimeout(() => {
+      console.log('[RootLayout] font timeout fired — forcing render');
+      setFontTimedOut(true);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
+    console.log('[RootLayout] font state — loaded:', fontsLoaded, 'error:', fontError, 'timedOut:', fontTimedOut);
     if (fontsLoaded || fontError || fontTimedOut) {
-      if (Platform.OS !== 'web') SplashScreen.hideAsync();
+      if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, fontError, fontTimedOut]);
 
-  if (!fontsLoaded && !fontError && !fontTimedOut) return null;
+  if (!fontsLoaded && !fontError && !fontTimedOut) {
+    console.log('[RootLayout] waiting for fonts…');
+    return null;
+  }
+
+  console.log('[RootLayout] rendering app tree');
 
   return (
     <ErrorBoundary>

@@ -71,17 +71,10 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     fi
   fi
 
-  # Expo's @expo/ngrok uses its own built-in relay token for exp.direct tunnels.
-  # We only override NGROK_AUTHTOKEN for the customer app (port 8080/8081) where
-  # the user's own ngrok v2 token is known to work. For all other ports (partner
-  # app) we leave NGROK_AUTHTOKEN unset so Expo uses its built-in token — the
-  # user-provided NGROK_AUTHTOKEN_2 is a ngrok v3 format token incompatible with
-  # the ngrok v2 binary that @expo/ngrok embeds.
-  AUTHTOKEN_VALUE="${!AUTHTOKEN_VAR}"
-  if [[ -n "$AUTHTOKEN_VALUE" && ( "$PORT" -eq 8080 || "$PORT" -eq 8081 ) ]]; then
-    echo "Setting NGROK_AUTHTOKEN for ngrok v2 (customer app)…"
-    export NGROK_AUTHTOKEN="$AUTHTOKEN_VALUE"
-  fi
+  # On Replit, always let Expo use its own built-in relay token for exp.direct
+  # tunnels. User-provided ngrok tokens (v3 format) are incompatible with the
+  # ngrok v2 binary embedded in @expo/ngrok and cause "remote gone away" errors.
+  unset NGROK_AUTHTOKEN
 
   # Use --tunnel so Expo creates a real exp.direct public URL that phones can
   # reach from outside Replit. The --host lan approach only works inside the
@@ -90,16 +83,31 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   # cannot use ngrok/tunnel. Anonymous users can tunnel fine.
   unset EXPO_TOKEN
   export EXPO_NO_INTERACTIVE=1
-  echo "Starting Expo (--tunnel / exp.direct) on port $PORT…"
 
-  _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
-  mkfifo "$_FIFO"
-  exec 9<>"$_FIFO"
-  pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
-  EXIT_CODE=$?
-  exec 9>&-
-  rm -f "$_FIFO"
-  exit $EXIT_CODE
+  # Retry loop — the exp.direct tunnel can fail with "remote gone away" on the
+  # first attempt (session conflict from a previous run). Retrying after a short
+  # delay reliably recovers.
+  NATIVE_MAX_RETRIES=5
+  NATIVE_RETRY_DELAY=15
+  for attempt in $(seq 1 $NATIVE_MAX_RETRIES); do
+    echo "Starting Expo (--tunnel / exp.direct) on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
+    _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
+    mkfifo "$_FIFO"
+    exec 9<>"$_FIFO"
+    pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
+    EXIT_CODE=$?
+    exec 9>&-
+    rm -f "$_FIFO"
+    if [[ $EXIT_CODE -eq 0 ]]; then
+      exit 0
+    fi
+    if [[ $attempt -lt $NATIVE_MAX_RETRIES ]]; then
+      echo "Tunnel exited (code $EXIT_CODE). Retrying in ${NATIVE_RETRY_DELAY}s…"
+      sleep "$NATIVE_RETRY_DELAY"
+    fi
+  done
+  echo "All $NATIVE_MAX_RETRIES tunnel attempts failed."
+  exit 1
 fi
 
 # ── ngrok fallback (outside Replit) ──────────────────────────────────────────

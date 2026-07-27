@@ -67,9 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Restore session on mount
   useEffect(() => {
     (async () => {
+      console.log('[AuthContext] restoring session…');
       try {
         const storedAccess = await storage.getItem(TOKEN_KEY);
         const storedRefresh = await storage.getItem(REFRESH_KEY);
+        console.log('[AuthContext] stored tokens present — access:', !!storedAccess, 'refresh:', !!storedRefresh);
         if (storedAccess) {
           try {
             const me = await profileApi.me(storedAccess);
