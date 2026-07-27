@@ -8,7 +8,7 @@
 #  2. Parses JSON log stream for the "started tunnel" URL
 #  3. Exports EXPO_TUNNEL_URL — the patched @expo/ngrok returns this immediately
 #     instead of spawning the old v2 binary
-#  4. Launches expo start --tunnel (which uses the pre-set URL)
+#  4. Launches Expo in LAN mode with the ngrok hostname
 #  5. Keeps ngrok alive in the background; cleans up on exit
 set -e
 
@@ -32,6 +32,13 @@ while [[ $# -gt 0 ]]; do
     *) break ;;
   esac
 done
+
+# Native Expo builds need an absolute API origin. When using ngrok for the
+# Metro tunnel, the API remains available through the project's public dev
+# domain; pass it into Metro so Expo Go does not try to fetch a relative URL.
+if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
+  export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
+fi
 
 # Optional startup delay (stagger Partner App behind Customer App)
 if [[ "$START_DELAY" -gt 0 ]]; then
@@ -133,10 +140,12 @@ mkdir -p "$CONFIG_HOME"
 NGROK_CONFIG="$CONFIG_HOME/ngrok-v3.yml"
 NGROK_LOG="$CONFIG_HOME/ngrok-v3.log"
 
-# Use distinct web UI ports per tunnel to avoid conflicts
-# Port 8081 → 4041 | Port 8082 → 4042 | fallback 4043
-WEB_PORT=$(( 4040 + PORT - 8080 ))
-if [[ $WEB_PORT -le 4040 || $WEB_PORT -ge 4050 ]]; then
+# Use distinct web UI ports per tunnel to avoid conflicts.
+if [[ "$PORT" -eq 8080 ]]; then
+  WEB_PORT=4041
+elif [[ "$PORT" -eq 8099 ]]; then
+  WEB_PORT=4042
+else
   WEB_PORT=4043
 fi
 
@@ -188,47 +197,49 @@ start_ngrok() {
 
     # Primary: query the ngrok web API (instant once the agent is up)
     TUNNEL_URL=$(curl -s --max-time 2 "http://127.0.0.1:${WEB_PORT}/api/tunnels" 2>/dev/null \
-      | python3 -c "
-import json,sys
-try:
-  d=json.load(sys.stdin)
-  for t in d.get('tunnels',[]):
-    u=t.get('public_url','')
-    if u.startswith('https://'):
-      print(u)
-      sys.exit(0)
-except:
-  pass
+      | node -e "
+let input = '';
+process.stdin.on('data', chunk => input += chunk);
+process.stdin.on('end', () => {
+  try {
+    const data = JSON.parse(input);
+    const tunnel = (data.tunnels || []).find(t => (t.public_url || '').startsWith('https://'));
+    if (tunnel) process.stdout.write(tunnel.public_url);
+  } catch {}
+});
 " 2>/dev/null)
 
     # Fallback: parse the JSON log file
     if [[ -z "$TUNNEL_URL" && -s "$NGROK_LOG" ]]; then
-      TUNNEL_URL=$(python3 - "$NGROK_LOG" <<'PY' 2>/dev/null
-import json, sys
-try:
-  with open(sys.argv[1]) as f:
-    for line in f:
-      try:
-        d = json.loads(line)
-        if d.get('msg') == 'started tunnel' and 'url' in d:
-          print(d['url'])
-          sys.exit(0)
-        if d.get('lvl') in ('info','INFO') and 'url' in d:
-          u = d['url']
-          if u.startswith('https://'):
-            print(u)
-            sys.exit(0)
-      except Exception:
-        pass
-except Exception:
-  pass
-PY
+      TUNNEL_URL=$(node - "$NGROK_LOG" <<'NODE' 2>/dev/null
+const fs = require('fs');
+try {
+  for (const line of fs.readFileSync(process.argv[2], 'utf8').split(/\r?\n/)) {
+    try {
+      const data = JSON.parse(line);
+      const url = data.msg === 'started tunnel' ? data.url : data.url;
+      if (typeof url === 'string' && url.startsWith('https://')) {
+        process.stdout.write(url);
+        break;
+      }
+    } catch {}
+  }
+} catch {}
+NODE
 )
     fi
 
     if [[ -n "$TUNNEL_URL" ]]; then
       echo "Tunnel ready: $TUNNEL_URL"
-      export EXPO_TUNNEL_URL="$TUNNEL_URL"
+      NGROK_HOST="${TUNNEL_URL#https://}"
+      # The ngrok public HTTPS URL is exposed on 443, so tell Expo CLI to use
+      # the public proxy
+      # URL for both the QR and the manifest bundle URLs. Do not include the
+      # internal Metro port here; ngrok terminates HTTPS on its public host.
+      export EXPO_PACKAGER_PROXY_URL="https://${NGROK_HOST}"
+      EXPO_GO_URL="exp://${NGROK_HOST}"
+      echo "$EXPO_GO_URL" > "/tmp/expo-tunnel-${PORT}.url"
+      export REACT_NATIVE_PACKAGER_HOSTNAME="$NGROK_HOST"
       return 0
     fi
 
@@ -250,14 +261,25 @@ for attempt in $(seq 1 $MAX_RETRIES); do
   echo "=== Tunnel attempt $attempt/$MAX_RETRIES ==="
 
   if start_ngrok; then
-    echo "Launching Expo --tunnel with pre-set URL: $EXPO_TUNNEL_URL"
-    yes | pnpm exec expo start --tunnel --port "$PORT" "$@" || true
+    echo "Launching Expo --host lan through ngrok: $REACT_NATIVE_PACKAGER_HOSTNAME"
+    if [[ "$PORT" -eq 8099 ]]; then
+      APP_DIR="$WORKSPACE_ROOT/apps/mobile-partner"
+    else
+      APP_DIR="$WORKSPACE_ROOT/apps/mobile"
+    fi
+    cd "$APP_DIR"
+    set +e
+    yes | pnpm exec expo start --host lan --port "$PORT" "$@"
     EXPO_EXIT=$?
+    set -e
 
     echo "Expo exited (code $EXPO_EXIT). Checking ngrok…"
     if kill -0 "$NGROK_PID" 2>/dev/null; then
       echo "ngrok still alive — restarting Expo only…"
-      yes | pnpm exec expo start --tunnel --port "$PORT" "$@" || true
+      set +e
+      yes | pnpm exec expo start --host lan --port "$PORT" "$@"
+      EXPO_EXIT=$?
+      set -e
     fi
   fi
 

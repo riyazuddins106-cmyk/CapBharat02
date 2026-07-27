@@ -23,13 +23,13 @@ title = "📱 Customer App — Scan in Expo Go"
 id = "58f8UHgVSV5JlZ6NfbQm3"
 uri = "file://screenshots/expo-customer-qr.png"
 type = "image"
-title = "Expo Customer App QR"
+title = "Corrected ServeNow Customer Expo Go QR"
 
 [[outputs]]
 id = "ZVixPCSwy5Ju0D6P1gIeb"
 uri = "file://screenshots/expo-partner-qr.png"
 type = "image"
-title = "Expo Partner App QR"
+title = "Corrected ServeNow Partner Expo Go QR"
 
 [[outputs]]
 id = "GZdRQd6oXsMdenrGJujZV"

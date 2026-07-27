@@ -27,3 +27,4 @@
 - [Expo Metro project root fix](expo-metro-project-root-fix.md) — stray workspace-root app.json makes Metro use wrong project root; delete it.
 - [Partner availability field name](partner-availability-field-name.md) — controller must accept availabilityStatus (mobile) or status (legacy).
 - [expo-tunnel set -e retry](expo-tunnel-set-e-retry.md) — set -e kills retry loop; wrap pnpm expo start with set +e / set -e to capture exit code.
+- [Expo ngrok workflows](expo-ngrok-workflows.md) — when ngrok is explicitly requested, use separate agents/inspector ports and Expo LAN mode for stable QR tunnels.

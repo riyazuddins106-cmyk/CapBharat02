@@ -71,6 +71,12 @@ export function createApp() {
     // This is the source of truth — the temp URL files are a secondary cache.
     const workspaceRoot = path.resolve(__dirname, '..', '..');
     const getUrl = (appDir: string, port: number) => {
+      // The ngrok workflow writes the current Expo Go URL here. Prefer it
+      // over Expo's exp.direct settings when an external tunnel is active.
+      try {
+        const externalUrl = fs.readFileSync(`/tmp/expo-tunnel-${port}.url`, 'utf8').trim();
+        if (externalUrl) return externalUrl;
+      } catch { /* fall through */ }
       try {
         const settingsPath = path.join(workspaceRoot, 'apps', appDir, '.expo', 'settings.json');
         const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
