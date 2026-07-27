@@ -12,6 +12,47 @@
 #  5. Keeps ngrok alive in the background; cleans up on exit
 set -e
 
+# ── Bundle pre-warmer ─────────────────────────────────────────────────────────
+# Runs in the background after Metro starts. Compiles and caches the Android
+# and iOS JS bundles so the first Expo Go scan loads in seconds, not 30-60s.
+prewarm_bundles() {
+  local port=$1
+  echo "[prewarm] Waiting for Metro on port $port…"
+  for i in $(seq 1 90); do
+    if curl -s --max-time 2 "http://localhost:$port/status" 2>/dev/null | grep -q "running"; then
+      break
+    fi
+    sleep 2
+  done
+
+  # Derive the bundle path from the Metro manifest
+  local MANIFEST BUNDLE_PATH
+  MANIFEST=$(curl -s --max-time 10 "http://localhost:$port" \
+    -H "Expo-Platform: android" 2>/dev/null)
+  BUNDLE_PATH=$(echo "$MANIFEST" | node -e "
+let d=''; process.stdin.on('data',c=>d+=c);
+process.stdin.on('end',()=>{
+  try {
+    const url = JSON.parse(d).launchAsset?.url || '';
+    process.stdout.write(url.replace(/https?:\/\/[^/]*/,''));
+  } catch {}
+})" 2>/dev/null)
+
+  if [[ -z "$BUNDLE_PATH" ]]; then
+    echo "[prewarm] Could not get bundle path — skipping"
+    return
+  fi
+
+  local IOS_PATH="${BUNDLE_PATH/platform=android/platform=ios}"
+  echo "[prewarm] Warming Android bundle (background)…"
+  curl -s --max-time 180 -o /dev/null "http://localhost:$port${BUNDLE_PATH}" \
+    && echo "[prewarm] Android bundle ready ✓" &
+  echo "[prewarm] Warming iOS bundle (background)…"
+  curl -s --max-time 180 -o /dev/null "http://localhost:$port${IOS_PATH}" \
+    && echo "[prewarm] iOS bundle ready ✓" &
+  wait
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NGROK_V3="$WORKSPACE_ROOT/bin/ngrok"
@@ -98,6 +139,7 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   NATIVE_RETRY_DELAY=15
   for attempt in $(seq 1 $NATIVE_MAX_RETRIES); do
     echo "Starting Expo (--tunnel / exp.direct) on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
+    prewarm_bundles "$PORT" &
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"
     exec 9<>"$_FIFO"
@@ -268,6 +310,7 @@ for attempt in $(seq 1 $MAX_RETRIES); do
       APP_DIR="$WORKSPACE_ROOT/apps/mobile"
     fi
     cd "$APP_DIR"
+    prewarm_bundles "$PORT" &
     set +e
     yes | pnpm exec expo start --host lan --port "$PORT" "$@"
     EXPO_EXIT=$?
@@ -276,6 +319,7 @@ for attempt in $(seq 1 $MAX_RETRIES); do
     echo "Expo exited (code $EXPO_EXIT). Checking ngrok…"
     if kill -0 "$NGROK_PID" 2>/dev/null; then
       echo "ngrok still alive — restarting Expo only…"
+      prewarm_bundles "$PORT" &
       set +e
       yes | pnpm exec expo start --host lan --port "$PORT" "$@"
       EXPO_EXIT=$?

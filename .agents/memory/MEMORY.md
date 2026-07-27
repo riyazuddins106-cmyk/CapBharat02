@@ -18,6 +18,7 @@
 - [CRUD test field names](crud-field-names.md) — exact API field names differ from obvious guesses; verified from validators/controllers.
 - [Expo web useFonts hang over tunnel](expo-web-usefonts-hang.md) — useFonts() can hang forever specifically over the public HTTPS domain even though font requests succeed fine directly; always add a setTimeout fallback to force render.
 - [worklets-src-redirect](worklets-src-redirect.md) — react-native-worklets "react-native" field resolves to src/TS; redirect to lib/module in resolveRequest.
+- [worklets-version-pin](worklets-version-pin.md) — must pin react-native-worklets@0.5.1 + reanimated@4.1.1 exactly for Expo SDK 54; newer worklets crash Expo Go with "installTurboModule called with 1 arguments".
 - [hermesc-jsc-workaround](hermesc-jsc-workaround.md) — pnpm RN 0.81 ships hermesc 0.12 (no private class fields); set jsEngine:jsc in app.json to skip hermesc for EAS Update.
 - [Service categories column drift](service-categories-column-drift.md) — featured/image_url missing after push on pre-existing DB; fix via run-column-migration.ts ALTER TABLE IF NOT EXISTS.
 - [Expo settings.json URL derivation](expo-settings-url-derivation.md) — exp.direct URL = settings.json urlRandomness (lowercased) + port; never capture from piped Metro stdout (TTY format differs).
