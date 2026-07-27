@@ -52,6 +52,16 @@ const FORCED_MODULES = {
   'react-native-reanimated': resolveReal('react-native-reanimated'),
 };
 
+// react-native-worklets declares a "react-native" source entry that points to
+// TypeScript. Under pnpm, Metro can resolve that source entry before the
+// compiled package entry, which crashes the Reanimated 4 bundle. Force the
+// compiled entry instead.
+const reanimatedRoot = path.dirname(resolveReal('react-native-reanimated'));
+const workletsRoot = path.dirname(
+  require.resolve('react-native-worklets/package.json', { paths: [reanimatedRoot] }),
+);
+FORCED_MODULES['react-native-worklets'] = path.join(workletsRoot, 'lib/module/index.js');
+
 config.resolver.extraNodeModules = { ...FORCED_MODULES };
 
 const defaultResolveRequest = config.resolver.resolveRequest;
