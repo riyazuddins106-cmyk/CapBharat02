@@ -83,20 +83,19 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     export NGROK_AUTHTOKEN="$AUTHTOKEN_VALUE"
   fi
 
-  # Use --host lan so Metro serves on the local network interface.
-  # Setting REACT_NATIVE_PACKAGER_HOSTNAME to the Replit public domain makes
-  # the QR code encode the public URL (exp://<replit-domain>:<port>) so Expo Go
-  # on a phone can reach Metro through Replit's HTTP proxy — no ngrok needed.
-  # DO NOT export CI=1 here: when EXPO_TOKEN is set Expo treats CI=1 as a
-  # "robot user" session and blocks tunnel/ngrok usage even in lan mode.
+  # Use --tunnel so Expo creates a real exp.direct public URL that phones can
+  # reach from outside Replit. The --host lan approach only works inside the
+  # browser preview (mTLS proxy) — phones cannot connect through it.
+  # Unset EXPO_TOKEN: when set, Expo treats the session as a robot user which
+  # cannot use ngrok/tunnel. Anonymous users can tunnel fine.
+  unset EXPO_TOKEN
   export EXPO_NO_INTERACTIVE=1
-  export REACT_NATIVE_PACKAGER_HOSTNAME="$REPLIT_DEV_DOMAIN"
-  echo "Starting Expo (--host lan) — QR will use $REPLIT_DEV_DOMAIN:$PORT"
+  echo "Starting Expo (--tunnel / exp.direct) on port $PORT…"
 
   _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
   mkfifo "$_FIFO"
   exec 9<>"$_FIFO"
-  pnpm exec expo start --host lan --port "$PORT" "$@" < "$_FIFO"
+  pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
   EXIT_CODE=$?
   exec 9>&-
   rm -f "$_FIFO"

@@ -166,7 +166,7 @@ run = ["node", "server/dist/index.js"]
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_SECURE = "false"
-EXPO_PUBLIC_API_URL = "https://c683899a-1f4c-4f7f-8b54-72f73765cf1f-00-r1dhmw3w1ekl.sisko.replit.dev"
+EXPO_PUBLIC_API_URL = "https://2c5b074f-01ef-4903-bbed-6f16c1cfe776-00-2dd0wgbdu6fio.sisko.replit.dev"
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
 
 [userenv.production]
