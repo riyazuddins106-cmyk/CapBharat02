@@ -24,3 +24,6 @@
 - [Expo tunnel FIFO stdin fix](expo-tunnel-fifo-stdin.md) — sleep 999999 in pipe blocks retry; use FIFO with exec 9<> (O_RDWR, non-blocking) to hold stdin open.
 - [Admin catalog ownership](admin-catalog-ownership.md) — customers book centrally managed products; partners are matched by skills and do not create or price products.
 - [Live serviceCount query](servicecount-live-query.md) — category serviceCount was static/stale; fixed to JOIN services table; Laundry got 6 new services.
+- [Expo Metro project root fix](expo-metro-project-root-fix.md) — stray workspace-root app.json makes Metro use wrong project root; delete it.
+- [Partner availability field name](partner-availability-field-name.md) — controller must accept availabilityStatus (mobile) or status (legacy).
+- [expo-tunnel set -e retry](expo-tunnel-set-e-retry.md) — set -e kills retry loop; wrap pnpm expo start with set +e / set -e to capture exit code.

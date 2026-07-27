@@ -69,7 +69,9 @@ export const partnerController = {
   }),
 
   updateAvailability: asyncHandler(async (req: Request, res: Response) => {
-    const data = await partnerService.updateAvailability(req.user!.userId, req.body.status);
+    // Accept both field names: mobile sends availabilityStatus, legacy sends status
+    const status = req.body.availabilityStatus ?? req.body.status;
+    const data = await partnerService.updateAvailability(req.user!.userId, status);
     res.json({ success: true, data });
   }),
 

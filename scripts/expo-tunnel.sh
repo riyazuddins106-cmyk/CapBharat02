@@ -94,8 +94,10 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"
     exec 9<>"$_FIFO"
+    set +e
     pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
     EXIT_CODE=$?
+    set -e
     exec 9>&-
     rm -f "$_FIFO"
     if [[ $EXIT_CODE -eq 0 ]]; then
