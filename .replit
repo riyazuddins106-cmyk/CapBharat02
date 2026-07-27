@@ -68,8 +68,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd apps/mobile && env -u REPLIT_EXPO_DEV_DOMAIN ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN"
-waitForPort = 8080
+args = "cd apps/mobile && env -u REPLIT_EXPO_DEV_DOMAIN ../../scripts/expo-tunnel.sh 8080 --authtoken-var NGROK_AUTHTOKEN 2>&1 | tee /tmp/metro-live.log"
 
 [[workflows.workflow]]
 name = "Expo Partner App"
