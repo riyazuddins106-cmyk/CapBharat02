@@ -431,6 +431,26 @@ export interface Payment {
   createdAt: string;
 }
 
+// ── Service Wishlist ───────────────────────────────────────
+export interface WishlistedService {
+  id: string;
+  name: string;
+  description: string | null;
+  images: string[];
+  customerPrice: number;
+  duration: number;
+  badge: string | null;
+  categoryId: string;
+  isWishlisted: boolean;
+}
+
+export const serviceWishlistApi = {
+  list: (token: string) => request<WishlistedService[]>('/api/service-wishlist', { token }),
+  toggle: (serviceId: string, token: string) =>
+    request<{ isWishlisted: boolean }>(`/api/service-wishlist/${serviceId}`, { method: 'POST', token }),
+  getIds: (token: string) => request<{ ids: string[] }>('/api/service-wishlist/ids', { token }),
+};
+
 // ── Favorites ──────────────────────────────────────────────
 export const favoritesApi = {
   list: (token: string) => request<Professional[]>('/api/favorites', { token }),

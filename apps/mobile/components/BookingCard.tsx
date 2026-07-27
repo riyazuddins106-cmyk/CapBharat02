@@ -7,7 +7,7 @@ import { bookingsApi, type Booking } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
 const STATUS_CONFIG = {
-  pending:     { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6' },
+  pending:     { label: 'Searching…',  color: '#7C3AED', bg: '#EDE9FE' },
   upcoming:    { label: 'Upcoming',    color: '#2563EB', bg: '#DBEAFE' },
   in_progress: { label: 'In Progress', color: '#D97706', bg: '#FEF3C7' },
   completed:   { label: 'Completed',   color: '#16A34A', bg: '#DCFCE7' },
@@ -60,7 +60,11 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             </View>
             <View>
               <Text style={[styles.service, { color: colors.foreground }]} numberOfLines={1}>{booking.serviceName}</Text>
-              <Text style={[styles.pro, { color: colors.mutedForeground }]}>{booking.proName}</Text>
+              {booking.status === 'pending' ? (
+                <Text style={[styles.pro, { color: '#7C3AED', fontStyle: 'italic' }]}>Searching for professional…</Text>
+              ) : (
+                <Text style={[styles.pro, { color: colors.mutedForeground }]}>{booking.proName}</Text>
+              )}
             </View>
           </View>
           <View style={[styles.badge, { backgroundColor: cfg.bg }]}>

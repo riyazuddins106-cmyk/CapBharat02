@@ -60,3 +60,15 @@ id = "N7Qeb3RyxSBAkzIoE6uja"
 uri = "file://tmp-qr/qr-partner.png"
 type = "image"
 title = "📱 Partner App — Scan with Expo Go"
+
+[[outputs]]
+id = "sbmra0RGDZ-dPVo4thLas"
+uri = "file://screenshots/qr-customer.png"
+type = "image"
+title = "Customer App — Scan with Expo Go"
+
+[[outputs]]
+id = "LqTiiW5EecDIbc8JLFp_L"
+uri = "file://screenshots/qr-partner.png"
+type = "image"
+title = "Partner App — Scan with Expo Go"

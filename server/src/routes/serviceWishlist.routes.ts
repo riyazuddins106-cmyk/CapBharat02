@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { authenticate } from '../middleware/authenticate.js';
 import { serviceWishlistController } from '../controllers/serviceWishlist.controller.js';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(authenticate);
 
 router.get('/', serviceWishlistController.list);
 router.get('/ids', serviceWishlistController.ids);

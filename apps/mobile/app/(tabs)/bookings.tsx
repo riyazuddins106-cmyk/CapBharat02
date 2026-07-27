@@ -291,7 +291,7 @@ export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { accessToken, isAuthenticated } = useAuth();
-  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [tab, setTab] = useState<'searching' | 'upcoming' | 'past'>('upcoming');
   const [reviewModal, setReviewModal] = useState<Booking | null>(null);
   const [payModal, setPayModal] = useState<Booking | null>(null);
   const [rating, setRating] = useState(5);
@@ -331,10 +331,13 @@ export default function BookingsScreen() {
   };
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
-  const UPCOMING = ['upcoming', 'in_progress'];
-  const filtered = (bookings ?? []).filter((b) =>
-    tab === 'upcoming' ? UPCOMING.includes(b.status) : !UPCOMING.includes(b.status),
-  );
+  const allBookings = bookings ?? [];
+  const searchingBookings = allBookings.filter((b) => b.status === 'pending');
+  const upcomingBookings  = allBookings.filter((b) => ['upcoming', 'in_progress'].includes(b.status));
+  const pastBookings      = allBookings.filter((b) => ['completed', 'cancelled'].includes(b.status));
+  const filtered = tab === 'searching' ? searchingBookings
+                 : tab === 'upcoming'  ? upcomingBookings
+                 : pastBookings;
 
   if (!isAuthenticated) {
     return (
@@ -360,18 +363,30 @@ export default function BookingsScreen() {
         <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
         {/* Tabs */}
         <View style={[styles.tabs, { backgroundColor: colors.muted, borderRadius: 100 }]}>
-          {(['upcoming', 'past'] as const).map((t) => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.tab, { backgroundColor: tab === t ? colors.card : 'transparent', borderRadius: 100 }]}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.tabText, { color: tab === t ? colors.foreground : colors.mutedForeground, fontWeight: tab === t ? '700' : '500' }]}>
-                {t === 'upcoming' ? 'Upcoming' : 'Past'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {(['searching', 'upcoming', 'past'] as const).map((t) => {
+            const label = t === 'searching' ? 'Searching' : t === 'upcoming' ? 'Upcoming' : 'Past';
+            const count = t === 'searching' ? searchingBookings.length : t === 'upcoming' ? upcomingBookings.length : pastBookings.length;
+            const isActive = tab === t;
+            return (
+              <TouchableOpacity
+                key={t}
+                onPress={() => setTab(t)}
+                style={[styles.tab, { backgroundColor: isActive ? colors.card : 'transparent', borderRadius: 100 }]}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={[styles.tabText, { color: isActive ? (t === 'searching' ? '#7C3AED' : colors.foreground) : colors.mutedForeground, fontWeight: isActive ? '700' : '500' }]}>
+                    {label}
+                  </Text>
+                  {count > 0 && (
+                    <View style={{ backgroundColor: t === 'searching' ? '#7C3AED' : colors.primary, borderRadius: 99, paddingHorizontal: 5, paddingVertical: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{count}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -381,6 +396,21 @@ export default function BookingsScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        ListHeaderComponent={
+          tab === 'searching' ? (
+            <View style={[styles.searchingBanner, { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' }]}>
+              <View style={styles.searchingRow}>
+                <ActivityIndicator size="small" color="#7C3AED" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.searchingTitle}>Finding your professional</Text>
+                  <Text style={styles.searchingText}>
+                    We're matching the best available professional to your booking. This usually takes a few minutes. You'll get a notification once confirmed.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           isLoading ? (
             <View style={styles.center}>
@@ -388,12 +418,26 @@ export default function BookingsScreen() {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={44} color={colors.mutedForeground} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No {tab} bookings</Text>
-              {tab === 'upcoming' && (
-                <TouchableOpacity onPress={() => router.push('/(tabs)/services')} style={[styles.signInBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}>
-                  <Text style={styles.signInBtnText}>Browse Services</Text>
-                </TouchableOpacity>
+              {tab === 'searching' ? (
+                <>
+                  <Ionicons name="search-outline" size={44} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No pending bookings</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Bookings waiting for a professional will appear here</Text>
+                </>
+              ) : tab === 'upcoming' ? (
+                <>
+                  <Ionicons name="calendar-outline" size={44} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No upcoming bookings</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/services')} style={[styles.signInBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}>
+                    <Text style={styles.signInBtnText}>Browse Services</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="time-outline" size={44} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No past bookings</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Completed and cancelled bookings will appear here</Text>
+                </>
               )}
             </View>
           )
@@ -477,6 +521,10 @@ export default function BookingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  searchingBanner: { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14 },
+  searchingRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  searchingTitle:  { fontSize: 13, fontWeight: '700', color: '#7C3AED', marginBottom: 3 },
+  searchingText:   { fontSize: 12, color: '#6D28D9', lineHeight: 17 },
   header: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, gap: 12 },
   title: { fontSize: 24, fontWeight: '700' },
   tabs: { flexDirection: 'row', padding: 3 },

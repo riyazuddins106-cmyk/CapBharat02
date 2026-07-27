@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { favoritesApi, type Professional } from '@/lib/api';
+import { serviceWishlistApi, type WishlistedService } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 export default function WishlistScreen() {
@@ -16,19 +16,21 @@ export default function WishlistScreen() {
   const { accessToken } = useAuth();
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
-  const { data: pros = [], isLoading } = useQuery({
-    queryKey: ['/api/favorites', accessToken],
-    queryFn: () => favoritesApi.list(accessToken!),
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ['/api/service-wishlist', accessToken],
+    queryFn: () => serviceWishlistApi.list(accessToken!),
     enabled: !!accessToken,
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (id: string) => favoritesApi.toggle(id, accessToken!),
+    mutationFn: (id: string) => serviceWishlistApi.toggle(id, accessToken!),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      queryClient.invalidateQueries({ queryKey: ['/api/favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/service-wishlist'] });
     },
   });
+
+  const fmtDuration = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ''}` : `${mins}m`;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -42,50 +44,56 @@ export default function WishlistScreen() {
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
-      ) : pros.length === 0 ? (
+      ) : items.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="heart-outline" size={52} color={colors.mutedForeground} />
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Your wishlist is empty</Text>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Heart a professional to save them here</Text>
-          <TouchableOpacity onPress={() => router.back()} style={[styles.browseBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}>
-            <Text style={styles.browseBtnText}>Browse Professionals</Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Heart a service to save it here</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/services')} style={[styles.browseBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}>
+            <Text style={styles.browseBtnText}>Browse Services</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={pros}
-          keyExtractor={(p) => p.id}
+          data={items}
+          keyExtractor={(s) => s.id}
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 32 }}
-          renderItem={({ item: p }) => (
-            <TouchableOpacity
-              onPress={() => router.push(`/professional/${p.id}` as any)}
-              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}
-              activeOpacity={0.8}
-            >
-              {p.avatarUrl ? (
-                <Image source={{ uri: p.avatarUrl }} style={[styles.avatar, { borderRadius: colors.radius }]} />
+          renderItem={({ item: s }) => (
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+              {/* Thumbnail */}
+              {s.images?.[0] ? (
+                <Image source={{ uri: s.images[0] }} style={[styles.thumb, { borderRadius: colors.radius - 2 }]} />
               ) : (
-                <View style={[styles.avatar, { backgroundColor: colors.secondary, borderRadius: colors.radius, alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={[styles.avatarInitial, { color: colors.primary }]}>{p.name[0]}</Text>
+                <View style={[styles.thumb, { backgroundColor: colors.secondary, borderRadius: colors.radius - 2, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="construct-outline" size={26} color={colors.primary} />
                 </View>
               )}
+
+              {/* Info */}
               <View style={styles.info}>
-                <Text style={[styles.proName, { color: colors.foreground }]} numberOfLines={1}>{p.name}</Text>
-                <Text style={[styles.proTitle, { color: colors.mutedForeground }]} numberOfLines={1}>{p.title}</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={12} color="#FBBF24" />
-                  <Text style={[styles.rating, { color: colors.mutedForeground }]}>{p.rating.toFixed(1)} ({p.reviewCount})</Text>
-                  <Text style={[styles.price, { color: colors.primary }]}>₹{p.basePrice}{p.priceUnit}</Text>
+                {s.badge && (
+                  <View style={[styles.badgePill, { backgroundColor: colors.primary + '18' }]}>
+                    <Text style={[styles.badgeText, { color: colors.primary }]}>{s.badge}</Text>
+                  </View>
+                )}
+                <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={2}>{s.name}</Text>
+                <View style={styles.metaRow}>
+                  <Ionicons name="time-outline" size={12} color={colors.mutedForeground} />
+                  <Text style={[styles.meta, { color: colors.mutedForeground }]}>{fmtDuration(s.duration)}</Text>
+                  <Text style={[styles.price, { color: colors.primary }]}>₹{s.customerPrice}</Text>
                 </View>
               </View>
+
+              {/* Remove heart */}
               <TouchableOpacity
-                onPress={(e) => { e.stopPropagation(); toggleMutation.mutate(p.id); }}
+                onPress={() => toggleMutation.mutate(s.id)}
                 style={styles.heartBtn}
                 activeOpacity={0.7}
+                disabled={toggleMutation.isPending}
               >
                 <Ionicons name="heart" size={22} color="#EF4444" />
               </TouchableOpacity>
-            </TouchableOpacity>
+            </View>
           )}
         />
       )}
@@ -94,22 +102,22 @@ export default function WishlistScreen() {
 }
 
 const styles = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, gap: 12 },
-  backBtn:      { padding: 4 },
-  title:        { flex: 1, fontSize: 20, fontWeight: '700' },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-  emptyTitle:   { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  emptyText:    { fontSize: 14, textAlign: 'center' },
-  browseBtn:    { paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, gap: 12 },
+  backBtn:     { padding: 4 },
+  title:       { flex: 1, fontSize: 20, fontWeight: '700' },
+  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  emptyTitle:  { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  emptyText:   { fontSize: 14, textAlign: 'center' },
+  browseBtn:   { paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
   browseBtnText:{ color: '#fff', fontWeight: '700' },
-  card:         { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12, borderWidth: 1 },
-  avatar:       { width: 60, height: 60 },
-  avatarInitial:{ fontSize: 22, fontWeight: '700' },
-  info:         { flex: 1, gap: 3 },
-  proName:      { fontSize: 15, fontWeight: '700' },
-  proTitle:     { fontSize: 13 },
-  ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rating:       { fontSize: 12 },
-  price:        { fontSize: 13, fontWeight: '700', marginLeft: 'auto' },
-  heartBtn:     { padding: 8 },
+  card:        { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12, borderWidth: 1 },
+  thumb:       { width: 64, height: 64 },
+  info:        { flex: 1, gap: 4 },
+  badgePill:   { alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 100 },
+  badgeText:   { fontSize: 10, fontWeight: '700' },
+  name:        { fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  metaRow:     { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  meta:        { fontSize: 12 },
+  price:       { fontSize: 13, fontWeight: '700', marginLeft: 'auto' },
+  heartBtn:    { padding: 8 },
 });

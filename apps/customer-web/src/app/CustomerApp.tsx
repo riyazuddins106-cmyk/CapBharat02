@@ -2464,13 +2464,14 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
   onRefresh: () => void;
   onRebook: (categoryId: string) => void;
 }) {
-  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  const [tab, setTab] = useState<"searching" | "upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [payBooking, setPayBooking] = useState<ApiBooking | null>(null);
 
-  const upcoming = bookings.filter((b) => ["pending", "upcoming", "in_progress"].includes(b.status));
-  const past = bookings.filter((b) => ["completed", "cancelled"].includes(b.status));
-  const filtered = tab === "upcoming" ? upcoming : past;
+  const searchingBookings = bookings.filter((b) => b.status === "pending");
+  const upcomingBookings  = bookings.filter((b) => ["upcoming", "in_progress"].includes(b.status));
+  const pastBookings      = bookings.filter((b) => ["completed", "cancelled"].includes(b.status));
+  const filtered = tab === "searching" ? searchingBookings : tab === "upcoming" ? upcomingBookings : pastBookings;
 
   async function handleCancel(id: string) {
     setCancelling(id);
@@ -2489,14 +2490,38 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
         <h2 className="text-lg font-bold">My Bookings</h2>
         <button onClick={onRefresh} className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>Refresh</button>
       </div>
-      <div className="flex mx-5 mt-4 bg-gray-100 rounded-xl p-1">
-        {(["upcoming", "past"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className="flex-1 py-2 rounded-lg text-sm font-bold capitalize"
-            style={{ background: tab === t ? "#fff" : "transparent", color: tab === t ? "#5B3EF5" : "#9CA3AF", boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
-            {t} {t === "upcoming" ? `(${upcoming.length})` : `(${past.length})`}
-          </button>
-        ))}
+      <div className="flex mx-5 mt-4 bg-gray-100 rounded-xl p-1 gap-0.5">
+        {(["searching", "upcoming", "past"] as const).map((t) => {
+          const label = t === "searching" ? "Searching" : t === "upcoming" ? "Upcoming" : "Past";
+          const count = t === "searching" ? searchingBookings.length : t === "upcoming" ? upcomingBookings.length : pastBookings.length;
+          const isActive = tab === t;
+          return (
+            <button key={t} onClick={() => setTab(t)} className="flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"
+              style={{ background: isActive ? "#fff" : "transparent", color: isActive ? (t === "searching" ? "#7C3AED" : "#5B3EF5") : "#9CA3AF", boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
+              {label}
+              {count > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: t === "searching" ? "#7C3AED" : "#5B3EF5" }}>{count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Searching tab — info banner */}
+      {tab === "searching" && (
+        <div className="mx-5 mt-4 rounded-2xl border p-4 flex items-start gap-3" style={{ background: "#F5F3FF", borderColor: "#DDD6FE" }}>
+          <div className="mt-0.5 flex-shrink-0">
+            <div className="w-3 h-3 rounded-full animate-pulse" style={{ background: "#7C3AED" }} />
+          </div>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#6D28D9" }}>Finding your professional</p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "#7C3AED" }}>
+              We're matching the best available professional to your booking. This usually takes a few minutes — you'll be notified once confirmed.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="px-5 mt-4 flex flex-col gap-4">
         {filtered.map((b) => {
           const sc = statusColors(b.status);
@@ -2505,7 +2530,11 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h4 className="text-sm font-bold">{b.serviceName}</h4>
-                  <p className="text-xs text-gray-400 mt-0.5">{b.proName}</p>
+                  {b.status === "pending" ? (
+                    <p className="text-xs mt-0.5 italic font-medium" style={{ color: "#7C3AED" }}>Searching for professional…</p>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-0.5">{b.proName}</p>
+                  )}
                 </div>
                 <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: sc.bg, color: sc.color }}>{statusLabel(b.status)}</span>
               </div>
@@ -2545,9 +2574,15 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
         })}
         {filtered.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-4xl mb-3"></div>
-            <p className="text-sm font-bold">No {tab} bookings</p>
-            <p className="text-xs text-gray-400 mt-1">{tab === "upcoming" ? "Book a service to get started" : "Completed bookings will appear here"}</p>
+            <div className="text-4xl mb-3">{tab === "searching" ? "🔍" : tab === "upcoming" ? "📅" : "🕐"}</div>
+            <p className="text-sm font-bold">
+              {tab === "searching" ? "No pending bookings" : tab === "upcoming" ? "No upcoming bookings" : "No past bookings"}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {tab === "searching" ? "Bookings waiting for a professional will appear here"
+               : tab === "upcoming" ? "Book a service to get started"
+               : "Completed and cancelled bookings will appear here"}
+            </p>
           </div>
         )}
       </div>
@@ -3099,10 +3134,12 @@ export default function CustomerApp() {
           categories={categories}
           professionals={professionals}
           favoriteIds={favoriteIds}
+          wishlistIds={wishlistIds}
           offers={offers}
           reels={reels}
           location={location}
           onToggleFavorite={handleToggleFavorite}
+          onToggleWishlist={handleToggleWishlist}
           onCategorySelect={handleCategorySelect}
           onLocationPress={() => setShowLocationPicker(true)}
           isLoggedIn={isLoggedIn}
@@ -3113,7 +3150,9 @@ export default function CustomerApp() {
         <CustServices
           categories={categories}
           favoriteIds={favoriteIds}
+          wishlistIds={wishlistIds}
           onToggleFavorite={handleToggleFavorite}
+          onToggleWishlist={handleToggleWishlist}
           initialCategoryId={servicesInitCatId}
           isLoggedIn={isLoggedIn}
           onCartChange={setCart}
