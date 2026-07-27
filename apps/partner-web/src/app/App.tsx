@@ -436,7 +436,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
                       <TextInput value={regArea} onChange={setRegArea} placeholder="e.g. Andheri West, Koramangala"/>
                     </Field>
                     <Field label="Pincode">
-                      <TextInput value={regPincode} onChange={v => setRegPincode(v.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit pincode" type="text" inputMode="numeric"/>
+                      <TextInput value={regPincode} onChange={v => setRegPincode(v.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit pincode" type="text"/>
                     </Field>
                   </div>
                 </div>
@@ -1276,7 +1276,10 @@ function Notifications({ token }: { token: string }) {
     try {
       await notificationsApi.markAllRead(token);
       setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch {}
+    } catch (e: any) {
+      // Surface error via the existing msg state if available, else console
+      console.error('[notifications] markAll failed:', e.message);
+    }
   }
 
   const unread = notifs.filter(n => !n.isRead).length;

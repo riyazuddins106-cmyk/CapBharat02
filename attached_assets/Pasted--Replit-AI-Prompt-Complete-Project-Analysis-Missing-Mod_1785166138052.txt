@@ -1,0 +1,350 @@
+# Replit AI Prompt – Complete Project Analysis, Missing Module Detection, End-to-End Testing & Production Readiness
+
+## Role
+
+Act as a **Principal Software Architect, Senior Full Stack Developer, Mobile App Developer, Backend Engineer, Database Architect, QA Automation Engineer, DevOps Engineer, Security Engineer, and Business Analyst**.
+
+Your responsibility is to **fully analyze the entire project** without making assumptions. Treat this as a production audit of a real application.
+
+Do **not** only fix the issue I mentioned. Instead, inspect the complete application, identify everything that is missing, broken, incomplete, inconsistent, or disconnected, then implement and verify all required functionality.
+
+---
+
+# OBJECTIVE
+
+Perform a complete audit of the entire project, including:
+
+* Customer Application
+* Partner Application
+* Admin Panel
+* Backend
+* APIs
+* Database
+* Authentication
+* Authorization
+* File Storage
+* Notifications
+* Real-time Features
+* Payments
+* Business Logic
+* Navigation
+* UI/UX
+* Performance
+* Security
+
+Analyze every file, screen, API, component, service, database table, workflow, and dependency.
+
+Do not assume anything is working simply because the UI exists.
+
+---
+
+# COMPLETE PROJECT ANALYSIS
+
+Inspect the entire codebase and identify:
+
+* Missing modules
+* Incomplete modules
+* Placeholder implementations
+* Mock data still in use
+* Missing backend integration
+* Missing database integration
+* Broken API connections
+* Missing validations
+* Missing navigation
+* Missing permissions
+* Missing business logic
+* Missing error handling
+* Missing loading states
+* Missing empty states
+* Missing success/failure handling
+* Missing notifications
+* Missing logging
+* Missing reports
+* Missing dashboards
+* Missing settings
+* Missing admin functionality
+* Missing partner functionality
+* Missing customer functionality
+
+Every issue found should either be fixed or clearly documented.
+
+---
+
+# END-TO-END BUSINESS FLOW REVIEW
+
+Analyze the application's complete business flow from start to finish.
+
+Verify that every action performed by one user correctly affects every other part of the system.
+
+For example:
+
+* Customer actions should update Partner and Admin.
+* Partner actions should update Customer and Admin.
+* Admin actions should update Customer and Partner.
+* Database changes should be reflected everywhere.
+* Notifications should reach all appropriate users.
+* Status changes should remain synchronized.
+* Payments, bookings, reviews, documents, and profiles should stay consistent across the platform.
+
+If any workflow is incomplete, redesign and implement it properly.
+
+---
+
+# COMPLETE FUNCTIONAL TESTING
+
+Perform complete testing of every module.
+
+Open every screen.
+
+Click every button.
+
+Use every menu.
+
+Submit every form.
+
+Upload files.
+
+Edit records.
+
+Delete records.
+
+Search.
+
+Filter.
+
+Sort.
+
+Navigate between screens.
+
+Verify API calls.
+
+Verify database updates.
+
+Verify real-time synchronization.
+
+Verify permissions.
+
+Verify validations.
+
+Verify responsiveness.
+
+Verify loading states.
+
+Verify error handling.
+
+Verify empty states.
+
+Verify success states.
+
+Nothing should remain untested.
+
+---
+
+# USER JOURNEY TESTING
+
+Test realistic scenarios from beginning to end.
+
+Examples include:
+
+* User registration
+* Login
+* Profile management
+* Service discovery
+* Booking workflow
+* Partner workflow
+* Order lifecycle
+* Payment lifecycle
+* Notifications
+* Reviews
+* Wallet
+* Reports
+* Admin management
+* Support
+* Settings
+
+Do not assume these flows are complete.
+
+Validate every step.
+
+---
+
+# DATABASE AUDIT
+
+Inspect the database completely.
+
+Verify:
+
+* Relationships
+* Constraints
+* Foreign keys
+* Indexes
+* Data integrity
+* Duplicate data
+* Orphan records
+* Performance
+* Security
+* Transactions
+* Audit logs
+
+Ensure every module stores and retrieves data correctly.
+
+---
+
+# API AUDIT
+
+Inspect every API.
+
+Verify:
+
+* Authentication
+* Authorization
+* Validation
+* Error responses
+* Status codes
+* Request handling
+* Response consistency
+* Pagination
+* Filtering
+* Sorting
+* Search
+* Logging
+* Performance
+
+Fix all inconsistencies.
+
+---
+
+# UI / UX REVIEW
+
+Inspect every screen.
+
+Identify:
+
+* Missing pages
+* Broken navigation
+* Incorrect layouts
+* Inconsistent design
+* Accessibility issues
+* Responsiveness problems
+* Missing feedback messages
+* Broken animations
+* Missing icons
+* Missing images
+* Incorrect colors
+* Spacing issues
+* Alignment issues
+* Poor user experience
+
+Improve where necessary while maintaining the existing design language.
+
+---
+
+# PERFORMANCE REVIEW
+
+Inspect the project for:
+
+* Slow APIs
+* Slow database queries
+* Large bundle sizes
+* Unnecessary re-renders
+* Memory leaks
+* Duplicate code
+* Unused components
+* Unused APIs
+* Unused packages
+* Performance bottlenecks
+
+Optimize where appropriate.
+
+---
+
+# SECURITY REVIEW
+
+Verify:
+
+* Authentication
+* Authorization
+* Role-based access
+* Session handling
+* Secure storage
+* Password security
+* API protection
+* File upload validation
+* Input validation
+* SQL injection protection
+* XSS protection
+* CSRF protection
+* Rate limiting
+* Environment variables
+* Secrets management
+
+Fix security weaknesses.
+
+---
+
+# CODE QUALITY REVIEW
+
+Review the entire codebase.
+
+Identify:
+
+* Duplicate code
+* Dead code
+* Poor architecture
+* Tight coupling
+* Naming inconsistencies
+* Poor folder structure
+* Missing comments where necessary
+* Missing documentation
+* Technical debt
+
+Refactor where beneficial without breaking functionality.
+
+---
+
+# AUTOMATED END-TO-END VERIFICATION
+
+Simulate complete user journeys.
+
+Verify that every feature works together correctly.
+
+If any step fails:
+
+* Identify the root cause.
+* Fix the issue.
+* Re-run the entire flow.
+* Continue until all scenarios pass successfully.
+
+Do not stop after fixing a single issue.
+
+---
+
+# FINAL REPORT
+
+When the audit is complete, generate a detailed report containing:
+
+1. Overall project health assessment.
+2. All missing modules discovered.
+3. All incomplete features discovered.
+4. All bugs identified.
+5. Root cause for each issue.
+6. Fixes implemented.
+7. Database improvements.
+8. API improvements.
+9. UI/UX improvements.
+10. Security improvements.
+11. Performance improvements.
+12. Code quality improvements.
+13. End-to-end testing results.
+14. Screens or modules that passed testing.
+15. Screens or modules that failed testing (if any).
+16. Remaining recommendations.
+17. Production readiness checklist.
+
+Classify every module as:
+
+* ✅ Complete
+* ⚠️ Partially Implemented
+* ❌ Missing
+
+Do not consider the task complete until the entire project has been analyzed, corrected where possible, integrated, and verified through comprehensive end-to-end testing.

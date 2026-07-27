@@ -461,6 +461,47 @@ export const serviceWishlistApi = {
   },
 };
 
+// ─── Support Tickets API ──────────────────────────────────────────────────────
+export interface ApiSupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const supportTicketsApi = {
+  async create(subject: string, message: string) {
+    const { data } = await client.post('/support-tickets', { subject, message });
+    return data.data as ApiSupportTicket;
+  },
+  async listMine() {
+    const { data } = await client.get('/support-tickets/mine');
+    return data.data as ApiSupportTicket[];
+  },
+};
+
+// ─── Platform Policies API ────────────────────────────────────────────────────
+export interface ApiPolicy {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  updatedAt: string;
+}
+
+export const platformPoliciesApi = {
+  async list() {
+    const { data } = await client.get('/platform-policies');
+    return data.data as ApiPolicy[];
+  },
+  async getOne(slug: string) {
+    const { data } = await client.get(`/platform-policies/${slug}`);
+    return data.data as ApiPolicy;
+  },
+};
+
 // ─── Points API ───────────────────────────────────────────────────────────────
 export interface ApiPointsTransaction {
   id: string;

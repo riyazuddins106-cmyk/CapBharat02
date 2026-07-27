@@ -292,8 +292,22 @@ const STATUS_COLOR: Record<string, string> = {
 
 function fmt(n: number) { return `₹${n.toLocaleString("en-IN")}`; }
 
+// ── Module-level toast bridge (allows deep components to surface errors) ──────
+let _adminShowMsg: ((text: string, type: "success" | "error") => void) | null = null;
+function adminShowError(msg: string) {
+  if (_adminShowMsg) _adminShowMsg(msg, "error");
+  else console.error("[AdminError]", msg);
+}
+
+const VALID_SECTIONS = ["dashboard","bookings","pros","create-pro","users","categories","dispatch",
+  "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
+  "payment-config","email-config","sms-config","otp-settings","documents","payouts"] as const;
+
 function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessToken: string; onLogout: () => void }) {
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(() => {
+    const hash = window.location.hash.replace(/^#/, "");
+    return VALID_SECTIONS.includes(hash as typeof VALID_SECTIONS[number]) ? hash : "dashboard";
+  });
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
   const [localUser,     setLocalUser]     = useState<AdminUser>(user);
 
@@ -1174,14 +1188,14 @@ function BookingsView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
   const handleCancel = async (id: string) => {
     setBusyId(id);
     try { await onCancel(id); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setBusyId(null); }
   };
 
@@ -1615,14 +1629,14 @@ function ProsView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
   const handleToggle = async (p: ProfessionalRow) => {
     setBusyId(p.id);
     try { await onToggle(p.id, p.isActive); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setBusyId(null); }
   };
 
@@ -1816,7 +1830,7 @@ function UsersView({
     if (!editTarget) return;
     setSaving(true);
     try { await onEdit(editTarget, form); setEditTarget(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -1824,14 +1838,14 @@ function UsersView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
   const handleToggle = async (u: CustomerUser) => {
     setBusyId(u.id);
     try { await onToggle(u.id, u.isActive); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setBusyId(null); }
   };
 
@@ -2107,7 +2121,7 @@ function CategoriesView({
   const handleCreate = async () => {
     setSaving(true);
     try { await onCreate({ name: form.name, description: form.description, iconName: form.iconName, color: form.color, iconColor: form.iconColor, sortOrder: form.sortOrder, featured: form.featured }); setCreating(false); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -2115,7 +2129,7 @@ function CategoriesView({
     if (!editTarget) return;
     setSaving(true);
     try { await onEdit(editTarget.id, form); setEditTarget(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -2123,14 +2137,14 @@ function CategoriesView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
   const handleToggleActive = async (c: Category) => {
     setBusyId(c.id);
     try { await onEdit(c.id, { name: c.name, description: c.description ?? "", iconName: c.iconName, color: c.color, iconColor: c.iconColor, sortOrder: c.sortOrder, isActive: !c.isActive, featured: c.featured ?? false }); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setBusyId(null); }
   };
 
@@ -2356,7 +2370,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
   const load = useCallback(async () => {
     setLoading(true);
     try { const d = await adminApi.getSubcategories(category.id, accessToken); setSubs(d.subcategories); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setLoading(false); }
   }, [category.id, accessToken]);
 
@@ -2365,7 +2379,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
   const handleCreate = async () => {
     setSaving(true);
     try { await adminApi.createSubcategory(category.id, { name: form.name, description: form.description, iconName: form.iconName, color: form.color, iconColor: form.iconColor, sortOrder: form.sortOrder }, accessToken); load(); setCreating(false); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
@@ -2373,7 +2387,7 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
     if (!editTarget) return;
     setSaving(true);
     try { await adminApi.updateSubcategory(editTarget.id, form, accessToken); load(); setEditTarget(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
@@ -2381,14 +2395,14 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
     if (!deleteId) return;
     setSaving(true);
     try { await adminApi.deleteSubcategory(deleteId, accessToken); load(); setDeleteId(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
   const handleToggle = async (s: SubCategory) => {
     setBusyId(s.id);
     try { await adminApi.updateSubcategory(s.id, { isActive: !s.isActive }, accessToken); load(); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setBusyId(null); }
   };
 
@@ -2648,7 +2662,7 @@ function ReelsView({
   const handleCreate = async () => {
     setSaving(true);
     try { await onCreate({ title: form.title, description: form.description, videoUrl: form.videoUrl, thumbnailUrl: form.thumbnailUrl || undefined, sortOrder: form.sortOrder }); setCreating(false); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
@@ -2656,7 +2670,7 @@ function ReelsView({
     if (!editTarget) return;
     setSaving(true);
     try { await onEdit(editTarget.id, form); setEditTarget(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
@@ -2664,14 +2678,14 @@ function ReelsView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
   const handleVideoUpload = async (id: string, file: File) => {
     setUploadingId(id);
     try { await adminApi.uploadReelVideo(id, file, accessToken); onRefresh(); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setUploadingId(null); }
   };
 
@@ -2682,7 +2696,7 @@ function ReelsView({
       if (editTarget?.id === reel.id) setEditTarget(updated);
       onRefresh();
     }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setUploadingId(null); }
   };
 
@@ -2895,7 +2909,7 @@ function OffersView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   }
 
@@ -3177,7 +3191,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { adminShowError(err.message); }
     finally { setSaving(false); }
   };
 
@@ -4908,7 +4922,7 @@ function ServicesView({
     if (!form.categoryId) return alert("Category is required");
     setSaving(true);
     try { await onCreate(toInput(form)); setCreating(false); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
@@ -4916,7 +4930,7 @@ function ServicesView({
     if (!editTarget) return;
     setSaving(true);
     try { await onEdit(editTarget.id, toInput(form)); setEditTarget(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 
@@ -4924,7 +4938,7 @@ function ServicesView({
     if (!deleteId) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { adminShowError(e.message); }
     finally { setSaving(false); }
   };
 

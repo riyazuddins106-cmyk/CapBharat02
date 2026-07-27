@@ -4,6 +4,7 @@ import {
   User, Clock, Shield, Sparkles, Wrench, Scissors, Zap, Droplets, Paintbrush,
   Wind, ChevronLeft, X, Calendar, ArrowRight, Plus, Trash2, Pencil,
   Navigation, Check, LogOut, Coins, RefreshCw, Award, Repeat2,
+  HelpCircle, FileText, Send, ChevronDown, AlertCircle,
   // Sub-category icons
   Flame, Lightbulb, Battery, Camera, Truck, Thermometer, Building2,
   Sofa, Shirt, Package, WashingMachine, Tag, Waves, Banknote, Smartphone, CreditCard,
@@ -11,10 +12,11 @@ import {
 import {
   auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
   addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig, servicesApi, cartApi,
-  notificationsApi, pointsApi, serviceWishlistApi,
+  notificationsApi, pointsApi, serviceWishlistApi, supportTicketsApi, platformPoliciesApi,
   type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
   type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment, type ApiService, type ApiCart,
   type ApiNotification, type ApiPointsSummary, type ApiWishlistedService,
+  type ApiSupportTicket, type ApiPolicy,
 } from "../lib/api";
 
 /* ─────────────────────────── Category icon map ─────────────────── */
@@ -2602,8 +2604,179 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
 /* ═══════════════════════════════════════════════════════════════
    PROFILE TAB
 ═══════════════════════════════════════════════════════════════ */
+/* ────────────────────── SupportScreen ────────────────────────── */
+function SupportScreen({ onBack }: { onBack: () => void }) {
+  const token = auth.getToken();
+  const [tickets, setTickets] = useState<ApiSupportTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) { setLoading(false); return; }
+    supportTicketsApi.listMine().then(setTickets).catch(() => {}).finally(() => setLoading(false));
+  }, [token]);
+
+  const STATUS_COLOR: Record<string, string> = {
+    open: "#5B3EF5", in_progress: "#F59E0B", resolved: "#16A34A", closed: "#6B7280",
+  };
+
+  async function submit() {
+    if (!subject.trim() || !message.trim()) { setErr("Subject and message are required."); return; }
+    setSending(true); setErr("");
+    try {
+      const t = await supportTicketsApi.create(subject.trim(), message.trim());
+      setTickets(prev => [t, ...prev]);
+      setSubject(""); setMessage(""); setShowForm(false);
+    } catch (e: any) { setErr(e.message ?? "Failed to submit ticket."); }
+    finally { setSending(false); }
+  }
+
+  return (
+    <div className="flex flex-col gap-4 px-5 pt-4 pb-8">
+      <div className="flex items-center gap-3 mb-1">
+        <button onClick={onBack} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
+          <ChevronLeft size={18} color="#374151" />
+        </button>
+        <h2 className="text-lg font-bold text-gray-900">Help & Support</h2>
+      </div>
+
+      <button onClick={() => setShowForm(v => !v)}
+        className="flex items-center justify-between px-4 py-3.5 rounded-2xl text-white text-sm font-semibold"
+        style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+        <span className="flex items-center gap-2"><HelpCircle size={16} /> New Support Ticket</span>
+        <ChevronDown size={16} className={`transition-transform ${showForm ? "rotate-180" : ""}`} />
+      </button>
+
+      {showForm && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
+          {err && <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={12}/>{err}</p>}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">Subject</label>
+            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Brief description of your issue"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">Message</label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Describe your issue in detail…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-violet-400 resize-none" />
+          </div>
+          <button onClick={submit} disabled={sending}
+            className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold"
+            style={{ background: sending ? "#A78BFA" : "#5B3EF5" }}>
+            <Send size={14} />{sending ? "Sending…" : "Submit Ticket"}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"/></div>
+      ) : tickets.length === 0 ? (
+        <div className="flex flex-col items-center py-16 text-gray-400">
+          <HelpCircle size={40} className="mb-3 opacity-30" />
+          <p className="text-sm">No support tickets yet</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {tickets.map(t => (
+            <div key={t.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <button className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+                onClick={() => setExpandedId(prev => prev === t.id ? null : t.id)}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{t.subject}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{new Date(t.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                </div>
+                <span className="ml-3 px-2.5 py-1 rounded-full text-xs font-bold text-white"
+                  style={{ background: STATUS_COLOR[t.status] ?? "#6B7280" }}>
+                  {t.status.replace("_", " ")}
+                </span>
+              </button>
+              {expandedId === t.id && (
+                <div className="px-4 pb-4 text-sm text-gray-600 border-t border-gray-50 pt-3">{t.message}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────── PoliciesScreen ────────────────────────── */
+function PoliciesScreen({ onBack }: { onBack: () => void }) {
+  const [policies, setPolicies] = useState<ApiPolicy[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ApiPolicy | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    platformPoliciesApi.list().then(setPolicies).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  async function openPolicy(slug: string) {
+    if (expandedSlug === slug) { setExpandedSlug(null); setDetail(null); return; }
+    setExpandedSlug(slug); setDetailLoading(true); setDetail(null);
+    try { setDetail(await platformPoliciesApi.getOne(slug)); }
+    catch { setDetail(null); }
+    finally { setDetailLoading(false); }
+  }
+
+  return (
+    <div className="flex flex-col gap-4 px-5 pt-4 pb-8">
+      <div className="flex items-center gap-3 mb-1">
+        <button onClick={onBack} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
+          <ChevronLeft size={18} color="#374151" />
+        </button>
+        <h2 className="text-lg font-bold text-gray-900">Policies</h2>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"/></div>
+      ) : policies.length === 0 ? (
+        <div className="flex flex-col items-center py-16 text-gray-400">
+          <FileText size={40} className="mb-3 opacity-30"/>
+          <p className="text-sm">No policies available</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {policies.map(p => (
+            <div key={p.slug} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <button className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+                onClick={() => openPolicy(p.slug)}>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#EDE9FD" }}>
+                    <FileText size={15} color="#5B3EF5" />
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">{p.title}</span>
+                </div>
+                <ChevronDown size={16} color="#9CA3AF" className={`transition-transform ${expandedSlug === p.slug ? "rotate-180" : ""}`} />
+              </button>
+              {expandedSlug === p.slug && (
+                <div className="px-4 pb-4 border-t border-gray-50 pt-3">
+                  {detailLoading
+                    ? <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"/></div>
+                    : detail
+                      ? <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{detail.content}</p>
+                      : <p className="text-xs text-red-400">Failed to load content.</p>
+                  }
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CustProfile({
   user, onLogout, onShowAddresses, onEditProfile, onShowWishlist, onShowNotifications, onShowPoints,
+  onShowSupport, onShowPolicies,
 }: {
   user: ApiUser;
   onLogout: () => void;
@@ -2612,15 +2785,19 @@ function CustProfile({
   onShowWishlist: () => void;
   onShowNotifications: () => void;
   onShowPoints: () => void;
+  onShowSupport: () => void;
+  onShowPolicies: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
 
   const menuItems = [
-    { icon: MapPin,  label: "Saved Addresses",    action: onShowAddresses },
-    { icon: Heart,   label: "Wishlist",            action: onShowWishlist },
-    { icon: Coins,   label: "Points & Rewards",    action: onShowPoints },
-    { icon: Bell,    label: "Notifications",       action: onShowNotifications },
-    { icon: Shield,  label: "Privacy & Security",  action: () => {} },
+    { icon: MapPin,      label: "Saved Addresses",    action: onShowAddresses },
+    { icon: Heart,       label: "Wishlist",            action: onShowWishlist },
+    { icon: Coins,       label: "Points & Rewards",    action: onShowPoints },
+    { icon: Bell,        label: "Notifications",       action: onShowNotifications },
+    { icon: HelpCircle,  label: "Help & Support",      action: onShowSupport },
+    { icon: FileText,    label: "Policies",            action: onShowPolicies },
+    { icon: Shield,      label: "Privacy & Security",  action: () => {} },
   ];
 
   return (
@@ -2896,7 +3073,7 @@ export default function CustomerApp() {
 
   // Navigation
   const [activeTab, setActiveTab] = useState("home");
-  const [profileScreen, setProfileScreen] = useState<"main" | "addresses" | "wishlist" | "notifications" | "points">("main");
+  const [profileScreen, setProfileScreen] = useState<"main" | "addresses" | "wishlist" | "notifications" | "points" | "support" | "policies">("main");
 
   // Data
   const [categories, setCategories]           = useState<ApiCategory[]>([]);
@@ -3124,6 +3301,20 @@ export default function CustomerApp() {
       </AppShell>
     );
   }
+  if (activeTab === "profile" && profileScreen === "support") {
+    return (
+      <AppShell title="Help & Support" {...shellProps}>
+        <SupportScreen onBack={() => setProfileScreen("main")} />
+      </AppShell>
+    );
+  }
+  if (activeTab === "profile" && profileScreen === "policies") {
+    return (
+      <AppShell title="Policies" {...shellProps}>
+        <PoliciesScreen onBack={() => setProfileScreen("main")} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={PAGE_TITLE[activeTab] ?? "Home"} {...shellProps}>
@@ -3174,6 +3365,8 @@ export default function CustomerApp() {
           onShowWishlist={() => setProfileScreen("wishlist")}
           onShowNotifications={() => setProfileScreen("notifications")}
           onShowPoints={() => setProfileScreen("points")}
+          onShowSupport={() => setProfileScreen("support")}
+          onShowPolicies={() => setProfileScreen("policies")}
           onEditProfile={(updated) => {
             setUser(updated);
             auth.store(auth.getToken()!, auth.getRefreshToken()!, updated);
