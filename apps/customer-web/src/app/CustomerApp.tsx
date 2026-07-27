@@ -362,11 +362,10 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
 /* ═══════════════════════════════════════════════════════════════
    PRO CARD
 ═══════════════════════════════════════════════════════════════ */
-function ProCard({ pro, wishlisted, onWishlist, onBook }: {
+function ProCard({ pro, wishlisted, onWishlist }: {
   pro: ApiProfessional;
   wishlisted: boolean;
   onWishlist: () => void;
-  onBook: () => void;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-black/[0.08] overflow-hidden shadow-sm">
@@ -409,9 +408,6 @@ function ProCard({ pro, wishlisted, onWishlist, onBook }: {
           <span className="text-lg font-bold text-foreground">₹{pro.basePrice}</span>
           <span className="text-xs text-gray-400">{pro.priceUnit}</span>
         </div>
-        <button onClick={onBook} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ background: "#EDE9FD", color: "#5B3EF5" }}>
-          View Services
-        </button>
       </div>
     </div>
   );
@@ -1028,7 +1024,7 @@ function ProfileEditModal({ user, onSave, onClose }: {
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
   user, categories, professionals, featuredServices, favoriteIds, offers, reels, location,
-  onToggleFavorite, onBook, onCategorySelect, onLocationPress,
+  onToggleFavorite, onCategorySelect, onLocationPress, isLoggedIn, addToCart,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
@@ -1039,9 +1035,10 @@ function CustHome({
   reels: ApiReel[];
   location: string;
   onToggleFavorite: (id: string) => void;
-  onBook: (pro: ApiProfessional) => void;
   onCategorySelect: (id: string) => void;
   onLocationPress: () => void;
+  isLoggedIn: boolean;
+  addToCart: (serviceId: string, serviceName?: string) => void;
 }) {
   const [offerIdx, setOfferIdx] = useState(0);
   const [activeReel, setActiveReel] = useState<ApiReel | null>(null);
@@ -1267,11 +1264,12 @@ function CustHome({
                         <Clock size={10} /> {service.duration} min
                       </p>
                     </div>
-                    <button 
-                      onClick={() => onCategorySelect(service.categoryId)} 
-                      className="h-8 px-3 rounded-lg text-xs font-bold text-[#5B3EF5] bg-[#F5F3FF] hover:bg-[#EDE9FD] transition-colors"
+                    <button
+                      onClick={() => addToCart(service.id, service.name)}
+                      disabled={!isLoggedIn}
+                      className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm transition-all"
                     >
-                      Explore
+                      {isLoggedIn ? '+ Add' : 'Sign in'}
                     </button>
                   </div>
                 </div>
@@ -1309,12 +1307,11 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, favoriteIds, onToggleFavorite, onBook, initialCategoryId, isLoggedIn, onCartChange,
+  categories, favoriteIds, onToggleFavorite, initialCategoryId, isLoggedIn, onCartChange,
 }: {
   categories: ApiCategory[];
   favoriteIds: Set<string>;
   onToggleFavorite: (id: string) => void;
-  onBook: (pro: ApiProfessional) => void;
   initialCategoryId?: string | null;
   isLoggedIn: boolean;
   onCartChange: (cart: ApiCart) => void;
@@ -2537,7 +2534,6 @@ export default function CustomerApp() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   // Booking modal
-  const [bookingPro, setBookingPro] = useState<ApiProfessional | null>(null);
 
   // Load public data on mount
   useEffect(() => {
@@ -2605,16 +2601,6 @@ export default function CustomerApp() {
     }
   }, [isLoggedIn]);
 
-  const handleBook = useCallback((pro: ApiProfessional) => {
-    if (!isLoggedIn) { setActiveTab("profile"); return; }
-    setBookingPro(pro);
-  }, [isLoggedIn]);
-
-  const handleBooked = useCallback((booking: ApiBooking) => {
-    setBookings((prev) => [booking, ...prev]);
-    setTimeout(() => setBookingPro(null), 4000);
-  }, []);
-
   const handleCancelBooking = useCallback((id: string) => {
     setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" as const } : b));
   }, []);
@@ -2634,6 +2620,16 @@ export default function CustomerApp() {
     localStorage.setItem(LOC_KEY, loc);
     setShowLocationPicker(false);
   }, []);
+
+  const addToCart = useCallback(async (serviceId: string, serviceName?: string) => {
+    if (!isLoggedIn) { setActiveTab("profile"); return; }
+    try {
+      const next = await cartApi.add(serviceId);
+      setCart(next);
+    } catch (e) {
+      console.error("Failed to add to cart", e);
+    }
+  }, [isLoggedIn]);
 
   const cartCount = cart.items.reduce((n, i) => n + i.quantity, 0);
 
@@ -2706,9 +2702,10 @@ export default function CustomerApp() {
           reels={reels}
           location={location}
           onToggleFavorite={handleToggleFavorite}
-          onBook={handleBook}
           onCategorySelect={handleCategorySelect}
           onLocationPress={() => setShowLocationPicker(true)}
+          isLoggedIn={isLoggedIn}
+          addToCart={addToCart}
         />
       )}
       {activeTab === "services" && (
@@ -2716,7 +2713,6 @@ export default function CustomerApp() {
           categories={categories}
           favoriteIds={favoriteIds}
           onToggleFavorite={handleToggleFavorite}
-          onBook={handleBook}
           initialCategoryId={servicesInitCatId}
           isLoggedIn={isLoggedIn}
           onCartChange={setCart}

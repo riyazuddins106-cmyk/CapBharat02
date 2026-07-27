@@ -197,22 +197,7 @@ export default function ProfessionalScreen() {
         )}
       </ScrollView>
 
-      {/* Sticky Book Button */}
-      <View style={[styles.sticky, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          onPress={() => {
-            if (!isAuthenticated) { router.push('/auth'); return; }
-            setStep(1); setSelectedTime(null); setNotes(''); setBookingOpen(true);
-          }}
-          style={[styles.bookBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="calendar-outline" size={18} color="#fff" />
-          <Text style={styles.bookBtnText}>Book Now — ₹{pro.basePrice}{pro.priceUnit}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Booking Modal */}
+      {/* Removed: Book Now button — use cart to add services */}
       <Modal visible={bookingOpen} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.modalBackdrop}>
           <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>

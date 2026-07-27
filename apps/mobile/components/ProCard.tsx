@@ -7,7 +7,6 @@ import type { Professional } from '@/lib/api';
 interface Props {
   pro: Professional;
   onPress: () => void;
-  onBook?: () => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   compact?: boolean;
@@ -20,7 +19,7 @@ function avatarBg(name: string): string {
   return AVATAR_COLORS[n % AVATAR_COLORS.length];
 }
 
-export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, compact }: Props) {
+export function ProCard({ pro, onPress, isFavorite, onToggleFavorite, compact }: Props) {
   const colors = useColors();
 
   return (
@@ -74,15 +73,6 @@ export function ProCard({ pro, onPress, onBook, isFavorite, onToggleFavorite, co
           </View>
         )}
 
-        {onBook && (
-          <TouchableOpacity
-            onPress={onBook}
-            activeOpacity={0.85}
-            style={[styles.bookBtn, { backgroundColor: colors.primary, borderRadius: colors.radius - 2 }]}
-          >
-            <Text style={styles.bookBtnText}>Explore</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </TouchableOpacity>
   );

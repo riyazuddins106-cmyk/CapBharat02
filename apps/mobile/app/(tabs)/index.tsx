@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -267,6 +267,12 @@ export default function HomeScreen() {
   });
   const featuredServices = featuredCatalogue?.services ?? [];
 
+  const queryClient = useQueryClient();
+  const cartMutation = useMutation({
+    mutationFn: (serviceId: string) => cartApi.add(serviceId, 1, accessToken!),
+    onSuccess: (next) => { queryClient.setQueryData(['/api/cart', accessToken], next); },
+  });
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -409,13 +415,8 @@ export default function HomeScreen() {
           [0, 1, 2].map((i) => <ProCardShimmer key={i} />)
         ) : (
           featuredServices.slice(0, 6).map((service) => (
-            <TouchableOpacity
+            <View
               key={service.id}
-              activeOpacity={0.9}
-              onPress={() => router.push({
-                pathname: '/(tabs)/services',
-                params: { categoryId: service.categoryId, subCategoryId: service.subCategoryId ?? undefined },
-              })}
               style={[styles.productCard, { backgroundColor: colors.card, borderColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }]}
             >
               <View style={styles.productImageWrapper}>
@@ -444,12 +445,23 @@ export default function HomeScreen() {
                       <Ionicons name="time-outline" size={10} color={colors.mutedForeground} /> {service.duration} min
                     </Text>
                   </View>
-                  <View style={[styles.bookBtn, { backgroundColor: '#F5F3FF' }]}>
-                    <Text style={styles.bookBtnText}>Explore</Text>
-                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={cartMutation.isPending}
+                    onPress={() => {
+                      if (!accessToken) { router.push('/login'); return; }
+                      Haptics.selectionAsync();
+                      cartMutation.mutate(service.id);
+                    }}
+                    style={[styles.bookBtn, { backgroundColor: '#5B3EF5', opacity: cartMutation.isPending ? 0.6 : 1 }]}
+                  >
+                    <Text style={[styles.bookBtnText, { color: '#fff' }]}>
+                      {accessToken ? '+ Add' : 'Sign in'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            </TouchableOpacity>
+            </View>
           ))
         )}
       </View>

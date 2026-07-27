@@ -271,14 +271,6 @@ export default function SubcategoriesScreen() {
           <ProCard
             pro={item}
             onPress={() => router.push({ pathname: '/professional/[id]', params: { id: item.id } })}
-            onBook={() => router.push({
-              pathname: '/(tabs)/services',
-              params: {
-                categoryId,
-                subCategoryId: selectedSubCat !== ALL_ID ? selectedSubCat : undefined,
-                categoryName,
-              },
-            })}
             isFavorite={favoriteIds.has(item.id)}
             onToggleFavorite={accessToken ? () => { Haptics.selectionAsync(); favMutation.mutate(item.id); } : undefined}
           />
