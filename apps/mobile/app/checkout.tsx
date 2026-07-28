@@ -10,11 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { cartApi, addressesApi, type Cart, type Address } from '@/lib/api';
-
-const TIME_SLOTS = ['9 AM - 11 AM', '11 AM - 1 PM', '2 PM - 4 PM', '4 PM - 6 PM'];
-const SLOT_HOURS: Record<string, number> = {
-  '9 AM - 11 AM': 9, '11 AM - 1 PM': 11, '2 PM - 4 PM': 14, '4 PM - 6 PM': 16,
-};
+import { TIME_SLOTS, SLOT_HOURS } from '@servenow/shared';
 
 function buildScheduledAt(dateLabel: string, slotLabel: string): string {
   const hour = SLOT_HOURS[slotLabel] ?? 9;

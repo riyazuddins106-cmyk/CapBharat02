@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { createPortal } from "react-dom";
 import {
   Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock,
@@ -16,8 +17,7 @@ import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
-  DispatchRequestRow, EligiblePartner,
-
+  DispatchRequestRow, EligiblePartner, TimeseriesPoint,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -258,28 +258,30 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
    ADMIN PANEL SHELL
 ═══════════════════════════════════════════════════════════════════ */
 
+// adminOnly: true  → visible to role === 'admin' only; hidden from operations_manager
 const ADMIN_SIDEBAR = [
-  { id: "dashboard",  icon: Home,       label: "Dashboard"          },
-  { id: "bookings",   icon: BookOpen,   label: "Bookings"           },
-  { id: "pros",       icon: Users,      label: "Professionals"      },
-  { id: "users",      icon: UserCheck,  label: "Users"              },
-  { id: "categories", icon: Grid,       label: "Categories"         },
-  { id: "services",   icon: Package,    label: "Services"           },
-  { id: "dispatch",   icon: Navigation, label: "Booking Operations Centre" },
-  { id: "reels",      icon: Film,       label: "Reels"              },
-  { id: "offers",     icon: Tag,        label: "Offers / Banners"   },
-  { id: "reviews",    icon: Star,       label: "Reviews"            },
-  { id: "analytics",  icon: BarChart2,  label: "Analytics"          },
-  { id: "audit-logs", icon: Activity,   label: "Audit Logs"         },
-  { id: "privacy",    icon: Shield,     label: "Privacy & Security" },
-  { id: "support",        icon: HelpCircle,  label: "Help & Support"    },
-  { id: "payment-config", icon: CreditCard,  label: "Payment Config"    },
-  { id: "email-config",   icon: Mail,        label: "Email Config"      },
-  { id: "sms-config",     icon: Smartphone,  label: "SMS Config"        },
-  { id: "otp-settings",   icon: KeyRound,    label: "OTP Settings"      },
-  { id: "documents",      icon: ShieldCheck, label: "Document Verification" },
-  { id: "payouts",        icon: Wallet,      label: "Partner Payouts"   },
-  { id: "settings",       icon: Settings,    label: "Settings"          },
+  { id: "dashboard",      icon: Home,        label: "Dashboard"                     },
+  { id: "bookings",       icon: BookOpen,    label: "Bookings"                      },
+  { id: "dispatch",       icon: Navigation,  label: "Booking Operations Centre"     },
+  { id: "pros",           icon: Users,       label: "Professionals"                 },
+  { id: "users",          icon: UserCheck,   label: "Users"                         },
+  { id: "categories",     icon: Grid,        label: "Categories"                    },
+  { id: "services",       icon: Package,     label: "Services"                      },
+  { id: "reels",          icon: Film,        label: "Reels"                         },
+  { id: "offers",         icon: Tag,         label: "Offers / Banners"              },
+  { id: "reviews",        icon: Star,        label: "Reviews"                       },
+  { id: "documents",      icon: ShieldCheck, label: "Document Verification"         },
+  { id: "payouts",        icon: Wallet,      label: "Partner Payouts"               },
+  { id: "support",        icon: HelpCircle,  label: "Help & Support"                },
+  { id: "analytics",      icon: BarChart2,   label: "Analytics"                     },
+  // ── admin-only below ──────────────────────────────────────────────────────────
+  { id: "audit-logs",     icon: Activity,    label: "Audit Logs",     adminOnly: true },
+  { id: "privacy",        icon: Shield,      label: "Privacy & Security", adminOnly: true },
+  { id: "payment-config", icon: CreditCard,  label: "Payment Config", adminOnly: true },
+  { id: "email-config",   icon: Mail,        label: "Email Config",   adminOnly: true },
+  { id: "sms-config",     icon: Smartphone,  label: "SMS Config",     adminOnly: true },
+  { id: "otp-settings",   icon: KeyRound,    label: "OTP Settings",   adminOnly: true },
+  { id: "settings",       icon: Settings,    label: "Settings",       adminOnly: true },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -319,7 +321,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [stats,        setStats]        = useState<DashboardStats | null>(null);
   const [bookingList,  setBookingList]  = useState<BookingRow[]>([]);
   const [proList,      setProList]      = useState<ProfessionalRow[]>([]);
+  const [proPage,      setProPage]      = useState(1);
+  const [proTotal,     setProTotal]     = useState(0);
   const [userList,     setUserList]     = useState<CustomerUser[]>([]);
+  const [userPage,     setUserPage]     = useState(1);
+  const [userTotal,    setUserTotal]    = useState(0);
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
   const [auditLogs,    setAuditLogs]    = useState<AuditLogRow[]>([]);
@@ -354,7 +360,9 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setStats(s);
       setBookingList(b.bookings);
       setProList(p.professionals);
+      setProTotal(p.total);
       setUserList(u.users);
+      setUserTotal(u.total);
       setCategoryList(c.categories);
       setReviewList(r.reviews);
       setAuditLogs(a.logs);
@@ -368,6 +376,20 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (userPage === 1) return; // page 1 already loaded by load()
+    adminApi.getUsers(accessToken, userPage, 25)
+      .then(u => { setUserList(u.users); setUserTotal(u.total); })
+      .catch(() => {});
+  }, [userPage, accessToken]);
+
+  useEffect(() => {
+    if (proPage === 1) return; // page 1 already loaded by load()
+    adminApi.getProfessionals(accessToken, proPage, 25)
+      .then(p => { setProList(p.professionals); setProTotal(p.total); })
+      .catch(() => {});
+  }, [proPage, accessToken]);
 
   /* ── Notifications ── */
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -577,7 +599,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         </div>
 
         <div className="flex-1 py-3 flex flex-col gap-1 px-2 overflow-y-auto">
-          {ADMIN_SIDEBAR.map((item) => {
+          {ADMIN_SIDEBAR.filter(item => !item.adminOnly || localUser.role === 'admin').map((item) => {
             const Icon = item.icon;
             const active = activeSection === item.id;
             return (
@@ -698,11 +720,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} />
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
-            <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} />
+            <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
@@ -716,7 +738,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "reviews" ? (
             <ReviewsView reviews={reviewList} onDelete={deleteReview} onRestore={restoreReview} accessToken={accessToken} />
           ) : activeSection === "analytics" ? (
-            <AnalyticsView stats={stats} />
+            <AnalyticsView stats={stats} accessToken={accessToken} />
           ) : activeSection === "audit-logs" ? (
             <AuditLogsView logs={auditLogs} />
           ) : activeSection === "privacy" ? (
@@ -1536,7 +1558,7 @@ function CreateProfessionalView({
 }
 
 function ProsView({
-  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew,
+  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew, proPage, proTotal, onProPageChange,
 }: {
   pros: ProfessionalRow[];
   onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => Promise<void>;
@@ -1545,6 +1567,9 @@ function ProsView({
   categories: Category[];
   accessToken: string;
   onCreateNew: () => void;
+  proPage: number;
+  proTotal: number;
+  onProPageChange: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const [search,      setSearch]      = useState("");
   const [editTarget,  setEditTarget]  = useState<ProfessionalRow | null>(null);
@@ -1792,6 +1817,21 @@ function ProsView({
             </tbody>
           </table>
         </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.07]">
+          <span className="text-white/40 text-xs">Showing page {proPage} of {Math.max(1, Math.ceil(proTotal / 25))}</span>
+          <div className="flex gap-2">
+            <button
+              disabled={proPage <= 1}
+              onClick={() => onProPageChange(p => p - 1)}
+              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
+            >← Prev</button>
+            <button
+              disabled={proPage >= Math.ceil(proTotal / 25)}
+              onClick={() => onProPageChange(p => p + 1)}
+              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
+            >Next →</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1806,12 +1846,15 @@ const ROLE_COLOR: Record<string, string> = {
 };
 
 function UsersView({
-  users, onEdit, onDelete, onToggle,
+  users, onEdit, onDelete, onToggle, userPage, userTotal, onUserPageChange,
 }: {
   users: CustomerUser[];
   onEdit: (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onToggle: (id: string, active: boolean) => Promise<void>;
+  userPage: number;
+  userTotal: number;
+  onUserPageChange: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const [search,     setSearch]     = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -1956,6 +1999,21 @@ function UsersView({
               {filtered.length === 0 && <EmptyRow cols={7} text="No users found" />}
             </tbody>
           </table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.07]">
+          <span className="text-white/40 text-xs">Showing page {userPage} of {Math.max(1, Math.ceil(userTotal / 25))}</span>
+          <div className="flex gap-2">
+            <button
+              disabled={userPage <= 1}
+              onClick={() => onUserPageChange(p => p - 1)}
+              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
+            >← Prev</button>
+            <button
+              disabled={userPage >= Math.ceil(userTotal / 25)}
+              onClick={() => onUserPageChange(p => p + 1)}
+              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
+            >Next →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3316,28 +3374,153 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
    ANALYTICS
 ═══════════════════════════════════════════════════════════════════ */
 
-function AnalyticsView({ stats }: { stats: DashboardStats | null }) {
+function toYMD(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function AnalyticsView({ stats, accessToken }: { stats: DashboardStats | null; accessToken: string }) {
   const items = [
-    { label: "Total Revenue",       value: stats ? fmt(stats.totalRevenue)      : "—", icon: DollarSign, color: "#5B3EF5" },
-    { label: "Total Bookings",      value: String(stats?.totalBookings    ?? 0),        icon: BookOpen,   color: "#F59E0B" },
-    { label: "Active Bookings",     value: String(stats?.activeBookings   ?? 0),        icon: Activity,   color: "#16A34A" },
-    { label: "Total Professionals", value: String(stats?.totalProfessionals ?? 0),      icon: Users,      color: "#DB2777" },
-    { label: "Total Customers",     value: String(stats?.totalCustomers   ?? 0),        icon: UserCheck,  color: "#0EA5E9" },
+    { label: "Total Revenue",       value: stats ? fmt(stats.totalRevenue)        : "—", icon: DollarSign, color: "#5B3EF5" },
+    { label: "Total Bookings",      value: String(stats?.totalBookings    ?? 0),          icon: BookOpen,   color: "#F59E0B" },
+    { label: "Active Bookings",     value: String(stats?.activeBookings   ?? 0),          icon: Activity,   color: "#16A34A" },
+    { label: "Total Professionals", value: String(stats?.totalProfessionals ?? 0),        icon: Users,      color: "#DB2777" },
+    { label: "Total Customers",     value: String(stats?.totalCustomers   ?? 0),          icon: UserCheck,  color: "#0EA5E9" },
   ];
+
+  const defaultTo   = toYMD(new Date());
+  const defaultFrom = toYMD(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+
+  const [fromDate, setFromDate] = useState(defaultFrom);
+  const [toDate,   setToDate]   = useState(defaultTo);
+  const [series,   setSeries]   = useState<TimeseriesPoint[]>([]);
+  const [tsLoading, setTsLoading] = useState(false);
+  const [tsError,   setTsError]   = useState<string | null>(null);
+
+  const fetchTimeseries = useCallback(async (from: string, to: string) => {
+    if (!accessToken) return;
+    setTsLoading(true);
+    setTsError(null);
+    try {
+      const data = await adminApi.getTimeseries(accessToken, from, to);
+      setSeries(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setTsError(e?.message ?? "Failed to load timeseries");
+    } finally {
+      setTsLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { fetchTimeseries(fromDate, toDate); }, [fetchTimeseries, fromDate, toDate]);
+
+  const fmtShortDate = (d: string) => {
+    const dt = new Date(d + "T00:00:00Z");
+    return dt.toLocaleDateString("en-IN", { month: "short", day: "numeric", timeZone: "UTC" });
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {items.map((i) => {
-        const Icon = i.icon;
-        return (
-          <div key={i.label} className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: i.color + "20" }}>
-              <Icon size={18} color={i.color} />
+    <div className="space-y-6">
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((i) => {
+          const Icon = i.icon;
+          return (
+            <div key={i.label} className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: i.color + "20" }}>
+                <Icon size={18} color={i.color} />
+              </div>
+              <p className="text-white/40 text-xs mb-1">{i.label}</p>
+              <p className="text-white font-bold text-2xl">{i.value}</p>
             </div>
-            <p className="text-white/40 text-xs mb-1">{i.label}</p>
-            <p className="text-white font-bold text-2xl">{i.value}</p>
+          );
+        })}
+      </div>
+
+      {/* Timeseries chart */}
+      <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h3 className="text-white font-semibold text-sm">Bookings &amp; Revenue Over Time</h3>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <label className="flex items-center gap-1">
+              From
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate}
+                onChange={e => setFromDate(e.target.value)}
+                className="ml-1 rounded-lg px-2 py-1 text-white text-xs outline-none border border-white/10 focus:border-violet-500/60"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              />
+            </label>
+            <label className="flex items-center gap-1">
+              To
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate}
+                onChange={e => setToDate(e.target.value)}
+                className="ml-1 rounded-lg px-2 py-1 text-white text-xs outline-none border border-white/10 focus:border-violet-500/60"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              />
+            </label>
           </div>
-        );
-      })}
+        </div>
+
+        {tsLoading && (
+          <div className="flex items-center justify-center h-48">
+            <Loader2 size={28} className="animate-spin text-violet-500" />
+          </div>
+        )}
+        {tsError && !tsLoading && (
+          <div className="flex items-center justify-center h-48 text-red-400 text-sm">{tsError}</div>
+        )}
+        {!tsLoading && !tsError && series.length === 0 && (
+          <div className="flex items-center justify-center h-48 text-white/30 text-sm">No data for the selected range</div>
+        )}
+        {!tsLoading && !tsError && series.length > 0 && (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={series} margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={fmtShortDate}
+                tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
+                axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                tickLine={false}
+              />
+              <YAxis
+                yAxisId="left"
+                tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+                label={{ value: "Bookings", angle: -90, position: "insideLeft", fill: "rgba(255,255,255,0.3)", fontSize: 10, dy: 40 }}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) => `₹${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v}`}
+                label={{ value: "Revenue", angle: 90, position: "insideRight", fill: "rgba(255,255,255,0.3)", fontSize: 10, dy: -30 }}
+              />
+              <Tooltip
+                contentStyle={{ background: "#1a2035", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, fontSize: 12, color: "#fff" }}
+                labelFormatter={fmtShortDate}
+                formatter={(value: number, name: string) =>
+                  name === "revenue" ? [`₹${value.toLocaleString("en-IN")}`, "Revenue"] : [value, name === "bookings" ? "Bookings" : "New Customers"]
+                }
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+                formatter={(v: string) => <span style={{ color: "rgba(255,255,255,0.6)" }}>{v === "bookings" ? "Bookings" : "Revenue (₹)"}</span>}
+              />
+              <Line yAxisId="left"  type="monotone" dataKey="bookings" stroke="#7C3AED" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              <Line yAxisId="right" type="monotone" dataKey="revenue"  stroke="#16A34A" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 }

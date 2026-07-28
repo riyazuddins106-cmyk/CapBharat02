@@ -38,6 +38,10 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "appStoreId": "",
+      "playStoreId": ""
     }
   }
 }

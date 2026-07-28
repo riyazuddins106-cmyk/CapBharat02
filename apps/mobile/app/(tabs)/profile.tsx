@@ -9,12 +9,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import Constants from 'expo-constants';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi, pointsApi, bookingsApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
-const MENU_ITEMS = [
+const ALL_MENU_ITEMS = [
   { icon: 'location-outline',          label: 'Saved Addresses',   route: '/addresses' },
   { icon: 'heart-outline',             label: 'Wishlist',           route: '/wishlist' },
   { icon: 'gift-outline',              label: 'Points & Rewards',   route: '/points' },
@@ -24,9 +25,21 @@ const MENU_ITEMS = [
   { icon: 'help-circle-outline',       label: 'Help & Support',     route: '/help-support' },
 ];
 
+const appStoreId: string = Constants.expoConfig?.extra?.appStoreId ?? '';
+const playStoreId: string = Constants.expoConfig?.extra?.playStoreId ?? '';
+const hasStoreIds = appStoreId.trim().length > 0 || playStoreId.trim().length > 0;
+
+const MENU_ITEMS = hasStoreIds
+  ? ALL_MENU_ITEMS
+  : ALL_MENU_ITEMS.filter((item) => item.label !== 'Rate the App');
+
 async function handleRateApp() {
-  const iosUrl = 'itms-apps://itunes.apple.com/app/id0000000000';
-  const androidUrl = 'market://details?id=com.servenow.app';
+  const iosUrl = appStoreId.trim()
+    ? `itms-apps://itunes.apple.com/app/id${appStoreId.trim()}`
+    : 'itms-apps://itunes.apple.com/app/id0000000000';
+  const androidUrl = playStoreId.trim()
+    ? `market://details?id=${playStoreId.trim()}`
+    : 'market://details?id=com.servenow.app';
   const url = Platform.OS === 'ios' ? iosUrl : androidUrl;
   try {
     const supported = await Linking.canOpenURL(url);

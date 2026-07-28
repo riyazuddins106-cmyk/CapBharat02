@@ -3,8 +3,8 @@
  * Run: pnpm --filter @servenow/server exec tsx src/database/link-partner-service.ts
  */
 import 'dotenv/config';
-import { db } from '../config/database.js';
-import { partnerServices } from './schema/index.js';
+import { db } from '../src/config/database.js';
+import { partnerServices } from '../src/database/schema/index.js';
 import { eq } from 'drizzle-orm';
 
 async function main() {

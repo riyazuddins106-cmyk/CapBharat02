@@ -20,6 +20,9 @@ router.use(authenticate, requireRole('admin'));
 // Dashboard stats
 router.get('/stats', adminController.getStats);
 
+// Analytics timeseries
+router.get('/analytics/timeseries', adminController.getAnalyticsTimeseries);
+
 // Bookings management
 router.get('/bookings',                  adminController.listBookings);
 router.patch('/bookings/:id',            adminController.updateBooking);

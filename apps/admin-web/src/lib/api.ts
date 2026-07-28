@@ -72,6 +72,13 @@ export interface OfferRow {
 
 export type OfferInput = Omit<OfferRow, 'id' | 'createdAt' | 'updatedAt'>;
 
+export interface TimeseriesPoint {
+  date: string;
+  bookings: number;
+  revenue: number;
+  newCustomers: number;
+}
+
 export interface BookingRow {
   id: string;
   status: string;
@@ -453,6 +460,10 @@ export const adminApi = {
   getStats: (token: string) =>
     request<DashboardStats>('/admin/stats', { token }),
 
+  // Analytics timeseries
+  getTimeseries: (token: string, from: string, to: string, granularity = 'day') =>
+    request<TimeseriesPoint[]>(`/admin/analytics/timeseries?from=${from}&to=${to}&granularity=${granularity}`, { token }),
+
   // Bookings
   getBookings: (token: string) =>
     request<{ bookings: BookingRow[]; total: number }>('/admin/bookings', { token }),
@@ -470,8 +481,8 @@ export const adminApi = {
     basePrice: number; priceUnit?: string; badge?: string; tags?: string[];
   }, token: string) =>
     request<ProfessionalRow>('/admin/professionals', { method: 'POST', token, body: JSON.stringify(data) }),
-  getProfessionals: (token: string) =>
-    request<{ professionals: ProfessionalRow[]; total: number }>('/admin/professionals', { token }),
+  getProfessionals: (token: string, page = 1, limit = 25) =>
+    request<{ professionals: ProfessionalRow[]; total: number }>(`/admin/professionals?page=${page}&limit=${limit}`, { token }),
   updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }, token: string) =>
     request<ProfessionalRow>(`/admin/professionals/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   suspendProfessional: (id: string, token: string) =>
@@ -487,8 +498,8 @@ export const adminApi = {
   },
 
   // Users
-  getUsers: (token: string) =>
-    request<{ users: CustomerUser[]; total: number }>('/admin/users', { token }),
+  getUsers: (token: string, page = 1, limit = 25) =>
+    request<{ users: CustomerUser[]; total: number }>(`/admin/users?page=${page}&limit=${limit}`, { token }),
   updateUser: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: string }, token: string) =>
     request<CustomerUser>(`/admin/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteUser: (id: string, token: string) =>

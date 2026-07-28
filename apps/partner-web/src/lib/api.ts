@@ -10,6 +10,9 @@ export class ApiError extends Error {
 }
 
 let _refreshHandler: (() => Promise<string | null>) | null = null;
+/** Deduplicates concurrent 401 refresh attempts — only one refresh runs at a time. */
+let _refreshPromise: Promise<string | null> | null = null;
+
 export function setRefreshHandler(fn: (() => Promise<string | null>) | null) {
   _refreshHandler = fn;
 }
@@ -31,7 +34,14 @@ async function request<T>(
 
   let res = await doFetch(token);
   if (res.status === 401 && token && _refreshHandler) {
-    const newToken = await _refreshHandler().catch(() => null);
+    // If another request already started a refresh, reuse that promise
+    // instead of firing a second one (avoids token revocation race conditions).
+    if (!_refreshPromise) {
+      _refreshPromise = _refreshHandler()
+        .catch(() => null)
+        .finally(() => { _refreshPromise = null; });
+    }
+    const newToken = await _refreshPromise;
     if (newToken) res = await doFetch(newToken);
   }
   const json = await res.json().catch(() => ({}));

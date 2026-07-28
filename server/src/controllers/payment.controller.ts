@@ -287,16 +287,24 @@ export const razorpayCallback = asyncHandler(async (req: Request, res: Response)
 export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) => {
   const cfg = await getPaymentCfg();
   const secret = cfg.razorpay?.webhookSecret;
-  if (secret) {
-    const sig = req.headers['x-razorpay-signature'] as string;
-    const body = (req as any).rawBody as Buffer | string | undefined;
-    if (!body) {
-      return res.status(400).json({ success: false, error: 'Missing request body for signature verification' });
-    }
-    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
-    if (sig !== expected) {
-      return res.status(400).json({ success: false, error: 'Invalid webhook signature' });
-    }
+
+  // Reject all webhook calls when the secret is not configured.
+  // Silently skipping verification would allow anyone to spoof payment events.
+  if (!secret) {
+    return res.status(400).json({
+      success: false,
+      error: 'Webhook secret not configured. Set it in Payment Config before enabling the webhook.',
+    });
+  }
+
+  const sig = req.headers['x-razorpay-signature'] as string;
+  const body = (req as any).rawBody as Buffer | string | undefined;
+  if (!body) {
+    return res.status(400).json({ success: false, error: 'Missing request body for signature verification' });
+  }
+  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+  if (sig !== expected) {
+    return res.status(400).json({ success: false, error: 'Invalid webhook signature' });
   }
 
   const event = req.body as { event: string; payload?: { payment?: { entity?: { order_id?: string; id?: string } } } };

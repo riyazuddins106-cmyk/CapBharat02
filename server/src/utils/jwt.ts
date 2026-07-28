@@ -4,6 +4,10 @@ import { env } from '../config/env.js';
 export interface AccessTokenPayload {
   userId: string;
   email: string;
+  /** Role is embedded in the token to eliminate per-request DB lookups.
+   *  Marked optional for backwards compat — tokens issued before this change
+   *  will not carry the field; requireRole falls back to a DB lookup in that case. */
+  role?: string;
 }
 
 export interface RefreshTokenPayload {

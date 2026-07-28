@@ -2,8 +2,8 @@
  * One-time script: add Laundry services for each existing subcategory.
  * Run: pnpm --filter @servenow/server exec tsx src/database/seed-laundry.ts
  */
-import { db } from '../config/database.js';
-import { services } from './schema/services.js';
+import { db } from '../src/config/database.js';
+import { services } from '../src/database/schema/services.js';
 import { sql } from 'drizzle-orm';
 
 const LAUNDRY_CAT = 'd907f28a-70db-4e32-ba92-b1a02ac6f013';

@@ -1,4 +1,4 @@
-import { db } from '../config/database.js';
+import { db } from '../src/config/database.js';
 import { sql } from 'drizzle-orm';
 
 async function main() {

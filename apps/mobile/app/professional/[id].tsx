@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { professionalsApi, bookingsApi, favoritesApi } from '@/lib/api';
+import { TIME_SLOTS, SLOT_HOURS } from '@servenow/shared';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { queryClient } from '@/lib/queryClient';
 
@@ -28,15 +29,9 @@ function isToday(d: Date) {
 function isPastSlot(slot: string, date: Date) {
   if (!isToday(date)) return false;
   const now = new Date();
-  const [h, rest] = slot.split(':');
-  const [min, period] = rest.split(' ');
-  let hour = parseInt(h);
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  return hour * 60 + parseInt(min) <= now.getHours() * 60 + now.getMinutes();
+  const hour = SLOT_HOURS[slot] ?? 9;
+  return hour * 60 <= now.getHours() * 60 + now.getMinutes();
 }
-
-const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'];
 
 function fmtDay(d: Date) {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -58,7 +53,7 @@ export default function ProfessionalScreen() {
   const [notes, setNotes] = useState('');
   const [isFav, setIsFav] = useState(false);
 
-  const { data: pro, isLoading } = useQuery({
+  const { data: pro, isLoading, isError, refetch } = useQuery({
     queryKey: ['/api/professionals', id],
     queryFn: () => professionalsApi.get(id),
     enabled: !!id,
@@ -85,13 +80,9 @@ export default function ProfessionalScreen() {
 
   const bookMutation = useMutation({
     mutationFn: () => {
-      const [h, rest] = (selectedTime ?? '9:00 AM').split(':');
-      const [min, period] = rest.split(' ');
-      let hour = parseInt(h);
-      if (period === 'PM' && hour !== 12) hour += 12;
-      if (period === 'AM' && hour === 12) hour = 0;
+      const hour = SLOT_HOURS[selectedTime ?? '9 AM - 11 AM'] ?? 9;
       const dt = new Date(selectedDate);
-      dt.setHours(hour, parseInt(min), 0, 0);
+      dt.setHours(hour, 0, 0, 0);
       return bookingsApi.create({ professionalId: id, scheduledAt: dt.toISOString(), notes: notes || undefined }, accessToken!);
     },
     onSuccess: () => {
@@ -112,6 +103,31 @@ export default function ProfessionalScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <ProCardShimmer />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ paddingTop: topPad + 8, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 }}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.foreground, textAlign: 'center' }}>
+            Couldn't load this professional
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={{ backgroundColor: colors.primary, borderRadius: colors.radius, paddingHorizontal: 28, paddingVertical: 12 }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }

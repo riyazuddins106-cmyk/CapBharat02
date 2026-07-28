@@ -13,7 +13,7 @@ export const authenticate = asyncHandler(async (req: Request, _res: Response, ne
 
   try {
     const payload = verifyAccessToken(token);
-    req.user = { userId: payload.userId, email: payload.email };
+    req.user = { userId: payload.userId, email: payload.email, role: payload.role };
     next();
   } catch {
     throw AppError.unauthorized('Invalid or expired access token');
@@ -31,7 +31,7 @@ export const optionalAuthenticate = asyncHandler(async (req: Request, _res: Resp
     const token = header.slice('Bearer '.length);
     try {
       const payload = verifyAccessToken(token);
-      req.user = { userId: payload.userId, email: payload.email };
+      req.user = { userId: payload.userId, email: payload.email, role: payload.role };
     } catch {
       // Token invalid — proceed as unauthenticated, do not throw
     }

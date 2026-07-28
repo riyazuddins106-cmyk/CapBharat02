@@ -24,7 +24,7 @@ function toPublicUser(user: User) {
 }
 
 async function issueTokenPair(user: User) {
-  const accessToken = signAccessToken({ userId: user.id, email: user.email });
+  const accessToken = signAccessToken({ userId: user.id, email: user.email, role: user.role });
 
   // Step 1: create a placeholder record to get a stable DB-generated ID
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);

@@ -75,11 +75,13 @@ export default function NotificationsScreen() {
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
       ) : isError ? (
         <View style={styles.center}>
-          <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground, marginTop: 12 }]}>Couldn't load notifications</Text>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground, marginBottom: 16 }]}>Check your connection and try again.</Text>
-          <TouchableOpacity onPress={() => refetch()} style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 24, paddingVertical: 10 }}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
+          <Ionicons name="notifications-off-outline" size={48} color="#EF4444" />
+          <Text style={[styles.emptyTitle, { color: colors.foreground, marginTop: 4 }]}>Couldn't load notifications</Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.retryBtnText}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : items.length === 0 ? (
@@ -128,6 +130,8 @@ const styles = StyleSheet.create({
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
   emptyTitle:  { fontSize: 18, fontWeight: '700' },
   emptyText:   { fontSize: 14 },
+  retryBtn:    { borderRadius: 8, paddingHorizontal: 28, paddingVertical: 11, marginTop: 4 },
+  retryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   item:        { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, gap: 12, borderBottomWidth: 1 },
   iconWrap:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
   itemContent: { flex: 1, gap: 3 },

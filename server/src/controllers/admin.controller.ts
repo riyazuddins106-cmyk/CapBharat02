@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
-import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg } from 'drizzle-orm';
+import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg, sql } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
@@ -781,5 +781,57 @@ export const adminController = {
     }
 
     res.json({ success: true, data: row });
+  }),
+
+  /* ─────────────────────── Analytics Timeseries ───────────────── */
+  getAnalyticsTimeseries: asyncHandler(async (req: Request, res: Response) => {
+    const VALID_GRANULARITIES = ['day', 'week', 'month'] as const;
+    type Granularity = typeof VALID_GRANULARITIES[number];
+
+    const granularity: Granularity = VALID_GRANULARITIES.includes(req.query.granularity as Granularity)
+      ? (req.query.granularity as Granularity)
+      : 'day';
+
+    // Default: last 30 days
+    const defaultTo = new Date();
+    const defaultFrom = new Date();
+    defaultFrom.setDate(defaultFrom.getDate() - 30);
+
+    const toDate = req.query.to
+      ? new Date(String(req.query.to) + 'T23:59:59Z')
+      : defaultTo;
+    const fromDate = req.query.from
+      ? new Date(String(req.query.from) + 'T00:00:00Z')
+      : defaultFrom;
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()))
+      throw AppError.badRequest('Invalid from/to date');
+
+    // Raw SQL query using date_trunc
+    const rows = await db.execute(sql`
+      SELECT
+        date_trunc(${granularity}, b.scheduled_at) AS date,
+        COUNT(b.id)::int                            AS bookings,
+        COALESCE(SUM(b.price), 0)::numeric          AS revenue,
+        COUNT(DISTINCT CASE WHEN u.created_at >= date_trunc(${granularity}, b.scheduled_at)
+                             AND u.created_at  <  date_trunc(${granularity}, b.scheduled_at) + (INTERVAL '1 ' || ${granularity})
+                            THEN b.customer_id END)::int AS "newCustomers"
+      FROM bookings b
+      LEFT JOIN users u ON u.id = b.customer_id
+      WHERE b.deleted_at IS NULL
+        AND b.scheduled_at >= ${fromDate}
+        AND b.scheduled_at <= ${toDate}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `);
+
+    const data = (rows as any[]).map((r: any) => ({
+      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10),
+      bookings: Number(r.bookings ?? 0),
+      revenue: Number(r.revenue ?? 0),
+      newCustomers: Number(r.newCustomers ?? r['newCustomers'] ?? 0),
+    }));
+
+    res.json({ success: true, data });
   }),
 };

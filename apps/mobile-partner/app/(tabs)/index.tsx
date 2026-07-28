@@ -56,7 +56,7 @@ export default function DashboardScreen() {
 
   const queryClient = useQueryClient();
 
-  const { data: jobs, isLoading, refetch, isRefetching } = useQuery({
+  const { data: jobs, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['/api/partner/jobs', accessToken],
     queryFn: () => partnerApi.listJobs(accessToken!),
     enabled: !!accessToken,
@@ -110,6 +110,33 @@ export default function DashboardScreen() {
   });
 
   const activeJobs = (jobs ?? []).filter((j: Job) => ['upcoming', 'in_progress', 'pending'].includes(j.status));
+
+  if (isError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.primary }]}>
+          <View>
+            <Text style={styles.headerGreet}>Good {greeting()} 👋</Text>
+            <Text style={styles.headerName}>{user?.fullName ?? 'Partner'}</Text>
+          </View>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 }}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.foreground, textAlign: 'center' }}>
+            Couldn't load dashboard
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={{ backgroundColor: colors.primary, borderRadius: colors.radius, paddingHorizontal: 28, paddingVertical: 12 }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
