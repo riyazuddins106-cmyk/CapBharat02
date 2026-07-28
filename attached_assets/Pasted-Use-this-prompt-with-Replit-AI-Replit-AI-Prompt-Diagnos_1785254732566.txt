@@ -1,0 +1,192 @@
+Use this prompt with Replit AI:
+
+---
+
+# Replit AI Prompt – Diagnose and Fix "Failed to Download Remote Update" in Expo Go
+
+## Objective
+
+The Customer Mobile App frequently fails to open in Expo Go after scanning the QR code and shows:
+
+> **Failed to download remote update**
+
+Do **not** make assumptions about the cause. Perform a systematic investigation, identify the root cause, and fix it.
+
+---
+
+## Requirements
+
+Before making any code changes:
+
+1. Analyze the complete Expo configuration.
+2. Analyze the Replit workflow configuration.
+3. Analyze the Metro bundler configuration.
+4. Analyze the tunnel configuration.
+5. Analyze Expo SDK compatibility.
+6. Analyze all environment variables.
+7. Analyze package versions.
+8. Analyze startup logs.
+9. Analyze runtime errors.
+10. Identify the actual root cause.
+
+Do not apply random fixes.
+
+---
+
+## Investigation Checklist
+
+Verify all of the following:
+
+### Expo Configuration
+
+* Expo SDK version
+* app.json / app.config
+* eas.json
+* Metro configuration
+* Babel configuration
+* Expo Router configuration
+* Updates configuration
+* Runtime version
+* Development client configuration
+
+---
+
+### Replit Configuration
+
+Inspect:
+
+* .replit
+* Workflows
+* Run commands
+* Environment variables
+* REPLIT_EXPO_DEV_DOMAIN
+* Tunnel configuration
+* Port forwarding
+* Native Replit Expo tunnel vs ngrok
+
+If the workflow is forcing ngrok unnecessarily, migrate it to Replit's native Expo tunnel.
+
+---
+
+### Metro Bundler
+
+Verify:
+
+* Metro starts successfully
+* Metro builds without errors
+* No module resolution failures
+* No syntax errors
+* No TypeScript errors
+* No dependency conflicts
+
+If Metro crashes, fix the actual error instead of hiding it.
+
+---
+
+### Dependencies
+
+Validate every Expo-related dependency.
+
+Check for version mismatches including:
+
+* react-native
+* expo
+* expo-router
+* react-native-reanimated
+* react-native-gesture-handler
+* react-native-screens
+* react-native-safe-area-context
+* expo-updates
+* expo-dev-client
+
+Ensure every package is compatible with the installed Expo SDK.
+
+---
+
+### Environment Variables
+
+Verify:
+
+* EXPO_PUBLIC_API_URL
+* API endpoints
+* Secrets
+* Development environment variables
+
+Ensure missing variables cannot crash the application during startup.
+
+---
+
+### Runtime Errors
+
+Look for:
+
+* JavaScript exceptions
+* Unhandled Promise rejections
+* Invalid imports
+* Circular dependencies
+* Startup crashes
+* Missing assets
+* Missing fonts
+* Invalid routes
+
+---
+
+### Network
+
+Verify:
+
+* Development server is reachable
+* Bundle URL is reachable
+* Expo Go can download the JavaScript bundle
+* No HTML error page is returned instead of the bundle
+* No ngrok browser warning page is being served
+
+---
+
+## Logging
+
+If the issue still exists, improve logging.
+
+Print:
+
+* Metro startup logs
+* Bundle generation logs
+* Expo startup logs
+* API initialization logs
+* Runtime exceptions
+* Navigation startup logs
+
+The real error must be visible in the console instead of only showing "Failed to download remote update" on Expo Go.
+
+---
+
+## Fix Requirements
+
+Apply only the fixes required by the investigation.
+
+Do not:
+
+* upgrade packages unnecessarily,
+* redesign the project,
+* recreate Expo configuration,
+* break existing functionality.
+
+Preserve the existing project architecture.
+
+---
+
+## Final Validation
+
+Before completing, verify:
+
+* Metro starts successfully.
+* Expo starts without warnings.
+* The QR code is generated correctly.
+* Expo Go downloads the bundle successfully.
+* The Customer Mobile App opens without showing "Failed to download remote update."
+* The Customer Web application continues to work correctly.
+* Document the exact root cause, every file changed, and why each change was necessary.
+
+---
+
+**Do not stop after applying one possible fix. Continue investigating until the mobile app launches successfully in Expo Go or the exact root cause has been identified and documented.**

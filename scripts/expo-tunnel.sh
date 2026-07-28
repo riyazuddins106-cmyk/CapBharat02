@@ -102,22 +102,44 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   fi
   echo "Using EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL"
 
-  # Derive the tunnel URL from .expo/settings.json (urlRandomness field).
-  # The exp.direct URL is always: exp://{urlRandomness}-anonymous-{port}.exp.direct
+  # Capture the live tunnel URL by querying the Metro manifest after startup.
+  #
+  # We intentionally do NOT read .expo/settings.json here — that file holds the
+  # urlRandomness from the PREVIOUS session and is only updated by Expo after the
+  # tunnel negotiates a new URL. Reading it before (or shortly after) startup gives
+  # a stale value that points to an offline exp.direct endpoint, which is the root
+  # cause of "Failed to download remote update" errors in Expo Go.
+  #
+  # Instead, a background poller waits for Metro to respond, then fetches the
+  # manifest JSON and extracts expoGo.debuggerHost — the actual live tunnel host.
   URL_FILE="/tmp/expo-tunnel-${PORT}.url"
-  SETTINGS_FILE="$WORKSPACE_ROOT/apps/mobile/.expo/settings.json"
-  if [[ "$PORT" -eq 8099 ]]; then
-    SETTINGS_FILE="$WORKSPACE_ROOT/apps/mobile-partner/.expo/settings.json"
-  fi
 
-  if [[ -f "$SETTINGS_FILE" ]]; then
-    RANDOMNESS=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('urlRandomness',''))" "$SETTINGS_FILE" 2>/dev/null | tr '[:upper:]' '[:lower:]')
-    if [[ -n "$RANDOMNESS" ]]; then
-      TUNNEL_URL="exp://${RANDOMNESS}-anonymous-${PORT}.exp.direct"
-      echo "Tunnel URL (from settings.json): $TUNNEL_URL"
-      echo "$TUNNEL_URL" > "$URL_FILE"
+  capture_live_tunnel_url() {
+    local port=$1
+    local url_file=$2
+    echo "[tunnel-url] Waiting for Metro on port $port to get live tunnel URL…"
+    for i in $(seq 1 120); do
+      if curl -s --max-time 2 "http://localhost:$port/status" 2>/dev/null | grep -q "running"; then
+        break
+      fi
+      sleep 2
+    done
+    # Give the tunnel a few extra seconds to negotiate its exp.direct hostname
+    sleep 5
+    local HOST
+    HOST=$(curl -s --max-time 10 "http://localhost:$port" \
+      -H "Expo-Platform: android" \
+      -H "Expo-SDK-Version: 54.0.0" \
+      -H "Accept: application/expo+json,application/json" 2>/dev/null \
+      | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const h=JSON.parse(d).extra?.expoGo?.debuggerHost||'';process.stdout.write(h)}catch{}})" 2>/dev/null)
+    if [[ -n "$HOST" ]]; then
+      local TUNNEL_URL="exp://${HOST}"
+      echo "[tunnel-url] Live tunnel URL: $TUNNEL_URL"
+      echo "$TUNNEL_URL" > "$url_file"
+    else
+      echo "[tunnel-url] Could not read live tunnel URL from manifest"
     fi
-  fi
+  }
 
   # On Replit, always let Expo use its own built-in relay token for exp.direct
   # tunnels. User-provided ngrok tokens (v3 format) are incompatible with the
@@ -140,6 +162,7 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   for attempt in $(seq 1 $NATIVE_MAX_RETRIES); do
     echo "Starting Expo (--tunnel / exp.direct) on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
     prewarm_bundles "$PORT" &
+    capture_live_tunnel_url "$PORT" "$URL_FILE" &
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"
     exec 9<>"$_FIFO"
