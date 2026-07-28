@@ -12,3 +12,9 @@ id = "dFbEEr_p5kKCVThYfL23X"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
 title = "Customer App — Expo Go QR (fixed)"
+
+[[outputs]]
+id = "2pD_lhSof0RDbSUsHTfCI"
+uri = "file://tmp-qr/expo-customer-qr.png"
+type = "image"
+title = "Expo Customer App — QR Code"
