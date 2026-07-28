@@ -1,0 +1,142 @@
+ServeNow — Full Issue & Solution Report
+🔴 CRITICAL (Security / Data Integrity)
+C-1 · Razorpay Webhook Skips Signature Verification
+File: server/src/controllers/payment.controller.ts ~line 290
+Issue: If webhookSecret is not set in the admin panel, the webhook handler skips signature verification entirely and processes the event anyway. A malicious actor can send fake payment.captured events and trigger point awards / booking status changes without paying.
+Solution: Change the guard from "verify only when secret exists" to "reject with 400 if secret is not configured". One if (!secret) return res.status(400)... line.
+
+C-2 · Live JWT Tokens & Real User Data in Repository
+File: QA_TEST_REPORT.md
+Issue: The file contains actual JWT access tokens, real Supabase user UUIDs, real email addresses, phone numbers, and real booking/payment IDs from a live Supabase database. Anyone with read access to the repo can extract these tokens and impersonate users until they expire.
+Solution: Redact all token values (replace with [REDACTED]) and scrub/replace real UUIDs, emails, and phone numbers with anonymised placeholders throughout the file.
+
+C-3 · operations_manager Role Sees All Admin Sections Including Destructive Ones
+File: apps/admin-web/src/app/App.tsx line 261 (ADMIN_SIDEBAR)
+Issue: The operations_manager role was designed for operational staff. Currently they see — and can use — Payment Config, SMS Config, Email Config, OTP Settings, Audit Logs, User deletion, and Professional deletion, which should be admin-only.
+Solution: Add a roles array to each ADMIN_SIDEBAR entry listing who may see it. Filter the rendered sidebar items by user.role. Sections like Dispatch, Bookings, Jobs are shared; destructive settings are admin-only.
+
+🟠 HIGH (Performance / Reliability)
+H-1 · requireRole Hits the Database on Every Protected Request
+Files: server/src/middleware/requireRole.ts, server/src/utils/jwt.ts, server/src/middleware/authenticate.ts, server/src/types/express.d.ts
+Issue: Every single authenticated API call (bookings, profile, admin, partner, cart, etc.) triggers a SELECT role FROM users WHERE id = ? query just to confirm the user's role. Under load this doubles the query count for every protected endpoint.
+Solution:
+
+Add role to AccessTokenPayload in jwt.ts.
+Pass role when calling signAccessToken in auth.service.ts.
+Attach role to req.user in authenticate.ts.
+Extend the Express.Request type declaration.
+Rewrite requireRole.ts to read req.user.role instead of querying the DB.
+H-2 · Partner Web Has No Automatic 401 Token Refresh
+File: apps/partner-web/src/lib/api.ts
+Issue: The partner web API client uses a setRefreshHandler callback pattern but the handler is only wired up inside App.tsx's useEffect which runs after mount, not at module load. Any API call that fires before the effect runs (e.g. during SSR hydration or early navigation) will fail with 401 and not retry.
+Solution: Move the setRefreshHandler registration to happen synchronously at component initialisation (outside the useEffect), or restructure the client to accept the token getter at call-time rather than relying on a module-level callback.
+
+H-3 · Push Notifications Sent Synchronously in Large Chunks
+File: server/src/services/notification.service.ts
+Issue: Expo push notifications are sent in sequential 100-item chunks inside the HTTP request handler. For large user bases (e.g. broadcast notifications) this blocks the event loop for seconds and can time out the HTTP response.
+Solution: Fire the Expo send call in the background (setImmediate / detached promise) and return immediately to the caller. For production scale, move notification dispatch to a job queue (BullMQ / pg-boss).
+
+🟡 MEDIUM (Missing Features / Incomplete Modules)
+M-1 · Hardcoded TIME_SLOTS in Two Separate Mobile Screens
+Files:
+
+apps/mobile/app/checkout.tsx line 14
+apps/mobile/app/professional/[id].tsx line 39
+Issue: Time slots are defined as static arrays in two different files with different formats ('9 AM - 11 AM' vs '9:00 AM'). There is no scheduling API — professionals cannot set their own availability.
+Solution (short-term): Extract to a single shared constant in packages/shared so at least the two screens are consistent. Solution (long-term): Add a GET /api/professionals/:id/availability?date=YYYY-MM-DD endpoint backed by a partner_availability table, and replace the hardcoded arrays with a live fetch.
+M-2 · Admin Analytics Is a Stub — No Time-Series Data
+File: apps/admin-web/src/app/App.tsx function AnalyticsView (~line 3319)
+Issue: The Analytics sidebar item renders AnalyticsView which simply re-displays the same five KPI cards from the Dashboard (total bookings, revenue, active bookings, professionals, customers). There are no charts, no date range filters, no time-series.
+Solution:
+
+Add a GET /api/admin/analytics/timeseries?from=&to=&granularity=day endpoint that aggregates bookings and payments by date.
+Replace AnalyticsView with a Recharts line/bar chart component that fetches this endpoint with a date-range picker.
+M-3 · Admin Users & Professionals Tables Have No Pagination
+File: apps/admin-web/src/app/App.tsx (Users section and Professionals section)
+Issue: Both tables fetch all records in a single API call. The server already supports ?page=&limit= on GET /admin/users and GET /admin/professionals but the frontend ignores it, loading everything at once. This will become slow/broken beyond ~500 records.
+Solution: Add page and totalPages state to each section. Render Previous / Next controls. Pass ?page=N&limit=25 on each fetch. The backend side is already complete.
+
+M-4 · No Unit or Integration Test Suite
+Files: server/src/ (only e2e/dispatch.e2e.ts exists)
+Issue: The entire backend has exactly one test file (dispatch.e2e.ts). There are no unit tests for services, repositories, validators, or middleware, and no integration tests for the API routes. Regressions are only caught manually.
+Solution: Add Vitest (ESM-compatible, zero-config with TypeScript) to server/devDependencies. Write tests for: auth flow, booking lifecycle, points ledger idempotency, requireRole middleware, and payment webhook verification. Target ~80% coverage on services/ and middleware/.
+
+M-5 · SMTP & Fast2SMS Secrets Missing from .env.example
+File: .env.example
+Issue: The server reads FAST2SMS_API_KEY, SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, and EMAIL_FROM from environment variables but only SMTP_* and EMAIL_FROM are documented in .env.example. FAST2SMS_API_KEY and EXPO_PUBLIC_API_URL are completely absent, making the onboarding experience confusing.
+Solution: Add the missing keys with comments to .env.example and replit.md's secrets table.
+
+M-6 · Mobile — Missing Error & Retry UI on Several Screens
+Files:
+
+apps/mobile/app/professional/[id].tsx — no error state, just hangs on failure
+apps/mobile/app/notifications.tsx — isError is checked but no retry button shown
+apps/mobile-partner/app/(tabs)/index.tsx — no error state on dashboard fetch
+Issue: When an API call fails on these screens the user sees a blank or loading spinner forever with no way to retry.
+Solution: Add a reusable ErrorState component (icon + message + "Try Again" button that calls refetch()). Apply it to all isError branches in these three screens.
+🔵 LOW (Code Quality / Tech Debt)
+L-1 · Three Massive Monolith Frontend Files
+Files:
+
+apps/admin-web/src/app/App.tsx — 250 KB / ~5 000 lines
+apps/customer-web/src/app/CustomerApp.tsx — 172 KB / ~3 500 lines
+apps/partner-web/src/app/App.tsx — 94 KB / ~2 000 lines
+Issue: All UI logic, state, API calls, and components live in single files. This causes: slow TypeScript compilation, impossible merge conflicts, no code splitting (entire app in one chunk), and very hard onboarding for new developers.
+Solution: Split each file by feature section into separate component files (e.g. AdminBookings.tsx, AdminUsers.tsx, AdminAnalytics.tsx). Each section becomes its own lazy-loaded route or conditional import. This is a large refactor — recommend doing it one app at a time.
+L-2 · Token Refresh Logic Duplicated Across Three Web Apps
+Files: apps/customer-web/src/lib/api.ts, apps/admin-web/src/lib/api.ts, apps/partner-web/src/lib/api.ts
+Issue: Each app implements its own version of the 401 → refresh → retry loop, with different patterns (Axios interceptor vs fetch wrapper vs setRefreshHandler callback). Bugs in one are not fixed in the others.
+Solution: Move a unified createApiClient(getToken, refreshToken) factory into packages/shared/src/api.ts. All three web apps import and configure it. One implementation, one fix propagates everywhere.
+
+L-3 · packages/shared is Nearly Empty
+File: packages/shared/src/
+Issue: The shared package exists but only contains a few type definitions. All API types (User, Booking, Professional, Job, Notification, etc.) are re-declared independently in each of the five apps with slight inconsistencies (different field optionality, different naming conventions).
+Solution: Move all API response types to packages/shared/src/types/. Re-export them in all apps. Eliminates ~600 lines of duplicate type code and prevents type drift between apps.
+
+L-4 · react-router Installed in Customer Web But Not Used
+File: apps/customer-web/package.json
+Issue: react-router@7.13.0 is in dependencies but navigation is done entirely via activeTab state switches inside CustomerApp.tsx. The router is never initialised, routes are never declared, and useNavigate/Link are never called. This adds ~250 KB to the bundle for zero benefit.
+Solution: Remove react-router from apps/customer-web/package.json. Or, if URL-based navigation is wanted, migrate navigation to use actual <BrowserRouter> routes (pairs with L-1).
+
+L-5 · App Store / Play Store Rating Links Are Placeholder IDs
+File: apps/mobile/app/(tabs)/profile.tsx
+Issue: "Rate the App" opens a hardcoded App Store / Play Store URL with a placeholder app ID. Tapping it will open a broken link in production.
+Solution: Replace placeholder IDs with the real published app IDs, or conditionally hide the button until IDs are available (read from app.config.js extra field).
+
+L-6 · Mobile App Has No EAS Project ID (Push Tokens Will Break in Standalone Builds)
+Files: apps/mobile/app.json, apps/mobile-partner/app.json
+Issue: Neither app has extra.eas.projectId set. In Expo Go this works via anonymous identity, but in standalone/production builds (eas build) push notification tokens will not be issued without a real EAS project ID.
+Solution: Run eas init inside each app directory. This registers the project with Expo's servers and writes the projectId into app.json. Add the resulting IDs to the extra block.
+
+L-7 · @google-cloud/storage Is an Unused Dependency
+File: server/package.json
+Issue: @google-cloud/storage is listed as a production dependency but the server uses Supabase Storage exclusively for all file operations. No code in server/src/ imports or uses the GCS SDK. It adds ~12 MB to the installed footprint and is a supply-chain risk for no benefit.
+Solution: Remove it from server/package.json and run pnpm install --frozen-lockfile after.
+
+L-8 · Seed & Migration Scripts in Production Source Tree
+File: server/src/database/ contains ~15 seed/migration utility scripts
+Issue: Files like seed-full-dummy.ts, seed-20-partners.ts, reset.ts, inspect.ts, purge-refresh-tokens.ts are inside server/src/ and compiled into server/dist/ on every production build. They reference process.env directly (bypassing the validated env.ts) and some run destructive operations (DROP/TRUNCATE).
+Solution: Move all seed/migration/one-off scripts to server/scripts/ (not inside src/) and exclude them from the TypeScript build via tsconfig.json exclude array. They should only ever run from the shell, never be compiled into the production bundle.
+
+Summary Table
+ID	Area	Severity	Effort
+C-1	Backend — payment webhook	🔴 Critical	5 min
+C-2	Repo — live data in QA report	🔴 Critical	15 min
+C-3	Admin — role visibility	🔴 Critical	1 hr
+H-1	Backend — requireRole DB hit	🟠 High	2 hr
+H-2	Partner Web — 401 refresh	🟠 High	30 min
+H-3	Backend — sync push notifications	🟠 High	1 hr
+M-1	Mobile — hardcoded time slots	🟡 Medium	30 min (shared const) / 1 day (API)
+M-2	Admin — analytics stub	🟡 Medium	1 day
+M-3	Admin — no pagination	🟡 Medium	2 hr
+M-4	Backend — no test suite	🟡 Medium	3 days
+M-5	Config — missing env vars	🟡 Medium	10 min
+M-6	Mobile — missing error/retry UI	🟡 Medium	1 hr
+L-1	Frontend — monolith files	🔵 Low	3–5 days
+L-2	Frontend — duplicate refresh logic	🔵 Low	1 day
+L-3	Shared — empty packages/shared	🔵 Low	2 days
+L-4	Customer Web — unused react-router	🔵 Low	5 min
+L-5	Mobile — placeholder store IDs	🔵 Low	5 min
+L-6	Mobile — no EAS project ID	🔵 Low	15 min
+L-7	Backend — unused GCS dependency	🔵 Low	5 min
+L-8	Backend — scripts in src tree	🔵 Low	30 min

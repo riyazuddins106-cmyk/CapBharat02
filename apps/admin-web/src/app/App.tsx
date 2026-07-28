@@ -193,6 +193,18 @@ function EmptyRow({ cols, text }: { cols: number; text: string }) {
   return <tr><td colSpan={cols} className="px-4 py-8 text-white/30 text-center text-sm">{text}</td></tr>;
 }
 
+function AccessDenied() {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)" }}>
+        <ShieldCheck size={28} color="#EF4444" />
+      </div>
+      <p className="text-white font-semibold text-base">Access Restricted</p>
+      <p className="text-white/40 text-sm max-w-xs">This section is only available to admin accounts.</p>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    LOGIN PAGE
 ═══════════════════════════════════════════════════════════════════ */
@@ -305,10 +317,19 @@ const VALID_SECTIONS = ["dashboard","bookings","pros","create-pro","users","cate
   "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
   "payment-config","email-config","sms-config","otp-settings","documents","payouts"] as const;
 
+// Sections that only role === 'admin' may access
+const ADMIN_ONLY_SECTIONS = new Set(
+  ADMIN_SIDEBAR.filter(s => s.adminOnly).map(s => s.id)
+);
+
 function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessToken: string; onLogout: () => void }) {
+  const isAdmin = user.role === "admin";
   const [activeSection, setActiveSection] = useState(() => {
     const hash = window.location.hash.replace(/^#/, "");
-    return VALID_SECTIONS.includes(hash as typeof VALID_SECTIONS[number]) ? hash : "dashboard";
+    const valid = VALID_SECTIONS.includes(hash as typeof VALID_SECTIONS[number]);
+    // Prevent operations_manager from landing on an admin-only section via hash
+    if (valid && ADMIN_ONLY_SECTIONS.has(hash) && user.role !== "admin") return "dashboard";
+    return valid ? hash : "dashboard";
   });
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
   const [localUser,     setLocalUser]     = useState<AdminUser>(user);
@@ -720,11 +741,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={deletePro} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} />
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
-            <UsersView users={userList} onEdit={editUser} onDelete={deleteUser} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} />
+            <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
@@ -740,25 +761,25 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "analytics" ? (
             <AnalyticsView stats={stats} accessToken={accessToken} />
           ) : activeSection === "audit-logs" ? (
-            <AuditLogsView logs={auditLogs} />
+            isAdmin ? <AuditLogsView logs={auditLogs} /> : <AccessDenied />
           ) : activeSection === "privacy" ? (
-            <PrivacySecurityView user={localUser} accessToken={accessToken} onUserUpdate={handleUserUpdate} />
+            isAdmin ? <PrivacySecurityView user={localUser} accessToken={accessToken} onUserUpdate={handleUserUpdate} /> : <AccessDenied />
           ) : activeSection === "support" ? (
             <HelpSupportView accessToken={accessToken} />
           ) : activeSection === "payment-config" ? (
-            <PaymentConfigView accessToken={accessToken} />
+            isAdmin ? <PaymentConfigView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "email-config" ? (
-            <EmailConfigView accessToken={accessToken} adminEmail={user.email} />
+            isAdmin ? <EmailConfigView accessToken={accessToken} adminEmail={user.email} /> : <AccessDenied />
           ) : activeSection === "sms-config" ? (
-            <SmsConfigView accessToken={accessToken} />
+            isAdmin ? <SmsConfigView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "otp-settings" ? (
-            <OtpSettingsView accessToken={accessToken} />
+            isAdmin ? <OtpSettingsView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
           ) : activeSection === "payouts" ? (
             <PayoutsAdminView accessToken={accessToken} />
           ) : (
-            <SettingsView user={user} />
+            isAdmin ? <SettingsView user={user} /> : <AccessDenied />
           )}
         </div>
       </div>
@@ -1563,7 +1584,7 @@ function ProsView({
   pros: ProfessionalRow[];
   onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => Promise<void>;
   onToggle: (id: string, active: boolean) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
   categories: Category[];
   accessToken: string;
   onCreateNew: () => void;
@@ -1651,7 +1672,7 @@ function ProsView({
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || !onDelete) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
     catch (err: any) { adminShowError(err.message); }
@@ -1808,7 +1829,7 @@ function ProsView({
                       >
                         {p.isActive ? "Suspend" : "Activate"}
                       </ActionBtn>
-                      <ActionBtn variant="danger" onClick={() => setDeleteId(p.id)}>Delete</ActionBtn>
+                      {onDelete && <ActionBtn variant="danger" onClick={() => setDeleteId(p.id)}>Delete</ActionBtn>}
                     </div>
                   </td>
                 </tr>
@@ -1850,7 +1871,7 @@ function UsersView({
 }: {
   users: CustomerUser[];
   onEdit: (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
   onToggle: (id: string, active: boolean) => Promise<void>;
   userPage: number;
   userTotal: number;
@@ -1878,7 +1899,7 @@ function UsersView({
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || !onDelete) return;
     setSaving(true);
     try { await onDelete(deleteId); setDeleteId(null); }
     catch (err: any) { adminShowError(err.message); }
@@ -1991,7 +2012,7 @@ function UsersView({
                       >
                         {u.isActive ? "Suspend" : "Activate"}
                       </ActionBtn>
-                      <ActionBtn variant="danger" onClick={() => setDeleteId(u.id)}>Delete</ActionBtn>
+                      {onDelete && <ActionBtn variant="danger" onClick={() => setDeleteId(u.id)}>Delete</ActionBtn>}
                     </div>
                   </td>
                 </tr>

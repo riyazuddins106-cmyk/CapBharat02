@@ -1874,16 +1874,23 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   function triggerRefresh() { setRefreshKey(k => k + 1); }
 
+  // Register the refresh handler synchronously during render so it is available
+  // before any child component fires its first API call. Moving this inside a
+  // useEffect would leave a window between mount and the first effect flush where
+  // 401 responses could not be retried. setRefreshHandler only mutates a
+  // module-level variable, so calling it during render has no React-visible
+  // side effects and is safe.
+  setRefreshHandler(auth ? async () => {
+    try {
+      const t = await authApi.refresh(auth.refreshToken);
+      const next = { ...auth, accessToken: t.accessToken, refreshToken: t.refreshToken };
+      setAuth(next); localStorage.setItem('partner_auth', JSON.stringify(next));
+      return t.accessToken;
+    } catch { return null; }
+  } : null);
+
   useEffect(() => {
     if (!auth) return;
-    setRefreshHandler(async () => {
-      try {
-        const t = await authApi.refresh(auth.refreshToken);
-        const next = { ...auth, accessToken: t.accessToken, refreshToken: t.refreshToken };
-        setAuth(next); localStorage.setItem('partner_auth', JSON.stringify(next));
-        return t.accessToken;
-      } catch { return null; }
-    });
     partnerApi.getProfile(auth.accessToken).then(setProfile).catch(() => {});
     notificationsApi.unreadCount(auth.accessToken).then(r => setUnread(r.count)).catch(() => {});
   }, [auth]);
