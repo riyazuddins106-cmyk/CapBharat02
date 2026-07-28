@@ -34,7 +34,13 @@
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow ServeNow to access your camera to scan QR codes."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

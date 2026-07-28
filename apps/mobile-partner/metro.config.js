@@ -69,6 +69,23 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (Object.prototype.hasOwnProperty.call(FORCED_MODULES, moduleName)) {
     return { type: 'sourceFile', filePath: FORCED_MODULES[moduleName] };
   }
+
+  // ESM packages in the monorepo (e.g. @servenow/shared) use .js extensions
+  // in their TypeScript source imports. Metro resolves TS source directly and
+  // cannot map .js → .ts, so we strip the .js suffix for relative imports
+  // that originate from inside the workspace and let Metro find the .ts file.
+  if (moduleName.startsWith('./') || moduleName.startsWith('../')) {
+    const origin = context.originModulePath || '';
+    if (origin.startsWith(workspaceRoot) && moduleName.endsWith('.js')) {
+      const stripped = moduleName.slice(0, -3);
+      try {
+        return (defaultResolveRequest || context.resolveRequest)(
+          context, stripped, platform,
+        );
+      } catch (_) { /* fall through to normal resolution */ }
+    }
+  }
+
   return defaultResolveRequest
     ? defaultResolveRequest(context, moduleName, platform)
     : context.resolveRequest(context, moduleName, platform);
