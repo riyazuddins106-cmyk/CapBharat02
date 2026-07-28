@@ -2,85 +2,19 @@ uploads = []
 generated = []
 
 [[outputs]]
-id = "WyA0rvU7S5IGPXJNsaibP"
-uri = "file://attached_assets/qr_customer.png"
-type = "image"
-title = "📱 Customer App — Scan in Expo Go"
-
-[[outputs]]
-id = "sDVTYFnExpUBXhQm5jyJD"
-uri = "file://attached_assets/qr_partner.png"
-type = "image"
-title = "📱 Partner App — Scan in Expo Go"
-
-[[outputs]]
-id = "TvFDsSsQQQ5810a6l6Ju2"
-uri = "file://attached_assets/qr_customer_new.png"
-type = "image"
-title = "📱 Customer App — Scan in Expo Go"
-
-[[outputs]]
-id = "58f8UHgVSV5JlZ6NfbQm3"
-uri = "file://screenshots/expo-customer-qr.png"
-type = "image"
-title = "Corrected ServeNow Customer Expo Go QR"
-
-[[outputs]]
-id = "ZVixPCSwy5Ju0D6P1gIeb"
-uri = "file://screenshots/expo-partner-qr.png"
-type = "image"
-title = "Corrected ServeNow Partner Expo Go QR"
-
-[[outputs]]
-id = "GZdRQd6oXsMdenrGJujZV"
-uri = "file://tmp-qr/customer-qr.png"
-type = "image"
-title = "📱 Customer App — Expo Go QR"
-
-[[outputs]]
-id = "bIv2r13uHLxqnW3v6j5Sv"
-uri = "file://tmp-qr/partner-qr.png"
-type = "image"
-title = "🔧 Partner App — Expo Go QR"
-
-[[outputs]]
 id = "fa_HV9YGqe6aeN2iZrz4A"
 uri = "file://SERVENOW_DOCUMENTATION.md"
 type = "text"
 title = "ServeNow — Complete Technical Documentation"
 
 [[outputs]]
-id = "w7AOGu4l_ereOchHZjQ3L"
-uri = "file://tmp-qr/qr-customer.png"
+id = "6hM4vJMf_x3E0ZeyOAZGP"
+uri = "file://tmp-qr/customer-qr.png"
 type = "image"
-title = "📱 Customer App — scan with Expo Go"
+title = "Customer App — Expo Go QR"
 
 [[outputs]]
-id = "N7Qeb3RyxSBAkzIoE6uja"
-uri = "file://tmp-qr/qr-partner.png"
+id = "SXyuBKStL4YdI7wBVnOYa"
+uri = "file://tmp-qr/partner-qr.png"
 type = "image"
-title = "📱 Partner App — scan with Expo Go"
-
-[[outputs]]
-id = "sbmra0RGDZ-dPVo4thLas"
-uri = "file://screenshots/qr-customer.png"
-type = "image"
-title = "Customer App — Scan with Expo Go"
-
-[[outputs]]
-id = "LqTiiW5EecDIbc8JLFp_L"
-uri = "file://screenshots/qr-partner.png"
-type = "image"
-title = "Partner App — Scan with Expo Go"
-
-[[outputs]]
-id = "A8dmyaHfINoyBam9Smdkz"
-uri = "file://screenshots/customer-qr.png"
-type = "image"
-title = "📱 Customer App QR"
-
-[[outputs]]
-id = "Wfm1Lwk1TppOP7hGESs-N"
-uri = "file://screenshots/partner-qr.png"
-type = "image"
-title = "📱 Partner App QR — update fix applied"
+title = "Partner App — Expo Go QR"

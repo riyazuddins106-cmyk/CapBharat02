@@ -7,7 +7,7 @@ import { bookingsApi, type Booking } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
 const STATUS_CONFIG = {
-  pending:     { label: 'Searching…',  color: '#7C3AED', bg: '#EDE9FE' },
+  pending:     { label: 'Pending',      color: '#7C3AED', bg: '#EDE9FE' },
   upcoming:    { label: 'Upcoming',    color: '#2563EB', bg: '#DBEAFE' },
   in_progress: { label: 'In Progress', color: '#D97706', bg: '#FEF3C7' },
   completed:   { label: 'Completed',   color: '#16A34A', bg: '#DCFCE7' },

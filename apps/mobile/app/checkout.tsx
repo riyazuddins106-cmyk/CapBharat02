@@ -395,7 +395,7 @@ export default function CheckoutScreen() {
                   </Text>
                 </>
               )}
-              <Text style={[styles.infoLabel, { color: '#D97706', marginTop: 8 }]}>Status: Searching Professional</Text>
+              <Text style={[styles.infoLabel, { color: '#D97706', marginTop: 8 }]}>Status: Pending</Text>
             </View>
             {createdBookingPrice != null && (
               <TouchableOpacity

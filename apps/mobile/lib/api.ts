@@ -402,8 +402,6 @@ export const supportApi = {
 export const bookingsApi = {
   list: (token: string) => request<Booking[]>('/api/bookings', { token }),
   get: (id: string, token: string) => request<Booking>(`/api/bookings/${id}`, { token }),
-  create: (data: { professionalId: string; scheduledAt: string; notes?: string; addressId?: string }, token: string) =>
-    request<Booking>('/api/bookings', { method: 'POST', body: JSON.stringify(data), token }),
   cancel: (id: string, token: string) =>
     request<Booking>(`/api/bookings/${id}/cancel`, { method: 'PATCH', token }),
   reschedule: (id: string, scheduledAt: string, token: string) =>

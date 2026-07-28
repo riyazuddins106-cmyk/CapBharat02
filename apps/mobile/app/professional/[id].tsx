@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, Platform, FlatList, TextInput } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -7,50 +7,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { professionalsApi, bookingsApi, favoritesApi } from '@/lib/api';
-import { TIME_SLOTS, SLOT_HOURS } from '@servenow/shared';
+import { professionalsApi, favoritesApi } from '@/lib/api';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { queryClient } from '@/lib/queryClient';
 
-// Generate today + next 13 days (14 total)
-function getDates() {
-  return Array.from({ length: 14 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-}
-
-function isToday(d: Date) {
-  const now = new Date();
-  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-}
-
-function isPastSlot(slot: string, date: Date) {
-  if (!isToday(date)) return false;
-  const now = new Date();
-  const hour = SLOT_HOURS[slot] ?? 9;
-  return hour * 60 <= now.getHours() * 60 + now.getMinutes();
-}
-
-function fmtDay(d: Date) {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return days[d.getDay()];
-}
-function fmtDate(d: Date) { return d.getDate(); }
-function fmtMonth(d: Date) { return d.toLocaleString('en', { month: 'short' }); }
 
 export default function ProfessionalScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { id, openBook } = useLocalSearchParams<{ id: string; openBook?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken, isAuthenticated } = useAuth();
 
-  const [bookingOpen, setBookingOpen] = useState(openBook === '1');
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedDate, setSelectedDate] = useState(getDates()[0]);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [notes, setNotes] = useState('');
   const [isFav, setIsFav] = useState(false);
 
   const { data: pro, isLoading, isError, refetch } = useQuery({
@@ -78,22 +45,6 @@ export default function ProfessionalScreen() {
     onSuccess: (data) => setIsFav(data.isFavorite),
   });
 
-  const bookMutation = useMutation({
-    mutationFn: () => {
-      const hour = SLOT_HOURS[selectedTime ?? '9 AM - 11 AM'] ?? 9;
-      const dt = new Date(selectedDate);
-      dt.setHours(hour, 0, 0, 0);
-      return bookingsApi.create({ professionalId: id, scheduledAt: dt.toISOString(), notes: notes || undefined }, accessToken!);
-    },
-    onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      setStep(3);
-    },
-    onError: (e: any) => Alert.alert('Booking Failed', e.message),
-  });
-
-  const dates = getDates();
   const topPad = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
   if (isLoading) {
@@ -227,142 +178,6 @@ export default function ProfessionalScreen() {
         )}
       </ScrollView>
 
-      {/* Removed: Book Now button — use cart to add services */}
-      <Modal visible={bookingOpen} animationType="slide" transparent presentationStyle="overFullScreen">
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.sheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
-            {/* Close */}
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
-                {step === 1 ? 'Select Date & Time' : step === 2 ? 'Confirm Booking' : 'Booking Confirmed!'}
-              </Text>
-              {step !== 3 && (
-                <TouchableOpacity onPress={() => setBookingOpen(false)}>
-                  <Ionicons name="close" size={22} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {step === 1 && (
-              <>
-                {/* Date picker */}
-                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Select Date</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-                  <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 2 }}>
-                    {dates.map((d, i) => {
-                      const sel = d.toDateString() === selectedDate.toDateString();
-                      return (
-                        <TouchableOpacity
-                          key={i}
-                          onPress={() => { setSelectedDate(d); Haptics.selectionAsync(); }}
-                          style={[styles.dateChip, { backgroundColor: sel ? colors.primary : colors.muted, borderRadius: colors.radius }]}
-                        >
-                          <Text style={[styles.dateDay, { color: sel ? 'rgba(255,255,255,0.8)' : colors.mutedForeground }]}>{fmtDay(d)}</Text>
-                          <Text style={[styles.dateNum, { color: sel ? '#fff' : colors.foreground }]}>{fmtDate(d)}</Text>
-                          <Text style={[styles.dateMon, { color: sel ? 'rgba(255,255,255,0.8)' : colors.mutedForeground }]}>{fmtMonth(d)}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-
-                {/* Time slots */}
-                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Select Time</Text>
-                <View style={styles.timeGrid}>
-                  {TIME_SLOTS.map((t) => {
-                    const sel = selectedTime === t;
-                    const past = isPastSlot(t, selectedDate);
-                    return (
-                      <TouchableOpacity
-                        key={t}
-                        disabled={past}
-                        onPress={() => { if (!past) { setSelectedTime(t); Haptics.selectionAsync(); } }}
-                        style={[styles.timeChip, { backgroundColor: past ? colors.border : sel ? colors.primary : colors.muted, borderRadius: colors.radius - 2, opacity: past ? 0.45 : 1 }]}
-                      >
-                        <Text style={[styles.timeText, { color: past ? colors.mutedForeground : sel ? '#fff' : colors.foreground }]}>{t}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <TouchableOpacity
-                  disabled={!selectedTime}
-                  onPress={() => setStep(2)}
-                  style={[styles.nextBtn, { backgroundColor: selectedTime ? colors.primary : colors.muted, borderRadius: colors.radius }]}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.nextBtnText, { color: selectedTime ? '#fff' : colors.mutedForeground }]}>Next</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <View style={[styles.confirmCard, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
-                  {[
-                    { label: 'Professional', value: pro.name },
-                    { label: 'Service', value: pro.title },
-                    { label: 'Date', value: `${fmtDay(selectedDate)}, ${fmtDate(selectedDate)} ${fmtMonth(selectedDate)}` },
-                    { label: 'Time', value: selectedTime ?? '' },
-                    { label: 'Amount', value: `₹${pro.basePrice}${pro.priceUnit}` },
-                  ].map(({ label, value }) => (
-                    <View key={label} style={styles.confirmRow}>
-                      <Text style={[styles.confirmLabel, { color: colors.mutedForeground }]}>{label}</Text>
-                      <Text style={[styles.confirmValue, { color: colors.foreground }]}>{value}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Add notes for the professional (optional)"
-                  placeholderTextColor={colors.mutedForeground}
-                  multiline
-                  numberOfLines={2}
-                  style={[styles.notesInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
-                />
-
-                <View style={styles.confirmActions}>
-                  <TouchableOpacity onPress={() => setStep(1)} style={[styles.backBtn, { borderColor: colors.border, borderRadius: colors.radius }]}>
-                    <Text style={[styles.backBtnText, { color: colors.foreground }]}>Back</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => bookMutation.mutate()}
-                    disabled={bookMutation.isPending}
-                    style={[styles.confirmBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.confirmBtnText}>{bookMutation.isPending ? 'Booking…' : 'Confirm Booking'}</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {step === 3 && (
-              <View style={styles.successContent}>
-                <View style={[styles.successIcon, { backgroundColor: colors.secondary }]}>
-                  <Ionicons name="checkmark-circle" size={56} color={colors.primary} />
-                </View>
-                <Text style={[styles.successTitle, { color: colors.foreground }]}>Booking Confirmed!</Text>
-                <Text style={[styles.successText, { color: colors.mutedForeground }]}>
-                  Your booking with {pro.name} on {fmtDay(selectedDate)}, {fmtDate(selectedDate)} {fmtMonth(selectedDate)} at {selectedTime} is confirmed.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => { setBookingOpen(false); router.push('/(tabs)/bookings'); }}
-                  style={[styles.viewBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.viewBtnText}>View My Bookings</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setBookingOpen(false); setStep(1); }} style={{ marginTop: 8 }}>
-                  <Text style={[styles.closeText, { color: colors.primary }]}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -399,38 +214,4 @@ const styles = StyleSheet.create({
   reviewStars: { flexDirection: 'row', gap: 2 },
   reviewDate: { fontSize: 11 },
   reviewComment: { fontSize: 13, lineHeight: 20 },
-  sticky: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, borderTopWidth: 1 },
-  bookBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  bookBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet: { margin: 8, padding: 24, gap: 16, maxHeight: '90%' },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sheetTitle: { fontSize: 18, fontWeight: '700' },
-  fieldLabel: { fontSize: 13, fontWeight: '600', marginBottom: -8 },
-  dateChip: { width: 56, paddingVertical: 10, alignItems: 'center', gap: 2 },
-  dateDay: { fontSize: 10, fontWeight: '600' },
-  dateNum: { fontSize: 18, fontWeight: '800' },
-  dateMon: { fontSize: 10, fontWeight: '600' },
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  timeChip: { paddingHorizontal: 14, paddingVertical: 9 },
-  timeText: { fontSize: 13, fontWeight: '600' },
-  nextBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  nextBtnText: { fontSize: 15, fontWeight: '700' },
-  confirmCard: { padding: 16, gap: 12 },
-  confirmRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  confirmLabel: { fontSize: 13 },
-  confirmValue: { fontSize: 14, fontWeight: '600' },
-  notesInput: { padding: 12, fontSize: 14, textAlignVertical: 'top', minHeight: 70 },
-  confirmActions: { flexDirection: 'row', gap: 10 },
-  backBtn: { flex: 1, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center' },
-  backBtnText: { fontSize: 15, fontWeight: '600' },
-  confirmBtn: { flex: 2, paddingVertical: 14, alignItems: 'center' },
-  confirmBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  successContent: { alignItems: 'center', gap: 12, paddingVertical: 16 },
-  successIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
-  successTitle: { fontSize: 22, fontWeight: '800' },
-  successText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  viewBtn: { paddingHorizontal: 28, paddingVertical: 14, marginTop: 8 },
-  viewBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  closeText: { fontSize: 14, fontWeight: '600' },
 });

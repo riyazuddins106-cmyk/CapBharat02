@@ -7,8 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, subcategoriesApi, professionalsApi, favoritesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
-import { ProCard } from '@/components/ProCard';
+import { categoriesApi, subcategoriesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
 import { ProCardShimmer } from '@/components/Shimmer';
 import { queryClient } from '@/lib/queryClient';
 
@@ -67,32 +66,6 @@ export default function ServicesScreen() {
     enabled: !!selectedCat,
   });
 
-  // Always fetch professionals for the selected category (or all categories if none selected).
-  // Sub-category filters down further once one is chosen.
-  const canFetchPros = true;
-
-  const { data: professionals, isLoading } = useQuery({
-    queryKey: ['/api/professionals', selectedCat, selectedSubCat, search],
-    queryFn: () => professionalsApi.list({
-      ...(selectedCat ? { categoryId: selectedCat } : {}),
-      ...(selectedSubCat ? { subCategoryId: selectedSubCat } : {}),
-      ...(search.trim() ? { search: search.trim() } : {}),
-    }),
-    enabled: canFetchPros,
-    staleTime: 10_000,
-  });
-
-  const { data: favorites } = useQuery({
-    queryKey: ['/api/favorites', accessToken],
-    queryFn: () => favoritesApi.list(accessToken!),
-    enabled: !!accessToken,
-  });
-  const favoriteIds = new Set((favorites ?? []).map((f: any) => f.professionalId ?? f.id));
-
-  const favMutation = useMutation({
-    mutationFn: (proId: string) => favoritesApi.toggle(proId, accessToken!),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/favorites'] }),
-  });
   const { data: catalogue, isLoading: catalogueLoading } = useQuery({
     queryKey: ['/api/services', selectedCat, selectedSubCat, search],
     queryFn: () => servicesApi.list({
@@ -218,7 +191,7 @@ export default function ServicesScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search professionals..."
+            placeholder="Search services..."
             placeholderTextColor={colors.mutedForeground}
             style={[styles.searchInput, { color: colors.foreground }]}
             returnKeyType="search"

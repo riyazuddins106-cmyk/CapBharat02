@@ -1,0 +1,184 @@
+That's actually a good sign. If the **Customer Web is already following the new flow**, then you **shouldn't ask Replit AI to refactor the entire project again**. Instead, have it **make the Customer Mobile App match the Customer Web**.
+
+Use a focused prompt like this:
+
+---
+
+# Replit AI Prompt – Synchronize Customer Mobile App with Customer Web
+
+## Objective
+
+Analyze the existing Customer Web application and compare it with the Customer Mobile App.
+
+The Customer Web application already has the correct business flow. The Customer Mobile App is still using the old booking logic.
+
+**Do NOT redesign the UI or create new screens.**
+
+Your task is to make the Customer Mobile App follow the exact same business logic, APIs, and data flow as the Customer Web application.
+
+---
+
+## Analysis First
+
+Before making any changes:
+
+1. Analyze the Customer Web implementation.
+2. Identify the APIs it calls.
+3. Identify the booking flow.
+4. Identify how Categories, Subcategories, Services, and Pricing are loaded.
+5. Compare this with the Customer Mobile implementation.
+6. List all differences.
+7. Refactor only the Mobile App so both applications behave identically.
+
+---
+
+## Required Business Flow
+
+The Customer Mobile App must use the same flow as the Customer Web.
+
+Customer
+
+↓
+
+Category
+
+↓
+
+Subcategory
+
+↓
+
+Service
+
+↓
+
+Service Details
+
+↓
+
+Address
+
+↓
+
+Schedule
+
+↓
+
+Payment
+
+↓
+
+Booking
+
+The customer must never select a professional directly.
+
+---
+
+## Service Data
+
+The Mobile App must load:
+
+* Categories
+* Subcategories
+* Services
+* Prices
+* Duration
+* Images
+* Description
+
+only from the Admin-created Services.
+
+Do not use any Partner-created pricing or service data.
+
+---
+
+## Pricing
+
+The displayed price must always come from the Service record created by Admin.
+
+Professionals must never influence pricing.
+
+---
+
+## Booking
+
+When a customer books:
+
+Send the Service ID to the backend.
+
+Do not send any Professional ID during booking.
+
+The backend is responsible for assigning a professional.
+
+---
+
+## Booking Status
+
+After booking:
+
+Display statuses exactly as used in the Customer Web application.
+
+Example:
+
+* Pending
+* Searching for Partner
+* Partner Accepted
+* On the Way
+* In Progress
+* Completed
+* Cancelled
+
+Reuse existing status components if available.
+
+---
+
+## API Consistency
+
+Ensure the Customer Mobile App uses the same:
+
+* API endpoints
+* Request payloads
+* Response models
+* Validation
+* Error handling
+* State management
+
+as the Customer Web application wherever applicable.
+
+Do not duplicate business logic.
+
+---
+
+## UI
+
+Do not redesign any screens.
+
+Keep:
+
+* Navigation
+* Layout
+* Styling
+* Components
+
+Only update the underlying logic and data binding.
+
+---
+
+## Validation
+
+Before completing:
+
+* Compare every booking screen between Customer Web and Customer Mobile.
+* Ensure both produce identical API requests.
+* Ensure both display the same service information.
+* Ensure prices match.
+* Ensure booking flow matches.
+* Ensure booking history matches.
+* Ensure booking details match.
+* Remove any remaining legacy logic that allows direct professional selection or partner-controlled pricing.
+
+The Customer Mobile App should behave exactly like the Customer Web application while preserving the existing mobile UI and architecture.
+
+---
+
+I would also ask Replit AI **one more thing**: have it generate a **difference report before making changes**. That way, it tells you exactly what is different between the web and mobile implementations, making the changes more reliable and easier to review.
