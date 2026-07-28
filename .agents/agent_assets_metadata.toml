@@ -8,13 +8,7 @@ type = "text"
 title = "ServeNow — Complete Technical Documentation"
 
 [[outputs]]
-id = "h3PinOUKJ4F72jE060USS"
+id = "dFbEEr_p5kKCVThYfL23X"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
-title = "Customer App — Expo Go QR Code"
-
-[[outputs]]
-id = "En_KiYk8icZCjDh-9zVpQ"
-uri = "file://screenshots/customer-qr-final.png"
-type = "image"
-title = "Customer App — Expo Go QR Code"
+title = "Customer App — Expo Go QR (fixed)"
