@@ -205,7 +205,7 @@ export default function HomeScreen() {
     queryFn: () => professionalsApi.list(),
   });
 
-  const { data: offers = [] } = useQuery({
+  const { data: offers = [], isLoading: offersLoading } = useQuery({
     queryKey: ['/api/offers'],
     queryFn: offersApi.listActive,
     staleTime: 5 * 60 * 1000,
@@ -353,22 +353,10 @@ export default function HomeScreen() {
           />
           <DotsIndicator count={offers.length} active={activeOffer} colors={colors} />
         </View>
-      ) : (
-        /* Fallback static banner while loading */
-        <View style={[styles.banner, { backgroundColor: colors.primary, marginHorizontal: 16, marginTop: 16, borderRadius: 16, width: undefined }]}>
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTag}>Limited Offer</Text>
-            <Text style={styles.bannerTitle}>40% Off Your{'\n'}First Booking!</Text>
-            <TouchableOpacity style={styles.bannerBtn} activeOpacity={0.85}
-              onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/services'); }}>
-              <Text style={[styles.bannerBtnText, { color: colors.primary }]}>Explore</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.bannerDecor}>
-            <MaterialCommunityIcons name="home-search" size={64} color="rgba(255,255,255,0.15)" />
-          </View>
-        </View>
-      )}
+      ) : offersLoading ? (
+        /* Shimmer placeholder while offers are loading — no blue flash */
+        <View style={{ marginHorizontal: 16, marginTop: 16, height: BANNER_H, borderRadius: 16, backgroundColor: colors.muted }} />
+      ) : null}
 
       {/* Categories */}
       <View style={styles.section}>
@@ -458,20 +446,17 @@ export default function HomeScreen() {
                       <Ionicons name="time-outline" size={10} color={colors.mutedForeground} /> {service.duration} min
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    disabled={cartMutation.isPending}
-                    onPress={() => {
-                      if (!accessToken) { router.push('/login'); return; }
-                      Haptics.selectionAsync();
-                      cartMutation.mutate(service.id);
-                    }}
-                    style={[styles.bookBtn, { backgroundColor: '#5B3EF5', opacity: cartMutation.isPending ? 0.6 : 1 }]}
-                  >
-                    <Text style={[styles.bookBtnText, { color: '#fff' }]}>
-                      {accessToken ? '+ Add' : 'Sign in'}
-                    </Text>
-                  </TouchableOpacity>
+                  {accessToken && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      disabled={cartMutation.isPending}
+                      onPress={() => { Haptics.selectionAsync(); cartMutation.mutate(service.id); }}
+                      style={[styles.bookBtn, { backgroundColor: '#5B3EF5', opacity: cartMutation.isPending ? 0.6 : 1 }]}
+                    >
+                      <Ionicons name="add" size={14} color="#fff" />
+                      <Text style={[styles.bookBtnText, { color: '#fff' }]}>Add</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
@@ -647,7 +632,7 @@ const styles = StyleSheet.create({
   productFooter: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8 },
   productPrice: { fontSize: 16, fontWeight: '800' },
   productDuration: { fontSize: 11, marginTop: 2, fontWeight: '600' },
-  bookBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  bookBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   bookBtnText: { color: '#5B3EF5', fontSize: 12, fontWeight: '700' },
   header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   greeting:       { fontSize: 13 },

@@ -137,6 +137,7 @@ function ServiceCard({ service, cartQty, onAdd, onIncrease, onDecrease, loading,
               onPress={requiresAuth ? () => router.push('/auth') : onAdd}
               activeOpacity={0.8}
             >
+              <Ionicons name="add" size={15} color="#fff" />
               <Text style={svcStyles.addBtnText}>Add</Text>
             </TouchableOpacity>
           ) : (
@@ -502,7 +503,10 @@ const svcStyles = StyleSheet.create({
     fontWeight: '800',
   },
   addBtn: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 8,
   },
