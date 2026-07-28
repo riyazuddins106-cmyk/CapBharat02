@@ -1,94 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset='utf-8'>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0f0f0f;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    padding: 40px 20px;
-  }
-  .container {
-    display: flex;
-    gap: 32px;
-    align-items: stretch;
-  }
-  .card {
-    background: #1a1a1a;
-    border-radius: 20px;
-    padding: 32px 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    border: 1px solid #2a2a2a;
-    min-width: 320px;
-  }
-  .badge {
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-  .badge-customer { background: #5b3ef510; color: #a78bfa; border: 1px solid #5b3ef540; }
-  .badge-partner  { background: #0ea5e910; color: #38bdf8; border: 1px solid #0ea5e940; }
-  .title {
-    font-size: 22px;
-    font-weight: 700;
-    color: #fff;
-    text-align: center;
-  }
-  .subtitle {
-    font-size: 13px;
-    color: #666;
-    text-align: center;
-  }
-  .qr-wrap {
-    background: #fff;
-    border-radius: 12px;
-    padding: 12px;
-  }
-  .qr-wrap img { display: block; width: 240px; height: 240px; }
-  .url {
-    font-size: 11px;
-    color: #444;
-    word-break: break-all;
-    text-align: center;
-    font-family: monospace;
-  }
-  .hint {
-    font-size: 12px;
-    color: #555;
-    text-align: center;
-  }
-  .hint span { color: #a78bfa; font-weight: 600; }
-</style>
+  <meta charset='utf-8'>
+  <title>ServeNow — Expo Go QR Codes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; gap: 32px; }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+    h1 span { color: #6366f1; }
+    .cards { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+    .card { background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 20px; padding: 28px 32px; text-align: center; width: 280px; }
+    .card .icon { font-size: 2rem; margin-bottom: 8px; }
+    .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+    .card p { font-size: 0.82rem; color: #888; margin-bottom: 20px; }
+    .qr-wrap { background: #fff; border-radius: 12px; padding: 10px; display: inline-block; }
+    .qr-wrap img { display: block; width: 220px; height: 220px; }
+    .url { font-size: 0.7rem; color: #6366f1; margin-top: 14px; word-break: break-all; }
+    .creds { background: #111122; border: 1px solid #2a2a45; border-radius: 12px; padding: 16px 24px; width: 100%; max-width: 580px; }
+    .creds h3 { font-size: 0.85rem; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    td { padding: 6px 8px; }
+    td:first-child { color: #888; width: 90px; }
+    td:nth-child(2) { color: #aaa; width: 180px; }
+    td:nth-child(3) { color: #6366f1; font-family: monospace; }
+    tr + tr td { border-top: 1px solid #1e1e35; }
+  </style>
 </head>
 <body>
-<div class='container'>
-  <div class='card'>
-    <div class='badge badge-customer'>Customer App</div>
-    <div class='title'>ServeNow</div>
-    <div class='subtitle'>Scan with Expo Go</div>
-    <div class='qr-wrap'><img src='data:image/png;base64,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'></div>
-    <div class='url'>exp://prison-deacon-science.ngrok-free.dev</div>
-    <div class='hint'>Open <span>Expo Go</span> → Scan QR Code</div>
+  <h1>ServeNow <span>Expo Go</span></h1>
+  <div class='cards'>
+    <div class='card'>
+      <div class='icon'>📱</div>
+      <h2>Customer App</h2>
+      <p>Scan with Expo Go</p>
+      <div class='qr-wrap'><img src='data:image/png;base64,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' alt='Customer QR'></div>
+      <div class='url'>exp://dmm9s8e-anonymous-8080.exp.direct</div>
+    </div>
+    <div class='card'>
+      <div class='icon'>🔧</div>
+      <h2>Partner App</h2>
+      <p>Scan with Expo Go</p>
+      <div class='qr-wrap'><img src='data:image/png;base64,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' alt='Partner QR'></div>
+      <div class='url'>exp://rgqvuly-anonymous-8099.exp.direct</div>
+    </div>
   </div>
-  <div class='card'>
-    <div class='badge badge-partner'>Partner App</div>
-    <div class='title'>ServeNow Partner</div>
-    <div class='subtitle'>Scan with Expo Go</div>
-    <div class='qr-wrap'><img src='data:image/png;base64,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'></div>
-    <div class='url'>exp://arose-unframed-eclipse.ngrok-free.dev</div>
-    <div class='hint'>Open <span>Expo Go</span> → Scan QR Code</div>
+  <div class='creds'>
+    <h3>Test credentials</h3>
+    <table>
+      <tr><td>Customer</td><td>customer@servenow.in</td><td>Customer@1234</td></tr>
+      <tr><td>Partner</td><td>partner@servenow.in</td><td>Partner@1234</td></tr>
+      <tr><td>Admin</td><td>admin@servenow.in</td><td>Admin@1234</td></tr>
+    </table>
   </div>
-</div>
 </body>
 </html>

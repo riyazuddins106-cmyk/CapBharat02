@@ -143,6 +143,7 @@ export default function SubcategoriesScreen() {
     : (subcategories?.find(s => s.id === selectedSubCat)?.name ?? '') + ' Professionals';
 
   // ── Header component for FlatList ───────────────────────
+  // JSX element (not a function) — FlatList re-renders it when extraData changes
   const ListHeader = (
     <View>
       {/* ── Sub-category grid ── */}
@@ -253,6 +254,7 @@ export default function SubcategoriesScreen() {
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        extraData={selectedSubCat}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
           prosLoading ? (

@@ -1,0 +1,101 @@
+
+Explaining the booking flow process
+Here's the complete end-to-end flow for both platforms, based on the code:
+
+📱 Mobile App — Booking to Payment
+Step 1 — Browse & Add to Cart
+User opens Services tab → picks a Category → picks a Subcategory
+Services load from GET /api/services?categoryId=&subCategoryId=
+Price shown: service.customerPrice (admin-set, never partner price)
+Tap "+ Add" → POST /api/cart/items { serviceId, quantity: 1 }
+Cart badge updates instantly; a mini cart panel slides up
+Step 2 — Cart Review (Checkout Step 0)
+Tap cart icon → navigates to /checkout
+Loads GET /api/cart — shows all items, unit price, duration, subtotal
+User can adjust quantities (PATCH /api/cart/items/:id) or remove (DELETE)
+Tap "Proceed to Checkout →"
+Step 3 — Address (Step 1)
+Loads GET /api/addresses
+User picks a saved address or taps "Add New Address" → /addresses
+Default address is pre-selected
+Step 4 — Date (Step 2)
+Picks from: Today, Tomorrow, or next 5 days
+Step 5 — Time Slot (Step 3)
+Picks a 2-hour window (e.g. "9 AM – 11 AM") from shared TIME_SLOTS constant
+Step 6 — Booking Summary (Step 4)
+Shows: all services + quantities, date, time, address, total
+Tap "Confirm Booking" →
+Calls POST /api/bookings/checkout { scheduledAt: ISO, addressId, notes? }
+No professionalId sent — backend assigns one
+Step 7 — Success Screen (Step 5)
+Shows "Booking Confirmed!"
+Message: "We're finding the best professional for your service."
+Status badge: Pending
+Two action buttons:
+💳 Pay Now — ₹X (if booking has a price) → goes to Bookings tab with payment sheet open
+Pay Later · View Bookings → goes to Bookings tab
+Step 8 — Bookings Tab (Searching)
+Booking appears in the "Searching" tab (status = pending)
+Animated spinner + banner: "We're matching the best available professional…"
+BookingCard shows badge "Pending" in purple
+Step 9 — After Partner Accepts
+Status changes: pending → upcoming
+Booking moves to "Upcoming" tab
+BookingCard shows partner name + "Upcoming" badge (blue)
+"Pay Now" button appears on the card
+Step 10 — Payment
+Tap "Pay Now" on the BookingCard → Payment bottom sheet opens:
+
+Method	Flow
+Cash	Tap "Confirm Cash Payment" → POST /api/bookings/:id/payment { method: "cash" }
+UPI	Shows QR code + UPI ID. Enter UTR reference → POST /api/bookings/:id/payment { method: "upi_manual", notes: UTR }
+Razorpay	POST /api/bookings/:id/razorpay/create-order → opens Razorpay checkout in WebView → intercepts servenow://payment-success deep link
+Stripe	POST /api/bookings/:id/stripe/create-session → opens Stripe checkout URL in WebView → intercepts servenow://payment-success
+On success → "Payment Recorded!" confirmation → booking list refreshes.
+
+Step 11 — After Service
+Status: in_progress → completed
+Booking moves to "Past" tab
+"Rate Service" button appears → star rating + comment → POST /api/reviews
+🌐 Web App — Booking to Payment
+Step 1 — Browse & Add to Cart
+Home or Services page → picks Category → Subcategory → Service
+Services load from GET /api/services
+Price: service.customerPrice
+Click "Book" or "Add to Cart" → POST /api/cart/items { serviceId, quantity }
+Step 2 — Checkout Flow (triggered from cart)
+Same 5-step flow, rendered as a modal/overlay:
+
+Step 0 — Your Cart → Review items, quantities, total
+
+Step 1 — Select Address → GET /api/addresses → pick or add address
+
+Step 2 — Select Date → Today, Tomorrow, or next 5 days
+
+Step 3 — Select Time Slot → 2-hour windows
+
+Step 4 — Booking Summary → Final review → "Confirm Booking" → POST /api/bookings/checkout { scheduledAt, addressId, notes? }
+
+Step 5 — Success → "We're finding the best available professional near you." → Status: Pending (gray badge)
+
+Step 3 — Bookings Page
+Status filters: Pending / Upcoming / In Progress / Completed / Cancelled
+pending → "Pending" badge (gray), subtitle "Searching for professional…"
+upcoming → "Upcoming" badge (violet #5B3EF5)
+Step 4 — Payment
+Web payment is handled inline on the booking detail — same methods (Cash, UPI, Razorpay, Stripe) via POST /api/bookings/:id/payment.
+
+🔄 Side-by-Side Comparison
+Stage	Mobile	Web
+Add to cart	POST /api/cart/items	Same
+Checkout submit	POST /api/bookings/checkout	Same
+Payload	{ scheduledAt, addressId, notes? }	Same
+Professional selection	❌ Never	❌ Never
+Pricing source	service.customerPrice	Same
+Post-booking status	Pending → Searching tab	Pending badge
+Payment trigger	"Pay Now" on BookingCard	Inline on booking
+Payment methods	Cash, UPI QR, Razorpay WebView, Stripe WebView	Cash, UPI, Razorpay, Stripe
+Review	After completed	After completed
+Both platforms are now 100% aligned — same API, same payload, same flow, same status values.
+
+

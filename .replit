@@ -59,6 +59,10 @@ args = "Admin Panel"
 task = "workflow.run"
 args = "Partner Web"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QR Codes"
+
 [[workflows.workflow]]
 name = "Expo Customer App"
 author = "agent"
@@ -93,6 +97,15 @@ waitForPort = 4000
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "QR Codes"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node -e \"const http=require('http'),fs=require('fs'),path=require('path');http.createServer((req,res)=>{const f=path.join('/home/runner/workspace/tmp-qr',req.url==='/'?'scanner.html':req.url);try{const d=fs.readFileSync(f);res.writeHead(200,{'Content-Type':req.url.endsWith('.png')?'image/png':'text/html','Cache-Control':'no-cache'});res.end(d);}catch(e){res.writeHead(404);res.end();}}).listen(3000);\""
+waitForPort = 3000
 
 [[ports]]
 localPort = 3000
