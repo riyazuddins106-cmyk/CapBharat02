@@ -59,7 +59,7 @@ export const dispatchService = {
       if (candidateIds.length > 0) {
         const approvedRows = await db.execute(
           sql`SELECT professional_id, document_type FROM partner_documents
-              WHERE professional_id = ANY(${candidateIds}) AND status = 'approved'`
+              WHERE professional_id = ANY(${candidateIds}::uuid[]) AND status = 'approved'`
         );
         const approvedByPro = new Map<string, Set<string>>();
         for (const r of ((approvedRows as any).rows ?? (approvedRows as any)) as any[]) {

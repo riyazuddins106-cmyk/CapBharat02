@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Search, MapPin, Star, ChevronRight, Bell, Heart, Home, Grid, BookOpen,
   User, Clock, Shield, Sparkles, Wrench, Scissors, Zap, Droplets, Paintbrush,
@@ -2443,22 +2444,38 @@ function PaymentModal({ booking, onClose, onPaid }: {
             </div>
           )}
 
-          {/* UPI VPA display */}
+          {/* UPI QR code + VPA display */}
           {selectedMethod === 'upi_manual' && config?.upiVpa && (
-            <div className="mt-3 bg-blue-50 rounded-xl p-3 text-center">
-              <p className="text-xs text-blue-600 font-medium mb-1">UPI ID to pay</p>
-              <p className="text-base font-bold text-blue-900 font-mono select-all">{config.upiVpa}</p>
-              <p className="text-xs text-blue-500 mt-1">After paying, enter transaction ID below</p>
+            <div className="mt-3 bg-blue-50 rounded-2xl p-4 flex flex-col items-center gap-3">
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Scan & Pay with any UPI app</p>
+              {/* QR encodes a standard UPI deep link — opens GPay / PhonePe / Paytm directly */}
+              <div className="bg-white rounded-2xl p-3 shadow-sm border border-blue-100">
+                <QRCodeSVG
+                  value={`upi://pay?pa=${encodeURIComponent(config.upiVpa)}&pn=ServeNow&am=${booking.price}&cu=INR&tn=ServeNow+Booking+Payment`}
+                  size={180}
+                  bgColor="#ffffff"
+                  fgColor="#1e3a5f"
+                  level="M"
+                />
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <p className="text-[10px] text-blue-500 font-medium">UPI ID</p>
+                <p className="text-sm font-bold text-blue-900 font-mono select-all">{config.upiVpa}</p>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-blue-600 bg-blue-100 rounded-xl px-3 py-2 w-full justify-center">
+                <Smartphone size={12} />
+                Open Google Pay, PhonePe or Paytm → Scan QR
+              </div>
             </div>
           )}
 
           {/* Notes / transaction ref */}
-          {(selectedMethod === 'upi_manual') && (
+          {selectedMethod === 'upi_manual' && (
             <div className="mt-3">
               <input
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="UPI transaction ID (optional)"
+                placeholder="Enter UPI transaction ID after paying (optional)"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-violet-400"
               />
             </div>
