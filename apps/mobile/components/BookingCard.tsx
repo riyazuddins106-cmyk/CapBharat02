@@ -111,7 +111,7 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               <Text style={[styles.actionBtnText, { color: colors.destructive }]}>Cancel</Text>
             </TouchableOpacity>
           )}
-          {booking.status === 'completed' && onPay && (
+          {['upcoming', 'in_progress', 'completed'].includes(booking.status) && onPay && (
             <TouchableOpacity
               onPress={() => onPay(booking)}
               style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}

@@ -2,6 +2,10 @@ import { db } from '../config/database.js';
 import { bookings, bookingPartnerRequests, professionals, users, payoutRequests } from '../database/schema/index.js';
 import { eq, and, isNull, isNotNull, or, desc, sql } from 'drizzle-orm';
 
+/** Subquery: most-recent payment status for a booking (null if none). */
+const paymentStatusSub = (bookingIdCol: typeof bookings.id) =>
+  sql<string | null>`(SELECT status FROM payments WHERE booking_id = ${bookingIdCol} ORDER BY created_at DESC LIMIT 1)`;
+
 export const partnerRepository = {
   /** Find the professional record linked to a user */
   async findProfessionalByUserId(userId: string) {
@@ -34,6 +38,7 @@ export const partnerRepository = {
         updatedAt: bookings.updatedAt,
         customerName: users.fullName,
         customerPhone: users.phone,
+        paymentStatus: paymentStatusSub(bookings.id),
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
@@ -78,6 +83,7 @@ export const partnerRepository = {
         updatedAt: bookings.updatedAt,
         customerName: users.fullName,
         customerPhone: users.phone,
+        paymentStatus: paymentStatusSub(bookings.id),
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))

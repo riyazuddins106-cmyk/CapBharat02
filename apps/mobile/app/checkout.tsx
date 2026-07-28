@@ -66,6 +66,8 @@ export default function CheckoutScreen() {
   const [selectedDate, setSelectedDate] = useState('Today');
   const [selectedSlot, setSelectedSlot] = useState('9 AM - 11 AM');
   const [done, setDone] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
+  const [createdBookingPrice, setCreatedBookingPrice] = useState<number | null>(null);
 
   const { data: cart, isLoading: cartLoading } = useQuery({
     queryKey: ['/api/cart', accessToken],
@@ -101,9 +103,11 @@ export default function CheckoutScreen() {
         },
         accessToken!,
       ),
-    onSuccess: () => {
+    onSuccess: (booking: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart', accessToken] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings', accessToken] });
+      setCreatedBookingId(booking?.id ?? null);
+      setCreatedBookingPrice(booking?.price ?? null);
       setDone(true);
       setStep(5);
     },
@@ -393,11 +397,19 @@ export default function CheckoutScreen() {
               )}
               <Text style={[styles.infoLabel, { color: '#D97706', marginTop: 8 }]}>Status: Searching Professional</Text>
             </View>
+            {createdBookingPrice != null && (
+              <TouchableOpacity
+                onPress={() => router.replace({ pathname: '/(tabs)/bookings', params: { payId: createdBookingId ?? '' } })}
+                style={[styles.primaryBtn, { backgroundColor: '#059669', marginTop: 8 }]}
+              >
+                <Text style={styles.primaryBtnText}>💳 Pay Now — ₹{createdBookingPrice}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => router.replace('/(tabs)/bookings')}
               style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
             >
-              <Text style={styles.primaryBtnText}>View My Bookings</Text>
+              <Text style={styles.primaryBtnText}>Pay Later · View Bookings</Text>
             </TouchableOpacity>
           </View>
         )}

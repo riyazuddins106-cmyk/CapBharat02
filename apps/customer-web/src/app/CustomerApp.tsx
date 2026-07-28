@@ -1925,6 +1925,8 @@ function CheckoutFlow({ cart, onClose, onChange }: {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
   const [bookingDone, setBookingDone] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState<ApiBooking | null>(null);
+  const [payAfterBook, setPayAfterBook] = useState(false);
 
   useEffect(() => {
     if (step === 1 && addresses.length === 0) {
@@ -1959,7 +1961,8 @@ function CheckoutFlow({ cart, onClose, onChange }: {
     setError(""); setConfirming(true);
     try {
       const scheduledAt = buildSlotScheduledAt(selectedDate, selectedSlot);
-      await cartApi.checkout({ scheduledAt, addressId: selectedAddressId ?? undefined });
+      const created = await cartApi.checkout({ scheduledAt, addressId: selectedAddressId ?? undefined });
+      setCreatedBooking(created);
       onChange({ ...cart, items: [], total: 0 });
       setBookingDone(true);
       setStep(5);
@@ -1969,6 +1972,7 @@ function CheckoutFlow({ cart, onClose, onChange }: {
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center"
       onClick={bookingDone ? undefined : onClose}>
       <div className="w-full max-w-[390px] bg-white rounded-t-3xl flex flex-col"
@@ -2298,18 +2302,35 @@ function CheckoutFlow({ cart, onClose, onChange }: {
                 </p>
               )}
 
+              {createdBooking && (
+                <button
+                  onClick={() => setPayAfterBook(true)}
+                  className="w-full py-3.5 mb-2 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                  style={{ background: "linear-gradient(135deg,#059669,#10b981)" }}
+                >
+                  💳 Pay Now — ₹{createdBooking.price.toLocaleString("en-IN")}
+                </button>
+              )}
               <button
                 onClick={onClose}
-                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
-                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold border border-gray-200 text-gray-600"
               >
-                View My Bookings
+                Pay Later — View My Bookings
               </button>
             </div>
           )}
         </div>
       </div>
     </div>
+
+    {payAfterBook && createdBooking && (
+      <PaymentModal
+        booking={createdBooking}
+        onClose={() => setPayAfterBook(false)}
+        onPaid={() => { setPayAfterBook(false); onClose(); }}
+      />
+    )}
+    </>
   );
 }
 
@@ -2569,12 +2590,12 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
                     {cancelling === b.id ? "Cancelling…" : "Cancel"}
                   </button>
                 )}
-                {b.status === "completed" && (
+                {["upcoming", "in_progress", "completed"].includes(b.status) && (
                   <button
                     onClick={() => setPayBooking(b)}
                     className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
                     style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
-                    Pay Now
+                    💳 Pay Now
                   </button>
                 )}
                 {b.status === "completed" && !reviewedIds.has(b.id) && (

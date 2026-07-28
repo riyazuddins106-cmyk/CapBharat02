@@ -8,6 +8,7 @@ import { bookingItems, cartItems, carts, serviceCategories, services, bookings }
 import { dispatchService } from '../services/dispatch.service.js';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
+import { notificationDbService } from '../services/notificationDb.service.js';
 
 export const bookingController = {
   list: asyncHandler(async (req: Request, res: Response) => {
@@ -77,6 +78,14 @@ export const bookingController = {
       })));
       await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
       return [created];
+    });
+    // Notify the customer that their booking was placed
+    void notificationDbService.create({
+      userId: req.user!.userId,
+      title: 'Booking placed!',
+      body: `Your booking for ${booking.serviceName} is confirmed. We're finding a professional near you.`,
+      type: 'booking',
+      data: { bookingId: booking.id },
     });
     try {
       await dispatchService.broadcast(booking, first.service.id);

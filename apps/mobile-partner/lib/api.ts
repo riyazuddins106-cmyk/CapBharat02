@@ -141,6 +141,7 @@ export interface Job {
   customerName: string | null;
   customerPhone: string | null;
   services?: JobService[];
+  paymentStatus?: string | null;
 }
 
 export interface Earnings {

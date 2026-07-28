@@ -682,6 +682,14 @@ function Jobs({ token }: { token: string }) {
   }, [token]);
   useEffect(() => { load(); }, [load]);
 
+  // Auto-refresh every 30 s so new dispatched jobs appear without manual reload
+  useEffect(() => {
+    const t = setInterval(() => {
+      partnerApi.listJobs(token).then(setJobs).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(t);
+  }, [token]);
+
   async function complete(id: string) {
     setCompleting(true);
     try {
@@ -797,6 +805,7 @@ function Jobs({ token }: { token: string }) {
                 ['Scheduled', fmtDate(selected.scheduledAt)],
                 ['Price',     fmt(selected.price)],
                 ['Status',    selected.status.replace('_', ' ')],
+                ['Payment',   selected.paymentStatus === 'paid' ? '✅ Paid' : selected.paymentStatus === 'created' ? '⏳ Pending' : selected.paymentStatus ?? '—'],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-xl p-3 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.03)' }}>
                   <p className="text-white/40 text-xs mb-1">{k}</p>
@@ -1893,6 +1902,15 @@ export default function App() {
     if (!auth) return;
     partnerApi.getProfile(auth.accessToken).then(setProfile).catch(() => {});
     notificationsApi.unreadCount(auth.accessToken).then(r => setUnread(r.count)).catch(() => {});
+  }, [auth]);
+
+  // Poll unread notification count every 30 s
+  useEffect(() => {
+    if (!auth) return;
+    const t = setInterval(() => {
+      notificationsApi.unreadCount(auth.accessToken).then(r => setUnread(r.count)).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(t);
   }, [auth]);
 
   function onLogin(tokens: AuthTokens) {

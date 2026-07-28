@@ -69,6 +69,7 @@ export interface Job {
   proName: string; scheduledAt: string; status: JobStatus; notes: string | null;
   price: number; createdAt: string; updatedAt: string;
   customerName: string | null; customerPhone: string | null;
+  paymentStatus?: string | null;
 }
 export interface Earnings {
   total: number; thisMonth: number; today: number;

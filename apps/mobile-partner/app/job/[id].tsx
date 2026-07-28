@@ -237,6 +237,14 @@ export default function JobDetailScreen() {
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Job Details</Text>
           <DetailRow icon="time-outline" label="Scheduled" value={fmtDate(job.scheduledAt)} colors={colors} />
           <DetailRow icon="cash-outline" label="Earnings" value={`₹${job.price}`} colors={colors} bold />
+          {job.paymentStatus != null && (
+            <DetailRow
+              icon={job.paymentStatus === 'paid' ? 'checkmark-circle-outline' : 'time-outline'}
+              label="Payment"
+              value={job.paymentStatus === 'paid' ? 'Customer paid ✅' : 'Awaiting customer payment ⏳'}
+              colors={colors}
+            />
+          )}
           {job.notes && <DetailRow icon="document-text-outline" label="Notes" value={job.notes} colors={colors} />}
         </View>
 
