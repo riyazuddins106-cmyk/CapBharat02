@@ -87,87 +87,69 @@ if [[ "$START_DELAY" -gt 0 ]]; then
   sleep "$START_DELAY"
 fi
 
-# ── Replit-native mode (skip ngrok entirely) ─────────────────────────────────
+# ── Replit-native mode (skip ngrok + exp.direct entirely) ────────────────────
 # MUST run before the ngrok token/binary checks below.
 #
-# Expo SDK 53+ uses Expo's own tunnel relay (exp.direct) — NOT ngrok — when
-# `expo start --tunnel` is invoked. ngrok is only a legacy fallback. On Replit
-# we simply skip the ngrok validation and let Expo use its own service.
+# Replit exposes each port via its own public HTTPS proxy domain:
+#   REPLIT_EXPO_DEV_DOMAIN = <repl-id>-00-<suffix>.expo.pike.replit.dev
+#   Port-specific form:      <repl-id>-<PORT>-<suffix>.expo.pike.replit.dev
+#
+# We derive the per-port domain, set REACT_NATIVE_PACKAGER_HOSTNAME so Metro
+# uses it in the QR code URL, and start with --host lan.  This avoids
+# exp.direct entirely — no anonymous-tunnel slot limit, no "remote gone away",
+# no session-conflict retries.  The Replit proxy forwards the exp:// WebSocket
+# connection from Expo Go straight to Metro on the local port.
 if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
-  echo "=== Replit: using public dev domain (no tunnel auth needed) ==="
-  echo "Starting Expo on port $PORT…"
+  echo "=== Replit: using per-port proxy domain (no exp.direct needed) ==="
+
+  # Derive port-specific domain: replace the -00- slot with the actual port.
+  EXPO_HOST=$(echo "$REPLIT_EXPO_DEV_DOMAIN" | sed "s/-00-/-${PORT}-/")
+  export REACT_NATIVE_PACKAGER_HOSTNAME="$EXPO_HOST"
 
   if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
     export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
   fi
-  echo "Using EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL"
 
-  # Capture the live tunnel URL by querying the Metro manifest after startup.
-  #
-  # We intentionally do NOT read .expo/settings.json here — that file holds the
-  # urlRandomness from the PREVIOUS session and is only updated by Expo after the
-  # tunnel negotiates a new URL. Reading it before (or shortly after) startup gives
-  # a stale value that points to an offline exp.direct endpoint, which is the root
-  # cause of "Failed to download remote update" errors in Expo Go.
-  #
-  # Instead, a background poller waits for Metro to respond, then fetches the
-  # manifest JSON and extracts expoGo.debuggerHost — the actual live tunnel host.
+  EXPO_URL="exp://${EXPO_HOST}"
   URL_FILE="/tmp/expo-tunnel-${PORT}.url"
+  echo "$EXPO_URL" > "$URL_FILE"
 
-  capture_live_tunnel_url() {
-    local port=$1
-    local url_file=$2
-    echo "[tunnel-url] Waiting for Metro on port $port to get live tunnel URL…"
-    for i in $(seq 1 120); do
-      if curl -s --max-time 2 "http://localhost:$port/status" 2>/dev/null | grep -q "running"; then
-        break
-      fi
-      sleep 2
-    done
-    # Give the tunnel a few extra seconds to negotiate its exp.direct hostname
-    sleep 5
-    local HOST
-    HOST=$(curl -s --max-time 10 "http://localhost:$port" \
-      -H "Expo-Platform: android" \
-      -H "Expo-SDK-Version: 54.0.0" \
-      -H "Accept: application/expo+json,application/json" 2>/dev/null \
-      | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const h=JSON.parse(d).extra?.expoGo?.debuggerHost||'';process.stdout.write(h)}catch{}})" 2>/dev/null)
-    if [[ -n "$HOST" ]]; then
-      local TUNNEL_URL="exp://${HOST}"
-      echo "[tunnel-url] Live tunnel URL: $TUNNEL_URL"
-      echo "$TUNNEL_URL" > "$url_file"
-    else
-      echo "[tunnel-url] Could not read live tunnel URL from manifest"
-    fi
-  }
+  echo "Metro host : $EXPO_HOST"
+  echo "Expo Go URL: $EXPO_URL"
+  echo "API URL    : $EXPO_PUBLIC_API_URL"
 
-  # On Replit, always let Expo use its own built-in relay token for exp.direct
-  # tunnels. User-provided ngrok tokens (v3 format) are incompatible with the
-  # ngrok v2 binary embedded in @expo/ngrok and cause "remote gone away" errors.
-  unset NGROK_AUTHTOKEN
+  # Regenerate the QR code PNG for this port and refresh scanner.html so the
+  # QR Codes workflow shows the correct URL immediately.
+  QR_DIR="$WORKSPACE_ROOT/tmp-qr"
+  if [[ "$PORT" -eq 8099 ]]; then
+    QR_PNG="$QR_DIR/partner-qr.png"
+    QR_LABEL="Partner App"
+  else
+    QR_PNG="$QR_DIR/customer-qr.png"
+    QR_LABEL="Customer App"
+  fi
+  node -e "
+const QRCode = require('qrcode');
+QRCode.toFile('$QR_PNG', '$EXPO_URL', { width: 400, margin: 2 }, err => {
+  if (err) console.error('[qr] Failed:', err.message);
+  else console.log('[qr] Written $QR_PNG for $EXPO_URL');
+});
+" 2>/dev/null || echo "[qr] qrcode module unavailable — skipping PNG regeneration"
 
-  # Use --tunnel so Expo creates a real exp.direct public URL that phones can
-  # reach from outside Replit. The --host lan approach only works inside the
-  # browser preview (mTLS proxy) — phones cannot connect through it.
-  # Unset EXPO_TOKEN: when set, Expo treats the session as a robot user which
-  # cannot use ngrok/tunnel. Anonymous users can tunnel fine.
-  unset EXPO_TOKEN
   export EXPO_NO_INTERACTIVE=1
+  unset EXPO_TOKEN
 
-  # Retry loop — the exp.direct tunnel can fail with "remote gone away" on the
-  # first attempt (session conflict from a previous run). Retrying after a short
-  # delay reliably recovers.
+  # Retry loop — Metro can occasionally crash on first start in a fresh env.
   NATIVE_MAX_RETRIES=5
-  NATIVE_RETRY_DELAY=15
+  NATIVE_RETRY_DELAY=10
   for attempt in $(seq 1 $NATIVE_MAX_RETRIES); do
-    echo "Starting Expo (--tunnel / exp.direct) on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
+    echo "Starting Expo (--host lan / Replit proxy) on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
     prewarm_bundles "$PORT" &
-    capture_live_tunnel_url "$PORT" "$URL_FILE" &
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"
     exec 9<>"$_FIFO"
     set +e
-    pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO"
+    pnpm exec expo start --host lan --port "$PORT" "$@" < "$_FIFO"
     EXIT_CODE=$?
     set -e
     exec 9>&-
@@ -176,11 +158,11 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
       exit 0
     fi
     if [[ $attempt -lt $NATIVE_MAX_RETRIES ]]; then
-      echo "Tunnel exited (code $EXIT_CODE). Retrying in ${NATIVE_RETRY_DELAY}s…"
+      echo "Expo exited (code $EXIT_CODE). Retrying in ${NATIVE_RETRY_DELAY}s…"
       sleep "$NATIVE_RETRY_DELAY"
     fi
   done
-  echo "All $NATIVE_MAX_RETRIES tunnel attempts failed."
+  echo "All $NATIVE_MAX_RETRIES attempts failed."
   exit 1
 fi
 

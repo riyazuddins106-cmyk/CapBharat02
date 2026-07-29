@@ -1,0 +1,298 @@
+# Replit AI Prompt – Enhance All Admin Panel DataTables with Enterprise Features
+
+## Objective
+
+Analyze the entire existing Admin Panel.
+
+**Do NOT redesign the UI, create duplicate pages, or replace existing components.**
+
+The Admin Panel is already functional. Your task is to enhance every existing DataTable, report, and chart with professional enterprise-level features while preserving the current architecture, navigation, permissions, and design.
+
+---
+
+# General Requirements
+
+Analyze every Admin module.
+
+Wherever tabular data is displayed (DataTable, Grid, List View, Reports, etc.), enhance the existing implementation rather than replacing it.
+
+These enhancements should automatically apply to all current and future DataTables wherever possible by creating reusable components or utilities.
+
+---
+
+# Excel Export
+
+Every page containing a DataTable must include a **Download Excel** button.
+
+Examples include (but are not limited to):
+
+* Dashboard Reports
+* Customers
+* Partners
+* Bookings
+* Categories
+* Subcategories
+* Services
+* Coupons
+* Reviews
+* Payments
+* Transactions
+* Wallet
+* Partner Earnings
+* Partner Payouts
+* Notifications
+* Cities
+* Areas
+* Roles & Permissions
+* Users
+* Documents
+* Support Tickets
+* Audit Logs
+* Activity Logs
+* Settings Logs
+* Reports
+* Analytics
+* Every existing and future DataTable
+
+### Export Requirements
+
+The Excel file should include:
+
+* Only currently filtered records
+* Current sorting order
+* Proper column headers
+* Currency formatting
+* Date formatting
+* Numeric formatting
+* Active column order
+* Respect hidden/visible columns (unless "Export All Columns" is selected)
+
+The exported filename should automatically include the page name and current date.
+
+Example:
+
+Bookings_2026-07-29.xlsx
+
+---
+
+# Graph & Chart Export
+
+Wherever charts, graphs, dashboards, analytics, or reports exist:
+
+Add a **Download** button.
+
+Allow downloading as:
+
+* PNG
+* JPG
+* SVG (if supported)
+
+Export should be:
+
+* High Resolution
+* Presentation Quality
+* Printable
+
+Reuse existing chart components.
+
+Do not recreate graphs.
+
+---
+
+# Global Search
+
+Every DataTable must support fast Global Search.
+
+Search across all searchable columns.
+
+Search should update results immediately.
+
+---
+
+# Column Sorting
+
+Every sortable column should support:
+
+* Ascending
+* Descending
+
+Sorting should work together with:
+
+* Pagination
+* Filters
+* Search
+* Export
+
+---
+
+# Advanced Column Filters
+
+Every DataTable should support professional filtering.
+
+### Text Columns
+
+* Contains
+* Equals
+* Starts With
+* Ends With
+
+### Number Columns
+
+* Equals
+* Greater Than
+* Less Than
+* Between
+
+### Date Columns
+
+* Today
+* Yesterday
+* Last 7 Days
+* Last 30 Days
+* This Month
+* Last Month
+* Custom Date Range
+
+### Status Columns
+
+Dropdown filters.
+
+Examples:
+
+* Active
+* Inactive
+* Pending
+* Approved
+* Rejected
+* Completed
+* Cancelled
+
+### Category Filters
+
+Dropdown selectors where applicable.
+
+### City / Area Filters
+
+Dropdown selectors where applicable.
+
+---
+
+# Multi-Filter Support
+
+Allow users to combine multiple filters.
+
+Example:
+
+Category = Cleaning
+
+AND
+
+Status = Active
+
+AND
+
+City = Mumbai
+
+AND
+
+Created Date = Last 30 Days
+
+---
+
+# Reset Filters
+
+Every DataTable should have:
+
+**Reset Filters**
+
+or
+
+**Clear Filters**
+
+button.
+
+One click should restore the default table.
+
+---
+
+# Pagination
+
+Ensure every DataTable supports configurable page sizes.
+
+Available options:
+
+* 10
+* 25
+* **50 (Default)**
+* 100
+* 250
+* All
+
+### Pagination Requirements
+
+* The default page size on every DataTable must be **50 records**.
+* Users can change the page size at any time.
+* Remember the selected page size during the current session.
+* When "All" is selected, display all records if performance allows.
+* For very large datasets, use server-side pagination, lazy loading, or virtualization to maintain performance.
+* Pagination must work correctly with:
+
+  * Search
+  * Sorting
+  * Filters
+  * Export
+* Always display the total record count.
+
+Example:
+
+Showing **1–50 of 2,486 records**
+
+or
+
+Showing **All 2,486 records**
+
+---
+
+# Column Visibility
+
+Allow users to:
+
+* Show Columns
+* Hide Columns
+
+without affecting database data.
+
+Provide an option to export:
+
+* Visible Columns Only
+* All Columns
+
+---
+
+# Sticky Headers
+
+Large DataTables should use sticky headers while scrolling.
+
+---
+
+# Responsive Tables
+
+Ensure every DataTable remains usable on smaller screen sizes.
+
+---
+
+# Export Behaviour
+
+Excel exports must respect:
+
+* Current Search
+* Current Filters
+* Current Sorting
+* Current Column Visibility
+* Current Pagination Selection (if applicable)
+
+If filters are applied:
+
+Export only filtered records.
+
+If sorting is applied:

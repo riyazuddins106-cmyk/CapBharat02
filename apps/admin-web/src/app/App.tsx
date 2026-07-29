@@ -9,7 +9,7 @@ import {
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
-  AlertCircle, History as HistoryIcon, X, KeyRound, Download,
+  AlertCircle, History as HistoryIcon, X, KeyRound, Download, Columns2, Camera,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import * as XLSX from "xlsx";
@@ -300,6 +300,103 @@ function useTableSort(initial: SortState = null) {
   }
   return { sort, toggleSort, applySortFn };
 }
+
+/* ── Column visibility ──────────────────────────────────────────── */
+
+function useColumnVisibility<T extends string>(allCols: readonly T[]) {
+  const [hidden, setHidden] = useState<Set<T>>(new Set());
+  const toggle = (col: T) =>
+    setHidden(h => { const n = new Set(h); n.has(col) ? n.delete(col) : n.add(col); return n; });
+  const isVisible = (col: T) => !hidden.has(col);
+  const visibleCols = allCols.filter(c => !hidden.has(c));
+  return { isVisible, toggle, hidden, visibleCols };
+}
+
+function ColumnVisibilityMenu({ columns, labels, hidden, onToggle }: {
+  columns: readonly string[];
+  labels?: Record<string, string>;
+  hidden: Set<string>;
+  onToggle: (col: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  const hiddenCount = [...columns].filter(c => hidden.has(c)).length;
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Show / hide columns"
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors whitespace-nowrap ${hiddenCount > 0 ? "border-violet-500/40 text-violet-400 bg-violet-500/10" : "border-white/[0.1] text-white/60 hover:text-white hover:border-white/20"}`}
+        style={hiddenCount === 0 ? { background: "rgba(255,255,255,0.04)" } : undefined}
+      >
+        <Columns2 size={13} />
+        Columns{hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-white/[0.1] py-2 min-w-[160px]"
+          style={{ background: "#1a2035", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+        >
+          <p className="px-3 pb-1.5 text-[10px] font-bold text-white/30 uppercase tracking-widest">Columns</p>
+          {columns.map(col => (
+            <label key={col} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/[0.04] cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={!hidden.has(col)}
+                onChange={() => onToggle(col)}
+                className="accent-violet-500 w-3.5 h-3.5"
+              />
+              <span className="text-xs text-white/70">{labels?.[col] ?? col}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Chart PNG export ────────────────────────────────────────────── */
+
+function downloadChartAsPng(containerId: string, filename: string) {
+  const el = document.getElementById(containerId);
+  const svg = el?.querySelector("svg");
+  if (!svg) { alert("Chart not ready — please wait for data to load, then try again."); return; }
+  const rect = svg.getBoundingClientRect();
+  const W = Math.round(rect.width) || 800;
+  const H = Math.round(rect.height) || 300;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#1a2035";
+  ctx.fillRect(0, 0, W, H);
+  const blob = new Blob(
+    [new XMLSerializer().serializeToString(svg)],
+    { type: "image/svg+xml;charset=utf-8" }
+  );
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, W, H);
+    URL.revokeObjectURL(url);
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = filename;
+    a.click();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("Chart export failed."); };
+  img.src = url;
+}
+
+/* ── Sticky thead background ─────────────────────────────────────── */
+const THEAD_STICKY = { background: "#0f1117" } as const;
 
 function AccessDenied() {
   return (
@@ -2117,11 +2214,16 @@ function ProsView({
     finally { setBusyId(null); }
   };
 
+  const { sort: pvSort, toggleSort: togglePvSort, applySortFn: sortPv } = useTableSort();
+  const PV_COLS = ["Professional", "Category", "Sub-category", "Rating", "Status", "Actions"] as const;
+  const pvColVis = useColumnVisibility(PV_COLS);
+
   const filtered = pros.filter(p =>
     p.name?.toLowerCase().includes(search.toLowerCase()) ||
     p.categoryName?.toLowerCase().includes(search.toLowerCase()) ||
     p.title?.toLowerCase().includes(search.toLowerCase())
   );
+  const pvSorted = sortPv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
     <div className="space-y-4">
@@ -2195,13 +2297,16 @@ function ProsView({
         />
       )}
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" /></div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" /></div>
+        <ColumnVisibilityMenu columns={PV_COLS} hidden={pvColVis.hidden} onToggle={pvColVis.toggle} />
         <ExportBtn onClick={() => exportToExcel(
-          filtered.map(p => ({
-            Name: p.name, Title: p.title, Category: p.categoryName ?? "—",
-            "Sub-category": p.subCategoryName ?? "—",
-            Rating: p.rating?.toFixed(1) ?? "—", Status: p.isActive ? "Active" : "Suspended",
+          pvSorted.map(p => ({
+            ...(pvColVis.isVisible("Professional") && { Name: p.name, Title: p.title }),
+            ...(pvColVis.isVisible("Category")     && { Category: p.categoryName ?? "—" }),
+            ...(pvColVis.isVisible("Sub-category") && { "Sub-category": p.subCategoryName ?? "—" }),
+            ...(pvColVis.isVisible("Rating")       && { Rating: p.rating?.toFixed(1) ?? "—" }),
+            ...(pvColVis.isVisible("Status")       && { Status: p.isActive ? "Active" : "Suspended" }),
           })),
           `Professionals_${new Date().toISOString().slice(0, 10)}.xlsx`
         )} />
@@ -2218,71 +2323,66 @@ function ProsView({
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
-                {["Professional", "Category", "Sub-category", "Rating", "Status", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
+                {pvColVis.isVisible("Professional") && <SortTh label="Professional"  field="name"         sort={pvSort} onSort={togglePvSort} />}
+                {pvColVis.isVisible("Category")     && <SortTh label="Category"      field="categoryName" sort={pvSort} onSort={togglePvSort} />}
+                {pvColVis.isVisible("Sub-category") && <SortTh label="Sub-category"  field="subCategoryName" sort={pvSort} onSort={togglePvSort} />}
+                {pvColVis.isVisible("Rating")       && <SortTh label="Rating"        field="rating"       sort={pvSort} onSort={togglePvSort} />}
+                {pvColVis.isVisible("Status")       && <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Status</th>}
+                {pvColVis.isVisible("Actions")      && <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((p) => (
+              {pvSorted.map((p) => (
                 <tr key={p.id} className="hover:bg-white/[0.02]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {p.avatarUrl ? (
-                        <img src={p.avatarUrl} alt={p.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
-                          {p.name?.charAt(0)}
+                  {pvColVis.isVisible("Professional") && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {p.avatarUrl ? (
+                          <img src={p.avatarUrl} alt={p.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
+                            {p.name?.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white font-semibold text-sm whitespace-nowrap">{p.name}</p>
+                          <p className="text-white/40 text-xs whitespace-nowrap">{p.title}</p>
                         </div>
-                      )}
-                      <div>
-                        <p className="text-white font-semibold text-sm whitespace-nowrap">{p.name}</p>
-                        <p className="text-white/40 text-xs whitespace-nowrap">{p.title}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-white/60 whitespace-nowrap">{p.categoryName ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{p.subCategoryName ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/80 whitespace-nowrap">⭐ {p.rating?.toFixed(1) ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <Badge label={p.isActive ? "Active" : "Suspended"} color={p.isActive ? "#16A34A" : "#EF4444"} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <ActionBtn variant="edit" onClick={() => openEdit(p)}>Edit</ActionBtn>
-                      <ActionBtn
-                        variant={p.isActive ? "warn" : "green"}
-                        onClick={() => handleToggle(p)}
-                        disabled={busyId === p.id}
-                      >
-                        {p.isActive ? "Suspend" : "Activate"}
-                      </ActionBtn>
-                      {onDelete && <ActionBtn variant="danger" onClick={() => setDeleteId(p.id)}>Delete</ActionBtn>}
-                    </div>
-                  </td>
+                    </td>
+                  )}
+                  {pvColVis.isVisible("Category")     && <td className="px-4 py-3 text-white/60 whitespace-nowrap">{p.categoryName ?? "—"}</td>}
+                  {pvColVis.isVisible("Sub-category") && <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{p.subCategoryName ?? "—"}</td>}
+                  {pvColVis.isVisible("Rating")       && <td className="px-4 py-3 text-white/80 whitespace-nowrap">⭐ {p.rating?.toFixed(1) ?? "—"}</td>}
+                  {pvColVis.isVisible("Status")       && (
+                    <td className="px-4 py-3">
+                      <Badge label={p.isActive ? "Active" : "Suspended"} color={p.isActive ? "#16A34A" : "#EF4444"} />
+                    </td>
+                  )}
+                  {pvColVis.isVisible("Actions")      && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <ActionBtn variant="edit" onClick={() => openEdit(p)}>Edit</ActionBtn>
+                        <ActionBtn
+                          variant={p.isActive ? "warn" : "green"}
+                          onClick={() => handleToggle(p)}
+                          disabled={busyId === p.id}
+                        >
+                          {p.isActive ? "Suspend" : "Activate"}
+                        </ActionBtn>
+                        {onDelete && <ActionBtn variant="danger" onClick={() => setDeleteId(p.id)}>Delete</ActionBtn>}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={7} text="No professionals found" />}
+              {pvSorted.length === 0 && <EmptyRow cols={pvColVis.visibleCols.length || 1} text="No professionals found" />}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.07]">
-          <span className="text-white/40 text-xs">Showing page {proPage} of {Math.max(1, Math.ceil(proTotal / 25))}</span>
-          <div className="flex gap-2">
-            <button
-              disabled={proPage <= 1}
-              onClick={() => onProPageChange(p => p - 1)}
-              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
-            >← Prev</button>
-            <button
-              disabled={proPage >= Math.ceil(proTotal / 25)}
-              onClick={() => onProPageChange(p => p + 1)}
-              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
-            >Next →</button>
-          </div>
-        </div>
+        <Pagination page={proPage} total={proTotal} pageSize={25} onChange={onProPageChange} />
       </div>
     </div>
   );
