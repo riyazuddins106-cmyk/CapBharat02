@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1117; font-family: system-ui, sans-serif; padding: 24px; color: white; }
+  h3 { color: #a78bfa; font-size: 13px; margin-bottom: 8px; }
+
+  /* The fixed card pattern */
+  .card {
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 100px); /* matches the fix */
+    margin-bottom: 16px;
+  }
+  .rows-bar {
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    flex-shrink: 0;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;   /* was clip — now auto */
+    flex: 1;
+    min-height: 0;      /* critical for flex child to shrink */
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #0f1117;  /* THEAD_STICKY */
+  }
+  th {
+    padding: 10px 16px;
+    text-align: left;
+    color: rgba(255,255,255,0.4);
+    font-size: 11px;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  td { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(255,255,255,0.7); }
+
+  .label {
+    position: fixed; top: 12px; right: 16px;
+    background: #16a34a; color: white; font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="label">✅ Header is STICKY (fixed)</div>
+<h3>Booking History — scroll down inside the table ↓</h3>
+<div class="card">
+  <div class="rows-bar">32 records &nbsp;|&nbsp; Rows per page: 50</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Service</th><th>Customer</th><th>Professional</th><th>Amount</th><th>Scheduled</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+const rows = Array.from({length: 32}, (_, i) => {
+  const s = ['AC Service','Cleaning','Plumbing','Electrician','Painting'][i%5];
+  const st = ['completed','pending','in_progress','cancelled','upcoming'][i%5];
+  const colors = {completed:'#22c55e',pending:'#f59e0b',in_progress:'#3b82f6',cancelled:'#ef4444',upcoming:'#8b5cf6'};
+  return `<tr>
+    <td style="color:rgba(255,255,255,0.3)">${i+1}</td>
+    <td style="color:white;font-weight:500">${s}</td>
+    <td>Test Customer<br><span style="font-size:10px;color:rgba(255,255,255,0.3)">customer@servenow.in</span></td>
+    <td>Rajan Verma</td>
+    <td style="font-weight:600">₹${(499 + i*50)}</td>
+    <td style="font-size:11px;color:rgba(255,255,255,0.4)">29 Jul 2026 3:30 pm</td>
+    <td><span style="padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:${colors[st]}20;color:${colors[st]}">${st}</span></td>
+  </tr>`;
+});
+document.getElementById('tbody').innerHTML = rows.join('');
+</script>
+</body>
+</html>

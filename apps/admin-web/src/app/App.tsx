@@ -257,7 +257,7 @@ function RowsBar({ total, pageSize, onPageSizeChange }: {
           </button>
           {open && (
             <div
-              className="absolute right-0 bottom-full mb-1.5 rounded-xl border border-white/[0.12] py-1 z-50 min-w-[80px] overflow-hidden"
+              className="absolute right-0 top-full mt-1.5 rounded-xl border border-white/[0.12] py-1 z-50 min-w-[80px] overflow-hidden"
               style={{ background: "#1c2133", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
             >
               {ROWS_OPTIONS.map(n => (
@@ -1399,9 +1399,9 @@ function DispatchView({
       </p>
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={dvSorted.length} pageSize={dvPageSize} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -1626,9 +1626,9 @@ function BookingsView({
         <ExportBtn onClick={exportBookings} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={bvSorted.length} pageSize={bvPageSize} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -1865,9 +1865,9 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       </div>
 
       {/* ── Table ── */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={bhSorted.length} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -2413,9 +2413,9 @@ function ProsView({
         </button>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={proTotal} pageSize={proPageSize} onPageSizeChange={n => { onProPageSizeChange(n); onProPageChange(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -2602,9 +2602,9 @@ function UsersView({
         )} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={userTotal} pageSize={userPageSize} onPageSizeChange={n => { onUserPageSizeChange(n); onUserPageChange(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -4138,9 +4138,9 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
       <p className="text-white/30 text-xs">{filtered.length} review{filtered.length !== 1 ? "s" : ""} shown</p>
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={rvSorted.length} pageSize={rvPageSize} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -4269,9 +4269,9 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
         <ExportBtn onClick={exportAudit} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
         <RowsBar total={alSorted.length} pageSize={alPageSize} onPageSizeChange={n => { setAlPageSize(n); setAlPage(1); }} />
-        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -5424,9 +5424,9 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
             <ExportBtn onClick={exportPayouts} />
           </div>
 
-          <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+          <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
             <RowsBar total={pvSorted.length} pageSize={pvPageSize} onPageSizeChange={n => { setPvPageSize(n); setPvPage(1); }} />
-            <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+            <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
                   <tr className="border-b border-white/[0.07]">
@@ -6332,9 +6332,9 @@ function ServicesView({
           <p className="text-sm">{hasSvFilters ? "No services match the filters." : "No services yet. Create your first service above."}</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
           <RowsBar total={svSorted.length} pageSize={svPageSize} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
-          <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
+          <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>

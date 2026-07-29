@@ -758,7 +758,7 @@ function Jobs({ token }: { token: string }) {
           : (
             <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10" style={{ background: 'rgba(20,20,30,1)' }}>
                   <tr className="border-b border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.02)' }}>
                     {['Service', 'Customer', 'Scheduled', 'Status', 'Price', ''].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
@@ -1426,7 +1426,7 @@ function Payouts({ token }: { token: string }) {
               </div>
             : (
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10" style={{ background: 'rgba(20,20,30,1)' }}>
                   <tr className="border-b border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.02)' }}>
                     {['Amount', 'Note', 'Status', 'Requested'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>

@@ -1,35 +1,29 @@
 ---
 name: Expo Replit-native tunnel
-description: How to run Expo Go on Replit using the per-port proxy domain instead of exp.direct or ngrok
+description: How to run Expo Go on Replit — Replit-native mode broken on sisko.replit.dev; use ngrok instead.
 ---
 
 # Expo Replit-native tunnel
 
 ## Rule
-When `REPLIT_EXPO_DEV_DOMAIN` is set (always on Replit), skip exp.direct and ngrok entirely.
-Derive a per-port domain from `REPLIT_EXPO_DEV_DOMAIN`, set `REACT_NATIVE_PACKAGER_HOSTNAME`, and run `expo start --host lan`.
+**Do NOT use the Replit-native (REPLIT_EXPO_DEV_DOMAIN) mode on sisko.replit.dev.** The per-port subdomain substitution (replacing `-00-` with `-8080-` or `-8099-`) returns 404 — Replit's sisko proxy only routes the default port (-00-). Always force ngrok.
 
-**Why:** exp.direct only allows **one anonymous tunnel per Replit IP at a time**. With two Expo apps (Customer + Partner), the second one consistently fails with "remote gone away". Using Replit's own proxy domain bypasses exp.direct entirely — each port gets its own stable public URL, no slot competition, no retries needed.
+**Why:** The old `pike.replit.dev` proxy routed per-port subdomains. The newer `sisko.replit.dev` proxy does not — only the default (-00-) port subdomain works. The `REPLIT_EXPO_DEV_DOMAIN` variable is present but the derived per-port domain is unreachable externally, causing "failed to download" in Expo Go.
 
-## Domain pattern
-- `REPLIT_EXPO_DEV_DOMAIN` = `<repl-id>-00-<suffix>.expo.pike.replit.dev`
-- Per-port: replace `-00-` with `-<PORT>-`
-  - Port 8080 (Customer): `<repl-id>-8080-<suffix>.expo.pike.replit.dev`
-  - Port 8099 (Partner):  `<repl-id>-8099-<suffix>.expo.pike.replit.dev`
-- Expo Go URL: `exp://<port-specific-domain>` (no port suffix needed; Replit proxy handles routing)
+**How to apply:** In both Expo workflow commands, prefix with `unset REPLIT_EXPO_DEV_DOMAIN &&` so the script's Replit-native block is skipped and the ngrok fallback runs.
 
-## How to apply in expo-tunnel.sh
-```bash
-if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
-  EXPO_HOST=$(echo "$REPLIT_EXPO_DEV_DOMAIN" | sed "s/-00-/-${PORT}-/")
-  export REACT_NATIVE_PACKAGER_HOSTNAME="$EXPO_HOST"
-  EXPO_URL="exp://${EXPO_HOST}"
-  echo "$EXPO_URL" > "/tmp/expo-tunnel-${PORT}.url"
-  pnpm exec expo start --host lan --port "$PORT"
-fi
-```
+## Workflow commands (correct)
+- Customer App: `unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile && ../../scripts/expo-tunnel.sh 8080 2>&1 | tee /tmp/metro-live.log`
+- Partner App: `unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile-partner && ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25`
+
+## Token assignment
+- Customer App (port 8080): uses `NGROK_AUTHTOKEN`
+- Partner App (port 8099): uses `NGROK_AUTHTOKEN_2` (separate token avoids slot conflict)
+
+## Domain pattern (now defunct — do not use)
+- `REPLIT_EXPO_DEV_DOMAIN` = `<repl-id>-00-<suffix>.expo.sisko.replit.dev`
+- Per-port substitution (`-00-` → `-8080-`) returns 404 on sisko hosts
 
 ## Stale .expo/settings.json
 If you previously used exp.direct and it left a `.expo/settings.json` with a `urlRandomness` key,
-delete it before restarting. The old urlRandomness causes exp.direct to try to reclaim a dead session.
-File locations: `apps/mobile/.expo/settings.json`, `apps/mobile-partner/.expo/settings.json`.
+delete it before restarting. File locations: `apps/mobile/.expo/settings.json`, `apps/mobile-partner/.expo/settings.json`.
