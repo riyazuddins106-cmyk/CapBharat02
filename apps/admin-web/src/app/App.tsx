@@ -1865,11 +1865,13 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       </div>
 
       {/* ── Table ── */}
-      {/* sticky top-0: card scrolls up with page and locks just below the top nav */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col sticky top-0 z-10" style={CARD}>
+      {/* sticky top-0: card scrolls up with the page then locks at the top of the      */}
+      {/* content pane. Solid background hides the date/filter/KPI that scroll behind.  */}
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col sticky top-0 z-20"
+        style={{ background: "#161b27" }}>
         <RowsBar total={bhSorted.length} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
-        {/* max-height keeps rows scrollable within the stuck card without overflowing the viewport */}
-        <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: "calc(100dvh - 200px)" }}>
+        {/* 100vh - nav(~60px) - content-padding-top/bottom(48px) - RowsBar(44px) - Pagination(44px) ≈ 196px */}
+        <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: "calc(100vh - 196px)" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">

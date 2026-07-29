@@ -70,7 +70,7 @@ only; no Replit Cloud deployment is required.
 - `GET /admin/stats` · `GET /admin/users` · `GET /admin/bookings` · `GET /admin/professionals`
 
 ## Admin Panel URL
-`https://b7d707c8-f61f-41e2-9ab5-53bd5f73b2a8-00-3eo90w1jtqr1m.pike.replit.dev/admin-panel/`
+`https://f486bc9d-d0a6-4cda-b3bf-1a3b132e8568-00-l3myhzsuh2vr.sisko.replit.dev/admin-panel/`
 
 ## Push notifications
 Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. No EAS `projectId` is set — tokens are obtained through the Expo Go anonymous identity. For production standalone builds, run `eas init` in each app directory to get a `projectId` and add it to `app.json` under `extra.eas.projectId`.
