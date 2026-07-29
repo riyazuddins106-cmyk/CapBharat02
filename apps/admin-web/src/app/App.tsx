@@ -399,8 +399,6 @@ function downloadChart(containerId: string, filename: string, format: "png" | "j
   img.onerror = () => { URL.revokeObjectURL(url); alert("Chart export failed."); };
   img.src = url;
 }
-/** backward-compat alias */
-const downloadChartAsPng = (id: string, fn: string) => downloadChart(id, fn, "png");
 
 /* ── Sticky thead background ─────────────────────────────────────── */
 const THEAD_STICKY = { background: "#0f1117" } as const;
@@ -556,10 +554,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [bookingList,  setBookingList]  = useState<BookingRow[]>([]);
   const [proList,      setProList]      = useState<ProfessionalRow[]>([]);
   const [proPage,      setProPage]      = useState(1);
+  const [proPageSize,  setProPageSize]  = useState(50);
   const [proTotal,     setProTotal]     = useState(0);
   const [userList,     setUserList]     = useState<CustomerUser[]>([]);
   const [userPage,     setUserPage]     = useState(1);
-  const [userPageSize, setUserPageSize] = useState(25);
+  const [userPageSize, setUserPageSize] = useState(50);
   const [userTotal,    setUserTotal]    = useState(0);
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
@@ -582,7 +581,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       const [s, b, p, u, c, r, a, o, rl, sv, d] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
-        adminApi.getProfessionals(accessToken),
+        adminApi.getProfessionals(accessToken, 1, proPageSize),
         adminApi.getUsers(accessToken),
         adminApi.getCategories(accessToken),
         adminApi.getReviews(accessToken),
@@ -608,7 +607,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
-  }, [accessToken]);
+  }, [accessToken, proPageSize]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -619,11 +618,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   }, [userPage, userPageSize, accessToken]);
 
   useEffect(() => {
-    if (proPage === 1) return; // page 1 already loaded by load()
-    adminApi.getProfessionals(accessToken, proPage, 25)
+    adminApi.getProfessionals(accessToken, proPage, proPageSize)
       .then(p => { setProList(p.professionals); setProTotal(p.total); })
       .catch(() => {});
-  }, [proPage, accessToken]);
+  }, [proPage, proPageSize, accessToken]);
 
   /* ── Notifications ── */
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -956,7 +954,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "booking-history" ? (
             <BookingHistoryView bookings={bookingList} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} proPageSize={proPageSize} onProPageSizeChange={setProPageSize} />
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
@@ -1269,10 +1267,11 @@ function DispatchView({
 
   const exportDispatch = () => exportToExcel(
     dvSorted.map(r => ({
-      Customer: r.customerName, Service: r.serviceName,
-      Scheduled: new Date(r.scheduledAt).toLocaleString("en-IN"),
-      "Dispatch Status": r.dispatchStatus.replace(/_/g, " "),
-      Partner: r.proName ?? "—",
+      ...(dvColVis.isVisible("Customer")        && { Customer: r.customerName }),
+      ...(dvColVis.isVisible("Service")         && { Service: r.serviceName }),
+      ...(dvColVis.isVisible("Scheduled")       && { Scheduled: new Date(r.scheduledAt).toLocaleString("en-IN") }),
+      ...(dvColVis.isVisible("Dispatch Status") && { "Dispatch Status": r.dispatchStatus.replace(/_/g, " ") }),
+      ...(dvColVis.isVisible("Partner")         && { Partner: r.proName ?? "—" }),
     })),
     `Dispatch_${new Date().toISOString().slice(0, 10)}.xlsx`
   );
@@ -2154,7 +2153,7 @@ function CreateProfessionalView({
 }
 
 function ProsView({
-  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew, proPage, proTotal, onProPageChange,
+  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew, proPage, proTotal, onProPageChange, proPageSize, onProPageSizeChange,
 }: {
   pros: ProfessionalRow[];
   onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => Promise<void>;
@@ -2166,6 +2165,8 @@ function ProsView({
   proPage: number;
   proTotal: number;
   onProPageChange: React.Dispatch<React.SetStateAction<number>>;
+  proPageSize: number;
+  onProPageSizeChange: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const [search,      setSearch]      = useState("");
   const [editTarget,  setEditTarget]  = useState<ProfessionalRow | null>(null);
@@ -2429,7 +2430,7 @@ function ProsView({
             </tbody>
           </table>
         </div>
-        <Pagination page={proPage} total={proTotal} pageSize={25} onChange={onProPageChange} />
+        <Pagination page={proPage} total={proTotal} pageSize={proPageSize} onChange={p => { onProPageChange(p); }} onPageSizeChange={n => { onProPageSizeChange(n); onProPageChange(1); }} />
       </div>
     </div>
   );
