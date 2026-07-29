@@ -12,6 +12,7 @@ import {
   AlertCircle, History as HistoryIcon, X, KeyRound, Download,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
+import * as XLSX from "xlsx";
 import { DocumentVerificationView } from "./DocumentVerification";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
@@ -193,17 +194,35 @@ function EmptyRow({ cols, text }: { cols: number; text: string }) {
   return <tr><td colSpan={cols} className="px-4 py-8 text-white/30 text-center text-sm">{text}</td></tr>;
 }
 
-function Pagination({ page, total, pageSize, onChange }: {
+function Pagination({ page, total, pageSize, onChange, onPageSizeChange }: {
   page: number; total: number; pageSize: number; onChange: (p: number) => void;
+  onPageSizeChange?: (n: number) => void;
 }) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to   = Math.min(page * pageSize, total);
+  const effectiveSize = pageSize === -1 ? total : pageSize;
+  const totalPages = Math.max(1, pageSize === -1 ? 1 : Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * effectiveSize + 1;
+  const to   = pageSize === -1 ? total : Math.min(page * pageSize, total);
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.07]">
-      <span className="text-white/40 text-xs">
-        {total === 0 ? "No results" : `Showing ${from}–${to} of ${total}`}
-      </span>
+    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
+      <div className="flex items-center gap-3">
+        <span className="text-white/40 text-xs">
+          {total === 0 ? "No results" : pageSize === -1 ? `Showing all ${total} records` : `Showing ${from}–${to} of ${total}`}
+        </span>
+        {onPageSizeChange && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-white/25 text-xs">Rows:</span>
+            <select
+              value={pageSize === -1 ? "all" : pageSize}
+              onChange={e => { onPageSizeChange(e.target.value === "all" ? -1 : Number(e.target.value)); onChange(1); }}
+              className="rounded-lg px-2 py-1 text-white text-xs outline-none border border-white/[0.1]"
+              style={{ background: "rgba(255,255,255,0.06)" }}
+            >
+              {[10, 25, 50, 100, 250].map(n => <option key={n} value={n}>{n}</option>)}
+              <option value="all">All</option>
+            </select>
+          </div>
+        )}
+      </div>
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => onChange(page - 1)} disabled={page <= 1}
@@ -217,6 +236,69 @@ function Pagination({ page, total, pageSize, onChange }: {
       </div>
     </div>
   );
+}
+
+/* ── Enterprise table utilities ──────────────────────────────────── */
+
+function exportToExcel(rows: Record<string, unknown>[], filename: string) {
+  if (!rows.length) return;
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data");
+  XLSX.writeFile(wb, filename);
+}
+
+function ExportBtn({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.1] text-white/60 hover:text-white hover:border-white/20 text-xs font-semibold transition-colors whitespace-nowrap disabled:opacity-40"
+      style={{ background: "rgba(255,255,255,0.04)" }}
+      title="Export to Excel"
+    >
+      <Download size={13} /> Export
+    </button>
+  );
+}
+
+type SortState = { field: string; dir: "asc" | "desc" } | null;
+
+function SortTh({ label, field, sort, onSort, className = "" }: {
+  label: string; field: string; sort: SortState; onSort: (f: string) => void; className?: string;
+}) {
+  const active = sort?.field === field;
+  return (
+    <th
+      className={`px-4 py-3 text-left text-xs font-semibold whitespace-nowrap cursor-pointer select-none transition-colors ${active ? "text-violet-400" : "text-white/40 hover:text-white/60"} ${className}`}
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {active ? (sort!.dir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronDown size={11} className="opacity-20" />}
+      </span>
+    </th>
+  );
+}
+
+function useTableSort(initial: SortState = null) {
+  const [sort, setSort] = useState<SortState>(initial);
+  const toggleSort = (field: string) =>
+    setSort(s => s?.field === field ? { field, dir: s.dir === "asc" ? "desc" : "asc" } : { field, dir: "asc" });
+  function applySortFn<T extends Record<string, unknown>>(arr: T[]): T[] {
+    if (!sort) return arr;
+    return [...arr].sort((a, b) => {
+      const av = a[sort.field], bv = b[sort.field];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const cmp = typeof av === "number" && typeof bv === "number"
+        ? av - bv
+        : String(av).localeCompare(String(bv), "en", { sensitivity: "base" });
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+  }
+  return { sort, toggleSort, applySortFn };
 }
 
 function AccessDenied() {
@@ -1017,10 +1099,11 @@ function DispatchView({
   const [loadingPartners, setLoadingPartners] = useState(false);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const DV_PAGE_SIZE = 20;
+  const [dvPageSize, setDvPageSize]   = useState(50);
   const [dvPage,      setDvPage]      = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const { sort: dvSort, toggleSort: toggleDvSort, applySortFn: sortDv } = useTableSort();
 
   const openModal = async (request: DispatchRequestRow) => {
     setModalBooking(request);
@@ -1072,9 +1155,21 @@ function DispatchView({
     const matchesStatus = statusFilter === "all" || r.dispatchStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
-  const dvPaged = filtered.slice((dvPage - 1) * DV_PAGE_SIZE, dvPage * DV_PAGE_SIZE);
+  const dvSorted = sortDv(filtered as Record<string, unknown>[]) as typeof filtered;
+  const dvEff    = dvPageSize === -1 ? dvSorted.length : dvPageSize;
+  const dvPaged  = dvSorted.slice((dvPage - 1) * dvEff, dvPage * dvEff);
 
   useEffect(() => { setDvPage(1); }, [search, statusFilter]);
+
+  const exportDispatch = () => exportToExcel(
+    dvSorted.map(r => ({
+      Customer: r.customerName, Service: r.serviceName,
+      Scheduled: new Date(r.scheduledAt).toLocaleString("en-IN"),
+      "Dispatch Status": r.dispatchStatus.replace(/_/g, " "),
+      Partner: r.proName ?? "—",
+    })),
+    `Dispatch_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 
   const STATUS_OPTIONS = [
     { value: "all",               label: "All" },
@@ -1127,6 +1222,7 @@ function DispatchView({
             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-xs">✕</button>
           )}
         </div>
+        <ExportBtn onClick={exportDispatch} />
         <div className="flex gap-1.5 flex-shrink-0">
           {STATUS_OPTIONS.map((opt) => (
             <button
@@ -1157,9 +1253,12 @@ function DispatchView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Customer", "Service", "Scheduled", "Dispatch Status", "Current Partner", "Actions"].map((heading) => (
-                  <th key={heading} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{heading}</th>
-                ))}
+                <SortTh label="Customer"         field="customerName"    sort={dvSort} onSort={toggleDvSort} />
+                <SortTh label="Service"          field="serviceName"     sort={dvSort} onSort={toggleDvSort} />
+                <SortTh label="Scheduled"        field="scheduledAt"     sort={dvSort} onSort={toggleDvSort} />
+                <SortTh label="Dispatch Status"  field="dispatchStatus"  sort={dvSort} onSort={toggleDvSort} />
+                <SortTh label="Current Partner"  field="proName"         sort={dvSort} onSort={toggleDvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -1195,7 +1294,7 @@ function DispatchView({
             </tbody>
           </table>
         </div>
-        <Pagination page={dvPage} total={filtered.length} pageSize={DV_PAGE_SIZE} onChange={setDvPage} />
+        <Pagination page={dvPage} total={dvSorted.length} pageSize={dvPageSize} onChange={setDvPage} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
       </div>
 
       {/* Modal */}
@@ -1230,9 +1329,10 @@ function BookingsView({
   onCancel: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
-  const BV_PAGE_SIZE = 20;
+  const [bvPageSize, setBvPageSize]   = useState(50);
   const [bvPage,      setBvPage]      = useState(1);
   const [search,      setSearch]      = useState("");
+  const { sort: bvSort, toggleSort: toggleBvSort, applySortFn: sortBv } = useTableSort();
   const [editTarget,  setEditTarget]  = useState<BookingRow | null>(null);
   const [deleteId,    setDeleteId]    = useState<string | null>(null);
   const [form,        setForm]        = useState<BookingPatch>({ status: "", notes: "", price: 0, scheduledAt: "" });
@@ -1284,7 +1384,19 @@ function BookingsView({
     b.customerName?.toLowerCase().includes(search.toLowerCase()) ||
     b.proName?.toLowerCase().includes(search.toLowerCase())
   );
-  const bvPaged = filtered.slice((bvPage - 1) * BV_PAGE_SIZE, bvPage * BV_PAGE_SIZE);
+  const bvSorted = sortBv(filtered as Record<string, unknown>[]) as typeof filtered;
+  const bvEff    = bvPageSize === -1 ? bvSorted.length : bvPageSize;
+  const bvPaged  = bvSorted.slice((bvPage - 1) * bvEff, bvPage * bvEff);
+
+  const exportBookings = () => exportToExcel(
+    bvSorted.map(b => ({
+      Service: b.serviceName, Customer: b.customerName ?? "—",
+      Professional: b.proName ?? "—", Amount: b.price,
+      Scheduled: new Date(b.scheduledAt).toLocaleString("en-IN"),
+      Status: b.status,
+    })),
+    `Bookings_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 
   return (
     <div className="space-y-4">
@@ -1323,16 +1435,23 @@ function BookingsView({
         />
       )}
 
-      <SearchBar value={search} onChange={setSearch} placeholder="Search bookings…" />
+      <div className="flex items-center gap-2">
+        <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search bookings…" /></div>
+        <ExportBtn onClick={exportBookings} />
+      </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Service", "Customer", "Professional", "Amount", "Scheduled", "Status", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
+                <SortTh label="Service"      field="serviceName"  sort={bvSort} onSort={toggleBvSort} />
+                <SortTh label="Customer"     field="customerName" sort={bvSort} onSort={toggleBvSort} />
+                <SortTh label="Professional" field="proName"      sort={bvSort} onSort={toggleBvSort} />
+                <SortTh label="Amount"       field="price"        sort={bvSort} onSort={toggleBvSort} />
+                <SortTh label="Scheduled"    field="scheduledAt"  sort={bvSort} onSort={toggleBvSort} />
+                <SortTh label="Status"       field="status"       sort={bvSort} onSort={toggleBvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -1366,7 +1485,7 @@ function BookingsView({
             </tbody>
           </table>
         </div>
-        <Pagination page={bvPage} total={filtered.length} pageSize={BV_PAGE_SIZE} onChange={p => { setBvPage(p); }} />
+        <Pagination page={bvPage} total={bvSorted.length} pageSize={bvPageSize} onChange={setBvPage} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
       </div>
     </div>
   );
@@ -1377,8 +1496,9 @@ function BookingsView({
 ═══════════════════════════════════════════════════════════════════ */
 
 function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
-  const PAGE_SIZE = 25;
+  const [pageSize, setPageSize]         = useState(50);
   const [page,         setPage]         = useState(1);
+  const { sort: bhSort, toggleSort: toggleBhSort, applySortFn: sortBh } = useTableSort();
   const [search,       setSearch]       = useState("");
   const [dateFrom,     setDateFrom]     = useState("");
   const [dateTo,       setDateTo]       = useState("");
@@ -1441,9 +1561,25 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
   const pendingCount     = filtered.filter(b => b.status === "pending" || b.status === "upcoming").length;
   const avgValue         = filtered.length > 0 ? totalRevenue / filtered.length : 0;
 
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const bhSorted = sortBh(filtered as Record<string, unknown>[]) as typeof filtered;
+  const bhEff    = pageSize === -1 ? bhSorted.length : pageSize;
+  const paged    = bhSorted.slice((page - 1) * bhEff, page * bhEff);
 
   const hasFilters = search || dateFrom || dateTo || selStatuses.length > 0 || selCustomers.length > 0 || selPros.length > 0;
+
+  const exportBookingHistory = () => exportToExcel(
+    bhSorted.map(b => ({
+      "#": bhSorted.indexOf(b) + 1,
+      Service: b.serviceName, Customer: b.customerName ?? "—",
+      "Customer Email": b.customerEmail ?? "—",
+      Professional: b.proName ?? "—",
+      Amount: b.price,
+      "Scheduled At": new Date(b.scheduledAt).toLocaleString("en-IN"),
+      "Created At": new Date(b.createdAt).toLocaleString("en-IN"),
+      Status: b.status, Notes: b.notes ?? "",
+    })),
+    `BookingHistory_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 
   return (
     <div className="space-y-4">
@@ -1521,6 +1657,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
             Clear all
           </button>
         )}
+        <ExportBtn onClick={exportBookingHistory} />
       </div>
 
       {/* ── KPI summary strip ── */}
@@ -1546,9 +1683,15 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["#", "Service", "Customer", "Professional", "Amount", "Scheduled At", "Created At", "Status", "Notes"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">#</th>
+                <SortTh label="Service"      field="serviceName"  sort={bhSort} onSort={toggleBhSort} />
+                <SortTh label="Customer"     field="customerName" sort={bhSort} onSort={toggleBhSort} />
+                <SortTh label="Professional" field="proName"      sort={bhSort} onSort={toggleBhSort} />
+                <SortTh label="Amount"       field="price"        sort={bhSort} onSort={toggleBhSort} />
+                <SortTh label="Scheduled At" field="scheduledAt"  sort={bhSort} onSort={toggleBhSort} />
+                <SortTh label="Created At"   field="createdAt"    sort={bhSort} onSort={toggleBhSort} />
+                <SortTh label="Status"       field="status"       sort={bhSort} onSort={toggleBhSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Notes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -1588,7 +1731,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
             </tbody>
           </table>
         </div>
-        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
+        <Pagination page={page} total={bhSorted.length} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
       </div>
 
       {/* ── Totals footer ── */}
@@ -2052,8 +2195,16 @@ function ProsView({
         />
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" />
+      <div className="flex items-center gap-2">
+        <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" /></div>
+        <ExportBtn onClick={() => exportToExcel(
+          filtered.map(p => ({
+            Name: p.name, Title: p.title, Category: p.categoryName ?? "—",
+            "Sub-category": p.subCategoryName ?? "—",
+            Rating: p.rating?.toFixed(1) ?? "—", Status: p.isActive ? "Active" : "Suspended",
+          })),
+          `Professionals_${new Date().toISOString().slice(0, 10)}.xlsx`
+        )} />
         <button
           onClick={onCreateNew}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white whitespace-nowrap"
@@ -2157,7 +2308,7 @@ function UsersView({
   onUserPageChange: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const [search,     setSearch]     = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [editTarget, setEditTarget] = useState<CustomerUser | null>(null);
   const [deleteId,   setDeleteId]   = useState<string | null>(null);
   const [form,       setForm]       = useState({ fullName: "", email: "", phone: "", role: "" });
@@ -2193,7 +2344,7 @@ function UsersView({
   };
 
   const filtered = users.filter(u =>
-    (roleFilter === "all" || u.role === roleFilter) &&
+    (roleFilter.length === 0 || roleFilter.includes(u.role)) &&
     (u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
      u.email?.toLowerCase().includes(search.toLowerCase()) ||
      u.role?.toLowerCase().includes(search.toLowerCase()))
@@ -2229,19 +2380,24 @@ function UsersView({
         />
       )}
 
-      <div className="flex gap-3">
-        <div className="flex-1">
+      <div className="flex gap-2 flex-wrap items-center">
+        <div className="flex-1 min-w-[200px]">
           <SearchBar value={search} onChange={setSearch} placeholder="Search users…" />
         </div>
-        <select
-          value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-          className="rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10"
-          style={{ background: "rgba(255,255,255,0.05)" }}
-        >
-          <option value="all">All roles</option>
-          <option value="customer">Customers</option>
-          <option value="partner">Partners</option>
-        </select>
+        <MultiSelect
+          label="Role"
+          options={["customer", "partner", "admin"]}
+          selected={roleFilter}
+          onChange={setRoleFilter}
+        />
+        <ExportBtn onClick={() => exportToExcel(
+          filtered.map(u => ({
+            Name: u.fullName, Email: u.email, Phone: u.phone ?? "—",
+            Role: u.role, Status: u.isActive ? "Active" : "Inactive",
+            Joined: new Date(u.createdAt ?? "").toLocaleDateString("en-IN"),
+          })),
+          `Users_${new Date().toISOString().slice(0, 10)}.xlsx`
+        )} />
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
@@ -3642,8 +3798,9 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
     finally { setSaving(false); }
   };
 
-  const RV_PAGE_SIZE = 20;
+  const [rvPageSize, setRvPageSize] = useState(50);
   const [rvPage, setRvPage] = useState(1);
+  const { sort: rvSort, toggleSort: toggleRvSort, applySortFn: sortRv } = useTableSort();
 
   const filtered = reviews.filter(r => {
     if (!showDeleted && r.deletedAt) return false;
@@ -3662,7 +3819,18 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
     }
     return true;
   });
-  const rvPaged = filtered.slice((rvPage - 1) * RV_PAGE_SIZE, rvPage * RV_PAGE_SIZE);
+  const rvSorted = sortRv(filtered as Record<string, unknown>[]) as typeof filtered;
+  const rvEff    = rvPageSize === -1 ? rvSorted.length : rvPageSize;
+  const rvPaged  = rvSorted.slice((rvPage - 1) * rvEff, rvPage * rvEff);
+  const exportReviews = () => exportToExcel(
+    rvSorted.map(r => ({
+      Customer: r.customerName ?? "—", Professional: r.proName ?? "—",
+      Service: r.serviceName ?? "—", Rating: r.rating,
+      Comment: r.comment ?? "", Date: new Date(r.createdAt).toLocaleString("en-IN"),
+      Status: r.deletedAt ? "Deleted" : "Active",
+    })),
+    `Reviews_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 
   const stars = (n: number) => "★".repeat(Math.max(0, Math.min(5, n))) + "☆".repeat(Math.max(0, 5 - Math.min(5, n)));
   const hasFilters = selCustomers.length > 0 || selPros.length > 0 || selServices.length > 0 || search;
@@ -3694,6 +3862,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
             Clear all
           </button>
         )}
+        <ExportBtn onClick={exportReviews} />
         {/* Deleted toggle */}
         <button
           onClick={() => setShowDeleted(d => !d)}
@@ -3712,9 +3881,14 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Customer", "Professional", "Service", "Rating", "Comment", "Date", "Status", "Action"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
+                <SortTh label="Customer"     field="customerName" sort={rvSort} onSort={toggleRvSort} />
+                <SortTh label="Professional" field="proName"      sort={rvSort} onSort={toggleRvSort} />
+                <SortTh label="Service"      field="serviceName"  sort={rvSort} onSort={toggleRvSort} />
+                <SortTh label="Rating"       field="rating"       sort={rvSort} onSort={toggleRvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Comment</th>
+                <SortTh label="Date"         field="createdAt"    sort={rvSort} onSort={toggleRvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Status</th>
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -3761,7 +3935,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
             </tbody>
           </table>
         </div>
-        <Pagination page={rvPage} total={filtered.length} pageSize={RV_PAGE_SIZE} onChange={p => { setRvPage(p); }} />
+        <Pagination page={rvPage} total={rvSorted.length} pageSize={rvPageSize} onChange={setRvPage} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
       </div>
     </div>
   );
@@ -3772,29 +3946,45 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
 ═══════════════════════════════════════════════════════════════════ */
 
 function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
-  const AL_PAGE_SIZE = 25;
+  const [alPageSize, setAlPageSize] = useState(50);
   const [alPage, setAlPage] = useState(1);
   const [search, setSearch] = useState("");
+  const { sort: alSort, toggleSort: toggleAlSort, applySortFn: sortAl } = useTableSort();
 
   const filtered = logs.filter(l =>
     l.action.toLowerCase().includes(search.toLowerCase()) ||
     l.targetType.toLowerCase().includes(search.toLowerCase())
   );
-  const alPaged = filtered.slice((alPage - 1) * AL_PAGE_SIZE, alPage * AL_PAGE_SIZE);
+  const alSorted = sortAl(filtered as Record<string, unknown>[]) as typeof filtered;
+  const alEff    = alPageSize === -1 ? alSorted.length : alPageSize;
+  const alPaged  = alSorted.slice((alPage - 1) * alEff, alPage * alEff);
   useEffect(() => { setAlPage(1); }, [search]);
+  const exportAudit = () => exportToExcel(
+    alSorted.map(l => ({
+      Action: l.action, "Target Type": l.targetType, "Target ID": l.targetId ?? "—",
+      Details: Object.keys(l.metadata ?? {}).length > 0 ? JSON.stringify(l.metadata) : "—",
+      Date: new Date(l.createdAt).toLocaleString("en-IN"),
+    })),
+    `AuditLog_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 
   return (
     <div className="space-y-4">
-      <SearchBar value={search} onChange={setSearch} placeholder="Search actions or entity type…" />
+      <div className="flex items-center gap-2">
+        <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search actions or entity type…" /></div>
+        <ExportBtn onClick={exportAudit} />
+      </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Action", "Target Type", "Target ID", "Details", "Date"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
+                <SortTh label="Action"      field="action"     sort={alSort} onSort={toggleAlSort} />
+                <SortTh label="Target Type" field="targetType" sort={alSort} onSort={toggleAlSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Target ID</th>
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Details</th>
+                <SortTh label="Date"        field="createdAt"  sort={alSort} onSort={toggleAlSort} />
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -3815,7 +4005,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
             </tbody>
           </table>
         </div>
-        <Pagination page={alPage} total={filtered.length} pageSize={AL_PAGE_SIZE} onChange={setAlPage} />
+        <Pagination page={alPage} total={alSorted.length} pageSize={alPageSize} onChange={setAlPage} onPageSizeChange={n => { setAlPageSize(n); setAlPage(1); }} />
       </div>
     </div>
   );
@@ -5593,16 +5783,29 @@ function ServicesView({
 
   const commission = (Number(form.customerPrice) || 0) - (Number(form.partnerPayout) || 0);
 
-  const SV_PAGE_SIZE = 20;
+  const [svPageSize, setSvPageSize] = useState(50);
   const [svPage, setSvPage] = useState(1);
+  const { sort: svSort, toggleSort: toggleSvSort, applySortFn: sortSv } = useTableSort();
 
   const filtered = services.filter(s => {
     const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase());
     const matchCat    = !filterCat || s.categoryId === filterCat;
     return matchSearch && matchCat;
   });
-  const svPaged = filtered.slice((svPage - 1) * SV_PAGE_SIZE, svPage * SV_PAGE_SIZE);
+  const svSorted = sortSv(filtered as Record<string, unknown>[]) as typeof filtered;
+  const svEff    = svPageSize === -1 ? svSorted.length : svPageSize;
+  const svPaged  = svSorted.slice((svPage - 1) * svEff, svPage * svEff);
   useEffect(() => { setSvPage(1); }, [search, filterCat]);
+  const exportServices = () => exportToExcel(
+    svSorted.map(s => ({
+      Service: s.name, Category: s.categoryName ?? "—",
+      "Sub-category": s.subCategoryName ?? "—",
+      "Price (₹)": s.customerPrice, "Payout (₹)": s.partnerPayout,
+      "Commission (₹)": s.commission, "Duration (min)": s.duration,
+      Status: s.isActive ? "Active" : "Inactive",
+    })),
+    `Services_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 
   const ServiceForm = () => (
     <div className="space-y-4">
@@ -5727,6 +5930,7 @@ function ServicesView({
           <div className="w-52 flex-shrink-0">
             <SearchBar value={search} onChange={setSearch} placeholder="Search services…" />
           </div>
+          <ExportBtn onClick={exportServices} />
           <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
             <Plus size={14} /> Add Service
           </button>
@@ -5744,9 +5948,14 @@ function ServicesView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>
-                {["Service", "Category", "Price", "Payout", "Commission", "Duration", "Status", ""].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
-                ))}
+                <SortTh label="Service"    field="name"           sort={svSort} onSort={toggleSvSort} />
+                <SortTh label="Category"   field="categoryName"   sort={svSort} onSort={toggleSvSort} />
+                <SortTh label="Price"      field="customerPrice"  sort={svSort} onSort={toggleSvSort} />
+                <SortTh label="Payout"     field="partnerPayout"  sort={svSort} onSort={toggleSvSort} />
+                <SortTh label="Commission" field="commission"     sort={svSort} onSort={toggleSvSort} />
+                <SortTh label="Duration"   field="duration"       sort={svSort} onSort={toggleSvSort} />
+                <SortTh label="Status"     field="isActive"       sort={svSort} onSort={toggleSvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold"></th>
               </tr>
             </thead>
             <tbody>
@@ -5787,7 +5996,7 @@ function ServicesView({
               {filtered.length === 0 && <EmptyRow cols={8} text="No services match the filters" />}
             </tbody>
           </table>
-          <Pagination page={svPage} total={filtered.length} pageSize={SV_PAGE_SIZE} onChange={setSvPage} />
+          <Pagination page={svPage} total={svSorted.length} pageSize={svPageSize} onChange={setSvPage} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
         </div>
       )}
     </div>
