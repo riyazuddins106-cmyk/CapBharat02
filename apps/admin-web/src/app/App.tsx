@@ -194,45 +194,87 @@ function EmptyRow({ cols, text }: { cols: number; text: string }) {
   return <tr><td colSpan={cols} className="px-4 py-8 text-white/30 text-center text-sm">{text}</td></tr>;
 }
 
-function Pagination({ page, total, pageSize, onChange, onPageSizeChange }: {
+function Pagination({ page, total, pageSize, onChange }: {
   page: number; total: number; pageSize: number; onChange: (p: number) => void;
-  onPageSizeChange?: (n: number) => void;
 }) {
   const effectiveSize = pageSize === -1 ? total : pageSize;
   const totalPages = Math.max(1, pageSize === -1 ? 1 : Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * effectiveSize + 1;
   const to   = pageSize === -1 ? total : Math.min(page * pageSize, total);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
-      <div className="flex items-center gap-3">
-        <span className="text-white/40 text-xs">
-          {total === 0 ? "No results" : pageSize === -1 ? `Showing all ${total} records` : `Showing ${from}–${to} of ${total}`}
-        </span>
-        {onPageSizeChange && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-white/25 text-xs">Rows:</span>
-            <select
-              value={pageSize === -1 ? "all" : pageSize}
-              onChange={e => { onPageSizeChange(e.target.value === "all" ? -1 : Number(e.target.value)); onChange(1); }}
-              className="rounded-lg px-2 py-1 text-white text-xs outline-none border border-white/[0.1]"
-              style={{ background: "rgba(255,255,255,0.06)" }}
-            >
-              {[10, 25, 50, 100, 250].map(n => <option key={n} value={n}>{n}</option>)}
-              <option value="all">All</option>
-            </select>
-          </div>
-        )}
-      </div>
+    <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
+      <span className="text-white/40 text-xs tabular-nums">
+        {total === 0 ? "No results" : pageSize === -1 ? `All ${total} records` : `${from}–${to} of ${total}`}
+      </span>
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => onChange(page - 1)} disabled={page <= 1}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >Prev</button>
-        <span className="px-2 text-white/40 text-xs font-medium">{page} / {totalPages}</span>
+        <span className="px-2 text-white/40 text-xs font-medium tabular-nums">{page} / {totalPages}</span>
         <button
           onClick={() => onChange(page + 1)} disabled={page >= totalPages}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >Next</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Rows-per-page bar (top of each table card) ──────────────────── */
+const ROWS_OPTIONS = [10, 25, 50, 100, 250] as const;
+
+function RowsBar({ total, pageSize, onPageSizeChange }: {
+  total: number; pageSize: number; onPageSizeChange: (n: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  const label = pageSize === -1 ? "All" : pageSize;
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.05]"
+      style={{ background: "rgba(255,255,255,0.015)" }}>
+      <span className="text-white/30 text-xs tabular-nums">
+        {total.toLocaleString("en-IN")} record{total !== 1 ? "s" : ""}
+      </span>
+      <div className="flex items-center gap-2.5" ref={ref}>
+        <span className="text-white/30 text-xs select-none">Rows per page</span>
+        <div className="relative">
+          <button
+            onClick={() => setOpen(o => !o)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.12] text-white/70 hover:text-white hover:border-violet-500/40 transition-all select-none"
+            style={{ background: "rgba(255,255,255,0.06)", minWidth: 60 }}
+          >
+            <span className="flex-1 text-center tabular-nums">{label}</span>
+            <ChevronDown size={11} className={`flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+          </button>
+          {open && (
+            <div
+              className="absolute right-0 bottom-full mb-1.5 rounded-xl border border-white/[0.12] py-1 z-50 min-w-[80px] overflow-hidden"
+              style={{ background: "#1c2133", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+            >
+              {ROWS_OPTIONS.map(n => (
+                <button key={n}
+                  onClick={() => { onPageSizeChange(n); setOpen(false); }}
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/[0.07] ${pageSize === n ? "text-violet-400 font-bold" : "text-white/65"}`}
+                >{n}</button>
+              ))}
+              <div className="border-t border-white/[0.06] mt-1 pt-1">
+                <button
+                  onClick={() => { onPageSizeChange(-1); setOpen(false); }}
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/[0.07] ${pageSize === -1 ? "text-violet-400 font-bold" : "text-white/65"}`}
+                >All</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1358,7 +1400,8 @@ function DispatchView({
 
       {/* Table */}
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={dvSorted.length} pageSize={dvPageSize} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -1407,7 +1450,7 @@ function DispatchView({
             </tbody>
           </table>
         </div>
-        <Pagination page={dvPage} total={dvSorted.length} pageSize={dvPageSize} onChange={setDvPage} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
+        <Pagination page={dvPage} total={dvSorted.length} pageSize={dvPageSize} onChange={setDvPage} />
       </div>
 
       {/* Modal */}
@@ -1584,7 +1627,8 @@ function BookingsView({
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={bvSorted.length} pageSize={bvPageSize} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -1628,7 +1672,7 @@ function BookingsView({
             </tbody>
           </table>
         </div>
-        <Pagination page={bvPage} total={bvSorted.length} pageSize={bvPageSize} onChange={setBvPage} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
+        <Pagination page={bvPage} total={bvSorted.length} pageSize={bvPageSize} onChange={setBvPage} />
       </div>
     </div>
   );
@@ -1822,7 +1866,8 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
 
       {/* ── Table ── */}
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={bhSorted.length} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -1874,7 +1919,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
             </tbody>
           </table>
         </div>
-        <Pagination page={page} total={bhSorted.length} pageSize={pageSize} onChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
+        <Pagination page={page} total={bhSorted.length} pageSize={pageSize} onChange={setPage} />
       </div>
 
       {/* ── Totals footer ── */}
@@ -2369,7 +2414,8 @@ function ProsView({
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={proTotal} pageSize={proPageSize} onPageSizeChange={n => { onProPageSizeChange(n); onProPageChange(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -2430,7 +2476,7 @@ function ProsView({
             </tbody>
           </table>
         </div>
-        <Pagination page={proPage} total={proTotal} pageSize={proPageSize} onChange={p => { onProPageChange(p); }} onPageSizeChange={n => { onProPageSizeChange(n); onProPageChange(1); }} />
+        <Pagination page={proPage} total={proTotal} pageSize={proPageSize} onChange={p => { onProPageChange(p); }} />
       </div>
     </div>
   );
@@ -2557,7 +2603,8 @@ function UsersView({
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={userTotal} pageSize={userPageSize} onPageSizeChange={n => { onUserPageSizeChange(n); onUserPageChange(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -2616,7 +2663,7 @@ function UsersView({
             </tbody>
           </table>
         </div>
-        <Pagination page={userPage} total={userTotal} pageSize={userPageSize} onChange={p => onUserPageChange(p)} onPageSizeChange={n => { onUserPageSizeChange(n); onUserPageChange(1); }} />
+        <Pagination page={userPage} total={userTotal} pageSize={userPageSize} onChange={p => onUserPageChange(p)} />
       </div>
     </div>
   );
@@ -4092,7 +4139,8 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
 
       {/* Table */}
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={rvSorted.length} pageSize={rvPageSize} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -4150,7 +4198,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
             </tbody>
           </table>
         </div>
-        <Pagination page={rvPage} total={rvSorted.length} pageSize={rvPageSize} onChange={setRvPage} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
+        <Pagination page={rvPage} total={rvSorted.length} pageSize={rvPageSize} onChange={setRvPage} />
       </div>
     </div>
   );
@@ -4222,7 +4270,8 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="overflow-x-auto">
+        <RowsBar total={alSorted.length} pageSize={alPageSize} onPageSizeChange={n => { setAlPageSize(n); setAlPage(1); }} />
+        <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
@@ -4251,7 +4300,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
             </tbody>
           </table>
         </div>
-        <Pagination page={alPage} total={alSorted.length} pageSize={alPageSize} onChange={setAlPage} onPageSizeChange={n => { setAlPageSize(n); setAlPage(1); }} />
+        <Pagination page={alPage} total={alSorted.length} pageSize={alPageSize} onChange={setAlPage} />
       </div>
     </div>
   );
@@ -5376,7 +5425,8 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
           </div>
 
           <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-            <div className="overflow-x-auto">
+            <RowsBar total={pvSorted.length} pageSize={pvPageSize} onPageSizeChange={n => { setPvPageSize(n); setPvPage(1); }} />
+            <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
                   <tr className="border-b border-white/[0.07]">
@@ -5425,7 +5475,7 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
                 </tbody>
               </table>
             </div>
-            <Pagination page={pvPage} total={pvSorted.length} pageSize={pvPageSize} onChange={setPvPage} onPageSizeChange={n => { setPvPageSize(n); setPvPage(1); }} />
+            <Pagination page={pvPage} total={pvSorted.length} pageSize={pvPageSize} onChange={setPvPage} />
           </div>
         </>
       )}
@@ -6283,6 +6333,8 @@ function ServicesView({
         </div>
       ) : (
         <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+          <RowsBar total={svSorted.length} pageSize={svPageSize} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
+          <div className="overflow-x-auto" style={{ overflowY: "clip" }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -6334,7 +6386,8 @@ function ServicesView({
               {filtered.length === 0 && <EmptyRow cols={8} text="No services match the filters" />}
             </tbody>
           </table>
-          <Pagination page={svPage} total={svSorted.length} pageSize={svPageSize} onChange={setSvPage} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
+          </div>
+          <Pagination page={svPage} total={svSorted.length} pageSize={svPageSize} onChange={setSvPage} />
         </div>
       )}
     </div>
