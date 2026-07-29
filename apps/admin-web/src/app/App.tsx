@@ -363,37 +363,44 @@ function ColumnVisibilityMenu({ columns, labels, hidden, onToggle }: {
   );
 }
 
-/* ── Chart PNG export ────────────────────────────────────────────── */
+/* ── Chart export (PNG / JPG / SVG, 2× high-res) ────────────────── */
 
-function downloadChartAsPng(containerId: string, filename: string) {
+function downloadChart(containerId: string, filename: string, format: "png" | "jpg" | "svg" = "png") {
   const el = document.getElementById(containerId);
   const svg = el?.querySelector("svg");
   if (!svg) { alert("Chart not ready — please wait for data to load, then try again."); return; }
+  if (format === "svg") {
+    const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
   const rect = svg.getBoundingClientRect();
   const W = Math.round(rect.width) || 800;
   const H = Math.round(rect.height) || 300;
   const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
+  canvas.width = W * 2; canvas.height = H * 2;
   const ctx = canvas.getContext("2d")!;
+  ctx.scale(2, 2);
   ctx.fillStyle = "#1a2035";
   ctx.fillRect(0, 0, W, H);
-  const blob = new Blob(
-    [new XMLSerializer().serializeToString(svg)],
-    { type: "image/svg+xml;charset=utf-8" }
-  );
+  const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const img = new Image();
   img.onload = () => {
     ctx.drawImage(img, 0, 0, W, H);
     URL.revokeObjectURL(url);
     const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
+    a.href = canvas.toDataURL(format === "jpg" ? "image/jpeg" : "image/png", 0.95);
     a.download = filename;
     a.click();
   };
   img.onerror = () => { URL.revokeObjectURL(url); alert("Chart export failed."); };
   img.src = url;
 }
+/** backward-compat alias */
+const downloadChartAsPng = (id: string, fn: string) => downloadChart(id, fn, "png");
 
 /* ── Sticky thead background ─────────────────────────────────────── */
 const THEAD_STICKY = { background: "#0f1117" } as const;
@@ -1306,8 +1313,8 @@ function DispatchView({
       </div>
 
       {/* Search + filter bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
           <input
             value={search}
@@ -1319,7 +1326,6 @@ function DispatchView({
             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-xs">✕</button>
           )}
         </div>
-        <ExportBtn onClick={exportDispatch} />
         <div className="flex gap-1.5 flex-shrink-0">
           {STATUS_OPTIONS.map((opt) => (
             <button
@@ -1336,10 +1342,14 @@ function DispatchView({
             </button>
           ))}
         </div>
+        {(search || statusFilter !== "all") && (
+          <button onClick={() => { setSearch(""); setStatusFilter("all"); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+        )}
+        <ExportBtn onClick={exportDispatch} />
       </div>
 
       {/* Result count */}
-      <p className="text-white/25 text-xs -mt-2">
+      <p className="text-white/25 text-xs -mt-1">
         Showing {filtered.length} of {requests.length} bookings
         {search && <span> matching "<span className="text-white/40">{search}</span>"</span>}
       </p>
@@ -1348,7 +1358,7 @@ function DispatchView({
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Customer"         field="customerName"    sort={dvSort} onSort={toggleDvSort} />
                 <SortTh label="Service"          field="serviceName"     sort={dvSort} onSort={toggleDvSort} />
@@ -1429,6 +1439,9 @@ function BookingsView({
   const [bvPageSize, setBvPageSize]   = useState(50);
   const [bvPage,      setBvPage]      = useState(1);
   const [search,      setSearch]      = useState("");
+  const [selStatuses, setSelStatuses] = useState<string[]>([]);
+  const [dateFrom,    setDateFrom]    = useState("");
+  const [dateTo,      setDateTo]      = useState("");
   const { sort: bvSort, toggleSort: toggleBvSort, applySortFn: sortBv } = useTableSort();
   const [editTarget,  setEditTarget]  = useState<BookingRow | null>(null);
   const [deleteId,    setDeleteId]    = useState<string | null>(null);
@@ -1476,11 +1489,24 @@ function BookingsView({
     finally { setBusyId(null); }
   };
 
-  const filtered = bookings.filter(b =>
-    b.serviceName?.toLowerCase().includes(search.toLowerCase()) ||
-    b.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-    b.proName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const BV_STATUS_OPTIONS = ["pending", "upcoming", "in_progress", "completed", "cancelled"];
+  const hasFilters = search || selStatuses.length > 0 || dateFrom || dateTo;
+  const resetBvFilters = () => { setSearch(""); setSelStatuses([]); setDateFrom(""); setDateTo(""); setBvPage(1); };
+
+  const filtered = bookings.filter(b => {
+    if (selStatuses.length > 0 && !selStatuses.includes(b.status)) return false;
+    if (dateFrom && new Date(b.scheduledAt) < new Date(dateFrom)) return false;
+    if (dateTo   && new Date(b.scheduledAt) > new Date(dateTo))   return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        b.serviceName?.toLowerCase().includes(q) ||
+        (b.customerName ?? "").toLowerCase().includes(q) ||
+        (b.proName ?? "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
   const bvSorted = sortBv(filtered as Record<string, unknown>[]) as typeof filtered;
   const bvEff    = bvPageSize === -1 ? bvSorted.length : bvPageSize;
   const bvPaged  = bvSorted.slice((bvPage - 1) * bvEff, bvPage * bvEff);
@@ -1488,7 +1514,7 @@ function BookingsView({
   const exportBookings = () => exportToExcel(
     bvSorted.map(b => ({
       Service: b.serviceName, Customer: b.customerName ?? "—",
-      Professional: b.proName ?? "—", Amount: b.price,
+      Professional: b.proName ?? "—", "Amount (₹)": b.price,
       Scheduled: new Date(b.scheduledAt).toLocaleString("en-IN"),
       Status: b.status,
     })),
@@ -1532,15 +1558,29 @@ function BookingsView({
         />
       )}
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search bookings…" /></div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={v => { setSearch(v); setBvPage(1); }} placeholder="Search bookings…" /></div>
+        <MultiSelect label="Status" options={BV_STATUS_OPTIONS} selected={selStatuses} onChange={v => { setSelStatuses(v); setBvPage(1); }} />
+        <div className="flex items-center gap-1.5 text-xs text-white/50">
+          <span>From</span>
+          <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setBvPage(1); }}
+            className="rounded-lg px-2 py-1.5 text-white text-xs border border-white/[0.1] outline-none focus:border-violet-500/60"
+            style={{ background: "rgba(255,255,255,0.05)" }} />
+          <span>To</span>
+          <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setBvPage(1); }}
+            className="rounded-lg px-2 py-1.5 text-white text-xs border border-white/[0.1] outline-none focus:border-violet-500/60"
+            style={{ background: "rgba(255,255,255,0.05)" }} />
+        </div>
+        {hasFilters && (
+          <button onClick={resetBvFilters} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+        )}
         <ExportBtn onClick={exportBookings} />
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Service"      field="serviceName"  sort={bvSort} onSort={toggleBvSort} />
                 <SortTh label="Customer"     field="customerName" sort={bvSort} onSort={toggleBvSort} />
@@ -2414,6 +2454,7 @@ function UsersView({
   const [form,       setForm]       = useState({ fullName: "", email: "", phone: "", role: "" });
   const [saving,     setSaving]     = useState(false);
   const [busyId,     setBusyId]     = useState<string | null>(null);
+  const { sort: uvSort, toggleSort: toggleUvSort, applySortFn: sortUv } = useTableSort();
 
   const openEdit = (u: CustomerUser) => {
     setForm({ fullName: u.fullName, email: u.email, phone: u.phone ?? "", role: u.role });
@@ -2449,6 +2490,7 @@ function UsersView({
      u.email?.toLowerCase().includes(search.toLowerCase()) ||
      u.role?.toLowerCase().includes(search.toLowerCase()))
   );
+  const uvSorted = sortUv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
     <div className="space-y-4">
@@ -2490,8 +2532,11 @@ function UsersView({
           selected={roleFilter}
           onChange={setRoleFilter}
         />
+        {(search || roleFilter.length > 0) && (
+          <button onClick={() => { setSearch(""); setRoleFilter([]); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+        )}
         <ExportBtn onClick={() => exportToExcel(
-          filtered.map(u => ({
+          uvSorted.map(u => ({
             Name: u.fullName, Email: u.email, Phone: u.phone ?? "—",
             Role: u.role, Status: u.isActive ? "Active" : "Inactive",
             Joined: new Date(u.createdAt ?? "").toLocaleDateString("en-IN"),
@@ -2503,15 +2548,19 @@ function UsersView({
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
-                {["Name", "Email", "Phone", "Role", "Status", "Joined", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
-                ))}
+                <SortTh label="Name"   field="fullName"  sort={uvSort} onSort={toggleUvSort} />
+                <SortTh label="Email"  field="email"     sort={uvSort} onSort={toggleUvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Phone</th>
+                <SortTh label="Role"   field="role"      sort={uvSort} onSort={toggleUvSort} />
+                <SortTh label="Status" field="isActive"  sort={uvSort} onSort={toggleUvSort} />
+                <SortTh label="Joined" field="createdAt" sort={uvSort} onSort={toggleUvSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((u) => (
+              {uvSorted.map((u) => (
                 <tr key={u.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -2552,25 +2601,11 @@ function UsersView({
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={7} text="No users found" />}
+              {uvSorted.length === 0 && <EmptyRow cols={7} text="No users found" />}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.07]">
-          <span className="text-white/40 text-xs">Showing page {userPage} of {Math.max(1, Math.ceil(userTotal / 25))}</span>
-          <div className="flex gap-2">
-            <button
-              disabled={userPage <= 1}
-              onClick={() => onUserPageChange(p => p - 1)}
-              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
-            >← Prev</button>
-            <button
-              disabled={userPage >= Math.ceil(userTotal / 25)}
-              onClick={() => onUserPageChange(p => p + 1)}
-              className="px-3 py-1.5 rounded-lg text-xs text-white/60 border border-white/10 disabled:opacity-30 hover:bg-white/5 transition"
-            >Next →</button>
-          </div>
-        </div>
+        <Pagination page={userPage} total={userTotal} pageSize={25} onChange={p => onUserPageChange(p)} />
       </div>
     </div>
   );
@@ -4049,16 +4084,32 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
   const [alPageSize, setAlPageSize] = useState(50);
   const [alPage, setAlPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [selActions,    setSelActions]    = useState<string[]>([]);
+  const [selTargetTypes, setSelTargetTypes] = useState<string[]>([]);
+  const [dateFrom,      setDateFrom]      = useState("");
+  const [dateTo,        setDateTo]        = useState("");
   const { sort: alSort, toggleSort: toggleAlSort, applySortFn: sortAl } = useTableSort();
 
-  const filtered = logs.filter(l =>
-    l.action.toLowerCase().includes(search.toLowerCase()) ||
-    l.targetType.toLowerCase().includes(search.toLowerCase())
-  );
+  const actionOptions    = useMemo(() => [...new Set(logs.map(l => l.action))].sort(),     [logs]);
+  const targetTypeOptions = useMemo(() => [...new Set(logs.map(l => l.targetType))].sort(), [logs]);
+  const hasAlFilters = search || selActions.length > 0 || selTargetTypes.length > 0 || dateFrom || dateTo;
+  const resetAlFilters = () => { setSearch(""); setSelActions([]); setSelTargetTypes([]); setDateFrom(""); setDateTo(""); setAlPage(1); };
+
+  const filtered = logs.filter(l => {
+    if (selActions.length     > 0 && !selActions.includes(l.action))          return false;
+    if (selTargetTypes.length > 0 && !selTargetTypes.includes(l.targetType))  return false;
+    if (dateFrom && new Date(l.createdAt) < new Date(dateFrom)) return false;
+    if (dateTo   && new Date(l.createdAt) > new Date(dateTo))   return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return l.action.toLowerCase().includes(q) || l.targetType.toLowerCase().includes(q);
+    }
+    return true;
+  });
   const alSorted = sortAl(filtered as Record<string, unknown>[]) as typeof filtered;
   const alEff    = alPageSize === -1 ? alSorted.length : alPageSize;
   const alPaged  = alSorted.slice((alPage - 1) * alEff, alPage * alEff);
-  useEffect(() => { setAlPage(1); }, [search]);
+  useEffect(() => { setAlPage(1); }, [search, selActions, selTargetTypes, dateFrom, dateTo]);
   const exportAudit = () => exportToExcel(
     alSorted.map(l => ({
       Action: l.action, "Target Type": l.targetType, "Target ID": l.targetId ?? "—",
@@ -4070,15 +4121,30 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search actions or entity type…" /></div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={v => { setSearch(v); setAlPage(1); }} placeholder="Search actions or entity type…" /></div>
+        <MultiSelect label="Action"      options={actionOptions}     selected={selActions}     onChange={v => { setSelActions(v); setAlPage(1); }} />
+        <MultiSelect label="Entity Type" options={targetTypeOptions} selected={selTargetTypes} onChange={v => { setSelTargetTypes(v); setAlPage(1); }} />
+        <div className="flex items-center gap-1.5 text-xs text-white/50">
+          <span>From</span>
+          <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setAlPage(1); }}
+            className="rounded-lg px-2 py-1.5 text-white text-xs border border-white/[0.1] outline-none focus:border-violet-500/60"
+            style={{ background: "rgba(255,255,255,0.05)" }} />
+          <span>To</span>
+          <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setAlPage(1); }}
+            className="rounded-lg px-2 py-1.5 text-white text-xs border border-white/[0.1] outline-none focus:border-violet-500/60"
+            style={{ background: "rgba(255,255,255,0.05)" }} />
+        </div>
+        {hasAlFilters && (
+          <button onClick={resetAlFilters} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+        )}
         <ExportBtn onClick={exportAudit} />
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Action"      field="action"     sort={alSort} onSort={toggleAlSort} />
                 <SortTh label="Target Type" field="targetType" sort={alSort} onSort={toggleAlSort} />
@@ -4101,7 +4167,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={5} text="No audit log entries yet" />}
+              {filtered.length === 0 && <EmptyRow cols={5} text="No audit log entries match the filters" />}
             </tbody>
           </table>
         </div>
@@ -4180,7 +4246,7 @@ function AnalyticsView({ stats, accessToken }: { stats: DashboardStats | null; a
       <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           <h3 className="text-white font-semibold text-sm">Bookings &amp; Revenue Over Time</h3>
-          <div className="flex items-center gap-2 text-xs text-white/60">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
             <label className="flex items-center gap-1">
               From
               <input
@@ -4203,6 +4269,26 @@ function AnalyticsView({ stats, accessToken }: { stats: DashboardStats | null; a
                 style={{ background: "rgba(255,255,255,0.06)" }}
               />
             </label>
+            {/* Chart download buttons */}
+            {series.length > 0 && (
+              <div className="flex items-center gap-1 ml-2">
+                {(["PNG","JPG","SVG"] as const).map(fmt => (
+                  <button
+                    key={fmt}
+                    onClick={() => downloadChart(
+                      "analytics-timeseries-chart",
+                      `Analytics_${fromDate}_${toDate}.${fmt.toLowerCase()}`,
+                      fmt.toLowerCase() as "png" | "jpg" | "svg"
+                    )}
+                    className="px-2 py-1 rounded-lg border border-white/[0.1] text-white/50 hover:text-white hover:border-white/20 text-[10px] font-bold transition-colors"
+                    style={{ background: "rgba(255,255,255,0.04)" }}
+                    title={`Download chart as ${fmt}`}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -4218,6 +4304,7 @@ function AnalyticsView({ stats, accessToken }: { stats: DashboardStats | null; a
           <div className="flex items-center justify-center h-48 text-white/30 text-sm">No data for the selected range</div>
         )}
         {!tsLoading && !tsError && series.length > 0 && (
+          <div id="analytics-timeseries-chart">
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={series} margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
@@ -4260,6 +4347,7 @@ function AnalyticsView({ stats, accessToken }: { stats: DashboardStats | null; a
               <Line yAxisId="right" type="monotone" dataKey="revenue"  stroke="#16A34A" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>
@@ -5107,12 +5195,15 @@ function OtpSettingsView({ accessToken }: { accessToken: string }) {
 ═══════════════════════════════════════════════════════════════════ */
 
 function PayoutsAdminView({ accessToken }: { accessToken: string }) {
-  const PV_PAGE_SIZE = 20;
-  const [pvPage, setPvPage] = useState(1);
-  const [payouts, setPayouts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [resolving, setResolving] = useState<string | null>(null);
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [pvPageSize, setPvPageSize] = useState(50);
+  const [pvPage,     setPvPage]     = useState(1);
+  const [payouts,    setPayouts]    = useState<any[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [resolving,  setResolving]  = useState<string | null>(null);
+  const [msg,        setMsg]        = useState<{ text: string; ok: boolean } | null>(null);
+  const [pvSearch,   setPvSearch]   = useState("");
+  const [pvSelStatus, setPvSelStatus] = useState<string[]>([]);
+  const { sort: pvSort, toggleSort: togglePvSort, applySortFn: sortPv } = useTableSort();
 
   useEffect(() => { load(); }, []);
 
@@ -5136,9 +5227,35 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
     } finally { setResolving(null); }
   }
 
-  const STATUS_COLOR: Record<string, string> = {
+  const PV_STATUS_COLOR: Record<string, string> = {
     pending: '#F59E0B', paid: '#16A34A', rejected: '#EF4444',
   };
+
+  const pvFiltered = payouts.filter(p => {
+    if (pvSelStatus.length > 0 && !pvSelStatus.includes(p.status)) return false;
+    if (pvSearch) {
+      const q = pvSearch.toLowerCase();
+      return (p.partner_name ?? "").toLowerCase().includes(q) || (p.note ?? "").toLowerCase().includes(q);
+    }
+    return true;
+  });
+  const pvSorted = sortPv(pvFiltered as Record<string, unknown>[]) as typeof pvFiltered;
+  const pvEff    = pvPageSize === -1 ? pvSorted.length : pvPageSize;
+  const pvPaged  = pvSorted.slice((pvPage - 1) * pvEff, pvPage * pvEff);
+  useEffect(() => { setPvPage(1); }, [pvSearch, pvSelStatus]);
+
+  const exportPayouts = () => exportToExcel(
+    pvSorted.map(p => ({
+      Partner: p.partner_name ?? p.partnerId?.slice(0, 8) ?? "—",
+      "Amount (₹)": p.amount,
+      Note: p.note ?? "—",
+      Requested: new Date(p.createdAt ?? p.created_at).toLocaleDateString("en-IN"),
+      Status: p.status,
+    })),
+    `Payouts_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+
+  const hasPvFilters = pvSearch || pvSelStatus.length > 0;
 
   return (
     <div className="space-y-4">
@@ -5166,51 +5283,71 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
           <p className="text-white/40 text-sm">No payout requests yet.</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.07]">
-                {["Partner", "Amount", "Note", "Requested", "Status", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {payouts.map((p: any) => (
-                <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-3 text-white font-medium">{p.partner_name ?? p.partnerId?.slice(0, 8)}</td>
-                  <td className="px-4 py-3 text-emerald-400 font-semibold">{fmt(p.amount)}</td>
-                  <td className="px-4 py-3 text-white/50 max-w-[160px] truncate">{p.note ?? '—'}</td>
-                  <td className="px-4 py-3 text-white/40 text-xs">{new Date(p.createdAt ?? p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold"
-                      style={{ background: (STATUS_COLOR[p.status] ?? '#6B7280') + '22', color: STATUS_COLOR[p.status] ?? '#6B7280' }}>
-                      {p.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {p.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => resolve(p.id, 'paid')}
-                          disabled={resolving === p.id}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors disabled:opacity-40">
-                          {resolving === p.id ? <Loader2 size={11} className="animate-spin"/> : <CheckCircle size={11}/>} Pay
-                        </button>
-                        <button
-                          onClick={() => resolve(p.id, 'rejected')}
-                          disabled={resolving === p.id}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-colors disabled:opacity-40">
-                          <XCircle size={11}/> Reject
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-[200px]">
+              <SearchBar value={pvSearch} onChange={setPvSearch} placeholder="Search partner or note…" />
+            </div>
+            <MultiSelect label="Status" options={["pending","paid","rejected"]} selected={pvSelStatus} onChange={setPvSelStatus} />
+            {hasPvFilters && (
+              <button onClick={() => { setPvSearch(""); setPvSelStatus([]); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+            )}
+            <ExportBtn onClick={exportPayouts} />
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+                  <tr className="border-b border-white/[0.07]">
+                    <SortTh label="Partner"   field="partner_name" sort={pvSort} onSort={togglePvSort} />
+                    <SortTh label="Amount"    field="amount"       sort={pvSort} onSort={togglePvSort} />
+                    <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold">Note</th>
+                    <SortTh label="Requested" field="createdAt"    sort={pvSort} onSort={togglePvSort} />
+                    <SortTh label="Status"    field="status"       sort={pvSort} onSort={togglePvSort} />
+                    <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pvPaged.map((p: any) => (
+                    <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3 text-white font-medium">{p.partner_name ?? p.partnerId?.slice(0, 8)}</td>
+                      <td className="px-4 py-3 text-emerald-400 font-semibold">{fmt(p.amount)}</td>
+                      <td className="px-4 py-3 text-white/50 max-w-[160px] truncate">{p.note ?? '—'}</td>
+                      <td className="px-4 py-3 text-white/40 text-xs">{new Date(p.createdAt ?? p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                          style={{ background: (PV_STATUS_COLOR[p.status] ?? '#6B7280') + '22', color: PV_STATUS_COLOR[p.status] ?? '#6B7280' }}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {p.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => resolve(p.id, 'paid')}
+                              disabled={resolving === p.id}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 transition-colors disabled:opacity-40">
+                              {resolving === p.id ? <Loader2 size={11} className="animate-spin"/> : <CheckCircle size={11}/>} Pay
+                            </button>
+                            <button
+                              onClick={() => resolve(p.id, 'rejected')}
+                              disabled={resolving === p.id}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-colors disabled:opacity-40">
+                              <XCircle size={11}/> Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {pvPaged.length === 0 && <EmptyRow cols={6} text="No payouts match the filters" />}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={pvPage} total={pvSorted.length} pageSize={pvPageSize} onChange={setPvPage} onPageSizeChange={n => { setPvPageSize(n); setPvPage(1); }} />
+          </div>
+        </>
       )}
     </div>
   );
@@ -5887,15 +6024,20 @@ function ServicesView({
   const [svPage, setSvPage] = useState(1);
   const { sort: svSort, toggleSort: toggleSvSort, applySortFn: sortSv } = useTableSort();
 
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+  const hasSvFilters = search || filterCat || filterStatus !== "all";
+  const resetSvFilters = () => { setSearch(""); setFilterCat(""); setFilterStatus("all"); setSvPage(1); };
+
   const filtered = services.filter(s => {
     const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase());
     const matchCat    = !filterCat || s.categoryId === filterCat;
-    return matchSearch && matchCat;
+    const matchStatus = filterStatus === "all" || (filterStatus === "active" ? s.isActive : !s.isActive);
+    return matchSearch && matchCat && matchStatus;
   });
   const svSorted = sortSv(filtered as Record<string, unknown>[]) as typeof filtered;
   const svEff    = svPageSize === -1 ? svSorted.length : svPageSize;
   const svPaged  = svSorted.slice((svPage - 1) * svEff, svPage * svEff);
-  useEffect(() => { setSvPage(1); }, [search, filterCat]);
+  useEffect(() => { setSvPage(1); }, [search, filterCat, filterStatus]);
   const exportServices = () => exportToExcel(
     svSorted.map(s => ({
       Service: s.name, Category: s.categoryName ?? "—",
@@ -6022,14 +6164,30 @@ function ServicesView({
           </div>
           <div className="flex-1 min-w-0" />
           <div className="w-48 flex-shrink-0">
-            <SelectInput value={filterCat} onChange={setFilterCat}>
+            <SelectInput value={filterCat} onChange={v => { setFilterCat(v); setSvPage(1); }}>
               <option value="">All categories</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </SelectInput>
           </div>
-          <div className="w-52 flex-shrink-0">
-            <SearchBar value={search} onChange={setSearch} placeholder="Search services…" />
+          {/* Status filter */}
+          <div className="flex gap-1 flex-shrink-0">
+            {(["all", "active", "inactive"] as const).map(s => (
+              <button key={s} onClick={() => { setFilterStatus(s); setSvPage(1); }}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all"
+                style={{
+                  background: filterStatus === s ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.04)",
+                  color: filterStatus === s ? "#a78bfa" : "rgba(255,255,255,0.4)",
+                  border: filterStatus === s ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.07)",
+                }}
+              >{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</button>
+            ))}
           </div>
+          <div className="w-52 flex-shrink-0">
+            <SearchBar value={search} onChange={v => { setSearch(v); setSvPage(1); }} placeholder="Search services…" />
+          </div>
+          {hasSvFilters && (
+            <button onClick={resetSvFilters} className="text-xs text-white/40 hover:text-white/70 transition-colors px-1 flex-shrink-0">Clear</button>
+          )}
           <ExportBtn onClick={exportServices} />
           <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
             <Plus size={14} /> Add Service
@@ -6038,15 +6196,15 @@ function ServicesView({
       </div>
 
       {/* Table */}
-      {filtered.length === 0 ? (
+      {svSorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-white/20">
           <Package size={44} className="mb-3" />
-          <p className="text-sm">No services yet. Create your first service above.</p>
+          <p className="text-sm">{hasSvFilters ? "No services match the filters." : "No services yet. Create your first service above."}</p>
         </div>
       ) : (
         <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <SortTh label="Service"    field="name"           sort={svSort} onSort={toggleSvSort} />
                 <SortTh label="Category"   field="categoryName"   sort={svSort} onSort={toggleSvSort} />
