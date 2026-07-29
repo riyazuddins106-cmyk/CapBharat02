@@ -81,6 +81,7 @@ export interface TimeseriesPoint {
 
 export interface BookingRow {
   id: string;
+  customerId?: string;
   status: string;
   serviceName: string;
   proName: string;
@@ -184,9 +185,12 @@ export interface ReviewRow {
   createdAt: string;
   customerId: string;
   professionalId: string;
+  bookingId?: string | null;
   customerName?: string | null;
   customerEmail?: string | null;
   proName?: string | null;
+  serviceName?: string | null;
+  deletedAt?: string | null;
 }
 
 export interface DashboardStats {

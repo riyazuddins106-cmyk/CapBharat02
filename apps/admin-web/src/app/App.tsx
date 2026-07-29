@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { createPortal } from "react-dom";
 import {
@@ -313,7 +313,7 @@ function adminShowError(msg: string) {
   else console.error("[AdminError]", msg);
 }
 
-const VALID_SECTIONS = ["dashboard","bookings","pros","create-pro","users","categories","dispatch",
+const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch",
   "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
   "payment-config","email-config","sms-config","otp-settings","documents","payouts"] as const;
 
@@ -1395,7 +1395,6 @@ function CreateProfessionalView({
     if (!form.password || form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (!form.title.trim())    { setError("Title / role is required."); return; }
     if (!form.categoryId)      { setError("Please select a category."); return; }
-    if (form.basePrice < 0)    { setError("Base price cannot be negative."); return; }
 
     setSaving(true);
     try {
@@ -1539,16 +1538,6 @@ function CreateProfessionalView({
                 {!form.categoryId ? "Select category first" : subCatsLoading ? "Loading…" : subCats.length === 0 ? "None available" : "— None —"}
               </option>
               {subCats.sort((a, b) => a.sortOrder - b.sortOrder).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </SelectInput>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Base Price (₹) *">
-            <TextInput type="number" value={String(form.basePrice)} onChange={v => set("basePrice", Number(v))} placeholder="500" />
-          </Field>
-          <Field label="Price Unit">
-            <SelectInput value={form.priceUnit} onChange={v => set("priceUnit", v)}>
-              {["/visit", "/hr", "/day", "/session"].map(u => <option key={u} value={u}>{u}</option>)}
             </SelectInput>
           </Field>
         </div>
@@ -1726,14 +1715,6 @@ function ProsView({
             <Field label="Name"><TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
             <Field label="Title"><TextInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} /></Field>
             <Field label="Bio"><TextArea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} placeholder="Professional bio…" /></Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Base Price (₹)"><TextInput type="number" value={String(form.basePrice)} onChange={v => setForm(f => ({ ...f, basePrice: Number(v) }))} /></Field>
-              <Field label="Price Unit">
-                <SelectInput value={form.priceUnit} onChange={v => setForm(f => ({ ...f, priceUnit: v }))}>
-                  {["/visit", "/hr", "/day", "/session"].map(u => <option key={u} value={u}>{u}</option>)}
-                </SelectInput>
-              </Field>
-            </div>
             <Field label="Category">
               <SelectInput value={form.categoryId} onChange={handleCategoryChange}>
                 <option value="">— Select category —</option>
@@ -1789,7 +1770,7 @@ function ProsView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Professional", "Category", "Sub-category", "Rating", "Price", "Status", "Actions"].map(h => (
+                {["Professional", "Category", "Sub-category", "Rating", "Status", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1815,7 +1796,6 @@ function ProsView({
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{p.categoryName ?? "—"}</td>
                   <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{p.subCategoryName ?? "—"}</td>
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">⭐ {p.rating?.toFixed(1) ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/80 whitespace-nowrap">{fmt(p.basePrice)}{p.priceUnit}</td>
                   <td className="px-4 py-3">
                     <Badge label={p.isActive ? "Active" : "Suspended"} color={p.isActive ? "#16A34A" : "#EF4444"} />
                   </td>
@@ -3261,10 +3241,99 @@ function OffersView({
   );
 }
 
+/* ── Multi-select dropdown (reusable) ───────────────────────────── */
+function MultiSelect({
+  label, options, selected, onChange,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];   // empty = All
+  onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (val: string) => {
+    if (selected.includes(val)) onChange(selected.filter(s => s !== val));
+    else onChange([...selected, val]);
+  };
+
+  const displayLabel =
+    selected.length === 0 ? `All ${label}s` :
+    selected.length === 1 ? selected[0] :
+    `${selected.length} ${label}s selected`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.1] text-sm text-white/70 hover:border-white/20 transition-colors whitespace-nowrap"
+        style={{ background: "rgba(255,255,255,0.04)", minWidth: 160 }}
+      >
+        <span className="flex-1 text-left truncate">{displayLabel}</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d={open ? "M2 8l4-4 4 4" : "M2 4l4 4 4-4"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-50 mt-1 rounded-xl border border-white/[0.1] py-1 overflow-y-auto"
+          style={{ background: "#1a1a2e", maxHeight: 240, minWidth: 200, top: "100%", left: 0 }}
+        >
+          {/* All option */}
+          <button
+            onClick={() => { onChange([]); setOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors ${selected.length === 0 ? "text-violet-400" : "text-white/60"}`}
+          >
+            <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${selected.length === 0 ? "border-violet-400 bg-violet-400/20" : "border-white/20"}`}>
+              {selected.length === 0 && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>}
+            </span>
+            All {label}s
+          </button>
+          <div className="border-t border-white/[0.06] my-1" />
+          {options.map(opt => (
+            <button
+              key={opt}
+              onClick={() => toggle(opt)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors text-white/80"
+            >
+              <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? "border-violet-400 bg-violet-400/20" : "border-white/20"}`}>
+                {selected.includes(opt) && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>}
+              </span>
+              <span className="truncate">{opt}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: ReviewRow[]; onDelete: (id: string) => Promise<void>; onRestore: (id: string) => Promise<void>; accessToken: string }) {
-  const [search,   setSearch]   = useState("");
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [saving,   setSaving]   = useState(false);
+  const [search,          setSearch]          = useState("");
+  const [selCustomers,    setSelCustomers]    = useState<string[]>([]);
+  const [selPros,         setSelPros]         = useState<string[]>([]);
+  const [selServices,     setSelServices]     = useState<string[]>([]);
+  const [showDeleted,     setShowDeleted]     = useState(false);
+  const [deleteId,        setDeleteId]        = useState<string | null>(null);
+  const [saving,          setSaving]          = useState(false);
+
+  // Unique option lists derived from data
+  const customerOptions = useMemo(() =>
+    [...new Set(reviews.map(r => r.customerName).filter(Boolean) as string[])].sort(), [reviews]);
+  const proOptions = useMemo(() =>
+    [...new Set(reviews.map(r => r.proName).filter(Boolean) as string[])].sort(), [reviews]);
+  const serviceOptions = useMemo(() =>
+    [...new Set(reviews.map(r => r.serviceName).filter(Boolean) as string[])].sort(), [reviews]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -3274,13 +3343,26 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
     finally { setSaving(false); }
   };
 
-  const filtered = reviews.filter(r =>
-    r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-    r.proName?.toLowerCase().includes(search.toLowerCase()) ||
-    r.comment?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = reviews.filter(r => {
+    if (!showDeleted && r.deletedAt) return false;
+    if (showDeleted && !r.deletedAt) return false;
+    if (selCustomers.length > 0 && !selCustomers.includes(r.customerName ?? "")) return false;
+    if (selPros.length > 0      && !selPros.includes(r.proName ?? ""))           return false;
+    if (selServices.length > 0  && !selServices.includes(r.serviceName ?? ""))   return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        r.customerName?.toLowerCase().includes(q) ||
+        r.proName?.toLowerCase().includes(q) ||
+        r.serviceName?.toLowerCase().includes(q) ||
+        r.comment?.toLowerCase().includes(q) || false
+      );
+    }
+    return true;
+  });
 
   const stars = (n: number) => "★".repeat(Math.max(0, Math.min(5, n))) + "☆".repeat(Math.max(0, 5 - Math.min(5, n)));
+  const hasFilters = selCustomers.length > 0 || selPros.length > 0 || selServices.length > 0 || search;
 
   return (
     <div className="space-y-4">
@@ -3295,45 +3377,84 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
         />
       )}
 
-      <SearchBar value={search} onChange={setSearch} placeholder="Search reviews…" />
+      {/* Filters row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBar value={search} onChange={setSearch} placeholder="Search reviews…" />
+        <MultiSelect label="Customer"    options={customerOptions} selected={selCustomers} onChange={setSelCustomers} />
+        <MultiSelect label="Professional" options={proOptions}     selected={selPros}      onChange={setSelPros} />
+        <MultiSelect label="Service"     options={serviceOptions}  selected={selServices}  onChange={setSelServices} />
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(""); setSelCustomers([]); setSelPros([]); setSelServices([]); }}
+            className="text-xs text-white/40 hover:text-white/70 transition-colors px-2"
+          >
+            Clear all
+          </button>
+        )}
+        {/* Deleted toggle */}
+        <button
+          onClick={() => setShowDeleted(d => !d)}
+          className={`ml-auto text-xs px-3 py-1.5 rounded-lg border transition-colors ${showDeleted ? "border-red-500/50 text-red-400 bg-red-500/10" : "border-white/[0.1] text-white/40 hover:text-white/60"}`}
+        >
+          {showDeleted ? "Showing Deleted" : "Show Deleted"}
+        </button>
+      </div>
 
+      {/* Summary */}
+      <p className="text-white/30 text-xs">{filtered.length} review{filtered.length !== 1 ? "s" : ""} shown</p>
+
+      {/* Table */}
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.07]">
-                {["Customer", "Professional", "Rating", "Comment", "Date", "Action"].map(h => (
+                {["Customer", "Professional", "Service", "Rating", "Comment", "Date", "Status", "Action"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-white/[0.02]">
+                <tr key={r.id} className={`hover:bg-white/[0.02] ${r.deletedAt ? "opacity-50" : ""}`}>
                   <td className="px-4 py-3">
                     <p className="text-white font-medium whitespace-nowrap">{r.customerName ?? "—"}</p>
-                    <p className="text-white/40 text-[10px] truncate">{r.customerEmail ?? ""}</p>
+                    <p className="text-white/40 text-[10px] truncate max-w-[140px]">{r.customerEmail ?? ""}</p>
                   </td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{r.proName ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-yellow-400 text-xs whitespace-nowrap">{stars(r.rating)}</span>
-                    <span className="text-white/40 text-[10px] ml-1">{r.rating}/5</span>
+                  <td className="px-4 py-3 text-white/60 whitespace-nowrap text-xs max-w-[140px]">
+                    <p className="truncate">{r.serviceName ?? "—"}</p>
                   </td>
-                  <td className="px-4 py-3 text-white/60 text-xs max-w-[240px]">
-                    <p className="truncate">{r.comment ?? "—"}</p>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-yellow-400 text-xs whitespace-nowrap">{stars(r.rating)}</span>
+                      <span className="text-white/40 text-[10px]">{r.rating}/5</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-white/60 text-xs max-w-[220px]">
+                    <p className="truncate" title={r.comment ?? ""}>{r.comment ?? <span className="italic text-white/20">No comment</span>}</p>
                   </td>
                   <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
-                    {new Date(r.createdAt).toLocaleDateString("en-IN")}
+                    {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.deletedAt
+                      ? <Badge label="Deleted"  color="#EF4444" />
+                      : <Badge label="Active"   color="#16A34A" />}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1 flex-wrap">
-                      <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
-                      <ActionBtn variant="green" onClick={async () => { try { await onRestore(r.id); } catch(e: any) { alert(e.message); } }}>Restore</ActionBtn>
+                      {!r.deletedAt && (
+                        <ActionBtn variant="danger" onClick={() => setDeleteId(r.id)}>Delete</ActionBtn>
+                      )}
+                      {r.deletedAt && (
+                        <ActionBtn variant="green" onClick={async () => { try { await onRestore(r.id); } catch(e: any) { adminShowError(e.message); } }}>Restore</ActionBtn>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={6} text="No reviews found" />}
+              {filtered.length === 0 && <EmptyRow cols={8} text="No reviews match the selected filters" />}
             </tbody>
           </table>
         </div>

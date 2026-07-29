@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
-import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg, sql } from 'drizzle-orm';
+import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg, sql, gte, lte } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
@@ -46,12 +46,32 @@ export const adminController = {
 
   /* ───────────────────────── Bookings ────────────────────────── */
   listBookings: asyncHandler(async (req: Request, res: Response) => {
-    const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
+    const limit  = Math.min(Number(req.query.limit  ?? 50), 200);
     const offset = Number(req.query.offset ?? 0);
+
+    const fromParam   = req.query.from   ? String(req.query.from)   : undefined;
+    const toParam     = req.query.to     ? String(req.query.to)     : undefined;
+    const statusParam = req.query.status ? String(req.query.status) : undefined;
+    const VALID_STATUSES = ['pending', 'upcoming', 'in_progress', 'completed', 'cancelled'];
+
+    const conditions: any[] = [isNull(bookings.deletedAt)];
+    if (fromParam) {
+      const d = new Date(fromParam + 'T00:00:00Z');
+      if (!isNaN(d.getTime())) conditions.push(gte(bookings.scheduledAt, d));
+    }
+    if (toParam) {
+      const d = new Date(toParam + 'T23:59:59Z');
+      if (!isNaN(d.getTime())) conditions.push(lte(bookings.scheduledAt, d));
+    }
+    if (statusParam && VALID_STATUSES.includes(statusParam)) {
+      conditions.push(eq(bookings.status, statusParam));
+    }
+    const where = and(...conditions);
 
     const rows = await db
       .select({
         id: bookings.id,
+        customerId: bookings.customerId,
         status: bookings.status,
         serviceName: bookings.serviceName,
         proName: bookings.proName,
@@ -64,17 +84,24 @@ export const adminController = {
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
-      .where(isNull(bookings.deletedAt))
+      .where(where)
       .orderBy(desc(bookings.createdAt))
       .limit(limit)
       .offset(offset);
 
-    const [{ total }] = await db
-      .select({ total: count(bookings.id) })
+    const [totals] = await db
+      .select({ total: count(bookings.id), revenueSum: sum(bookings.price) })
       .from(bookings)
-      .where(isNull(bookings.deletedAt));
+      .where(where);
 
-    res.json({ success: true, data: { bookings: rows, total: Number(total) } });
+    res.json({
+      success: true,
+      data: {
+        bookings: rows,
+        total: Number(totals?.total ?? 0),
+        revenueSum: Number(totals?.revenueSum ?? 0),
+      },
+    });
   }),
 
   updateBooking: asyncHandler(async (req: Request, res: Response) => {
@@ -626,7 +653,7 @@ export const adminController = {
 
   /* ──────────────────────── Reviews ──────────────────────────── */
   listReviews: asyncHandler(async (req: Request, res: Response) => {
-    const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
+    const limit  = Math.min(Number(req.query.limit  ?? 500), 500);
     const offset = Number(req.query.offset ?? 0);
 
     const rows = await db
@@ -638,22 +665,23 @@ export const adminController = {
         deletedAt: reviews.deletedAt,
         customerId: reviews.customerId,
         professionalId: reviews.professionalId,
+        bookingId: reviews.bookingId,
         customerName: users.fullName,
         customerEmail: users.email,
         proName: professionals.name,
+        serviceName: bookings.serviceName,
       })
       .from(reviews)
       .leftJoin(users, eq(reviews.customerId, users.id))
       .leftJoin(professionals, eq(reviews.professionalId, professionals.id))
-      .where(isNull(reviews.deletedAt))
+      .leftJoin(bookings, eq(reviews.bookingId, bookings.id))
       .orderBy(desc(reviews.createdAt))
       .limit(limit)
       .offset(offset);
 
     const [{ total }] = await db
       .select({ total: count(reviews.id) })
-      .from(reviews)
-      .where(isNull(reviews.deletedAt));
+      .from(reviews);
 
     res.json({ success: true, data: { reviews: rows, total: Number(total) } });
   }),
@@ -807,6 +835,10 @@ export const adminController = {
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()))
       throw AppError.badRequest('Invalid from/to date');
 
+    // postgres driver requires strings (not Date objects) in raw sql templates
+    const fromIso = fromDate.toISOString();
+    const toIso   = toDate.toISOString();
+
     // Raw SQL query using date_trunc
     const rows = await db.execute(sql`
       SELECT
@@ -814,13 +846,13 @@ export const adminController = {
         COUNT(b.id)::int                            AS bookings,
         COALESCE(SUM(b.price), 0)::numeric          AS revenue,
         COUNT(DISTINCT CASE WHEN u.created_at >= date_trunc(${granularity}, b.scheduled_at)
-                             AND u.created_at  <  date_trunc(${granularity}, b.scheduled_at) + (INTERVAL '1 ' || ${granularity})
+                             AND u.created_at  <  date_trunc(${granularity}, b.scheduled_at) + ('1 ' || ${granularity})::interval
                             THEN b.customer_id END)::int AS "newCustomers"
       FROM bookings b
       LEFT JOIN users u ON u.id = b.customer_id
       WHERE b.deleted_at IS NULL
-        AND b.scheduled_at >= ${fromDate}
-        AND b.scheduled_at <= ${toDate}
+        AND b.scheduled_at >= ${fromIso}::timestamptz
+        AND b.scheduled_at <= ${toIso}::timestamptz
       GROUP BY 1
       ORDER BY 1 ASC
     `);

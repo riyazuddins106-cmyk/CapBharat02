@@ -435,7 +435,7 @@ Every mockup request -- whether handled directly or via subagents -- should show
 }
 ```
 
-Then once the component is built, `update` the placeholder's shapeId to set the URL and mark it live **with 3 `suggestedActions` in that same update**, with each changed property inside `updates`:
+Then once the component is built, `update` the placeholder's shapeId to set the URL and mark it live, with each changed property inside `updates`:
 
 ```json
 {
@@ -444,30 +444,11 @@ Then once the component is built, `update` the placeholder's shapeId to set the 
   "updates": {
     "url": "https://<dev-url>/__mockup/preview/pricing-cards/Bold",
     "componentPath": "artifacts/mockup-sandbox/src/components/mockups/pricing-cards/Bold.tsx",
-    "state": "live",
-    "suggestedActions": [
-      { "id": "checkout-page", "label": "Turn this pricing overview into a focused checkout flow", "category": "new page / flow extension", "content": { "kind": "prompt", "prompt": "Create a new frame that expands this pricing overview into a complete checkout flow with order details, payment fields, and a clear confirmation action" } },
-      { "id": "dark-editorial", "label": "Reimagine this page as a bold dark editorial spread", "category": "extreme reimagining", "content": { "kind": "prompt", "prompt": "Create a new variant of this design as a bold, editorial dark-mode magazine spread" } },
-      { "id": "cinematic-hero", "label": "Give the hero richer and more cinematic imagery", "category": "imagery refresh", "content": { "kind": "prompt", "prompt": "Generate a new variant with a moodier, cinematic hero using dramatic lighting and a more immersive composition" } }
-    ]
+    "state": "live"
   }
 }
 ```
 
-
-### Suggested next steps (required when marking a design frame live)
-
-Every design frame must carry 3 `suggestedActions` by the time it goes `state: "live"` — attach them in that same update (ideally also up front on the still-`building` frame so the cards appear immediately), for every live design frame including each fan-out variant and any frame spawned from a clicked suggestion. They render as one-click ghost-frame cards beside the frame; clicking one drops a new building frame and sends that prompt with the frame as context. A live design frame without them is a bug.
-
-Each suggestion is an object: `content` (`{ "kind": "prompt", "prompt": "…" }`, the hidden execution prompt sent verbatim when clicked), a required user-facing `label` (the card body, ≤60 chars), an optional freeform `category` style hint, and an authored short `id` slug (used for accept/dedup/telemetry). Author them with the **design-exploration** skill's principles (`pkg/agent-skills/skills/design-exploration/SKILL.md`):
-
-- **Write each `label` as one brief sentence describing the concrete change to the selected frame.** The user sees the original frame beside this sentence, so summarize what the proposed variant will change. Do not use a short title or category-like phrase, and do not copy or expose the full execution prompt.
-- **Phrase each prompt as a self-contained "new frame/variant" request.** A clicked suggestion arrives as an ordinary message with the source frame as context — nothing flags it as a branch — so the prompt must clearly ask for a NEW frame ("Create a new variant of this design that …", "Generate a new frame exploring …"), never an in-place edit of the selected frame.
-- **Direct refinements to copy, never edit.** When a suggestion refines an existing component ("add a vinyl section"), the prompt must say to copy the source into a new component file and change the copy — e.g. "Create a new variant of this design, as a new component file (do not modify existing files), that adds …". Whoever executes it may run in parallel with other agents reading the same source file.
-- **Comprehend the frame first** — its function, content, interaction, and visual structure — before generating suggestions.
-- **Each suggestion is a distinct design hypothesis**, not three reskins of the same page.
-- Default to **≥2 of 3 being net-new big swings** — a new page/screen the design implies, or an extreme reimagining (radically different art direction or layout) — with at most one incremental refinement. For image-heavy designs, make one a "new variant with regenerated imagery" prompt.
-- **Account for sibling frames and existing canvas frames** so suggestions diverge instead of colliding (e.g. don't have two variants both propose a light/dark toggle).
 
 
 ### When to use subagents
@@ -514,10 +495,6 @@ For modifications to existing mockups, set `state: "modifying"` on the iframe, e
 4. Delete the mockup's previous file only once no frame still references it.
 
 This is the one case where you replace a mockup's file with a new file under a different entry instead of editing in place.
-
-**Exploring a suggested action is not a modification.** When the work comes from a clicked ghost-frame suggestion, or any "iterate on this frame" / "what else could this be?" request, create a **new** component file and a **new** frame for the explored direction — do not edit the source frame's file or overwrite its `url`/contents in place. The source frame is the user's reference point and must stay intact. In-place modification (above) is only for an explicit "change *this* frame" request.
-
-**Never delete a reserved building frame.** A `state: "building"` iframe you did not create this turn is a reserved slot the client placed (e.g. from a clicked ghost-frame suggestion) for this loop or the next one. Fill it with an `update` if it's the slot for your current work; never delete one as "stray"/leftover cleanup. You may only delete building placeholders you created earlier this same turn and chose not to fill.
 
 
 
@@ -586,7 +563,6 @@ When done, update the canvas iframe to show the real preview:
   URL: https://<dev-url>/__mockup/preview/pricing-cards/Bold
   componentPath: artifacts/mockup-sandbox/src/components/mockups/pricing-cards/Bold.tsx
   state: "live"
-  suggestedActions: 3 follow-up suggestion cards, in this same "live" update (see "Suggested next steps (required when marking a design frame live)" above for how to author them)
 ```
 
 **Parent responsibilities:**
@@ -627,7 +603,6 @@ When done, update the canvas iframe to show the real preview:
   URL: https://<dev-url>/__mockup/preview/crm-dashboard/Dashboard
   componentPath: artifacts/mockup-sandbox/src/components/mockups/crm-dashboard/Dashboard.tsx
   state: "live"
-  suggestedActions: 3 follow-up suggestion cards, in this same "live" update (see "Suggested next steps (required when marking a design frame live)" above for how to author them)
 ```
 
 ### Pattern C: Multi-page with multiple variant directions
@@ -695,7 +670,6 @@ When done, update the canvas iframes to show real previews (set state: "live" on
   Shape ID: crm-minimal-dashboard -- URL: https://<dev-url>/__mockup/preview/crm-minimal/Dashboard
   Shape ID: crm-minimal-userlist -- URL: https://<dev-url>/__mockup/preview/crm-minimal/UserList
   Shape ID: crm-minimal-settings -- URL: https://<dev-url>/__mockup/preview/crm-minimal/Settings
-Attach 3 suggestedActions to each iframe in its same "live" update (see "Suggested next steps (required when marking a design frame live)" above).
 ```
 
 **Important:** The multi-page pattern above should only be used when the user explicitly requests separate pages. If the user says "design a CRM" or "design a dashboard" without specifying separate pages, build everything as a single page component.
