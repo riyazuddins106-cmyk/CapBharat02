@@ -349,6 +349,18 @@ export async function runMigrations() {
     `ALTER TABLE services ADD COLUMN IF NOT EXISTS badge VARCHAR(64)`);
   await run('column: services.featured',
     `ALTER TABLE services ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT false`);
+  await run('column: services.what_included',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS what_included TEXT`);
+  await run('column: services.what_not_included',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS what_not_included TEXT`);
+  await run('column: services.service_process',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS service_process TEXT`);
+  await run('column: services.requirements',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS requirements TEXT`);
+  await run('column: services.important_notes',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS important_notes TEXT`);
+  await run('column: services.cancellation_policy',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS cancellation_policy TEXT`);
   await run('index: services_category',    `CREATE INDEX IF NOT EXISTS idx_services_category    ON services(category_id)`);
   await run('index: services_subcategory', `CREATE INDEX IF NOT EXISTS idx_services_subcategory ON services(sub_category_id)`);
   await run('index: services_active',      `CREATE INDEX IF NOT EXISTS idx_services_active      ON services(is_active)`);

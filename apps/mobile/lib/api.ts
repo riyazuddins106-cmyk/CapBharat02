@@ -123,7 +123,9 @@ export interface Professional {
 export interface Service {
   id: string;
   categoryId: string;
+  categoryName?: string | null;
   subCategoryId: string | null;
+  subCategoryName?: string | null;
   name: string;
   description: string | null;
   images: string[];
@@ -133,6 +135,12 @@ export interface Service {
   badge: string | null;
   featured: boolean;
   isActive: boolean;
+  whatIncluded?: string | null;
+  whatNotIncluded?: string | null;
+  serviceProcess?: string | null;
+  requirements?: string | null;
+  importantNotes?: string | null;
+  cancellationPolicy?: string | null;
 }
 export interface CartItem {
   id: string;
@@ -322,6 +330,7 @@ export const servicesApi = {
     return request<{ services: Service[]; total: number }>(`/api/services${qs ? `?${qs}` : ''}`);
   },
   featured: () => request<{ services: Service[]; total: number }>('/api/services?featured=true'),
+  getById: (id: string) => request<Service>(`/api/services/${id}`).then((r: any) => r.data ?? r),
 };
 
 export const cartApi = {

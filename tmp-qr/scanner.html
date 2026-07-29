@@ -1,60 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset='utf-8'>
-  <title>ServeNow — Expo Go QR Codes</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ServeNow — Expo QR Codes</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; gap: 32px; }
-    h1 { font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
-    h1 span { color: #6366f1; }
-    .cards { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
-    .card { background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 20px; padding: 28px 32px; text-align: center; width: 280px; }
-    .card .icon { font-size: 2rem; margin-bottom: 8px; }
-    .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
-    .card p { font-size: 0.82rem; color: #888; margin-bottom: 20px; }
-    .qr-wrap { background: #fff; border-radius: 12px; padding: 10px; display: inline-block; }
-    .qr-wrap img { display: block; width: 220px; height: 220px; }
-    .url { font-size: 0.7rem; color: #6366f1; margin-top: 14px; word-break: break-all; }
-    .admin-card { background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 20px; padding: 24px 32px; text-align: center; width: 100%; max-width: 580px; }
-    .admin-card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
-    .admin-card p { font-size: 0.82rem; color: #888; margin-bottom: 14px; }
-    .admin-link { display: inline-block; background: #6366f1; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 10px 24px; border-radius: 10px; }
-    .admin-link:hover { background: #4f46e5; }
-    .admin-url { font-size: 0.7rem; color: #6366f1; margin-top: 10px; word-break: break-all; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f13;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+      gap: 40px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: #fff;
+    }
+    h1 span { color: #7c5ef5; }
+    .cards {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .card {
+      background: #1a1a24;
+      border: 1px solid #2e2e42;
+      border-radius: 20px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      width: 280px;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 99px;
+    }
+    .badge.customer { background: #1e3a5f; color: #60aaff; }
+    .badge.partner  { background: #2d1f5e; color: #a885ff; }
+    .card img {
+      width: 220px;
+      height: 220px;
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px;
+    }
+    .card h2 { font-size: 17px; font-weight: 600; }
+    .url {
+      font-size: 11px;
+      color: #888;
+      word-break: break-all;
+      text-align: center;
+      font-family: monospace;
+    }
+    .instructions {
+      background: #1a1a24;
+      border: 1px solid #2e2e42;
+      border-radius: 14px;
+      padding: 20px 28px;
+      max-width: 600px;
+      width: 100%;
+    }
+    .instructions h3 { font-size: 14px; color: #aaa; margin-bottom: 12px; font-weight: 500; }
+    .instructions ol { padding-left: 20px; line-height: 2; font-size: 14px; color: #ccc; }
+    .instructions ol li b { color: #fff; }
+    .status {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: #4caf50;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   </style>
 </head>
 <body>
-  <h1>ServeNow <span>Expo Go</span></h1>
+  <h1><span>ServeNow</span> — Expo Go QR Codes</h1>
+
+  <div class="status">
+    <div class="dot"></div>
+    Tunnels live · Bundles pre-warmed
+  </div>
 
   <div class="cards">
     <div class="card">
-      <div class="icon">👤</div>
-      <h2>Customer App</h2>
-      <p>Open in Expo Go on your phone</p>
-      <div class="qr-wrap">
-        <img src="customer-qr.png" alt="Customer App QR">
-      </div>
-      <div class="url">exp://qkcz8_i-anonymous-8080.exp.direct</div>
+      <div class="badge customer">Customer App</div>
+      <img src="/customer-qr.png" alt="Customer App QR" />
+      <h2>ServeNow Customer</h2>
+      <div class="url">exp://mkokke8-anonymous-8080.exp.direct</div>
     </div>
 
     <div class="card">
-      <div class="icon">🔧</div>
-      <h2>Partner App</h2>
-      <p>Open in Expo Go on your phone</p>
-      <div class="qr-wrap">
-        <img src="partner-qr.png" alt="Partner App QR">
-      </div>
-      <div class="url">exp://1xsxe-4-anonymous-8099.exp.direct</div>
+      <div class="badge partner">Partner App</div>
+      <img src="/partner-qr.png" alt="Partner App QR" />
+      <h2>ServeNow Partner</h2>
+      <div class="url">exp://tagabwu-anonymous-8099.exp.direct</div>
     </div>
   </div>
 
-  <div class="admin-card">
-    <div style="font-size:1.5rem;margin-bottom:8px">🛠️</div>
-    <h2>Admin Panel</h2>
-    <p>Open in your browser</p>
-    <a class="admin-link" href="https://64331acd-62af-4a50-bb6e-7361abf2c242-00-3tx2h4jxz6mff.sisko.replit.dev/admin-panel/" target="_blank">Open Admin Panel →</a>
-    <div class="admin-url">https://64331acd-62af-4a50-bb6e-7361abf2c242-00-3tx2h4jxz6mff.sisko.replit.dev/admin-panel/</div>
+  <div class="instructions">
+    <h3>HOW TO OPEN</h3>
+    <ol>
+      <li>Install <b>Expo Go</b> on your phone (App Store / Play Store)</li>
+      <li><b>Android:</b> Open Expo Go → tap <b>Scan QR code</b></li>
+      <li><b>iOS:</b> Use the default <b>Camera app</b> to scan</li>
+      <li>Wait ~5 s for the bundle to load (already pre-warmed)</li>
+    </ol>
   </div>
 </body>
 </html>

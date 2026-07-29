@@ -6,3 +6,15 @@ id = "fa_HV9YGqe6aeN2iZrz4A"
 uri = "file://SERVENOW_DOCUMENTATION.md"
 type = "text"
 title = "ServeNow — Complete Technical Documentation"
+
+[[outputs]]
+id = "MEeSS8MViqkHJ2P8Q05Ar"
+uri = "file://tmp-qr/customer-qr.png"
+type = "image"
+title = "Customer App QR Code"
+
+[[outputs]]
+id = "_Wqe-I0I3-b57w9_gOIrp"
+uri = "file://tmp-qr/partner-qr.png"
+type = "image"
+title = "Partner App QR Code"

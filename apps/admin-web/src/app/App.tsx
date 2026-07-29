@@ -5062,10 +5062,14 @@ type SvcForm = {
   name: string; categoryId: string; subCategoryId: string;
   description: string; customerPrice: string; partnerPayout: string;
   duration: string; requiredSkill: string; isActive: boolean;
+  whatIncluded: string; whatNotIncluded: string; serviceProcess: string;
+  requirements: string; importantNotes: string; cancellationPolicy: string;
 };
 const EMPTY_SVC: SvcForm = {
   name: "", categoryId: "", subCategoryId: "", description: "",
   customerPrice: "", partnerPayout: "", duration: "60", requiredSkill: "", isActive: true,
+  whatIncluded: "", whatNotIncluded: "", serviceProcess: "",
+  requirements: "", importantNotes: "", cancellationPolicy: "",
 };
 
 function ServicesView({
@@ -5106,6 +5110,9 @@ function ServicesView({
       description: s.description ?? "", customerPrice: String(s.customerPrice),
       partnerPayout: String(s.partnerPayout), duration: String(s.duration),
       requiredSkill: s.requiredSkill ?? "", isActive: s.isActive,
+      whatIncluded: s.whatIncluded ?? "", whatNotIncluded: s.whatNotIncluded ?? "",
+      serviceProcess: s.serviceProcess ?? "", requirements: s.requirements ?? "",
+      importantNotes: s.importantNotes ?? "", cancellationPolicy: s.cancellationPolicy ?? "",
     });
     setEditTarget(s);
   };
@@ -5119,6 +5126,12 @@ function ServicesView({
     duration: Number(f.duration) || 60,
     requiredSkill: f.requiredSkill || undefined,
     isActive: f.isActive,
+    whatIncluded: f.whatIncluded || undefined,
+    whatNotIncluded: f.whatNotIncluded || undefined,
+    serviceProcess: f.serviceProcess || undefined,
+    requirements: f.requirements || undefined,
+    importantNotes: f.importantNotes || undefined,
+    cancellationPolicy: f.cancellationPolicy || undefined,
   });
 
   const handleCreate = async () => {
@@ -5204,6 +5217,29 @@ function ServicesView({
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.isActive ? "translate-x-5" : ""}`} />
         </div>
         <span className="text-white/60 text-xs">{form.isActive ? "Active" : "Inactive"} — customers can book this service</span>
+      </div>
+
+      {/* ── Service Detail Fields ── */}
+      <div className="border-t border-white/10 pt-4 space-y-4">
+        <p className="text-white/40 text-xs font-semibold uppercase tracking-widest">Service Details (shown on detail page)</p>
+        <Field label="What's Included">
+          <TextArea value={form.whatIncluded} onChange={v => setForm(f => ({ ...f, whatIncluded: v }))} placeholder={"• Professional equipment and supplies\n• Deep cleaning of all surfaces\n• Post-service cleanup"} rows={4} />
+        </Field>
+        <Field label="What's Not Included">
+          <TextArea value={form.whatNotIncluded} onChange={v => setForm(f => ({ ...f, whatNotIncluded: v }))} placeholder={"• Exterior window cleaning\n• Furniture moving"} rows={3} />
+        </Field>
+        <Field label="Service Process">
+          <TextArea value={form.serviceProcess} onChange={v => setForm(f => ({ ...f, serviceProcess: v }))} placeholder={"1. Technician arrives and assesses the area\n2. Equipment is set up\n3. Service is performed\n4. Quality check and sign-off"} rows={4} />
+        </Field>
+        <Field label="Requirements">
+          <TextArea value={form.requirements} onChange={v => setForm(f => ({ ...f, requirements: v }))} placeholder={"• Ensure water and electricity access\n• Clear the area before arrival"} rows={3} />
+        </Field>
+        <Field label="Important Notes">
+          <TextArea value={form.importantNotes} onChange={v => setForm(f => ({ ...f, importantNotes: v }))} placeholder={"• Please ensure someone is home during the service\n• Pets should be kept away from the work area"} rows={3} />
+        </Field>
+        <Field label="Cancellation Policy">
+          <TextArea value={form.cancellationPolicy} onChange={v => setForm(f => ({ ...f, cancellationPolicy: v }))} placeholder={"Free cancellation up to 2 hours before the scheduled time. Late cancellations may incur a fee."} rows={3} />
+        </Field>
       </div>
     </div>
   );

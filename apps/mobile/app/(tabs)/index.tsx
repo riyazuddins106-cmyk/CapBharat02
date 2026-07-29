@@ -416,8 +416,10 @@ export default function HomeScreen() {
           [0, 1, 2].map((i) => <ProCardShimmer key={i} />)
         ) : (
           featuredServices.slice(0, 6).map((service) => (
-            <View
+            <TouchableOpacity
               key={service.id}
+              activeOpacity={0.92}
+              onPress={() => { Haptics.selectionAsync(); router.push(`/service/${service.id}` as any); }}
               style={[styles.productCard, { backgroundColor: colors.card, borderColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }]}
             >
               <View style={styles.productImageWrapper}>
@@ -446,20 +448,22 @@ export default function HomeScreen() {
                       <Ionicons name="time-outline" size={10} color={colors.mutedForeground} /> {service.duration} min
                     </Text>
                   </View>
-                  {accessToken && (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      disabled={cartMutation.isPending}
-                      onPress={() => { Haptics.selectionAsync(); cartMutation.mutate(service.id); }}
-                      style={[styles.bookBtn, { backgroundColor: '#5B3EF5', opacity: cartMutation.isPending ? 0.6 : 1 }]}
-                    >
-                      <Ionicons name="add" size={14} color="#fff" />
-                      <Text style={[styles.bookBtnText, { color: '#fff' }]}>Add</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={!!accessToken && cartMutation.isPending}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      if (!accessToken) { router.push('/auth'); return; }
+                      cartMutation.mutate(service.id);
+                    }}
+                    style={[styles.bookBtn, { backgroundColor: '#5B3EF5', opacity: (accessToken && cartMutation.isPending) ? 0.6 : 1 }]}
+                  >
+                    <Ionicons name="add" size={14} color="#fff" />
+                    <Text style={[styles.bookBtnText, { color: '#fff' }]}>Add</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </View>

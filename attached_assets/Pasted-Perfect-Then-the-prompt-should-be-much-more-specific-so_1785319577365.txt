@@ -1,0 +1,115 @@
+Perfect. Then the prompt should be **much more specific** so Replit AI doesn't create anything new.
+
+Use this:
+
+---
+
+# Replit AI Prompt – Enable Existing Service Details Page
+
+## Objective
+
+Analyze the existing Customer Web, Customer Mobile App, Backend, APIs, and Admin Panel.
+
+**Do NOT create a new Service Details page if one already exists.**
+
+The application already has Service Management and the booking flow. The issue is that clicking on a Service does not navigate to or display the Service Details page correctly.
+
+Your task is to identify why the Service Details page is not being shown and fix the existing implementation.
+
+---
+
+## Customer Web & Customer Mobile
+
+When a user clicks/taps on a Service card:
+
+* Navigate to the existing Service Details page.
+* If the route already exists, fix the navigation.
+* If the page exists but is not connected, connect it to the Service cards.
+* If the API call is incorrect, fix the API.
+* If the Service ID is not being passed correctly, fix the parameter passing.
+* If the page exists but is displaying empty data, fix the data loading.
+
+Do not create duplicate pages.
+
+Reuse the existing page and existing design.
+
+---
+
+## Data Loading
+
+The Service Details page must load the complete Service information from the existing Admin-created Service.
+
+Display:
+
+* Service Name
+* Category
+* Subcategory
+* Service Images
+* Price
+* Duration
+* Short Description
+* Detailed Description
+* What's Included
+* What's Not Included
+* Service Process
+* Requirements
+* Important Notes
+* Cancellation Policy
+
+Only display fields that already exist.
+
+If some fields are available in the database but not returned by the API, extend the existing API to include them.
+
+---
+
+## Admin Panel
+
+Analyze the existing Create Service and Update Service forms.
+
+If any Service Details fields already exist but are not being saved correctly, fix the save/update logic.
+
+If the Service Details page expects fields that are missing from the Service Management form, add only those missing fields to the existing Create/Edit Service screens.
+
+Do not redesign the Admin Panel.
+
+Do not create duplicate forms.
+
+---
+
+## Navigation
+
+Verify:
+
+* Service Card → Service Details
+* Service Details → Book Service
+
+Ensure both Customer Web and Customer Mobile use the same navigation flow.
+
+---
+
+## API & Backend
+
+Verify:
+
+* Service ID is passed correctly.
+* The correct Service is fetched.
+* API returns complete Service details.
+* No hardcoded data is used.
+* Existing endpoints are reused whenever possible.
+
+---
+
+## Validation
+
+Before completing:
+
+* Clicking any Service opens the existing Service Details page.
+* The page displays the correct Service information from the Admin-created Service.
+* Customer Web and Customer Mobile behave identically.
+* Admin can create/update the information displayed on the Service Details page.
+* No duplicate pages, routes, or APIs are created.
+* Existing UI and navigation remain unchanged.
+
+---
+
+This prompt tells Replit AI to **debug and connect the existing functionality**, rather than generating a new Service Details page or redesigning the app.

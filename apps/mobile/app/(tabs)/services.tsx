@@ -274,7 +274,11 @@ export default function ServicesScreen() {
           ) : null
         }
         renderItem={({ item: service }) => (
-          <View style={[styles.catalogCard, { backgroundColor: colors.card, borderColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }]}>
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onPress={() => { Haptics.selectionAsync(); router.push(`/service/${service.id}` as any); }}
+            style={[styles.catalogCard, { backgroundColor: colors.card, borderColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }]}
+          >
             <View style={styles.catalogImageWrapper}>
               {service.images?.[0] ? (
                 <Image source={{ uri: service.images[0] }} style={styles.catalogImage} />
@@ -302,18 +306,17 @@ export default function ServicesScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => accessToken && cartMutation.mutate(service.id)}
-                  disabled={!accessToken}
+                  onPress={(e) => { e.stopPropagation?.(); Haptics.selectionAsync(); if (!accessToken) { router.push('/auth'); return; } cartMutation.mutate(service.id); }}
                   activeOpacity={0.8}
-                  style={[styles.catalogAddBtn, { backgroundColor: accessToken ? '#5B3EF5' : colors.muted }]}
+                  style={[styles.catalogAddBtn, { backgroundColor: '#5B3EF5' }]}
                 >
-                  <Text style={[styles.catalogAddBtnText, { color: accessToken ? '#fff' : colors.mutedForeground }]}>
-                    {accessToken ? '+ Add' : 'Sign in'}
+                  <Text style={[styles.catalogAddBtnText, { color: '#fff' }]}>
+                    + Add
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>

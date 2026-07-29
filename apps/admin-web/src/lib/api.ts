@@ -257,6 +257,12 @@ export interface ServiceRow {
   duration: number;
   requiredSkill?: string | null;
   isActive: boolean;
+  whatIncluded?: string | null;
+  whatNotIncluded?: string | null;
+  serviceProcess?: string | null;
+  requirements?: string | null;
+  importantNotes?: string | null;
+  cancellationPolicy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -379,6 +385,12 @@ export type ServiceInput = {
   duration?: number;
   requiredSkill?: string;
   isActive?: boolean;
+  whatIncluded?: string;
+  whatNotIncluded?: string;
+  serviceProcess?: string;
+  requirements?: string;
+  importantNotes?: string;
+  cancellationPolicy?: string;
 };
 
 // ── Base request ─────────────────────────────────────────────────────────────

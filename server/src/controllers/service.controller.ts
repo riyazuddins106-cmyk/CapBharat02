@@ -9,24 +9,30 @@ import { AppError } from '../utils/AppError.js';
 
 function formatService(row: any, cat: any, sub: any) {
   return {
-    id:             row.id,
-    categoryId:     row.categoryId,
-    categoryName:   cat?.name ?? null,
-    subCategoryId:  row.subCategoryId,
-    subCategoryName: sub?.name ?? null,
-    name:           row.name,
-    description:    row.description,
-    images:         Array.isArray(row.images) ? row.images : [],
-    customerPrice:  row.customerPrice,
-    partnerPayout:  row.partnerPayout,
-    commission:     row.commission,
-    duration:       row.duration,
-    requiredSkill:  row.requiredSkill,
-    badge:          row.badge,
-    featured:       row.featured,
-    isActive:       row.isActive,
-    createdAt:      row.createdAt,
-    updatedAt:      row.updatedAt,
+    id:                  row.id,
+    categoryId:          row.categoryId,
+    categoryName:        cat?.name ?? null,
+    subCategoryId:       row.subCategoryId,
+    subCategoryName:     sub?.name ?? null,
+    name:                row.name,
+    description:         row.description,
+    images:              Array.isArray(row.images) ? row.images : [],
+    customerPrice:       row.customerPrice,
+    partnerPayout:       row.partnerPayout,
+    commission:          row.commission,
+    duration:            row.duration,
+    requiredSkill:       row.requiredSkill,
+    badge:               row.badge,
+    featured:            row.featured,
+    isActive:            row.isActive,
+    whatIncluded:        row.whatIncluded ?? null,
+    whatNotIncluded:     row.whatNotIncluded ?? null,
+    serviceProcess:      row.serviceProcess ?? null,
+    requirements:        row.requirements ?? null,
+    importantNotes:      row.importantNotes ?? null,
+    cancellationPolicy:  row.cancellationPolicy ?? null,
+    createdAt:           row.createdAt,
+    updatedAt:           row.updatedAt,
   };
 }
 
@@ -109,10 +115,13 @@ export const serviceController = {
     const {
       categoryId, subCategoryId, name, description,
       images, customerPrice, partnerPayout, duration, requiredSkill, isActive,
+      whatIncluded, whatNotIncluded, serviceProcess, requirements, importantNotes, cancellationPolicy,
     } = req.body as {
       categoryId: string; subCategoryId?: string; name: string; description?: string;
       images?: string[]; customerPrice: number; partnerPayout: number;
       duration?: number; requiredSkill?: string; isActive?: boolean;
+      whatIncluded?: string; whatNotIncluded?: string; serviceProcess?: string;
+      requirements?: string; importantNotes?: string; cancellationPolicy?: string;
     };
 
     if (!name?.trim())      throw AppError.badRequest('Name is required');
@@ -130,16 +139,22 @@ export const serviceController = {
 
     const [row] = await db.insert(services).values({
       categoryId,
-      subCategoryId:  subCategoryId || null,
-      name:           name.trim(),
-      description:    description || null,
-      images:         Array.isArray(images) ? images : [],
-      customerPrice:  cPrice,
-      partnerPayout:  pPayout,
+      subCategoryId:       subCategoryId || null,
+      name:                name.trim(),
+      description:         description || null,
+      images:              Array.isArray(images) ? images : [],
+      customerPrice:       cPrice,
+      partnerPayout:       pPayout,
       commission,
-      duration:       Number(duration ?? 60),
-      requiredSkill:  requiredSkill?.trim() || null,
-      isActive:       isActive !== false,
+      duration:            Number(duration ?? 60),
+      requiredSkill:       requiredSkill?.trim() || null,
+      isActive:            isActive !== false,
+      whatIncluded:        whatIncluded || null,
+      whatNotIncluded:     whatNotIncluded || null,
+      serviceProcess:      serviceProcess || null,
+      requirements:        requirements || null,
+      importantNotes:      importantNotes || null,
+      cancellationPolicy:  cancellationPolicy || null,
     }).returning();
 
     const [created] = await db
@@ -166,6 +181,7 @@ export const serviceController = {
     const {
       name, categoryId, subCategoryId, description,
       images, customerPrice, partnerPayout, duration, requiredSkill, isActive,
+      whatIncluded, whatNotIncluded, serviceProcess, requirements, importantNotes, cancellationPolicy,
     } = req.body as Record<string, any>;
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -176,7 +192,13 @@ export const serviceController = {
     if (images        !== undefined) patch.images        = Array.isArray(images) ? images : [];
     if (isActive      !== undefined) patch.isActive      = Boolean(isActive);
     if (duration      !== undefined) patch.duration      = Number(duration);
-    if (requiredSkill !== undefined) patch.requiredSkill = requiredSkill?.trim() || null;
+    if (requiredSkill         !== undefined) patch.requiredSkill       = requiredSkill?.trim() || null;
+    if (whatIncluded         !== undefined) patch.whatIncluded        = whatIncluded || null;
+    if (whatNotIncluded      !== undefined) patch.whatNotIncluded     = whatNotIncluded || null;
+    if (serviceProcess       !== undefined) patch.serviceProcess      = serviceProcess || null;
+    if (requirements         !== undefined) patch.requirements        = requirements || null;
+    if (importantNotes       !== undefined) patch.importantNotes      = importantNotes || null;
+    if (cancellationPolicy   !== undefined) patch.cancellationPolicy  = cancellationPolicy || null;
 
     let cPrice  = existing.customerPrice;
     let pPayout = existing.partnerPayout;
