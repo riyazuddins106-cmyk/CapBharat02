@@ -193,6 +193,32 @@ function EmptyRow({ cols, text }: { cols: number; text: string }) {
   return <tr><td colSpan={cols} className="px-4 py-8 text-white/30 text-center text-sm">{text}</td></tr>;
 }
 
+function Pagination({ page, total, pageSize, onChange }: {
+  page: number; total: number; pageSize: number; onChange: (p: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to   = Math.min(page * pageSize, total);
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.07]">
+      <span className="text-white/40 text-xs">
+        {total === 0 ? "No results" : `Showing ${from}–${to} of ${total}`}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => onChange(page - 1)} disabled={page <= 1}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >Prev</button>
+        <span className="px-2 text-white/40 text-xs font-medium">{page} / {totalPages}</span>
+        <button
+          onClick={() => onChange(page + 1)} disabled={page >= totalPages}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >Next</button>
+      </div>
+    </div>
+  );
+}
+
 function AccessDenied() {
   return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
@@ -274,6 +300,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
 const ADMIN_SIDEBAR = [
   { id: "dashboard",      icon: Home,        label: "Dashboard"                     },
   { id: "bookings",       icon: BookOpen,    label: "Bookings"                      },
+  { id: "booking-history", icon: HistoryIcon, label: "Booking History"              },
   { id: "dispatch",       icon: Navigation,  label: "Booking Operations Centre"     },
   { id: "pros",           icon: Users,       label: "Professionals"                 },
   { id: "users",          icon: UserCheck,   label: "Users"                         },
@@ -740,6 +767,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <DashboardView stats={stats} bookings={bookingList} pros={proList} />
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
+          ) : activeSection === "booking-history" ? (
+            <BookingHistoryView bookings={bookingList} />
           ) : activeSection === "pros" ? (
             <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} />
           ) : activeSection === "create-pro" ? (
@@ -988,6 +1017,8 @@ function DispatchView({
   const [loadingPartners, setLoadingPartners] = useState(false);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const DV_PAGE_SIZE = 20;
+  const [dvPage,      setDvPage]      = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -1041,6 +1072,9 @@ function DispatchView({
     const matchesStatus = statusFilter === "all" || r.dispatchStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const dvPaged = filtered.slice((dvPage - 1) * DV_PAGE_SIZE, dvPage * DV_PAGE_SIZE);
+
+  useEffect(() => { setDvPage(1); }, [search, statusFilter]);
 
   const STATUS_OPTIONS = [
     { value: "all",               label: "All" },
@@ -1129,7 +1163,7 @@ function DispatchView({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((request) => (
+              {dvPaged.map((request) => (
                 <tr key={request.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-4 py-3 text-white font-medium">{request.customerName}</td>
                   <td className="px-4 py-3 text-white/70">{request.serviceName}</td>
@@ -1161,6 +1195,7 @@ function DispatchView({
             </tbody>
           </table>
         </div>
+        <Pagination page={dvPage} total={filtered.length} pageSize={DV_PAGE_SIZE} onChange={setDvPage} />
       </div>
 
       {/* Modal */}
@@ -1195,6 +1230,8 @@ function BookingsView({
   onCancel: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
+  const BV_PAGE_SIZE = 20;
+  const [bvPage,      setBvPage]      = useState(1);
   const [search,      setSearch]      = useState("");
   const [editTarget,  setEditTarget]  = useState<BookingRow | null>(null);
   const [deleteId,    setDeleteId]    = useState<string | null>(null);
@@ -1247,6 +1284,7 @@ function BookingsView({
     b.customerName?.toLowerCase().includes(search.toLowerCase()) ||
     b.proName?.toLowerCase().includes(search.toLowerCase())
   );
+  const bvPaged = filtered.slice((bvPage - 1) * BV_PAGE_SIZE, bvPage * BV_PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -1298,7 +1336,7 @@ function BookingsView({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((b) => (
+              {bvPaged.map((b) => (
                 <tr key={b.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3 text-white font-medium whitespace-nowrap">{b.serviceName}</td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.customerName ?? "—"}</td>
@@ -1324,11 +1362,272 @@ function BookingsView({
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={7} text="No bookings found" />}
+              {bvPaged.length === 0 && <EmptyRow cols={7} text="No bookings found" />}
             </tbody>
           </table>
         </div>
+        <Pagination page={bvPage} total={filtered.length} pageSize={BV_PAGE_SIZE} onChange={p => { setBvPage(p); }} />
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BOOKING HISTORY
+═══════════════════════════════════════════════════════════════════ */
+
+function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
+  const PAGE_SIZE = 25;
+  const [page,         setPage]         = useState(1);
+  const [search,       setSearch]       = useState("");
+  const [dateFrom,     setDateFrom]     = useState("");
+  const [dateTo,       setDateTo]       = useState("");
+  const [selStatuses,  setSelStatuses]  = useState<string[]>([]);
+  const [selCustomers, setSelCustomers] = useState<string[]>([]);
+  const [selPros,      setSelPros]      = useState<string[]>([]);
+
+  const resetPage = () => setPage(1);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmtDt = (d: Date, end = false) =>
+    `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${end ? "23:59" : "00:00"}`;
+
+  const applyPreset = (preset: "today" | "week" | "month" | "all") => {
+    const now = new Date();
+    if (preset === "today") {
+      setDateFrom(fmtDt(now)); setDateTo(fmtDt(now, true));
+    } else if (preset === "week") {
+      const s = new Date(now); s.setDate(now.getDate() - 6);
+      setDateFrom(fmtDt(s)); setDateTo(fmtDt(now, true));
+    } else if (preset === "month") {
+      const s = new Date(now.getFullYear(), now.getMonth(), 1);
+      setDateFrom(fmtDt(s)); setDateTo(fmtDt(now, true));
+    } else {
+      setDateFrom(""); setDateTo("");
+    }
+    resetPage();
+  };
+
+  const STATUS_OPTIONS = ["pending", "upcoming", "in_progress", "completed", "cancelled"];
+  const customerOptions = useMemo(() =>
+    [...new Set(bookings.map(b => b.customerName).filter(Boolean) as string[])].sort(), [bookings]);
+  const proOptions = useMemo(() =>
+    [...new Set(bookings.map(b => b.proName).filter(Boolean) as string[])].sort(), [bookings]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return bookings.filter(b => {
+      if (selStatuses.length > 0  && !selStatuses.includes(b.status))           return false;
+      if (selCustomers.length > 0 && !selCustomers.includes(b.customerName ?? "")) return false;
+      if (selPros.length > 0      && !selPros.includes(b.proName))              return false;
+      if (dateFrom && new Date(b.scheduledAt) < new Date(dateFrom))             return false;
+      if (dateTo   && new Date(b.scheduledAt) > new Date(dateTo))               return false;
+      if (q) return (
+        b.serviceName?.toLowerCase().includes(q) ||
+        (b.customerName ?? "").toLowerCase().includes(q) ||
+        b.proName?.toLowerCase().includes(q) ||
+        (b.customerEmail ?? "").toLowerCase().includes(q)
+      );
+      return true;
+    });
+  }, [bookings, search, dateFrom, dateTo, selStatuses, selCustomers, selPros]);
+
+  // Totals
+  const totalRevenue     = filtered.reduce((s, b) => s + (b.price || 0), 0);
+  const completedItems   = filtered.filter(b => b.status === "completed");
+  const completedRevenue = completedItems.reduce((s, b) => s + (b.price || 0), 0);
+  const completedCount   = completedItems.length;
+  const cancelledCount   = filtered.filter(b => b.status === "cancelled").length;
+  const pendingCount     = filtered.filter(b => b.status === "pending" || b.status === "upcoming").length;
+  const avgValue         = filtered.length > 0 ? totalRevenue / filtered.length : 0;
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const hasFilters = search || dateFrom || dateTo || selStatuses.length > 0 || selCustomers.length > 0 || selPros.length > 0;
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── Date range card ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-4 space-y-3" style={CARD}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-white/40 text-[11px] font-bold tracking-wide uppercase">Date Range</span>
+          {(["today","week","month","all"] as const).map(p => (
+            <button key={p} onClick={() => applyPreset(p)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:text-white/80 hover:bg-white/[0.05] hover:border-white/20 transition-colors"
+            >
+              {p === "today" ? "Today" : p === "week" ? "Last 7 days" : p === "month" ? "This month" : "All time"}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-white/40 text-xs whitespace-nowrap">From</label>
+            <input
+              type="datetime-local" value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); resetPage(); }}
+              className="rounded-xl px-3 py-2 text-white text-xs border border-white/10 outline-none focus:border-violet-500/60 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)" }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-white/40 text-xs whitespace-nowrap">To</label>
+            <input
+              type="datetime-local" value={dateTo}
+              onChange={e => { setDateTo(e.target.value); resetPage(); }}
+              className="rounded-xl px-3 py-2 text-white text-xs border border-white/10 outline-none focus:border-violet-500/60 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)" }}
+            />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); resetPage(); }}
+              className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
+              Clear dates
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Filters row ── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBar
+          value={search}
+          onChange={v => { setSearch(v); resetPage(); }}
+          placeholder="Search service, customer, professional…"
+        />
+        <MultiSelect
+          label="Status"
+          options={STATUS_OPTIONS}
+          selected={selStatuses}
+          onChange={v => { setSelStatuses(v); resetPage(); }}
+        />
+        <MultiSelect
+          label="Customer"
+          options={customerOptions}
+          selected={selCustomers}
+          onChange={v => { setSelCustomers(v); resetPage(); }}
+        />
+        <MultiSelect
+          label="Professional"
+          options={proOptions}
+          selected={selPros}
+          onChange={v => { setSelPros(v); resetPage(); }}
+        />
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setSelStatuses([]); setSelCustomers([]); setSelPros([]); resetPage(); }}
+            className="text-xs text-white/40 hover:text-white/70 transition-colors px-2"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* ── KPI summary strip ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          { label: "Total Bookings",   value: filtered.length.toString(),            color: "#5B3EF5" },
+          { label: "Total Revenue",    value: fmt(totalRevenue),                      color: "#16A34A" },
+          { label: "Completed",        value: `${completedCount} · ${fmt(completedRevenue)}`, color: "#16A34A" },
+          { label: "Pending / Active", value: pendingCount.toString(),                color: "#F59E0B" },
+          { label: "Cancelled",        value: cancelledCount.toString(),              color: "#EF4444" },
+          { label: "Avg. Value",       value: fmt(Math.round(avgValue)),              color: "#0EA5E9" },
+        ].map(k => (
+          <div key={k.label} className="rounded-xl border border-white/[0.07] px-4 py-3" style={CARD}>
+            <p className="text-white/40 text-[10px] font-semibold uppercase tracking-wide mb-1">{k.label}</p>
+            <p className="text-white font-bold text-sm" style={{ color: k.color }}>{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Table ── */}
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.07]">
+                {["#", "Service", "Customer", "Professional", "Amount", "Scheduled At", "Created At", "Status", "Notes"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {paged.map((b, i) => (
+                <tr key={b.id} className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3 text-white/30 text-xs tabular-nums">
+                    {(page - 1) * PAGE_SIZE + i + 1}
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-white font-medium whitespace-nowrap">{b.serviceName}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-white/70 whitespace-nowrap">{b.customerName ?? "—"}</p>
+                    {b.customerEmail && (
+                      <p className="text-white/30 text-[10px] truncate max-w-[160px]">{b.customerEmail}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.proName ?? "—"}</td>
+                  <td className="px-4 py-3 text-white/80 font-semibold whitespace-nowrap">{fmt(b.price)}</td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                    {new Date(b.scheduledAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                    {new Date(b.scheduledAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                  </td>
+                  <td className="px-4 py-3 text-white/30 text-xs whitespace-nowrap">
+                    {new Date(b.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                    {new Date(b.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge label={b.status.replace(/_/g, " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
+                  </td>
+                  <td className="px-4 py-3 text-white/40 text-xs max-w-[200px]">
+                    <p className="truncate" title={b.notes ?? ""}>{b.notes ?? <span className="italic text-white/20">—</span>}</p>
+                  </td>
+                </tr>
+              ))}
+              {paged.length === 0 && <EmptyRow cols={9} text="No bookings match the selected filters" />}
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
+      </div>
+
+      {/* ── Totals footer ── */}
+      {filtered.length > 0 && (
+        <div className="rounded-2xl border border-violet-500/20 px-6 py-4" style={{ background: "rgba(91,62,245,0.06)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(91,62,245,0.2)" }}>
+                <DollarSign size={14} color="#7C5BF8" />
+              </div>
+              <span className="text-white/60 text-sm font-semibold">
+                {filtered.length} booking{filtered.length !== 1 ? "s" : ""}
+                {(dateFrom || dateTo) ? " in selected period" : ""}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="text-center">
+                <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Total Revenue</p>
+                <p className="text-white font-bold text-base">{fmt(totalRevenue)}</p>
+              </div>
+              <div className="w-px h-8 bg-white/[0.08]" />
+              <div className="text-center">
+                <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Completed</p>
+                <p className="font-bold text-base" style={{ color: "#16A34A" }}>{fmt(completedRevenue)}</p>
+              </div>
+              <div className="w-px h-8 bg-white/[0.08]" />
+              <div className="text-center">
+                <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Avg. Booking</p>
+                <p className="text-white font-bold text-base">{fmt(Math.round(avgValue))}</p>
+              </div>
+              <div className="w-px h-8 bg-white/[0.08]" />
+              <div className="text-center">
+                <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Cancelled</p>
+                <p className="font-bold text-base" style={{ color: "#EF4444" }}>{cancelledCount}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3343,6 +3642,9 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
     finally { setSaving(false); }
   };
 
+  const RV_PAGE_SIZE = 20;
+  const [rvPage, setRvPage] = useState(1);
+
   const filtered = reviews.filter(r => {
     if (!showDeleted && r.deletedAt) return false;
     if (showDeleted && !r.deletedAt) return false;
@@ -3360,6 +3662,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
     }
     return true;
   });
+  const rvPaged = filtered.slice((rvPage - 1) * RV_PAGE_SIZE, rvPage * RV_PAGE_SIZE);
 
   const stars = (n: number) => "★".repeat(Math.max(0, Math.min(5, n))) + "☆".repeat(Math.max(0, 5 - Math.min(5, n)));
   const hasFilters = selCustomers.length > 0 || selPros.length > 0 || selServices.length > 0 || search;
@@ -3415,7 +3718,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((r) => (
+              {rvPaged.map((r) => (
                 <tr key={r.id} className={`hover:bg-white/[0.02] ${r.deletedAt ? "opacity-50" : ""}`}>
                   <td className="px-4 py-3">
                     <p className="text-white font-medium whitespace-nowrap">{r.customerName ?? "—"}</p>
@@ -3454,10 +3757,11 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <EmptyRow cols={8} text="No reviews match the selected filters" />}
+              {rvPaged.length === 0 && <EmptyRow cols={8} text="No reviews match the selected filters" />}
             </tbody>
           </table>
         </div>
+        <Pagination page={rvPage} total={filtered.length} pageSize={RV_PAGE_SIZE} onChange={p => { setRvPage(p); }} />
       </div>
     </div>
   );
@@ -3468,12 +3772,16 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
 ═══════════════════════════════════════════════════════════════════ */
 
 function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
+  const AL_PAGE_SIZE = 25;
+  const [alPage, setAlPage] = useState(1);
   const [search, setSearch] = useState("");
 
   const filtered = logs.filter(l =>
     l.action.toLowerCase().includes(search.toLowerCase()) ||
     l.targetType.toLowerCase().includes(search.toLowerCase())
   );
+  const alPaged = filtered.slice((alPage - 1) * AL_PAGE_SIZE, alPage * AL_PAGE_SIZE);
+  useEffect(() => { setAlPage(1); }, [search]);
 
   return (
     <div className="space-y-4">
@@ -3490,7 +3798,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {filtered.map((l) => (
+              {alPaged.map((l) => (
                 <tr key={l.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3 text-white font-medium whitespace-nowrap">{l.action}</td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap capitalize">{l.targetType}</td>
@@ -3507,6 +3815,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
             </tbody>
           </table>
         </div>
+        <Pagination page={alPage} total={filtered.length} pageSize={AL_PAGE_SIZE} onChange={setAlPage} />
       </div>
     </div>
   );
@@ -4508,6 +4817,8 @@ function OtpSettingsView({ accessToken }: { accessToken: string }) {
 ═══════════════════════════════════════════════════════════════════ */
 
 function PayoutsAdminView({ accessToken }: { accessToken: string }) {
+  const PV_PAGE_SIZE = 20;
+  const [pvPage, setPvPage] = useState(1);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState<string | null>(null);
@@ -5282,11 +5593,16 @@ function ServicesView({
 
   const commission = (Number(form.customerPrice) || 0) - (Number(form.partnerPayout) || 0);
 
+  const SV_PAGE_SIZE = 20;
+  const [svPage, setSvPage] = useState(1);
+
   const filtered = services.filter(s => {
     const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase());
     const matchCat    = !filterCat || s.categoryId === filterCat;
     return matchSearch && matchCat;
   });
+  const svPaged = filtered.slice((svPage - 1) * SV_PAGE_SIZE, svPage * SV_PAGE_SIZE);
+  useEffect(() => { setSvPage(1); }, [search, filterCat]);
 
   const ServiceForm = () => (
     <div className="space-y-4">

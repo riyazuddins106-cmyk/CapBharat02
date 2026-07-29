@@ -11,8 +11,9 @@ const appJson = require('./app.json');
  */
 module.exports = ({ config }) => {
   const domain = process.env.REPLIT_DEV_DOMAIN;
-  const port = 8099;
-  const origin = domain ? `https://${domain}:${port}` : undefined;
+  // No port — Replit proxy serves on standard 443; the browser origin has no port.
+  // Including :8099 here makes the allowlist useless and breaks CORS (same fix as customer app).
+  const origin = domain ? `https://${domain}` : undefined;
 
   return {
     ...appJson.expo,
