@@ -60,6 +60,19 @@ export default defineConfig({
         target: 'http://localhost:5001',
         changeOrigin: true,
       },
+      '/qr': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/qr/, '') || '/',
+      },
+      '/customer-qr.png': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/partner-qr.png': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
       '/partner': {
         target: 'http://localhost:4000',
         changeOrigin: true,
