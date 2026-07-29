@@ -5750,7 +5750,7 @@ function ServicesView({
               </tr>
             </thead>
             <tbody>
-              {filtered.map(s => (
+              {svPaged.map(s => (
                 <tr key={s.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors last:border-b-0">
                   <td className="px-4 py-3">
                     <div>
@@ -5784,8 +5784,10 @@ function ServicesView({
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && <EmptyRow cols={8} text="No services match the filters" />}
             </tbody>
           </table>
+          <Pagination page={svPage} total={filtered.length} pageSize={SV_PAGE_SIZE} onChange={setSvPage} />
         </div>
       )}
     </div>
