@@ -375,24 +375,29 @@ export default function SubcategoriesScreen() {
           const qty = entry?.qty ?? 0;
           const loading = pendingIds.has(row.id);
           return (
-            <ServiceCard
-              service={row}
-              cartQty={qty}
-              loading={loading}
-              colors={colors}
-              requiresAuth={!accessToken}
-              onAdd={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); addMutation.mutate(row.id); }}
-              onIncrease={() => {
-                if (!entry) return;
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                updateMutation.mutate({ itemId: entry.itemId, qty: qty + 1, serviceId: row.id });
-              }}
-              onDecrease={() => {
-                if (!entry) return;
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                updateMutation.mutate({ itemId: entry.itemId, qty: qty - 1, serviceId: row.id });
-              }}
-            />
+            <TouchableOpacity
+              activeOpacity={0.95}
+              onPress={() => router.push(`/service/${row.id}`)}
+            >
+              <ServiceCard
+                service={row}
+                cartQty={qty}
+                loading={loading}
+                colors={colors}
+                requiresAuth={!accessToken}
+                onAdd={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); addMutation.mutate(row.id); }}
+                onIncrease={() => {
+                  if (!entry) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateMutation.mutate({ itemId: entry.itemId, qty: qty + 1, serviceId: row.id });
+                }}
+                onDecrease={() => {
+                  if (!entry) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateMutation.mutate({ itemId: entry.itemId, qty: qty - 1, serviceId: row.id });
+                }}
+              />
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={

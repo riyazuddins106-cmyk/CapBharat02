@@ -1306,7 +1306,7 @@ function ProfileEditModal({ user, onSave, onClose }: {
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
   user, categories, professionals, featuredServices, favoriteIds, wishlistIds, offers, reels, location,
-  onToggleFavorite, onToggleWishlist, onCategorySelect, onLocationPress, isLoggedIn, addToCart,
+  onToggleFavorite, onToggleWishlist, onCategorySelect, onLocationPress, isLoggedIn, addToCart, onServicePress,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
@@ -1323,6 +1323,7 @@ function CustHome({
   onLocationPress: () => void;
   isLoggedIn: boolean;
   addToCart: (serviceId: string, serviceName?: string) => void;
+  onServicePress: (id: string) => void;
 }) {
   const [offerIdx, setOfferIdx] = useState(0);
   const [activeReel, setActiveReel] = useState<ApiReel | null>(null);
@@ -1521,7 +1522,7 @@ function CustHome({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {featuredServices.slice(0, 6).map((service) => (
-              <div key={service.id} className="relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all">
+              <div key={service.id} onClick={() => onServicePress(service.id)} className="relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all cursor-pointer">
                 <div className="w-28 h-28 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0 relative">
                   {service.images?.[0] ? (
                     <img src={service.images[0]} alt={service.name} className="w-full h-full object-cover" />
@@ -1542,7 +1543,7 @@ function CustHome({
                       <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
                       <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Expert service"}</p>
                     </div>
-                    <button onClick={() => onToggleWishlist(service.id)} className="flex-shrink-0 p-1 -mt-0.5">
+                    <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(service.id); }} className="flex-shrink-0 p-1 -mt-0.5">
                       <Heart size={15} fill={wishlistIds.has(service.id) ? "#EF4444" : "none"} color={wishlistIds.has(service.id) ? "#EF4444" : "#D1D5DB"} />
                     </button>
                   </div>
@@ -1554,7 +1555,7 @@ function CustHome({
                       </p>
                     </div>
                     <button
-                      onClick={() => addToCart(service.id, service.name)}
+                      onClick={(e) => { e.stopPropagation(); addToCart(service.id, service.name); }}
                       disabled={!isLoggedIn}
                       className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm transition-all"
                     >
@@ -1596,7 +1597,7 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, favoriteIds, wishlistIds, onToggleFavorite, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange,
+  categories, favoriteIds, wishlistIds, onToggleFavorite, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange, onServicePress,
 }: {
   categories: ApiCategory[];
   favoriteIds: Set<string>;
@@ -1606,6 +1607,7 @@ function CustServices({
   initialCategoryId?: string | null;
   isLoggedIn: boolean;
   onCartChange: (cart: ApiCart) => void;
+  onServicePress: (id: string) => void;
 }) {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
@@ -1793,7 +1795,7 @@ function CustServices({
             </div>
             <div className="flex flex-col gap-3">
               {catalogue.map((service) => (
-                <div key={service.id} className="group relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all">
+                <div key={service.id} onClick={() => onServicePress(service.id)} className="group relative rounded-2xl bg-white border border-black/[0.05] p-3 flex gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(91,62,245,0.08)] transition-all cursor-pointer">
                   <div className="w-28 h-28 rounded-xl bg-[#F5F3FF] overflow-hidden flex-shrink-0 relative">
                     {service.images?.[0] ? (
                       <img src={service.images[0]} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
@@ -1814,7 +1816,7 @@ function CustServices({
                         <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
                         <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
                       </div>
-                      <button onClick={() => onToggleWishlist(service.id)} className="flex-shrink-0 p-1 -mt-0.5">
+                      <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(service.id); }} className="flex-shrink-0 p-1 -mt-0.5">
                         <Heart size={15} fill={wishlistIds.has(service.id) ? "#EF4444" : "none"} color={wishlistIds.has(service.id) ? "#EF4444" : "#D1D5DB"} />
                       </button>
                     </div>
@@ -1826,7 +1828,7 @@ function CustServices({
                         </p>
                       </div>
                       <button
-                        onClick={() => addToCart(service.id, service.name)}
+                        onClick={(e) => { e.stopPropagation(); addToCart(service.id, service.name); }}
                         disabled={!isLoggedIn}
                         className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm"
                       >
@@ -3292,6 +3294,157 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
   );
 }
 
+// ── Service Detail Page ─────────────────────────────────────────────────────
+function ServiceDetailPage({
+  serviceId, isLoggedIn, onBack, onAddToCart,
+}: {
+  serviceId: string;
+  isLoggedIn: boolean;
+  onBack: () => void;
+  onAddToCart: (serviceId: string, serviceName?: string) => void;
+}) {
+  const [service, setService] = useState<ApiService | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    servicesApi.getById(serviceId)
+      .then(setService)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [serviceId]);
+
+  function handleAdd() {
+    if (!service) return;
+    onAddToCart(service.id, service.name);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  }
+
+  function renderSection(title: string, content: string | null | undefined) {
+    if (!content?.trim()) return null;
+    const lines = content.trim().split('\n').filter(l => l.trim());
+    return (
+      <div className="mb-5">
+        <h3 className="text-sm font-bold text-gray-900 mb-2">{title}</h3>
+        <ul className="space-y-1.5">
+          {lines.map((line, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+              <span className="mt-0.5 w-4 h-4 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <Check size={10} color="#5B3EF5" strokeWidth={3} />
+              </span>
+              {line.replace(/^[•\-\d+.]\s*/, '')}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-400">Loading service…</p>
+      </div>
+    );
+  }
+
+  if (error || !service) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-6">
+        <Wrench size={40} color="#D1D5DB" />
+        <p className="text-base font-semibold text-gray-700">Service not found</p>
+        <button onClick={onBack} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold">Go back</button>
+      </div>
+    );
+  }
+
+  const mins = service.duration;
+  const durationLabel = mins >= 60
+    ? `${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ''}`
+    : `${mins} min`;
+
+  return (
+    <div className="pb-32">
+      {/* Back button */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 px-4 pt-4 pb-2 text-violet-600 font-semibold text-sm"
+      >
+        <ChevronLeft size={18} />
+        Back
+      </button>
+
+      {/* Hero image */}
+      <div className="mx-4 rounded-2xl overflow-hidden bg-[#F5F3FF] h-52 relative">
+        {service.images?.[0] ? (
+          <img src={service.images[0]} alt={service.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Sparkles size={48} color="#C4B5FD" />
+          </div>
+        )}
+        {service.badge && (
+          <div className="absolute top-3 left-3 bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] px-3 py-1 rounded-full text-xs font-bold text-white shadow">
+            {service.badge}
+          </div>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="px-4 mt-5">
+        <h1 className="text-xl font-black text-gray-900 leading-tight mb-1">{service.name}</h1>
+        {service.description && (
+          <p className="text-sm text-gray-500 leading-relaxed mb-4">{service.description}</p>
+        )}
+
+        {/* Meta pills */}
+        <div className="flex gap-2 flex-wrap mb-5">
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-600">
+            <Clock size={12} color="#6B7280" /> {durationLabel}
+          </div>
+          {service.category && (
+            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-600">
+              <Grid size={12} color="#6B7280" /> {service.category}
+            </div>
+          )}
+        </div>
+
+        {/* Sections */}
+        {renderSection("What's included", (service as any).whatsIncluded)}
+        {renderSection('What to expect', (service as any).whatToExpect)}
+        {renderSection('Requirements', (service as any).requirements)}
+        {renderSection('Exclusions', (service as any).exclusions)}
+      </div>
+
+      {/* Sticky footer */}
+      <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 bg-white/95 backdrop-blur border-t border-gray-100 pt-3">
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          <div>
+            <p className="text-xl font-black text-gray-900">₹{service.customerPrice.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-gray-400">{durationLabel} service</p>
+          </div>
+          <button
+            onClick={handleAdd}
+            disabled={!isLoggedIn}
+            className={`h-11 px-7 rounded-xl text-sm font-bold text-white transition-all shadow-sm ${
+              added
+                ? 'bg-green-500'
+                : 'bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400'
+            }`}
+          >
+            {!isLoggedIn ? 'Sign in to book' : added ? '✓ Added' : '+ Add to Cart'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerApp() {
   // Auth
   const [user, setUser] = useState<ApiUser | null>(() => auth.getUser());
@@ -3300,6 +3453,7 @@ export default function CustomerApp() {
   // Navigation
   const [activeTab, setActiveTab] = useState("home");
   const [profileScreen, setProfileScreen] = useState<"main" | "addresses" | "wishlist" | "notifications" | "points" | "support" | "policies" | "privacy">("main");
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
 
   // Data
   const [categories, setCategories]           = useState<ApiCategory[]>([]);
@@ -3483,6 +3637,20 @@ export default function CustomerApp() {
     onLocationPickerClose: () => setShowLocationPicker(false),
   };
 
+  /* ── Service detail ── */
+  if (selectedServiceId) {
+    return (
+      <AppShell title="Service Details" {...shellProps}>
+        <ServiceDetailPage
+          serviceId={selectedServiceId}
+          isLoggedIn={isLoggedIn}
+          onBack={() => setSelectedServiceId(null)}
+          onAddToCart={addToCart}
+        />
+      </AppShell>
+    );
+  }
+
   /* ── Login gate ── */
   if (!isLoggedIn && (activeTab === "bookings" || activeTab === "profile")) {
     return (
@@ -3568,6 +3736,7 @@ export default function CustomerApp() {
           onLocationPress={() => setShowLocationPicker(true)}
           isLoggedIn={isLoggedIn}
           addToCart={addToCart}
+          onServicePress={setSelectedServiceId}
         />
       )}
       {activeTab === "services" && (
@@ -3580,6 +3749,7 @@ export default function CustomerApp() {
           initialCategoryId={servicesInitCatId}
           isLoggedIn={isLoggedIn}
           onCartChange={setCart}
+          onServicePress={setSelectedServiceId}
         />
       )}
       {activeTab === "bookings" && (
