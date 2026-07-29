@@ -52,15 +52,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="scan"
-        options={{
-          title: 'Scan',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'qr-code' : 'qr-code-outline'} size={22} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
