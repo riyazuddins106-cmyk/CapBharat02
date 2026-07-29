@@ -1,5 +1,46 @@
 @custom-variant dark (&:is(.dark *));
 
+/* ── Thin blending scrollbars ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode override */
+.dark * {
+  scrollbar-color: #2a2d3e transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2a2d3e;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3d4060;
+}
+
 :root {
   --font-size: 16px;
   --background: #f7f8fa;

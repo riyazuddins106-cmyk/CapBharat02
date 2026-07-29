@@ -229,7 +229,8 @@ start_ngrok() {
     --config "$NGROK_CONFIG" \
     --log-format json \
     --log "$NGROK_LOG" \
-    --pooling-enabled &
+    --pooling-enabled \
+    --request-header-add "ngrok-skip-browser-warning:true" &
   NGROK_PID=$!
 
   echo "ngrok v3 pid: $NGROK_PID — waiting for tunnel URL…"

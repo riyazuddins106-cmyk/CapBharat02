@@ -984,7 +984,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-hidden flex flex-col p-6 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-48">
               <Loader2 size={32} className="animate-spin text-violet-500" />
@@ -1056,7 +1056,7 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-y-auto">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {cards.map((c) => {
           const Icon = c.icon;
@@ -1326,7 +1326,7 @@ function DispatchView({
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5 flex-1 min-h-0">
       <div>
         <h2 className="text-white font-bold text-xl">Customer Booking Operations Control Centre</h2>
         <p className="text-white/40 text-sm mt-1">Monitor customer bookings and coordinate partner assignment.</p>
@@ -1399,7 +1399,7 @@ function DispatchView({
       </p>
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={dvSorted.length} pageSize={dvPageSize} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -1571,7 +1571,7 @@ function BookingsView({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {editTarget && (
         <Modal title="Edit Booking" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
@@ -1626,7 +1626,7 @@ function BookingsView({
         <ExportBtn onClick={exportBookings} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={bvSorted.length} pageSize={bvPageSize} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -1769,7 +1769,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
 
       {/* ── Date range card ── */}
       <div className="rounded-2xl border border-white/[0.07] p-4 space-y-3" style={CARD}>
@@ -1865,7 +1865,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       </div>
 
       {/* ── Table ── */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={bhSorted.length} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -2319,7 +2319,7 @@ function ProsView({
   const pvSorted = sortPv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {editTarget && (
         <Modal title="Edit Professional" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
@@ -2413,7 +2413,7 @@ function ProsView({
         </button>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={proTotal} pageSize={proPageSize} onPageSizeChange={n => { onProPageSizeChange(n); onProPageChange(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -2550,7 +2550,7 @@ function UsersView({
   const uvSorted = sortUv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {editTarget && (
         <Modal title="Edit User" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
@@ -2602,7 +2602,7 @@ function UsersView({
         )} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={userTotal} pageSize={userPageSize} onPageSizeChange={n => { onUserPageSizeChange(n); onUserPageChange(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -2868,7 +2868,7 @@ function CategoriesView({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5 flex-1 min-h-0">
       {/* Modals */}
       {creating && (
         <Modal title="New Category" onClose={() => setCreating(false)}>
@@ -3446,7 +3446,7 @@ function ReelsView({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {creating && (
         <Modal title="New Reel" onClose={() => setCreating(false)}>
           <ReelFormFields form={form} setForm={setForm} reel={null} onVideoUpload={handleVideoUpload} onThumbUpload={handleThumbUpload} uploadingId={uploadingId} />
@@ -3688,7 +3688,7 @@ function OffersView({
   const statusColor: Record<string, string> = { active: "#16A34A", inactive: "#6B7280", draft: "#D97706" };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {deleteId && (
         <ConfirmDialog title="Delete Banner?" body="This banner will be moved to trash and can be restored later."
           confirmLabel="Yes, delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
@@ -4098,7 +4098,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
   const hasFilters = selCustomers.length > 0 || selPros.length > 0 || selServices.length > 0 || search;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {deleteId && (
         <ConfirmDialog
           title="Delete Review?"
@@ -4138,7 +4138,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
       <p className="text-white/30 text-xs">{filtered.length} review{filtered.length !== 1 ? "s" : ""} shown</p>
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={rvSorted.length} pageSize={rvPageSize} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -4248,7 +4248,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={v => { setSearch(v); setAlPage(1); }} placeholder="Search actions or entity type…" /></div>
         <MultiSelect label="Action"      options={actionOptions}     selected={selActions}     onChange={v => { setSelActions(v); setAlPage(1); }} />
@@ -4269,7 +4269,7 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
         <ExportBtn onClick={exportAudit} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
         <RowsBar total={alSorted.length} pageSize={alPageSize} onPageSizeChange={n => { setAlPageSize(n); setAlPage(1); }} />
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -5424,7 +5424,7 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
             <ExportBtn onClick={exportPayouts} />
           </div>
 
-          <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+          <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
             <RowsBar total={pvSorted.length} pageSize={pvPageSize} onPageSizeChange={n => { setPvPageSize(n); setPvPage(1); }} />
             <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
               <table className="w-full text-sm">
@@ -6257,7 +6257,7 @@ function ServicesView({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5 flex-1 min-h-0">
       {/* Modals */}
       {creating && (
         <Modal title="New Service" onClose={() => setCreating(false)}>
@@ -6332,7 +6332,7 @@ function ServicesView({
           <p className="text-sm">{hasSvFilters ? "No services match the filters." : "No services yet. Create your first service above."}</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col max-h-[calc(100vh-260px)]" style={CARD}>
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
           <RowsBar total={svSorted.length} pageSize={svPageSize} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
           <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">

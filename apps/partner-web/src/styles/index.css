@@ -11,3 +11,31 @@
     color: #fff;
   }
 }
+
+/* ── Thin blending scrollbars (dark theme) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2d3e transparent;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2d3e;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3d4060;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
