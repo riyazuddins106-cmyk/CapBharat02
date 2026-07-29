@@ -559,6 +559,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [proTotal,     setProTotal]     = useState(0);
   const [userList,     setUserList]     = useState<CustomerUser[]>([]);
   const [userPage,     setUserPage]     = useState(1);
+  const [userPageSize, setUserPageSize] = useState(25);
   const [userTotal,    setUserTotal]    = useState(0);
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
@@ -612,11 +613,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (userPage === 1) return; // page 1 already loaded by load()
-    adminApi.getUsers(accessToken, userPage, 25)
+    adminApi.getUsers(accessToken, userPage, userPageSize)
       .then(u => { setUserList(u.users); setUserTotal(u.total); })
       .catch(() => {});
-  }, [userPage, accessToken]);
+  }, [userPage, userPageSize, accessToken]);
 
   useEffect(() => {
     if (proPage === 1) return; // page 1 already loaded by load()
@@ -960,7 +960,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
-            <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} />
+            <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} userPageSize={userPageSize} onUserPageSizeChange={setUserPageSize} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
@@ -1198,6 +1198,7 @@ function DispatchView({
   accessToken: string;
   onAssigned: () => void;
 }) {
+  const DV_COLS = ["Customer", "Service", "Scheduled", "Dispatch Status", "Partner"] as const;
   const [modalBooking, setModalBooking] = useState<DispatchRequestRow | null>(null);
   const [partners, setPartners] = useState<EligiblePartner[] | null>(null);
   const [loadingPartners, setLoadingPartners] = useState(false);
@@ -1208,6 +1209,7 @@ function DispatchView({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { sort: dvSort, toggleSort: toggleDvSort, applySortFn: sortDv } = useTableSort();
+  const dvColVis = useColumnVisibility(DV_COLS);
 
   const openModal = async (request: DispatchRequestRow) => {
     setModalBooking(request);
@@ -1345,6 +1347,7 @@ function DispatchView({
         {(search || statusFilter !== "all") && (
           <button onClick={() => { setSearch(""); setStatusFilter("all"); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
         )}
+        <ColumnVisibilityMenu columns={DV_COLS} labels={{ Customer: "Customer", Service: "Service", Scheduled: "Scheduled", "Dispatch Status": "Dispatch Status", Partner: "Partner" }} hidden={dvColVis.hidden} onToggle={dvColVis.toggle as (col: string) => void} />
         <ExportBtn onClick={exportDispatch} />
       </div>
 
@@ -1360,31 +1363,35 @@ function DispatchView({
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
-                <SortTh label="Customer"         field="customerName"    sort={dvSort} onSort={toggleDvSort} />
-                <SortTh label="Service"          field="serviceName"     sort={dvSort} onSort={toggleDvSort} />
-                <SortTh label="Scheduled"        field="scheduledAt"     sort={dvSort} onSort={toggleDvSort} />
-                <SortTh label="Dispatch Status"  field="dispatchStatus"  sort={dvSort} onSort={toggleDvSort} />
-                <SortTh label="Current Partner"  field="proName"         sort={dvSort} onSort={toggleDvSort} />
+                {dvColVis.isVisible("Customer")         && <SortTh label="Customer"         field="customerName"    sort={dvSort} onSort={toggleDvSort} />}
+                {dvColVis.isVisible("Service")          && <SortTh label="Service"          field="serviceName"     sort={dvSort} onSort={toggleDvSort} />}
+                {dvColVis.isVisible("Scheduled")        && <SortTh label="Scheduled"        field="scheduledAt"     sort={dvSort} onSort={toggleDvSort} />}
+                {dvColVis.isVisible("Dispatch Status")  && <SortTh label="Dispatch Status"  field="dispatchStatus"  sort={dvSort} onSort={toggleDvSort} />}
+                {dvColVis.isVisible("Partner")          && <SortTh label="Current Partner"  field="proName"         sort={dvSort} onSort={toggleDvSort} />}
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {dvPaged.map((request) => (
                 <tr key={request.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-3 text-white font-medium">{request.customerName}</td>
-                  <td className="px-4 py-3 text-white/70">{request.serviceName}</td>
-                  <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(request.scheduledAt).toLocaleString("en-IN")}</td>
-                  <td className="px-4 py-3">
-                    <Badge
-                      label={request.dispatchStatus.replace(/_/g, " ")}
-                      color={dispatchStatusColor(request.dispatchStatus)}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-white/70">
-                    {request.dispatchStatus === "assigned" && request.proName
-                      ? request.proName
-                      : <span className="text-white/25 italic">—</span>}
-                  </td>
+                  {dvColVis.isVisible("Customer")        && <td className="px-4 py-3 text-white font-medium">{request.customerName}</td>}
+                  {dvColVis.isVisible("Service")         && <td className="px-4 py-3 text-white/70">{request.serviceName}</td>}
+                  {dvColVis.isVisible("Scheduled")       && <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(request.scheduledAt).toLocaleString("en-IN")}</td>}
+                  {dvColVis.isVisible("Dispatch Status") && (
+                    <td className="px-4 py-3">
+                      <Badge
+                        label={request.dispatchStatus.replace(/_/g, " ")}
+                        color={dispatchStatusColor(request.dispatchStatus)}
+                      />
+                    </td>
+                  )}
+                  {dvColVis.isVisible("Partner") && (
+                    <td className="px-4 py-3 text-white/70">
+                      {request.dispatchStatus === "assigned" && request.proName
+                        ? request.proName
+                        : <span className="text-white/25 italic">—</span>}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <button
                       onClick={() => openModal(request)}
@@ -1818,7 +1825,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">#</th>
                 <SortTh label="Service"      field="serviceName"  sort={bhSort} onSort={toggleBhSort} />
@@ -1835,7 +1842,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
               {paged.map((b, i) => (
                 <tr key={b.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3 text-white/30 text-xs tabular-nums">
-                    {(page - 1) * PAGE_SIZE + i + 1}
+                    {(page - 1) * bhEff + i + 1}
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-white font-medium whitespace-nowrap">{b.serviceName}</p>
@@ -2438,6 +2445,7 @@ const ROLE_COLOR: Record<string, string> = {
 
 function UsersView({
   users, onEdit, onDelete, onToggle, userPage, userTotal, onUserPageChange,
+  userPageSize, onUserPageSizeChange,
 }: {
   users: CustomerUser[];
   onEdit: (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => Promise<void>;
@@ -2446,6 +2454,8 @@ function UsersView({
   userPage: number;
   userTotal: number;
   onUserPageChange: React.Dispatch<React.SetStateAction<number>>;
+  userPageSize: number;
+  onUserPageSizeChange: React.Dispatch<React.SetStateAction<number>>;
 }) {
   const [search,     setSearch]     = useState("");
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
@@ -2605,7 +2615,7 @@ function UsersView({
             </tbody>
           </table>
         </div>
-        <Pagination page={userPage} total={userTotal} pageSize={25} onChange={p => onUserPageChange(p)} />
+        <Pagination page={userPage} total={userTotal} pageSize={userPageSize} onChange={p => onUserPageChange(p)} onPageSizeChange={n => { onUserPageSizeChange(n); onUserPageChange(1); }} />
       </div>
     </div>
   );
@@ -2867,6 +2877,17 @@ function CategoriesView({
           <div className="w-60 flex-shrink-0">
             <SearchBar value={search} onChange={setSearch} placeholder="Search categories…" />
           </div>
+          <ExportBtn onClick={() => exportToExcel(
+            filtered.map(c => ({
+              Name: c.name, Description: c.description ?? "—",
+              Featured: c.featured ? "Yes" : "No",
+              Status: c.isActive ? "Active" : "Inactive",
+              "Sort Order": c.sortOrder,
+              "Sub-categories": subCounts[c.id] ?? 0,
+              Partners: c.serviceCount,
+            })),
+            `Categories_${new Date().toISOString().slice(0, 10)}.xlsx`
+          )} disabled={filtered.length === 0} />
           <button
             onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0"
@@ -3131,6 +3152,16 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
           <div className="w-60 flex-shrink-0">
             <SearchBar value={search} onChange={setSearch} placeholder={`Search in ${category.name}…`} />
           </div>
+          <ExportBtn onClick={() => exportToExcel(
+            filtered.map(s => ({
+              Name: s.name, Description: s.description ?? "—",
+              Category: category.name,
+              Status: s.isActive ? "Active" : "Inactive",
+              Featured: s.featured ? "Yes" : "No",
+              "Sort Order": s.sortOrder,
+            })),
+            `SubCategories_${category.name}_${new Date().toISOString().slice(0, 10)}.xlsx`
+          )} disabled={filtered.length === 0} />
           <button
             onClick={() => { setForm(EMPTY_SUB); setCreating(true); }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0"
@@ -3295,6 +3326,7 @@ function ReelsView({
   accessToken: string;
   onRefresh: () => void;
 }) {
+  const [search,     setSearch]     = useState("");
   const [creating,   setCreating]   = useState(false);
   const [editTarget, setEditTarget] = useState<ReelRow | null>(null);
   const [deleteId,   setDeleteId]   = useState<string | null>(null);
@@ -3303,6 +3335,22 @@ function ReelsView({
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [deletedReels, setDeletedReels] = useState<ReelRow[]>([]);
   const [showTrash, setShowTrash] = useState(false);
+
+  const filteredReels = search
+    ? reels.filter(r =>
+        r.title?.toLowerCase().includes(search.toLowerCase()) ||
+        r.description?.toLowerCase().includes(search.toLowerCase())
+      )
+    : reels;
+
+  const exportReels = () => exportToExcel(
+    filteredReels.map(r => ({
+      Title: r.title, Description: r.description ?? "—",
+      "Video URL": r.videoUrl, Status: r.isActive ? "Active" : "Inactive",
+      "Sort Order": r.sortOrder,
+    })),
+    `Reels_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
   const loadDeleted = async () => {
     try { setDeletedReels(await adminApi.getDeletedReels(accessToken)); } catch {}
   };
@@ -3367,14 +3415,21 @@ function ReelsView({
         <ConfirmDialog title="Move to Trash?" body="This reel will be soft-deleted and can be restored later." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
       )}
 
-      <div className="flex justify-between items-center">
-        <div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-0">
           <h3 className="text-white font-bold text-lg">Reels</h3>
           <p className="text-white/40 text-sm">Short video clips shown on the customer home screen</p>
         </div>
+        <div className="w-56 flex-shrink-0">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search reels…" />
+        </div>
+        {search && (
+          <button onClick={() => setSearch("")} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear</button>
+        )}
+        <ExportBtn onClick={exportReels} disabled={filteredReels.length === 0} />
         <button
           onClick={() => { setForm(EMPTY_REEL); setCreating(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white flex-shrink-0"
           style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
         >
           <Plus size={14} /> New Reel
@@ -3382,7 +3437,7 @@ function ReelsView({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {reels.map((r) => (
+        {filteredReels.map((r) => (
           <div key={r.id} className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
             <div className="relative aspect-video bg-black/40">
               {r.thumbnailUrl
@@ -3407,10 +3462,10 @@ function ReelsView({
             </div>
           </div>
         ))}
-        {reels.length === 0 && (
+        {filteredReels.length === 0 && (
           <div className="col-span-3 py-16 flex flex-col items-center gap-3 text-white/30">
             <Film size={40} />
-            <p className="text-sm">No reels yet. Create one to get started.</p>
+            <p className="text-sm">{search ? `No reels match "${search}"` : "No reels yet. Create one to get started."}</p>
           </div>
         )}
       </div>
@@ -3498,6 +3553,7 @@ function OffersView({
   onUploadImage: (file: File) => Promise<string>;
   accessToken: string;
 }) {
+  const [search,    setSearch]    = useState("");
   const [showForm,  setShowForm]  = useState(false);
   const [editRow,   setEditRow]   = useState<OfferRow | null>(null);
   const [form,      setForm]      = useState<OfferInput>(BLANK_OFFER);
@@ -3505,6 +3561,25 @@ function OffersView({
   const [uploading, setUploading] = useState(false);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [formErr,   setFormErr]   = useState("");
+
+  const filteredOffers = search
+    ? offers.filter(r =>
+        r.title?.toLowerCase().includes(search.toLowerCase()) ||
+        r.subtitle?.toLowerCase().includes(search.toLowerCase()) ||
+        r.tag?.toLowerCase().includes(search.toLowerCase())
+      )
+    : offers;
+
+  const exportOffers = () => exportToExcel(
+    filteredOffers.map(r => ({
+      Title: r.title, Subtitle: r.subtitle ?? "—",
+      Tag: r.tag ?? "—", Status: r.status ?? (r.isActive ? "active" : "inactive"),
+      Priority: r.priority ?? 0, SortOrder: r.sortOrder,
+      "Start Date": r.startDate ? new Date(r.startDate).toLocaleDateString("en-IN") : "—",
+      "End Date": r.endDate ? new Date(r.endDate).toLocaleDateString("en-IN") : "—",
+    })),
+    `Offers_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
   const [activeTab, setActiveTab] = useState<"content" | "visual" | "schedule">("content");
   const [dragOver,  setDragOver]  = useState(false);
   const fileInputRef              = useRef<HTMLInputElement>(null);
@@ -3749,31 +3824,35 @@ function OffersView({
         </Modal>
       )}
 
-      <div className="flex items-center justify-between">
-        <p className="text-white/50 text-sm">{offers.length} banner{offers.length !== 1 ? "s" : ""} total</p>
-        <div className="flex gap-2">
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-            <Plus size={15} /> Create Banner
-          </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <p className="text-white/50 text-sm">{filteredOffers.length} of {offers.length} banner{offers.length !== 1 ? "s" : ""}</p>
+        <div className="flex-1 min-w-[200px]">
+          <SearchBar value={search} onChange={v => setSearch(v)} placeholder="Search banners…" />
         </div>
+        {search && (
+          <button onClick={() => setSearch("")} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear</button>
+        )}
+        <ExportBtn onClick={exportOffers} disabled={filteredOffers.length === 0} />
+        <button onClick={handleToggleTrash} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border" style={{ borderColor: "rgba(255,255,255,0.1)", color: showTrash ? "#f87171" : "rgba(255,255,255,0.4)", background: "transparent" }}>
+          🗑 {showTrash ? "Hide Trash" : "Trash"}
+        </button>
+        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+          <Plus size={15} /> Create Banner
+        </button>
       </div>
 
-      <div className="flex justify-end">
-        <div className="flex gap-2">
-          <button onClick={handleToggleTrash} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border" style={{ borderColor: "rgba(255,255,255,0.1)", color: showTrash ? "#f87171" : "rgba(255,255,255,0.4)", background: "transparent" }}>
-            🗑 {showTrash ? "Hide Trash" : "Trash"}
-          </button>
+      {filteredOffers.length === 0 && offers.length > 0 ? (
+        <div className="rounded-2xl border border-white/[0.07] p-12 text-center" style={CARD}>
+          <p className="text-white/30 text-sm">No banners match "<span className="text-white/50">{search}</span>"</p>
         </div>
-      </div>
-
-      {offers.length === 0 ? (
+      ) : offers.length === 0 ? (
         <div className="rounded-2xl border border-white/[0.07] p-12 text-center" style={CARD}>
           <Tag size={32} color="rgba(255,255,255,0.15)" className="mx-auto mb-3" />
           <p className="text-white/30 text-sm">No banners yet. Create one to show in the customer app.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3">
-          {offers.map(r => (
+          {filteredOffers.map(r => (
             <div key={r.id} className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
               <div className="flex gap-4 p-4 items-center">
                 <div className="relative flex-shrink-0 w-24 h-16 rounded-xl overflow-hidden" style={{ background: r.bgColor ?? "#5B3EF5" }}>
@@ -4014,7 +4093,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Customer"     field="customerName" sort={rvSort} onSort={toggleRvSort} />
                 <SortTh label="Professional" field="proName"      sort={rvSort} onSort={toggleRvSort} />

@@ -79,12 +79,14 @@ Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. No E
 `expo-tunnel.sh` detects `REPLIT_EXPO_DEV_DOMAIN` and skips ngrok entirely, using Replit's built-in Expo proxy. No ngrok tokens needed when running on Replit. ngrok is only used as a fallback outside of Replit.
 
 ## Required secrets
+All secrets below are configured in this Replit environment.
+
 | Secret | Purpose |
 |---|---|
-| SUPABASE_URL | Supabase REST project URL |
+| SUPABASE_URL | Supabase REST project URL (`https://xxx.supabase.co`) |
 | SUPABASE_ANON_KEY | Supabase anonymous key |
 | SUPABASE_SERVICE_ROLE_KEY | Supabase service role key |
-| DATABASE_URL | Supabase Postgres connection string |
+| SUPABASE_DATABASE_URL | Supabase Postgres connection string (used directly by the server) |
 | JWT_SECRET | Access token signing secret |
 | JWT_REFRESH_SECRET | Refresh token signing secret |
 | NGROK_AUTHTOKEN | Customer App ngrok (fallback outside Replit) |
