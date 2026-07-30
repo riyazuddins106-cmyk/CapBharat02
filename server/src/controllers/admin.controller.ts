@@ -64,7 +64,7 @@ export const adminController = {
       if (!isNaN(d.getTime())) conditions.push(lte(bookings.scheduledAt, d));
     }
     if (statusParam && VALID_STATUSES.includes(statusParam)) {
-      conditions.push(eq(bookings.status, statusParam));
+      conditions.push(eq(bookings.status, statusParam as 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled'));
     }
     const where = and(...conditions);
 

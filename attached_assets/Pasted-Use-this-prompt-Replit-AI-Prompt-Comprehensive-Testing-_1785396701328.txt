@@ -1,0 +1,253 @@
+Use this prompt:
+
+---
+
+# Replit AI Prompt – Comprehensive Testing & Validation of Admin Panel Enterprise Features
+
+## Objective
+
+The implementation has already been completed.
+
+**Do NOT implement any new features unless a defect is found.**
+
+Your task is to perform a comprehensive audit, testing, and validation of the existing Admin Panel to ensure every requested feature is working correctly.
+
+---
+
+# Phase 1 – Analyze the Current Implementation
+
+Inspect the complete Admin Panel and identify every page that contains:
+
+* DataTables
+* Grid Views
+* Reports
+* Charts
+* Dashboard Widgets
+* Analytics
+* Lists
+
+Do not modify any code during this phase.
+
+---
+
+# Phase 2 – Functional Testing
+
+Test every Admin page and verify the following functionality.
+
+## Excel Export
+
+Verify that:
+
+* Download Excel button exists.
+* Excel downloads successfully.
+* Export contains the correct records.
+* Export respects current filters.
+* Export respects current sorting.
+* Export respects current search results.
+* Currency formatting is correct.
+* Date formatting is correct.
+* File name is generated correctly.
+
+Report any failures.
+
+---
+
+## Graph & Chart Download
+
+Verify every chart.
+
+Test:
+
+* PNG download
+* JPG download
+* SVG download (if implemented)
+
+Ensure exported images are high quality.
+
+---
+
+## Search
+
+Verify:
+
+* Global Search works.
+* Search returns accurate results.
+* Search performance is acceptable.
+
+---
+
+## Sorting
+
+Verify every sortable column.
+
+Test:
+
+* Ascending
+* Descending
+
+Ensure sorting works correctly with filters and pagination.
+
+---
+
+## Filters
+
+Verify every filter.
+
+Test:
+
+* Text filters
+* Number filters
+* Date filters
+* Status filters
+* Category filters
+* Multi-filter combinations
+
+Ensure filtered data is accurate.
+
+---
+
+## Reset Filters
+
+Verify that:
+
+* Reset/Clear Filters restores the default view.
+* All active filters are removed.
+
+---
+
+## Pagination
+
+Verify every DataTable.
+
+Confirm:
+
+* 10 records
+* 25 records
+* 50 records (Default)
+* 100 records
+* 250 records
+* All
+
+Verify:
+
+* Default page size is 50.
+* Total record count is displayed.
+* Pagination works correctly with:
+
+  * Search
+  * Filters
+  * Sorting
+  * Excel Export
+
+---
+
+## Column Visibility
+
+Verify:
+
+* Columns can be hidden.
+* Columns can be shown again.
+* Export respects the selected option (Visible Columns or All Columns).
+
+---
+
+## Sticky Headers
+
+Verify sticky headers function correctly on long tables.
+
+---
+
+## Responsive Layout
+
+Verify DataTables remain usable on smaller screen sizes.
+
+---
+
+## Permissions
+
+Verify Role-Based Access Control.
+
+Ensure users without export permissions cannot access:
+
+* Excel Export
+* Chart Download
+
+---
+
+# Phase 3 – Performance Testing
+
+Verify:
+
+* Large datasets load efficiently.
+* Pagination remains responsive.
+* Filtering remains responsive.
+* Searching remains responsive.
+* Export performs correctly with large datasets.
+
+Identify any performance bottlenecks.
+
+---
+
+# Phase 4 – Code Review
+
+Inspect the implementation for:
+
+* Duplicate code
+* Unused components
+* Dead code
+* Unused imports
+* Performance issues
+* Inconsistent implementations
+
+Recommend improvements only where necessary.
+
+---
+
+# Phase 5 – Final Validation Report
+
+Generate a detailed report containing:
+
+## ✅ Fully Working Features
+
+List every feature that passed testing.
+
+---
+
+## ⚠ Minor Issues
+
+List any small issues found.
+
+---
+
+## ❌ Failed Tests
+
+List every failed test with:
+
+* Page Name
+* Feature
+* Expected Result
+* Actual Result
+* Root Cause
+
+---
+
+## 📄 Missing Functionality
+
+If any requested feature is missing, list it separately.
+
+---
+
+## 📁 Files Requiring Changes
+
+Provide a list of only the files that need modification to fix identified issues.
+
+---
+
+## Important Rules
+
+* Do **not** implement new features unless testing reveals a defect.
+* Do **not** redesign the UI.
+* Do **not** refactor working code unnecessarily.
+* Test every existing implementation thoroughly.
+* If everything passes, explicitly state that the implementation is complete and no further changes are required.
+* Only fix genuine defects discovered during testing.

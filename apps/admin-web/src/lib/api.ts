@@ -498,7 +498,7 @@ export const adminApi = {
   }, token: string) =>
     request<ProfessionalRow>('/admin/professionals', { method: 'POST', token, body: JSON.stringify(data) }),
   getProfessionals: (token: string, page = 1, limit = 25) =>
-    request<{ professionals: ProfessionalRow[]; total: number }>(`/admin/professionals?page=${page}&limit=${limit}`, { token }),
+    request<{ professionals: ProfessionalRow[]; total: number }>(`/admin/professionals?offset=${(page - 1) * limit}&limit=${limit}`, { token }),
   updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }, token: string) =>
     request<ProfessionalRow>(`/admin/professionals/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   suspendProfessional: (id: string, token: string) =>
@@ -515,7 +515,7 @@ export const adminApi = {
 
   // Users
   getUsers: (token: string, page = 1, limit = 25) =>
-    request<{ users: CustomerUser[]; total: number }>(`/admin/users?page=${page}&limit=${limit}`, { token }),
+    request<{ users: CustomerUser[]; total: number }>(`/admin/users?offset=${(page - 1) * limit}&limit=${limit}`, { token }),
   updateUser: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: string }, token: string) =>
     request<CustomerUser>(`/admin/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteUser: (id: string, token: string) =>

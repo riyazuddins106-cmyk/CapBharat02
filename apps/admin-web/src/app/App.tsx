@@ -998,7 +998,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
-            <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} userPageSize={userPageSize} onUserPageSizeChange={setUserPageSize} />
+            <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} userPageSize={userPageSize} onUserPageSizeChange={setUserPageSize} accessToken={accessToken} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
@@ -2309,6 +2309,7 @@ function ProsView({
   const { sort: pvSort, toggleSort: togglePvSort, applySortFn: sortPv } = useTableSort();
   const PV_COLS = ["Professional", "Category", "Sub-category", "Rating", "Status", "Actions"] as const;
   const pvColVis = useColumnVisibility(PV_COLS);
+  const [pvExporting, setPvExporting] = useState(false);
 
   const filtered = pros.filter(p =>
     p.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -2392,16 +2393,32 @@ function ProsView({
       <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
         <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" /></div>
         <ColumnVisibilityMenu columns={PV_COLS} hidden={pvColVis.hidden} onToggle={pvColVis.toggle} />
-        <ExportBtn onClick={() => exportToExcel(
-          pvSorted.map(p => ({
-            ...(pvColVis.isVisible("Professional") && { Name: p.name, Title: p.title }),
-            ...(pvColVis.isVisible("Category")     && { Category: p.categoryName ?? "—" }),
-            ...(pvColVis.isVisible("Sub-category") && { "Sub-category": p.subCategoryName ?? "—" }),
-            ...(pvColVis.isVisible("Rating")       && { Rating: p.rating?.toFixed(1) ?? "—" }),
-            ...(pvColVis.isVisible("Status")       && { Status: p.isActive ? "Active" : "Suspended" }),
-          })),
-          `Professionals_${new Date().toISOString().slice(0, 10)}.xlsx`
-        )} />
+        <ExportBtn
+          disabled={pvExporting}
+          onClick={() => {
+            setPvExporting(true);
+            adminApi.getProfessionals(accessToken, 1, 9999)
+              .then(all => {
+                const rows = all.professionals.filter(p =>
+                  p.name?.toLowerCase().includes(search.toLowerCase()) ||
+                  p.categoryName?.toLowerCase().includes(search.toLowerCase()) ||
+                  p.title?.toLowerCase().includes(search.toLowerCase())
+                );
+                exportToExcel(
+                  rows.map(p => ({
+                    ...(pvColVis.isVisible("Professional") && { Name: p.name, Title: p.title }),
+                    ...(pvColVis.isVisible("Category")     && { Category: p.categoryName ?? "—" }),
+                    ...(pvColVis.isVisible("Sub-category") && { "Sub-category": p.subCategoryName ?? "—" }),
+                    ...(pvColVis.isVisible("Rating")       && { Rating: p.rating?.toFixed(1) ?? "—" }),
+                    ...(pvColVis.isVisible("Status")       && { Status: p.isActive ? "Active" : "Suspended" }),
+                  })),
+                  `Professionals_${new Date().toISOString().slice(0, 10)}.xlsx`
+                );
+              })
+              .catch(e => adminShowError(e?.message ?? "Export failed"))
+              .finally(() => setPvExporting(false));
+          }}
+        />
         <button
           onClick={onCreateNew}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white whitespace-nowrap"
@@ -2491,7 +2508,7 @@ const ROLE_COLOR: Record<string, string> = {
 
 function UsersView({
   users, onEdit, onDelete, onToggle, userPage, userTotal, onUserPageChange,
-  userPageSize, onUserPageSizeChange,
+  userPageSize, onUserPageSizeChange, accessToken,
 }: {
   users: CustomerUser[];
   onEdit: (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => Promise<void>;
@@ -2502,9 +2519,11 @@ function UsersView({
   onUserPageChange: React.Dispatch<React.SetStateAction<number>>;
   userPageSize: number;
   onUserPageSizeChange: React.Dispatch<React.SetStateAction<number>>;
+  accessToken: string;
 }) {
   const [search,     setSearch]     = useState("");
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
+  const [uvExporting, setUvExporting] = useState(false);
   const [editTarget, setEditTarget] = useState<CustomerUser | null>(null);
   const [deleteId,   setDeleteId]   = useState<string | null>(null);
   const [form,       setForm]       = useState({ fullName: "", email: "", phone: "", role: "" });
@@ -2591,14 +2610,32 @@ function UsersView({
         {(search || roleFilter.length > 0) && (
           <button onClick={() => { setSearch(""); setRoleFilter([]); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
         )}
-        <ExportBtn onClick={() => exportToExcel(
-          uvSorted.map(u => ({
-            Name: u.fullName, Email: u.email, Phone: u.phone ?? "—",
-            Role: u.role, Status: u.isActive ? "Active" : "Inactive",
-            Joined: new Date(u.createdAt ?? "").toLocaleDateString("en-IN"),
-          })),
-          `Users_${new Date().toISOString().slice(0, 10)}.xlsx`
-        )} />
+        <ExportBtn
+          disabled={uvExporting}
+          onClick={() => {
+            setUvExporting(true);
+            adminApi.getUsers(accessToken, 1, 9999)
+              .then(all => {
+                const rows = all.users
+                  .filter(u =>
+                    (roleFilter.length === 0 || roleFilter.includes(u.role)) &&
+                    (u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+                     u.email?.toLowerCase().includes(search.toLowerCase()) ||
+                     u.role?.toLowerCase().includes(search.toLowerCase()))
+                  );
+                exportToExcel(
+                  rows.map(u => ({
+                    Name: u.fullName, Email: u.email, Phone: u.phone ?? "—",
+                    Role: u.role, Status: u.isActive ? "Active" : "Inactive",
+                    Joined: new Date(u.createdAt ?? "").toLocaleDateString("en-IN"),
+                  })),
+                  `Users_${new Date().toISOString().slice(0, 10)}.xlsx`
+                );
+              })
+              .catch(e => adminShowError(e?.message ?? "Export failed"))
+              .finally(() => setUvExporting(false));
+          }}
+        />
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
