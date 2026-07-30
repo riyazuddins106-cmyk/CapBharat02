@@ -12,6 +12,7 @@ import { eq, and } from 'drizzle-orm';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { pointsService } from '../services/points.service.js';
+import { notificationService } from '../services/notification.service.js';
 
 /** Award loyalty points for a paid booking — non-fatal, swallowed on error */
 async function awardPoints(customerId: string, bookingId: string, priceRupees: number) {
@@ -500,6 +501,73 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
 
   // Award loyalty points (idempotent, non-fatal)
   void awardPoints(userId, bookingId, booking.price ?? 0);
+
+  // Notify customer of payment receipt
+  void notificationService.sendToUser(
+    userId,
+    'Payment Recorded ✅',
+    `Your ${method === 'cash' ? 'cash' : 'UPI'} payment of ₹${booking.price} for ${booking.serviceName} has been recorded. Awaiting confirmation.`,
+  );
+
+  sendSuccess(res, paymentRecord, 200);
+});
+
+/* ── POST /api/bookings/:id/razorpay/verify  (customer auth — web client) ──
+   Called by React web app after Razorpay checkout.js succeeds in-browser.
+   Verifies HMAC signature server-side and marks the payment as paid.        */
+export const verifyRazorpayWeb = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { id: bookingId } = req.params;
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature } =
+    req.body as Record<string, string>;
+
+  if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature)
+    throw AppError.badRequest('Missing payment verification fields.');
+
+  const cfg = await getPaymentCfg();
+  if (!cfg.razorpay?.keySecret) throw AppError.internal('Razorpay not configured.');
+
+  const expectedSig = crypto
+    .createHmac('sha256', cfg.razorpay.keySecret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest('hex');
+
+  if (expectedSig !== razorpay_signature)
+    throw AppError.badRequest('Payment verification failed. Signature mismatch.');
+
+  const [booking] = await db.select().from(bookings)
+    .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
+  if (!booking) throw AppError.notFound('Booking not found.');
+
+  const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
+  let paymentRecord;
+  if (existing) {
+    const [updated] = await db.update(payments).set({
+      status: 'paid', method: 'razorpay',
+      razorpayPaymentId: razorpay_payment_id,
+      razorpayOrderId:   razorpay_order_id,
+      razorpaySignature: razorpay_signature,
+      updatedAt: new Date(),
+    }).where(eq(payments.id, existing.id)).returning();
+    paymentRecord = updated;
+  } else {
+    const [created] = await db.insert(payments).values({
+      bookingId, customerId: userId,
+      amount: booking.price ?? 0, currency: 'INR',
+      status: 'paid', method: 'razorpay',
+      razorpayPaymentId: razorpay_payment_id,
+      razorpayOrderId:   razorpay_order_id,
+      razorpaySignature: razorpay_signature,
+    }).returning();
+    paymentRecord = created;
+  }
+
+  void awardPoints(userId, bookingId, booking.price ?? 0);
+  void notificationService.sendToUser(
+    userId,
+    'Payment Confirmed ✅',
+    `Your Razorpay payment of ₹${booking.price} for ${booking.serviceName} has been recorded.`,
+  );
 
   sendSuccess(res, paymentRecord, 200);
 });

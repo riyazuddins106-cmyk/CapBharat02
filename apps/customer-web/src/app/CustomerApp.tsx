@@ -2365,6 +2365,51 @@ function PaymentModal({ booking, onClose, onPaid }: {
 
   const handlePay = async () => {
     if (!selectedMethod) return;
+
+    // ── Razorpay: open in-browser checkout ──────────────────────
+    if (selectedMethod === 'razorpay') {
+      setSubmitting(true);
+      try {
+        const order = await bookingsApi.createRazorpayOrder(booking.id);
+        // Dynamically load Razorpay checkout.js if not already present
+        await new Promise<void>((resolve, reject) => {
+          if ((window as any).Razorpay) { resolve(); return; }
+          const s = document.createElement('script');
+          s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+          document.body.appendChild(s);
+        });
+        const rzp = new (window as any).Razorpay({
+          key:         order.keyId,
+          amount:      order.amount,
+          currency:    order.currency,
+          name:        order.businessName,
+          description: booking.serviceName,
+          order_id:    order.orderId,
+          handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+            try {
+              await bookingsApi.verifyRazorpay(booking.id, response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
+              setPaid(true);
+              setTimeout(() => { onPaid(); onClose(); }, 1500);
+            } catch (e: any) {
+              alert(e?.response?.data?.message ?? 'Payment verification failed');
+            } finally {
+              setSubmitting(false);
+            }
+          },
+          modal: { ondismiss: () => setSubmitting(false) },
+          theme: { color: '#5B3EF5' },
+        });
+        rzp.open();
+      } catch (e: any) {
+        alert(e?.response?.data?.message ?? e.message ?? 'Payment failed');
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // ── Cash / UPI manual ────────────────────────────────────────
     setSubmitting(true);
     try {
       await bookingsApi.submitPayment(booking.id, selectedMethod, notes || undefined);

@@ -2,7 +2,20 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
+import { payments } from '../database/schema/payments.js';
 import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg, sql, gte, lte } from 'drizzle-orm';
+
+/** Most-recent payment status for a booking (null = no payment yet). */
+const paymentStatusSub = (bookingIdCol: typeof bookings.id) =>
+  sql<string | null>`(SELECT status FROM payments WHERE booking_id = ${bookingIdCol} ORDER BY created_at DESC LIMIT 1)`;
+
+/** Most-recent payment method for a booking. */
+const paymentMethodSub = (bookingIdCol: typeof bookings.id) =>
+  sql<string | null>`(SELECT method FROM payments WHERE booking_id = ${bookingIdCol} ORDER BY created_at DESC LIMIT 1)`;
+
+/** Most-recent payment id for a booking. */
+const paymentIdSub = (bookingIdCol: typeof bookings.id) =>
+  sql<string | null>`(SELECT id FROM payments WHERE booking_id = ${bookingIdCol} ORDER BY created_at DESC LIMIT 1)`;
 import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
@@ -81,6 +94,9 @@ export const adminController = {
         createdAt: bookings.createdAt,
         customerName: users.fullName,
         customerEmail: users.email,
+        paymentStatus: paymentStatusSub(bookings.id),
+        paymentMethod: paymentMethodSub(bookings.id),
+        paymentId:     paymentIdSub(bookings.id),
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
@@ -190,6 +206,40 @@ export const adminController = {
     if (!row) throw AppError.notFound('Booking not found');
     await auditLogService.record(req.user!.userId, 'booking.delete', 'booking', id);
     res.json({ success: true, data: { id: row.id } });
+  }),
+
+  /* ──────────────────── Payment Confirmation ──────────────────── */
+  confirmPayment: asyncHandler(async (req: Request, res: Response) => {
+    const { id: paymentId } = req.params;
+    const { action, notes } = req.body as { action: 'confirm' | 'reject'; notes?: string };
+
+    if (!['confirm', 'reject'].includes(action))
+      throw AppError.badRequest('action must be "confirm" or "reject".');
+
+    const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+    if (!payment) throw AppError.notFound('Payment not found.');
+    if (payment.status === 'paid' && action === 'confirm')
+      throw AppError.badRequest('Payment is already confirmed.');
+
+    const newStatus = action === 'confirm' ? 'paid' : 'failed';
+    const [updated] = await db.update(payments)
+      .set({ status: newStatus, notes: notes ?? payment.notes, updatedAt: new Date() })
+      .where(eq(payments.id, paymentId))
+      .returning();
+
+    // Notify the customer
+    const [booking] = await db.select().from(bookings)
+      .where(eq(bookings.id, payment.bookingId)).limit(1);
+    if (booking) {
+      const title = action === 'confirm' ? 'Payment Confirmed ✅' : 'Payment Issue ⚠️';
+      const body  = action === 'confirm'
+        ? `Your payment of ₹${booking.price} for ${booking.serviceName} has been confirmed by admin.`
+        : `Your payment for ${booking.serviceName} was not accepted. Please contact support.`;
+      void notificationService.sendToUser(payment.customerId, title, body);
+    }
+
+    await auditLogService.record(req.user!.userId, `payment.${action}`, 'payment', paymentId, { newStatus });
+    res.json({ success: true, data: updated });
   }),
 
   /* ─────────────────────── Professionals ─────────────────────── */

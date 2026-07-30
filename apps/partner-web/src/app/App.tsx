@@ -760,7 +760,7 @@ function Jobs({ token }: { token: string }) {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10" style={{ background: 'rgba(20,20,30,1)' }}>
                   <tr className="border-b border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                    {['Service', 'Customer', 'Scheduled', 'Status', 'Price', ''].map(h => (
+                    {['Service', 'Customer', 'Scheduled', 'Status', 'Payment', 'Price', ''].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-white/40 text-xs font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -777,6 +777,14 @@ function Jobs({ token }: { token: string }) {
                       <td className="px-4 py-3 text-white/70">{j.customerName ?? '—'}</td>
                       <td className="px-4 py-3 text-white/50 text-xs">{fmtDate(j.scheduledAt)}</td>
                       <td className="px-4 py-3"><StatusBadge status={j.status}/></td>
+                      <td className="px-4 py-3">
+                        {j.paymentStatus === 'paid'
+                          ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>✓ Paid</span>
+                          : j.paymentStatus === 'created'
+                          ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(251,191,36,0.15)', color: '#CA8A04' }}>⏳ Pending</span>
+                          : <span className="text-white/25 text-[10px]">—</span>
+                        }
+                      </td>
                       <td className="px-4 py-3 text-white font-bold">{fmt(j.price)}</td>
                       <td className="px-4 py-3">
                         <button

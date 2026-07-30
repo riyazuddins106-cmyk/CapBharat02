@@ -992,7 +992,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "booking-history" ? (
-            <BookingHistoryView bookings={bookingList} />
+            <BookingHistoryView bookings={bookingList} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "pros" ? (
             <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} proPageSize={proPageSize} onProPageSizeChange={setProPageSize} />
           ) : activeSection === "create-pro" ? (
@@ -1680,7 +1680,74 @@ function BookingsView({
    BOOKING HISTORY
 ═══════════════════════════════════════════════════════════════════ */
 
-function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
+/* ── PaymentStatusCell: shows status badge + confirm/reject for cash/UPI ── */
+function PaymentStatusCell({ booking, accessToken, onRefresh }: {
+  booking: BookingRow;
+  accessToken: string;
+  onRefresh: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  const act = async (action: 'confirm' | 'reject') => {
+    if (!booking.paymentId) return;
+    setConfirming(true);
+    try {
+      await adminApi.confirmPayment(booking.paymentId, action, accessToken);
+      onRefresh();
+    } catch (e: any) {
+      alert(e?.message ?? 'Action failed');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const ps = booking.paymentStatus;
+  const pm = booking.paymentMethod;
+
+  if (!ps) {
+    return <span className="text-white/25 text-xs italic">No payment</span>;
+  }
+  if (ps === 'paid') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>
+          <CheckCircle size={10} /> Paid
+        </span>
+        {pm && <span className="text-white/30 text-[10px]">{pm}</span>}
+      </div>
+    );
+  }
+  if (ps === 'failed') {
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
+      <XCircle size={10} /> Rejected
+    </span>;
+  }
+  // created / pending — show confirm/reject for cash & UPI
+  const isManual = pm === 'cash' || pm === 'upi_manual';
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold w-fit" style={{ background: 'rgba(251,191,36,0.15)', color: '#CA8A04' }}>
+        <AlertCircle size={10} /> {isManual ? 'Awaiting confirm' : 'Pending'}
+      </span>
+      {isManual && booking.paymentId && (
+        <div className="flex gap-1">
+          <button disabled={confirming} onClick={() => act('confirm')}
+            className="px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors disabled:opacity-50"
+            style={{ background: 'rgba(22,163,74,0.2)', color: '#16A34A' }}>
+            {confirming ? '…' : '✓ Confirm'}
+          </button>
+          <button disabled={confirming} onClick={() => act('reject')}
+            className="px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors disabled:opacity-50"
+            style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+            ✕ Reject
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: BookingRow[]; accessToken: string; onRefresh: () => void }) {
   const [pageSize, setPageSize]         = useState(50);
   const [page,         setPage]         = useState(1);
   const { sort: bhSort, toggleSort: toggleBhSort, applySortFn: sortBh } = useTableSort();
@@ -1878,6 +1945,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
                 <SortTh label="Scheduled At" field="scheduledAt"  sort={bhSort} onSort={toggleBhSort} />
                 <SortTh label="Created At"   field="createdAt"    sort={bhSort} onSort={toggleBhSort} />
                 <SortTh label="Status"       field="status"       sort={bhSort} onSort={toggleBhSort} />
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Payment</th>
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Notes</th>
               </tr>
             </thead>
@@ -1909,12 +1977,15 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
                   <td className="px-4 py-3">
                     <Badge label={b.status.replace(/_/g, " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
                   </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <PaymentStatusCell booking={b} accessToken={accessToken} onRefresh={refetch} />
+                  </td>
                   <td className="px-4 py-3 text-white/40 text-xs max-w-[200px]">
                     <p className="truncate" title={b.notes ?? ""}>{b.notes ?? <span className="italic text-white/20">—</span>}</p>
                   </td>
                 </tr>
               ))}
-              {paged.length === 0 && <EmptyRow cols={9} text="No bookings match the selected filters" />}
+              {paged.length === 0 && <EmptyRow cols={10} text="No bookings match the selected filters" />}
             </tbody>
           </table>
         </div>

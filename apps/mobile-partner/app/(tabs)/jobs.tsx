@@ -71,6 +71,22 @@ function JobCard({ job }: { job: Job }) {
           </Text>
         </View>
       ) : null}
+
+      {job.status === 'completed' && (
+        <View style={[styles.scanHint, {
+          backgroundColor: job.paymentStatus === 'paid' ? '#DCFCE7' : '#FEF9C3',
+          borderRadius: colors.radius,
+        }]}>
+          <Ionicons
+            name={job.paymentStatus === 'paid' ? 'checkmark-circle-outline' : 'time-outline'}
+            size={14}
+            color={job.paymentStatus === 'paid' ? '#16A34A' : '#CA8A04'}
+          />
+          <Text style={[styles.scanHintText, { color: job.paymentStatus === 'paid' ? '#16A34A' : '#CA8A04' }]}>
+            {job.paymentStatus === 'paid' ? 'Payment received' : 'Awaiting payment'}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }

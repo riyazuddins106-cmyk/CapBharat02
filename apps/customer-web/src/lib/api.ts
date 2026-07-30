@@ -283,6 +283,16 @@ export const bookingsApi = {
     const { data } = await client.post(`/bookings/${id}/payment`, { method, notes });
     return data.data as ApiPayment;
   },
+
+  async createRazorpayOrder(id: string) {
+    const { data } = await client.post(`/bookings/${id}/razorpay/create-order`);
+    return data.data as { orderId: string; amount: number; currency: string; keyId: string; bookingId: string; businessName: string };
+  },
+
+  async verifyRazorpay(id: string, razorpay_payment_id: string, razorpay_order_id: string, razorpay_signature: string) {
+    const { data } = await client.post(`/bookings/${id}/razorpay/verify`, { razorpay_payment_id, razorpay_order_id, razorpay_signature });
+    return data.data as ApiPayment;
+  },
 };
 
 export interface ApiPayment {

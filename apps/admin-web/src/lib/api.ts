@@ -91,6 +91,9 @@ export interface BookingRow {
   createdAt: string;
   customerName?: string | null;
   customerEmail?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  paymentId?: string | null;
 }
 
 export interface ProfessionalRow {
@@ -489,6 +492,8 @@ export const adminApi = {
     request(`/admin/bookings/${id}/cancel`, { method: 'PATCH', token }),
   deleteBooking: (id: string, token: string) =>
     request<{ id: string }>(`/admin/bookings/${id}`, { method: 'DELETE', token }),
+  confirmPayment: (paymentId: string, action: 'confirm' | 'reject', token: string, notes?: string) =>
+    request(`/admin/payments/${paymentId}/confirm`, { method: 'PATCH', token, body: JSON.stringify({ action, notes }) }),
 
   // Professionals
   createProfessional: (data: {

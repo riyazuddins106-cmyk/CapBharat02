@@ -24,10 +24,13 @@ router.get('/stats', adminController.getStats);
 router.get('/analytics/timeseries', adminController.getAnalyticsTimeseries);
 
 // Bookings management
-router.get('/bookings',                  adminController.listBookings);
-router.patch('/bookings/:id',            adminController.updateBooking);
-router.patch('/bookings/:id/cancel',     adminController.cancelBooking);
-router.delete('/bookings/:id',           adminController.deleteBooking);
+router.get('/bookings',                        adminController.listBookings);
+router.patch('/bookings/:id',                  adminController.updateBooking);
+router.patch('/bookings/:id/cancel',           adminController.cancelBooking);
+router.delete('/bookings/:id',                 adminController.deleteBooking);
+
+// Payment confirmation (admin manually confirms/rejects cash or UPI payments)
+router.patch('/payments/:id/confirm',          adminController.confirmPayment);
 
 // Professionals management
 router.post('/professionals',                   adminController.createProfessional);
