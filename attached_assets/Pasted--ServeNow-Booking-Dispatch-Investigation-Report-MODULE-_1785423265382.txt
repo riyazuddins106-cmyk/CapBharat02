@@ -1,0 +1,207 @@
+
+
+ServeNow Booking Dispatch Investigation Report
+MODULE 1 — Booking Creation
+File: server/src/controllers/booking.controller.ts lines 55–96
+
+The checkout function inserts a booking with these exact values:
+
+status:          'pending'
+professionalId:  null
+dispatchStatus:  'searching_partner'
+dispatchDeadline: NOW() + 10 minutes
+
+After insert, it calls:
+
+await dispatchService.broadcast(booking, first.service.id);  // line 91
+
+⚠️ Critical detail: Only first.service.id (the first item in the cart) is passed to broadcast(). If the cart had multiple services, only the first one is used for partner matching.
+
+Dispatch is wrapped in a try/catch (lines 90–95) — dispatch failure is non-fatal and logged as a warning. The booking is created regardless.
+
+MODULE 2 — Dispatch Service
+File: server/src/services/dispatch.service.ts lines 36–129
+
+Candidate query filters (lines 37–46)
+.from(partnerServices)
+.innerJoin(professionals, eq(partnerServices.partnerId, professionals.id))
+.leftJoin(users, eq(professionals.userId, users.id))
+.where(and(
+  eq(partnerServices.serviceId, serviceId),        // 1. Must have this exact service in partner_services
+  eq(professionals.isActive, true),                // 2. Must be active
+  eq(professionals.availabilityStatus, 'available'), // 3. *** MUST be 'available' ***
+  isNull(professionals.deletedAt),                 // 4. Not soft-deleted
+))
+
+Document verification gate (lines 50–76)
+Queries document_type_configs WHERE is_mandatory = true AND is_active = true
+For each candidate, checks partner_documents for status = 'approved' on ALL mandatory keys
+Partners missing any mandatory document are silently removed from verifiedCandidates
+GPS proximity filter (lines 80–118)
+Only activates if booking.addressId is non-null
+Partners without GPS coordinates get distance = Infinity (go last but not excluded)
+If booking.addressId is null, ALL verified candidates are dispatched
+When zero candidates found — line 78:
+if (!verifiedCandidates.length) return [];
+
+Returns immediately. No rows are inserted into booking_partner_requests. No notification is sent.
+
+On success (lines 121–127):
+Inserts into bookingPartnerRequests with status = 'pending' and sends push notification to each partner.
+
+MODULE 3 — Database Schema
+server/src/database/schema/professionals.ts line 21:
+
+availabilityStatus: varchar('availability_status', { length: 16 }).notNull().default('offline'),
+
+🔴 Default is 'offline', not 'available'. Every new professional record starts offline.
+
+server/src/database/schema/bookingPartnerRequests.ts: Columns: id, bookingId, partnerId, status (default 'pending'), sentAt, respondedAt
+
+server/src/database/schema/partnerServices.ts: Simple join table: partnerId → professionals.id, serviceId → services.id, unique constraint on the pair. No extra metadata.
+
+MODULE 4 — Partner Booking API (Backend)
+Route: server/src/routes/partner.routes.ts line 21:
+
+GET /jobs → partnerController.listJobs
+
+server/src/repositories/partner.repository.ts lines 23–63 — the listJobs query:
+
+.leftJoin(
+  bookingPartnerRequests,
+  and(
+    eq(bookingPartnerRequests.bookingId, bookings.id),
+    eq(bookingPartnerRequests.partnerId, professionalId),
+    eq(bookingPartnerRequests.status, 'pending'),   // ← only pending requests
+  ),
+)
+.where(
+  and(
+    isNull(bookings.deletedAt),
+    or(
+      eq(bookings.professionalId, professionalId),   // assigned bookings
+      isNotNull(bookingPartnerRequests.id),           // dispatched pending requests
+    ),
+  ),
+)
+
+✅ The listJobs query is logically correct. It returns a booking if either:
+
+bookings.professional_id = this_partner, OR
+There exists a booking_partner_requests row where partner_id = this_partner AND status = 'pending'
+The problem is NOT the listJobs query. The problem is that dispatch.broadcast() never creates those rows in the first place.
+
+MODULE 5 — Admin Booking API
+server/src/controllers/admin.controller.ts lines 48–105 — listBookings:
+
+WHERE clause only contains:
+
+isNull(bookings.deletedAt) — always
+Optional date range (gte/lte)
+Optional status filter
+No filter by customerId or professionalId — admin sees every booking regardless of dispatch status or partner assignment. That's why the booking is visible in the Admin Panel immediately.
+
+MODULE 6 — Partner Mobile App
+apps/mobile-partner/lib/api.ts lines 271–272:
+
+listJobs: (token: string) =>
+  request<Job[]>('/api/partner/jobs', { token }),
+
+GET request, no query params, Bearer token attached.
+
+apps/mobile-partner/app/(tabs)/jobs.tsx lines 85–92:
+
+const { data: jobs = [], ... } = useQuery({
+  queryKey: ['/api/partner/jobs', accessToken],
+  queryFn: () => partnerApi.listJobs(accessToken!),
+  enabled: !!accessToken,
+  refetchInterval: 30_000,   // polls every 30 seconds
+});
+
+✅ Auto-polling every 30 s is present
+Active tab shows statuses: ['upcoming', 'pending', 'in_progress']
+Empty state message (line 129): "Make sure you are set to Available in your profile — new job requests will appear here automatically." — the UI itself is hinting at the root cause
+MODULE 7 — Partner App Authentication
+apps/mobile-partner/context/AuthContext.tsx:
+
+Tokens stored in SecureStore as partner_access_token / partner_refresh_token
+On login (line 128): queryClient.clear() then registerPushToken(data.accessToken) — queries reset and re-fetch when screens mount
+listJobs is called with accessToken from context via enabled: !!accessToken
+After login, accessToken is set synchronously → Jobs screen fetches immediately
+Token refresh interceptor registered via setRefreshHandler — 401s trigger silent token refresh and retry
+MODULE 8 — Push Notifications
+server/src/services/notification.service.ts:
+
+Looks up users.pushToken for the target user
+Sends via Expo SDK — silent failure if no token or invalid token
+apps/mobile-partner/lib/pushNotifications.ts:
+
+Conditionally loads expo-notifications — skipped entirely on Android Expo Go
+Requests permission, creates Android channel, gets Expo push token
+Returns null on Android Expo Go (SDK 53+ restriction)
+Push token registered via authApi.registerPushToken() after login
+⚠️ On Android Expo Go, push token registration is skipped. Partners on Android Expo Go will not receive push notifications for new job requests. They would still see jobs via the 30s polling — but only if broadcast() ran successfully and created rows.
+
+No notification tap handler was found in the files read (would be in _layout.tsx).
+
+MODULE 9 — End-to-End Trace
+Step	What Happens	Result
+1	checkout inserts booking	status='pending', professional_id=NULL, dispatch_status='searching_partner'
+2	broadcast(booking, first.service.id) called	Runs partner candidate query
+3	Query filters availabilityStatus = 'available'	Test partner defaults to 'offline' → filtered out
+4	If availability passed: doc gate checks mandatory docs	Test partner has no docs → also filtered out
+5	verifiedCandidates.length === 0 → return []	No rows inserted into booking_partner_requests
+6	Partner calls GET /api/partner/jobs	listJobs LEFT JOIN finds no matching booking_partner_requests row
+7	WHERE isNotNull(bookingPartnerRequests.id) fails	Booking is invisible to partner
+8	Admin calls GET /admin/bookings	No filters → booking visible ✅
+ROOT CAUSE
+professionals.availabilityStatus defaults to 'offline' (schema line 21), and dispatch.broadcast() exclusively selects partners where availabilityStatus = 'available' (dispatch.service.ts line 44).
+
+The test partner seeded by seed-test-accounts.ts starts with availability_status = 'offline'. Dispatch finds zero candidates, returns early without inserting any booking_partner_requests rows, and the partner's listJobs query has nothing to return.
+
+SECONDARY CAUSES
+B — partnerServices mismatch (dispatch.service.ts lines 38–39): The query starts from partnerServices INNER JOIN to professionals. If the test partner has no rows in partner_services matching first.service.id, they are excluded before the availability filter even runs. This is a second independent gate.
+
+C — Document verification gate (dispatch.service.ts lines 50–76 + partner.service.ts lines 156–178): If document_type_configs contains any is_mandatory = true AND is_active = true rows, partners must have all of them in approved status. The updateAvailability endpoint enforces this too — you cannot even set availabilityStatus = 'available' without passing the doc check.
+
+D — Only first service ID dispatched (booking.controller.ts line 91 first.service.id): Multi-item carts only dispatch based on the first service, meaning a partner must offer specifically that service.
+
+EVIDENCE REFERENCES
+Finding	File:Line
+availability_status defaults to 'offline'	server/src/database/schema/professionals.ts:21
+Dispatch filters to available only	server/src/services/dispatch.service.ts:44
+Early return with empty candidates	server/src/services/dispatch.service.ts:78
+Document gate blocks non-approved partners	server/src/services/dispatch.service.ts:50–76
+updateAvailability also blocks without docs	server/src/services/partner.service.ts:156–178
+Only first service ID passed to broadcast	server/src/controllers/booking.controller.ts:91
+listJobs correctly joins on pending requests	server/src/repositories/partner.repository.ts:45–62
+30s polling present in Jobs screen	apps/mobile-partner/app/(tabs)/jobs.tsx:91
+Empty state hints at the root cause	apps/mobile-partner/app/(tabs)/jobs.tsx:129
+SUGGESTED FIXES
+Fix 1 — Immediate (database, for testing)
+Set the test partner's availability to 'available':
+
+UPDATE professionals SET availability_status = 'available' WHERE user_id = (
+  SELECT id FROM users WHERE email = 'partner@servenow.in'
+);
+
+Fix 2 — Ensure partner has service entries (for testing)
+The test partner must have rows in partner_services for the services being booked:
+
+INSERT INTO partner_services (partner_id, service_id)
+SELECT p.id, s.id
+FROM professionals p, services s
+WHERE p.name = 'Test Partner'   -- adjust to match seeded name
+  AND s.is_active = true
+ON CONFLICT DO NOTHING;
+
+Fix 3 — Check/clear mandatory document gates
+If document_type_configs has mandatory entries, either approve the partner's docs via the admin panel, or for development deactivate the mandatory flag:
+
+UPDATE document_type_configs SET is_mandatory = false;
+
+Fix 4 — Code: seed script should set availabilityStatus = 'available'
+In server/src/database/seed-test-accounts.ts, the professional insert (or a follow-up update) should set availability_status = 'available' for the test partner so the dispatch flow works out of the box.
+
+Fix 5 — Code: dispatch should use ALL booked service IDs, not just the first
+In booking.controller.ts line 91, first.service.id should be replaced with all service IDs from the cart items, and dispatch.broadcast() should be updated to accept an array and use inArray(partnerServices.serviceId, serviceIds) — matching partners who offer ANY of the booked services.

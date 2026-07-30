@@ -87,100 +87,107 @@ if [[ "$START_DELAY" -gt 0 ]]; then
   sleep "$START_DELAY"
 fi
 
-# ── Replit-native mode (skip ngrok + exp.direct entirely) ────────────────────
+# ── Replit-native mode: use Expo's --tunnel for correct HTTPS bundle URLs ─────
 # MUST run before the ngrok token/binary checks below.
 #
-# Replit exposes each port via its own public HTTPS proxy domain:
-#   REPLIT_EXPO_DEV_DOMAIN = <repl-id>-00-<suffix>.expo.pike.replit.dev
-#   Port-specific form:      <repl-id>-<PORT>-<suffix>.expo.pike.replit.dev
+# Root cause why --host lan fails on Replit: Metro generates bundle URLs as
+#   http://hostname:PORT/...bundle
+# but Replit's proxy only accepts TLS connections — plain HTTP returns 400.
+# Expo Go downloads the manifest fine (via TLS WebSocket) but fails on the
+# bundle fetch ("failed to download").
 #
-# We derive the per-port domain, set REACT_NATIVE_PACKAGER_HOSTNAME so Metro
-# uses it in the QR code URL, and start with --host lan.  This avoids
-# exp.direct entirely — no anonymous-tunnel slot limit, no "remote gone away",
-# no session-conflict retries.  The Replit proxy forwards the exp:// WebSocket
-# connection from Expo Go straight to Metro on the local port.
+# Fix: use `expo start --tunnel` which creates an exp.direct HTTPS tunnel.
+# Bundle URLs become https://xxxx.exp.direct/...bundle — no port, TLS-only.
+# The tunnel URL is parsed from Metro stdout and used to regenerate QR PNG.
 if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
-  echo "=== Replit: using per-port proxy domain (no exp.direct needed) ==="
-
-  # Derive port-specific domain: replace the -00- slot with the actual port.
-  EXPO_HOST=$(echo "$REPLIT_EXPO_DEV_DOMAIN" | sed "s/-00-/-${PORT}-/")
-  export REACT_NATIVE_PACKAGER_HOSTNAME="$EXPO_HOST"
+  echo "=== Replit: using expo --tunnel (HTTPS bundle URLs required) ==="
 
   if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
     export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
   fi
+  echo "API URL: $EXPO_PUBLIC_API_URL"
 
-  # Include the Metro port so Expo Go connects to the right server.
-  EXPO_URL="exp://${EXPO_HOST}:${PORT}"
-  URL_FILE="/tmp/expo-tunnel-${PORT}.url"
-  echo "$EXPO_URL" > "$URL_FILE"
-
-  echo "Metro host : $EXPO_HOST"
-  echo "Expo Go URL: $EXPO_URL"
-  echo "API URL    : $EXPO_PUBLIC_API_URL"
-
-  # Regenerate the QR code PNG for this port and refresh scanner.html so the
-  # QR Codes workflow shows the correct URL immediately.
   QR_DIR="$WORKSPACE_ROOT/tmp-qr"
   if [[ "$PORT" -eq 8099 ]]; then
     QR_PNG="$QR_DIR/partner-qr.png"
-    QR_LABEL="Partner App"
     QR_KEY="partner"
   else
     QR_PNG="$QR_DIR/customer-qr.png"
-    QR_LABEL="Customer App"
     QR_KEY="customer"
   fi
-  node -e "
-const QRCode = require('qrcode');
-const fs = require('fs');
-const qrPng = '$QR_PNG';
-const expoUrl = '$EXPO_URL';
-const qrKey = '$QR_KEY';
-const htmlPath = '${QR_DIR}/scanner.html';
-
-QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
-  if (err) { console.error('[qr] Failed:', err.message); return; }
-  console.log('[qr] Written ' + qrPng + ' for ' + expoUrl);
-  // Patch the URL label in scanner.html
-  try {
-    let html = fs.readFileSync(htmlPath, 'utf8');
-    // Replace any exp:// URL inside the div.url that follows the qrKey card
-    const re = new RegExp('(<div class=\"badge ' + qrKey + '\">.*?<div class=\"url\">)[^<]*(</div>)', 's');
-    html = html.replace(re, (_, before, after) => before + expoUrl + after);
-    fs.writeFileSync(htmlPath, html);
-    console.log('[qr] Patched scanner.html label for ' + qrKey);
-  } catch(e) { console.warn('[qr] Could not patch scanner.html:', e.message); }
-});
-" 2>/dev/null || echo "[qr] qrcode module unavailable — skipping PNG regeneration"
 
   export EXPO_NO_INTERACTIVE=1
   unset EXPO_TOKEN
 
-  # Retry loop — Metro can occasionally crash on first start in a fresh env.
+  # Helper: parse the exp[s]:// tunnel URL from a line of Metro output and
+  # regenerate QR PNG + scanner.html.  Called once per successful tunnel start.
+  regenerate_qr() {
+    local url="$1"
+    node -e "
+const QRCode = require('qrcode');
+const fs = require('fs');
+const qrPng = '$QR_PNG';
+const expoUrl = '$url';
+const qrKey = '$QR_KEY';
+const htmlPath = '${QR_DIR}/scanner.html';
+QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
+  if (err) { console.error('[qr] Failed:', err.message); return; }
+  console.log('[qr] QR written for ' + expoUrl);
+  try {
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    const re = new RegExp('(<div class=\"badge ' + qrKey + '\">.*?<div class=\"url\">)[^<]*(</div>)', 's');
+    html = html.replace(re, (_, b, a) => b + expoUrl + a);
+    fs.writeFileSync(htmlPath, html);
+    console.log('[qr] scanner.html updated for ' + qrKey);
+  } catch(e) { console.warn('[qr] scanner.html patch failed:', e.message); }
+});
+" 2>/dev/null || true
+  }
+
   NATIVE_MAX_RETRIES=5
-  NATIVE_RETRY_DELAY=10
+  NATIVE_RETRY_DELAY=15
+
   for attempt in $(seq 1 $NATIVE_MAX_RETRIES); do
-    echo "Starting Expo (--host lan / Replit proxy) on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
+    echo "Starting Expo --tunnel on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
     prewarm_bundles "$PORT" &
+    PREWARM_PID=$!
+
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"
     exec 9<>"$_FIFO"
+
+    QR_DONE=0
     set +e
-    pnpm exec expo start --host lan --port "$PORT" "$@" < "$_FIFO"
-    EXIT_CODE=$?
+    # Pipe output through awk to intercept the tunnel URL on first appearance.
+    pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO" 2>&1 | \
+    while IFS= read -r line; do
+      echo "$line"
+      if [[ $QR_DONE -eq 0 ]]; then
+        # Metro prints: "Metro waiting on exp[s]://xxxx"  OR  "› Metro waiting on ..."
+        TUNNEL_URL=$(echo "$line" | grep -oE 'exp[s]?://[^ ]+' | head -1)
+        if [[ -n "$TUNNEL_URL" ]]; then
+          echo "[tunnel] URL: $TUNNEL_URL"
+          regenerate_qr "$TUNNEL_URL"
+          QR_DONE=1
+        fi
+      fi
+    done
+    EXPO_EXIT=${PIPESTATUS[0]}
     set -e
+
     exec 9>&-
     rm -f "$_FIFO"
-    if [[ $EXIT_CODE -eq 0 ]]; then
+    kill "$PREWARM_PID" 2>/dev/null || true
+
+    if [[ $EXPO_EXIT -eq 0 ]]; then
       exit 0
     fi
     if [[ $attempt -lt $NATIVE_MAX_RETRIES ]]; then
-      echo "Expo exited (code $EXIT_CODE). Retrying in ${NATIVE_RETRY_DELAY}s…"
+      echo "Expo exited (code $EXPO_EXIT). Retrying in ${NATIVE_RETRY_DELAY}s…"
       sleep "$NATIVE_RETRY_DELAY"
     fi
   done
-  echo "All $NATIVE_MAX_RETRIES attempts failed."
+  echo "All $NATIVE_MAX_RETRIES tunnel attempts failed."
   exit 1
 fi
 

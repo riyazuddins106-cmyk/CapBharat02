@@ -31,17 +31,17 @@ scripts/           # expo-tunnel.sh — Replit-native Expo tunneling
 
 ## Database setup
 ```bash
-# Run migrations (idempotent)
+# 1. Run migrations (idempotent — also backfills availability + clears mandatory doc gates)
 pnpm --filter @servenow/server exec tsx src/database/migrate.ts
 
-# Seed test accounts (admin, customer, partner users)
+# 2. Seed the service catalog (categories + services)
+pnpm --filter @servenow/server exec tsx src/database/seed-catalog.ts
+
+# 3. Seed test accounts (admin, customer, partner — partner starts 'available')
 pnpm --filter @servenow/server exec tsx src/database/seed-test-accounts.ts
 
-# Link test partner user to a professional record (required for Partner App login)
-pnpm --filter @servenow/server exec tsx src/database/link-partner.ts
-
-# Seed demo data (categories + professionals)
-pnpm --filter @servenow/server exec tsx src/database/seed-demo.ts
+# 4. Link test partner to all active services (so dispatch finds them for any booking)
+pnpm --filter @servenow/server exec tsx src/database/seed-partner-services.ts
 ```
 
 For Replit development, set the Postgres connection string as `DATABASE_URL`.
