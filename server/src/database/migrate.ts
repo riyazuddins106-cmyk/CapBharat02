@@ -507,11 +507,11 @@ export async function runMigrations() {
 
   // Seed default document types (idempotent)
   const defaultTypes = [
-    { key: 'aadhaar_front',       label: 'Aadhaar Card (Front)',     desc: 'Front side of your Aadhaar card',           emoji: '🪪', mandatory: true,  order: 1  },
-    { key: 'aadhaar_back',        label: 'Aadhaar Card (Back)',      desc: 'Back side of your Aadhaar card',            emoji: '🪪', mandatory: true,  order: 2  },
-    { key: 'pan_card',            label: 'PAN Card',                 desc: 'Your PAN card (Income Tax ID)',              emoji: '💳', mandatory: true,  order: 3  },
-    { key: 'bank_passbook',       label: 'Bank Passbook / Cheque',   desc: 'Cancelled cheque or passbook first page',   emoji: '🏦', mandatory: true,  order: 4  },
-    { key: 'profile_photo',       label: 'Profile Photo',            desc: 'Clear passport-size face photo',            emoji: '📸', mandatory: true,  order: 5  },
+    { key: 'aadhaar_front',       label: 'Aadhaar Card (Front)',     desc: 'Front side of your Aadhaar card',           emoji: '🪪', mandatory: false, order: 1  },
+    { key: 'aadhaar_back',        label: 'Aadhaar Card (Back)',      desc: 'Back side of your Aadhaar card',            emoji: '🪪', mandatory: false, order: 2  },
+    { key: 'pan_card',            label: 'PAN Card',                 desc: 'Your PAN card (Income Tax ID)',              emoji: '💳', mandatory: false, order: 3  },
+    { key: 'bank_passbook',       label: 'Bank Passbook / Cheque',   desc: 'Cancelled cheque or passbook first page',   emoji: '🏦', mandatory: false, order: 4  },
+    { key: 'profile_photo',       label: 'Profile Photo',            desc: 'Clear passport-size face photo',            emoji: '📸', mandatory: false, order: 5  },
     { key: 'driving_license',     label: 'Driving License',          desc: 'Valid driving license',                     emoji: '🚗', mandatory: false, order: 6  },
     { key: 'police_verification', label: 'Police Verification',      desc: 'Police clearance certificate',              emoji: '👮', mandatory: false, order: 7  },
     { key: 'gst_certificate',     label: 'GST Certificate',          desc: 'GST registration certificate',              emoji: '📋', mandatory: false, order: 8  },

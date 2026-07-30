@@ -165,6 +165,7 @@ export interface Booking {
   price: number;
   notes: string | null;
   reviewed?: boolean;
+  serviceId?: string | null;
   createdAt: string;
 }
 export interface Review {

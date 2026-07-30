@@ -58,7 +58,7 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
           <TouchableOpacity
             style={styles.iconWrap}
             activeOpacity={0.7}
-            onPress={() => (booking as any).serviceId && router.push(`/service/${(booking as any).serviceId}`)}
+            onPress={() => booking.serviceId && router.push(`/service/${booking.serviceId}`)}
           >
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
               <Ionicons name="construct-outline" size={18} color={colors.primary} />
@@ -94,7 +94,7 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
           <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={2}>"{booking.notes}"</Text>
         )}
 
-        {/* Actions */}
+        {/* Actions row — QR + Pay Now / Rate Service */}
         <View style={styles.actions}>
           {/* QR Code — show for all active bookings so partner can scan to check in */}
           {(booking.status === 'pending' || booking.status === 'upcoming' || booking.status === 'in_progress') && (
@@ -105,15 +105,6 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             >
               <Ionicons name="qr-code-outline" size={15} color={colors.primary} />
               <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
-            </TouchableOpacity>
-          )}
-          {['pending', 'upcoming'].includes(booking.status) && onCancel && (
-            <TouchableOpacity
-              onPress={() => onCancel(booking.id)}
-              style={[styles.actionBtn, { borderColor: colors.destructive }]}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.actionBtnText, { color: colors.destructive }]}>Cancel</Text>
             </TouchableOpacity>
           )}
           {['upcoming', 'in_progress', 'completed'].includes(booking.status) && onPay && (
@@ -136,6 +127,18 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Cancel — full-width prominent button on its own row */}
+        {['pending', 'upcoming'].includes(booking.status) && onCancel && (
+          <TouchableOpacity
+            onPress={() => onCancel(booking.id)}
+            style={[styles.cancelBtn, { borderColor: '#DC2626', backgroundColor: '#FEF2F2' }]}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close-circle-outline" size={15} color="#DC2626" />
+            <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Cancel Booking</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* QR Code Modal */}
@@ -202,6 +205,7 @@ const styles = StyleSheet.create({
   actions: { marginTop: 12, flexDirection: 'row', gap: 8 },
   actionBtn: { flex: 1, borderWidth: 1.5, borderRadius: 8, paddingVertical: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5 },
   actionBtnText: { fontSize: 13, fontWeight: '700' },
+  cancelBtn: { marginTop: 8, borderWidth: 1.5, borderRadius: 8, paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5 },
   // QR Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   qrSheet: { width: '100%', maxWidth: 340, padding: 24, gap: 18 },

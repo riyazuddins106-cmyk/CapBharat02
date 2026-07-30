@@ -77,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const me = await profileApi.me(storedAccess);
             setUser(me);
             setAccessToken(storedAccess);
+            // Register the refresh handler so expired tokens are silently renewed
+            if (storedRefresh) setupRefreshHandler(storedRefresh);
             registerPushTokenRef.current(storedAccess);
           } catch {
             // Try refreshing
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const me = await profileApi.me(tokens.accessToken);
                 setUser(me);
                 setAccessToken(tokens.accessToken);
+                setupRefreshHandler(tokens.refreshToken);
                 registerPushTokenRef.current(tokens.accessToken);
               } catch {
                 await clearTokens();

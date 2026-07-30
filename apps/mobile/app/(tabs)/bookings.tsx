@@ -305,13 +305,20 @@ export default function BookingsScreen() {
     enabled: !!accessToken,
   });
 
-  // Auto-open payment modal when navigated here with a payId param (from checkout "Pay Now")
+  // When arriving from checkout with a payId, force-refresh bookings (cache may be stale)
+  // and switch to the searching tab so the pending booking is visible.
+  useEffect(() => {
+    if (!payId) return;
+    setTab('searching');
+    refetch();
+  }, [payId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open payment modal once fresh bookings data contains the target booking.
   useEffect(() => {
     if (!payId || !bookings) return;
     const target = bookings.find((b) => b.id === payId);
     if (target) {
       setPayModal(target);
-      // Switch to the right tab so the booking is visible behind the modal
       if (target.status === 'pending') setTab('searching');
       else if (['upcoming', 'in_progress'].includes(target.status)) setTab('upcoming');
     }
