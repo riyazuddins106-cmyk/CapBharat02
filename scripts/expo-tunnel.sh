@@ -110,7 +110,8 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
     export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
   fi
 
-  EXPO_URL="exp://${EXPO_HOST}"
+  # Include the Metro port so Expo Go connects to the right server.
+  EXPO_URL="exp://${EXPO_HOST}:${PORT}"
   URL_FILE="/tmp/expo-tunnel-${PORT}.url"
   echo "$EXPO_URL" > "$URL_FILE"
 
@@ -124,15 +125,32 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   if [[ "$PORT" -eq 8099 ]]; then
     QR_PNG="$QR_DIR/partner-qr.png"
     QR_LABEL="Partner App"
+    QR_KEY="partner"
   else
     QR_PNG="$QR_DIR/customer-qr.png"
     QR_LABEL="Customer App"
+    QR_KEY="customer"
   fi
   node -e "
 const QRCode = require('qrcode');
-QRCode.toFile('$QR_PNG', '$EXPO_URL', { width: 400, margin: 2 }, err => {
-  if (err) console.error('[qr] Failed:', err.message);
-  else console.log('[qr] Written $QR_PNG for $EXPO_URL');
+const fs = require('fs');
+const qrPng = '$QR_PNG';
+const expoUrl = '$EXPO_URL';
+const qrKey = '$QR_KEY';
+const htmlPath = '${QR_DIR}/scanner.html';
+
+QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
+  if (err) { console.error('[qr] Failed:', err.message); return; }
+  console.log('[qr] Written ' + qrPng + ' for ' + expoUrl);
+  // Patch the URL label in scanner.html
+  try {
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    // Replace any exp:// URL inside the div.url that follows the qrKey card
+    const re = new RegExp('(<div class=\"badge ' + qrKey + '\">.*?<div class=\"url\">)[^<]*(</div>)', 's');
+    html = html.replace(re, (_, before, after) => before + expoUrl + after);
+    fs.writeFileSync(htmlPath, html);
+    console.log('[qr] Patched scanner.html label for ' + qrKey);
+  } catch(e) { console.warn('[qr] Could not patch scanner.html:', e.message); }
 });
 " 2>/dev/null || echo "[qr] qrcode module unavailable — skipping PNG regeneration"
 
@@ -285,9 +303,41 @@ NODE
       # URL for both the QR and the manifest bundle URLs. Do not include the
       # internal Metro port here; ngrok terminates HTTPS on its public host.
       export EXPO_PACKAGER_PROXY_URL="https://${NGROK_HOST}"
-      EXPO_GO_URL="exp://${NGROK_HOST}"
+      # ngrok terminates HTTP on port 80 with a 307 redirect to HTTPS.
+      # Expo Go does NOT follow that redirect — it just fails with
+      # "failed to download remote update". Using exps:// makes Expo Go
+      # connect directly to HTTPS:443, bypassing the redirect entirely.
+      EXPO_GO_URL="exps://${NGROK_HOST}"
       echo "$EXPO_GO_URL" > "/tmp/expo-tunnel-${PORT}.url"
       export REACT_NATIVE_PACKAGER_HOSTNAME="$NGROK_HOST"
+
+      # Regenerate QR PNG and patch scanner.html with the exps:// URL
+      QR_DIR="$WORKSPACE_ROOT/tmp-qr"
+      if [[ "$PORT" -eq 8099 ]]; then
+        QR_PNG="$QR_DIR/partner-qr.png"; QR_KEY="partner"
+      else
+        QR_PNG="$QR_DIR/customer-qr.png"; QR_KEY="customer"
+      fi
+      node -e "
+const QRCode = require('qrcode');
+const fs = require('fs');
+const qrPng = '$QR_PNG';
+const expoUrl = '$EXPO_GO_URL';
+const qrKey = '$QR_KEY';
+const htmlPath = '${QR_DIR}/scanner.html';
+QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
+  if (err) { console.error('[qr] Failed:', err.message); return; }
+  console.log('[qr] Written ' + qrPng + ' for ' + expoUrl);
+  try {
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    const re = new RegExp('(<div class=\"badge ' + qrKey + '\">.*?<div class=\"url\">)[^<]*(</div>)', 's');
+    html = html.replace(re, (_, b, a) => b + expoUrl + a);
+    fs.writeFileSync(htmlPath, html);
+    console.log('[qr] Patched scanner.html for ' + qrKey);
+  } catch(e) { console.warn('[qr] Could not patch scanner.html:', e.message); }
+});
+" 2>/dev/null || echo "[qr] qrcode module unavailable"
+
       return 0
     fi
 
