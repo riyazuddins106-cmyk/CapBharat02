@@ -297,7 +297,7 @@ export default function BookingsScreen() {
   // router.replace from a Stack modal to a nested tab route does not reliably
   // deliver URL params in Expo Router SDK 54, so we use a synchronous store.
   const [payId] = useState<string | undefined>(() => urlPayId || consumePendingPayId() || undefined);
-  const [tab, setTab] = useState<'searching' | 'upcoming' | 'past'>('upcoming');
+  const [tab, setTab] = useState<'searching' | 'upcoming' | 'awaitingPayment' | 'past'>('upcoming');
   const [reviewModal, setReviewModal] = useState<Booking | null>(null);
   const [payModal, setPayModal] = useState<Booking | null>(null);
   const [rating, setRating] = useState(5);
@@ -328,6 +328,7 @@ export default function BookingsScreen() {
       setPayModal(target);
       if (target.status === 'pending') setTab('searching');
       else if (['upcoming', 'in_progress'].includes(target.status)) setTab('upcoming');
+      else if (target.status === 'completed' && target.paymentStatus !== 'paid') setTab('awaitingPayment');
     } else {
       // Booking not in list yet — refetch once after a short delay.
       const timer = setTimeout(() => refetch(), 1500);
@@ -363,11 +364,15 @@ export default function BookingsScreen() {
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const allBookings = bookings ?? [];
-  const searchingBookings = allBookings.filter((b) => b.status === 'pending');
-  const upcomingBookings  = allBookings.filter((b) => ['upcoming', 'in_progress'].includes(b.status));
-  const pastBookings      = allBookings.filter((b) => ['completed', 'cancelled'].includes(b.status));
-  const filtered = tab === 'searching' ? searchingBookings
-                 : tab === 'upcoming'  ? upcomingBookings
+  const searchingBookings       = allBookings.filter((b) => b.status === 'pending');
+  const upcomingBookings        = allBookings.filter((b) => ['upcoming', 'in_progress'].includes(b.status));
+  const awaitingPaymentBookings = allBookings.filter((b) => b.status === 'completed' && b.paymentStatus !== 'paid');
+  const pastBookings            = allBookings.filter((b) =>
+    b.status === 'cancelled' || (b.status === 'completed' && b.paymentStatus === 'paid'),
+  );
+  const filtered = tab === 'searching'       ? searchingBookings
+                 : tab === 'upcoming'        ? upcomingBookings
+                 : tab === 'awaitingPayment' ? awaitingPaymentBookings
                  : pastBookings;
 
   if (!isAuthenticated) {
@@ -394,10 +399,14 @@ export default function BookingsScreen() {
         <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
         {/* Tabs */}
         <View style={[styles.tabs, { backgroundColor: colors.muted, borderRadius: 100 }]}>
-          {(['searching', 'upcoming', 'past'] as const).map((t) => {
-            const label = t === 'searching' ? 'Searching' : t === 'upcoming' ? 'Upcoming' : 'Past';
-            const count = t === 'searching' ? searchingBookings.length : t === 'upcoming' ? upcomingBookings.length : pastBookings.length;
+          {(['searching', 'upcoming', 'awaitingPayment', 'past'] as const).map((t) => {
+            const label = t === 'searching' ? 'Search' : t === 'upcoming' ? 'Active' : t === 'awaitingPayment' ? 'Pay Now' : 'Past';
+            const count = t === 'searching' ? searchingBookings.length
+                        : t === 'upcoming'  ? upcomingBookings.length
+                        : t === 'awaitingPayment' ? awaitingPaymentBookings.length
+                        : pastBookings.length;
             const isActive = tab === t;
+            const tabColor = t === 'searching' ? '#7C3AED' : t === 'awaitingPayment' ? '#D97706' : colors.foreground;
             return (
               <TouchableOpacity
                 key={t}
@@ -406,11 +415,11 @@ export default function BookingsScreen() {
                 activeOpacity={0.8}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={[styles.tabText, { color: isActive ? (t === 'searching' ? '#7C3AED' : colors.foreground) : colors.mutedForeground, fontWeight: isActive ? '700' : '500' }]}>
+                  <Text style={[styles.tabText, { color: isActive ? tabColor : colors.mutedForeground, fontWeight: isActive ? '700' : '500' }]}>
                     {label}
                   </Text>
                   {count > 0 && (
-                    <View style={{ backgroundColor: t === 'searching' ? '#7C3AED' : colors.primary, borderRadius: 99, paddingHorizontal: 5, paddingVertical: 1 }}>
+                    <View style={{ backgroundColor: t === 'searching' ? '#7C3AED' : t === 'awaitingPayment' ? '#D97706' : colors.primary, borderRadius: 99, paddingHorizontal: 5, paddingVertical: 1 }}>
                       <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{count}</Text>
                     </View>
                   )}
@@ -440,6 +449,18 @@ export default function BookingsScreen() {
                 </View>
               </View>
             </View>
+          ) : tab === 'awaitingPayment' ? (
+            <View style={[styles.searchingBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+              <View style={styles.searchingRow}>
+                <Ionicons name="wallet-outline" size={20} color="#D97706" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.searchingTitle, { color: '#D97706' }]}>Service Complete — Payment Due</Text>
+                  <Text style={[styles.searchingText, { color: '#92400E' }]}>
+                    Your service provider has finished the job. Please tap "Pay Now" on each booking below to complete payment.
+                  </Text>
+                </View>
+              </View>
+            </View>
           ) : null
         }
         ListEmptyComponent={
@@ -463,11 +484,17 @@ export default function BookingsScreen() {
                     <Text style={styles.signInBtnText}>Browse Services</Text>
                   </TouchableOpacity>
                 </>
+              ) : tab === 'awaitingPayment' ? (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={44} color="#16A34A" />
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>All payments up to date!</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Completed bookings waiting for payment will appear here</Text>
+                </>
               ) : (
                 <>
                   <Ionicons name="time-outline" size={44} color={colors.mutedForeground} />
                   <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No past bookings</Text>
-                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Completed and cancelled bookings will appear here</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Paid and cancelled bookings will appear here</Text>
                 </>
               )}
             </View>

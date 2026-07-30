@@ -202,6 +202,14 @@ export interface DashboardStats {
   totalProfessionals: number;
   totalRevenue: number;
   totalCustomers: number;
+  /** Completed bookings with a paid payment record */
+  completedPaid: number;
+  /** Completed bookings still awaiting payment */
+  completedAwaitingPayment: number;
+  /** Sum of paid payment amounts whose payment was marked paid today */
+  todayCollection: number;
+  /** Sum of booking prices for completed-but-unpaid bookings */
+  pendingCollection: number;
 }
 
 export interface AuditLogRow {

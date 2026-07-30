@@ -15,6 +15,9 @@ const STATUS_CONFIG = {
   cancelled:   { label: 'Cancelled',   color: '#D4183D', bg: '#FEE2E2' },
 } as const;
 
+const PAYMENT_PENDING_COLOR = '#D97706';
+const PAYMENT_PENDING_BG    = '#FFFBEB';
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
@@ -30,6 +33,11 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
   const colors = useColors();
   const { accessToken } = useAuth();
   const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.upcoming;
+  // Completed but not yet paid → show amber "Awaiting Payment" badge instead of green "Completed"
+  const isAwaitingPayment = booking.status === 'completed' && booking.paymentStatus !== 'paid';
+  const displayCfg = isAwaitingPayment
+    ? { label: 'Awaiting Payment', color: PAYMENT_PENDING_COLOR, bg: PAYMENT_PENDING_BG }
+    : cfg;
   const [showQR, setShowQR] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -72,8 +80,8 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               )}
             </View>
           </TouchableOpacity>
-          <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-            <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+          <View style={[styles.badge, { backgroundColor: displayCfg.bg }]}>
+            <Text style={[styles.badgeText, { color: displayCfg.color }]}>{displayCfg.label}</Text>
           </View>
         </View>
 
@@ -94,7 +102,26 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
           <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={2}>"{booking.notes}"</Text>
         )}
 
-        {/* Actions row — QR + Pay Now / Rate Service */}
+        {/* Payment pending banner — completed but not yet paid */}
+        {isAwaitingPayment && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: PAYMENT_PENDING_BG, borderRadius: 8, padding: 10, marginTop: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
+            <Ionicons name="time-outline" size={15} color={PAYMENT_PENDING_COLOR} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: PAYMENT_PENDING_COLOR }}>Payment Pending</Text>
+              <Text style={{ fontSize: 11, color: '#92400E', marginTop: 1 }}>Service complete. Tap "Pay Now" to settle ₹{booking.price}.</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Payment received indicator — completed and paid */}
+        {booking.status === 'completed' && booking.paymentStatus === 'paid' && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#F0FDF4', borderRadius: 8, padding: 10, marginTop: 10, borderWidth: 1, borderColor: '#BBF7D0' }}>
+            <Ionicons name="checkmark-circle" size={15} color="#16A34A" />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#16A34A' }}>Payment Received</Text>
+          </View>
+        )}
+
+        {/* Actions row — QR + Pay Now (inline for active) / Rate Service */}
         <View style={styles.actions}>
           {/* QR Code — show for all active bookings so partner can scan to check in */}
           {(booking.status === 'pending' || booking.status === 'upcoming' || booking.status === 'in_progress') && (
@@ -107,7 +134,8 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
             </TouchableOpacity>
           )}
-          {['upcoming', 'in_progress', 'completed'].includes(booking.status) && onPay && (
+          {/* Inline Pay Now for in-progress/upcoming bookings only */}
+          {['upcoming', 'in_progress'].includes(booking.status) && onPay && (
             <TouchableOpacity
               onPress={() => onPay(booking)}
               style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
@@ -117,7 +145,8 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               <Text style={[styles.actionBtnText, { color: '#fff' }]}>Pay Now</Text>
             </TouchableOpacity>
           )}
-          {booking.status === 'completed' && !booking.reviewed && onReview && (
+          {/* Rate Service — only after payment confirmed */}
+          {booking.status === 'completed' && booking.paymentStatus === 'paid' && !booking.reviewed && onReview && (
             <TouchableOpacity
               onPress={() => onReview(booking)}
               style={[styles.actionBtn, { borderColor: colors.primary }]}
@@ -127,6 +156,18 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Prominent Pay Now — full-width for completed + unpaid bookings */}
+        {isAwaitingPayment && onPay && (
+          <TouchableOpacity
+            onPress={() => onPay(booking)}
+            style={[styles.cancelBtn, { borderColor: PAYMENT_PENDING_COLOR, backgroundColor: PAYMENT_PENDING_COLOR, marginTop: 10 }]}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="wallet-outline" size={15} color="#fff" />
+            <Text style={[styles.actionBtnText, { color: '#fff', fontSize: 14 }]}>Pay Now — ₹{booking.price}</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Cancel — full-width prominent button on its own row */}
         {['pending', 'upcoming'].includes(booking.status) && onCancel && (
@@ -177,9 +218,9 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               Show this to your service partner when they arrive to check in
             </Text>
 
-            <View style={[styles.qrBadge, { backgroundColor: cfg.bg, borderRadius: colors.radius }]}>
-              <View style={[styles.qrBadgeDot, { backgroundColor: cfg.color }]} />
-              <Text style={[styles.qrBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+            <View style={[styles.qrBadge, { backgroundColor: displayCfg.bg, borderRadius: colors.radius }]}>
+              <View style={[styles.qrBadgeDot, { backgroundColor: displayCfg.color }]} />
+              <Text style={[styles.qrBadgeText, { color: displayCfg.color }]}>{displayCfg.label}</Text>
             </View>
           </View>
         </View>

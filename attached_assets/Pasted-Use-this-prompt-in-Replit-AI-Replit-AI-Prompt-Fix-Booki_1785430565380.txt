@@ -1,0 +1,519 @@
+Use this prompt in Replit AI:
+
+---
+
+# Replit AI Prompt – Fix Booking Completion, Payment Status & Post-Service Workflow
+
+## Objective
+
+Analyze the complete booking lifecycle across:
+
+* Customer App
+* Partner App
+* Admin Panel
+* Backend APIs
+* Database
+* Notifications
+
+Do **NOT** redesign the UI or create duplicate booking flows.
+
+The objective is to make the booking completion and payment process reliable and synchronized across all applications.
+
+---
+
+# Current Problem
+
+When the partner marks a booking as **Completed**:
+
+* Customer receives a notification to make payment.
+* The booking immediately disappears from the customer's Upcoming Bookings.
+* Customer has not yet paid.
+* Partner has no idea whether payment has been received.
+* Admin cannot clearly identify Paid vs Unpaid completed jobs.
+
+This creates confusion because the service is completed but payment is still pending.
+
+---
+
+# Required Booking Lifecycle
+
+## 1. Booking Status
+
+Separate the **Service Status** from the **Payment Status**.
+
+Do NOT use one field for both.
+
+Example:
+
+Service Status
+
+* Pending
+* Accepted
+* On The Way
+* Arrived
+* In Progress
+* Completed
+* Cancelled
+
+Payment Status
+
+* Pending
+* Paid
+* Failed
+* Refunded
+
+These must be independent.
+
+---
+
+# 2. Customer Booking Flow
+
+When partner marks work as Completed:
+
+DO NOT remove booking from customer view.
+
+Instead:
+
+Upcoming Booking
+
+↓
+
+Move to a new section such as:
+
+* Completed
+* Awaiting Payment
+
+or
+
+Completed Bookings
+
+Inside that booking show:
+
+Service Completed
+
+Payment Pending
+
+Large Pay Now button
+
+Invoice (if available)
+
+Service details
+
+Partner details
+
+Date & Time
+
+OTP completed
+
+Amount
+
+This booking must remain visible until payment is successful.
+
+---
+
+# 3. Payment Flow
+
+Customer taps Pay Now
+
+↓
+
+Payment Gateway
+
+↓
+
+If payment succeeds
+
+Update
+
+Payment Status = Paid
+
+Booking Payment Timestamp
+
+Transaction ID
+
+Payment Method
+
+Receipt
+
+Automatically refresh all applications.
+
+---
+
+# 4. Partner App Changes
+
+Partner must immediately know payment status.
+
+Inside Booking Details show:
+
+Service Status
+
+Completed
+
+Payment Status
+
+Pending
+
+or
+
+Paid
+
+Show colored badge.
+
+Examples
+
+Completed
+
+Payment Pending
+
+Completed
+
+Payment Received
+
+After successful payment:
+
+Show
+
+Payment Received
+
+Amount
+
+Transaction Time
+
+Payment Method
+
+Reference Number
+
+Optional notification
+
+Customer has successfully completed payment.
+
+Partner should never guess whether payment is received.
+
+---
+
+# 5. Partner Booking History
+
+Every completed booking should display
+
+Service Completed
+
+Payment Pending
+
+or
+
+Service Completed
+
+Payment Paid
+
+Allow filtering
+
+All
+
+Paid
+
+Pending
+
+Cancelled
+
+Date
+
+Customer
+
+Service
+
+Amount
+
+---
+
+# 6. Customer Notifications
+
+When service completed
+
+Send
+
+Your service has been completed.
+
+Please complete payment.
+
+When payment succeeds
+
+Payment successful.
+
+Thank you.
+
+Receipt generated.
+
+---
+
+# 7. Partner Notifications
+
+When payment succeeds
+
+Notify partner instantly.
+
+Example
+
+Payment of ₹XXXX received for Booking #12345.
+
+---
+
+# 8. Admin Panel Changes
+
+Booking table must have separate columns
+
+Booking Status
+
+Payment Status
+
+Payment Date
+
+Payment Method
+
+Transaction ID
+
+Collected Amount
+
+Outstanding Amount
+
+Service Completion Time
+
+Do NOT combine booking status and payment status.
+
+---
+
+# 9. Admin Dashboard
+
+Create payment widgets
+
+Completed Awaiting Payment
+
+Completed Paid
+
+Today's Collection
+
+Pending Collection
+
+Failed Payments
+
+Refunded
+
+Total Outstanding
+
+Average Collection Time
+
+---
+
+# 10. Admin Booking Details
+
+Inside booking page show
+
+Booking Timeline
+
+Booked
+
+Accepted
+
+Partner Assigned
+
+Started
+
+Completed
+
+Payment Pending
+
+Payment Successful
+
+Show timestamps for every event.
+
+---
+
+# 11. Filters
+
+Customer
+
+Completed Awaiting Payment
+
+Completed Paid
+
+Partner
+
+Completed Awaiting Payment
+
+Completed Paid
+
+Admin
+
+Service Status
+
+Payment Status
+
+Date
+
+Partner
+
+Customer
+
+City
+
+Amount
+
+---
+
+# 12. Database Improvements
+
+Create independent fields
+
+Service Status
+
+Payment Status
+
+Completed At
+
+Payment Paid At
+
+Payment Method
+
+Payment Reference
+
+Transaction ID
+
+Payment Gateway Response
+
+Invoice Number
+
+Receipt URL
+
+Outstanding Amount
+
+Collected Amount
+
+Never overwrite Service Status when payment changes.
+
+---
+
+# 13. Booking History
+
+History should always preserve
+
+Completed
+
+Payment Pending
+
+↓
+
+later
+
+Completed
+
+Payment Paid
+
+Do not delete or recreate booking records.
+
+Only update Payment Status.
+
+---
+
+# 14. Timeline Module
+
+Maintain booking activity log
+
+Booking Created
+
+Partner Accepted
+
+Partner Started
+
+Partner Completed
+
+Payment Requested
+
+Payment Successful
+
+Invoice Generated
+
+Each event should include
+
+Timestamp
+
+User
+
+Action
+
+Device (if available)
+
+---
+
+# 15. Automatic Synchronization
+
+After any payment event
+
+Immediately sync
+
+Customer App
+
+Partner App
+
+Admin Panel
+
+Notifications
+
+Dashboard
+
+Booking History
+
+Reports
+
+No manual refresh should be required.
+
+---
+
+# 16. Reports
+
+Generate accurate reports based on separate statuses.
+
+Examples
+
+Completed but Payment Pending
+
+Completed and Paid
+
+Pending Collections
+
+Daily Revenue
+
+Partner Earnings
+
+Outstanding Payments
+
+Collection Reports
+
+Payment Success Rate
+
+---
+
+# 17. Testing
+
+Verify every scenario
+
+* Partner marks booking completed.
+* Customer receives payment request.
+* Booking moves to **Completed / Awaiting Payment**, not removed.
+* Customer can still access booking and click **Pay Now**.
+* Payment succeeds.
+* Payment Status updates to **Paid**.
+* Partner instantly sees **Payment Received**.
+* Admin dashboard updates automatically.
+* Booking history shows **Completed + Paid**.
+* Reports and analytics reflect the correct payment status.
+* No duplicate bookings, inconsistent states, or synchronization issues occur.
+
+---
+
+## Expected Result
+
+The booking workflow should clearly distinguish **service completion** from **payment completion**. Every stakeholder should always know the exact state of the job:
+
+* **Customer:** Can see completed services awaiting payment and pay later.
+* **Partner:** Can instantly see whether payment is **Pending** or **Received**, eliminating uncertainty.
+* **Admin:** Can monitor completed jobs, outstanding collections, successful payments, and financial reports with complete visibility.
+* **System:** Maintains accurate, synchronized service and payment states across the Customer App, Partner App, Admin Panel, APIs, database, notifications, reports, and analytics.

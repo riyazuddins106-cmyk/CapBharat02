@@ -1052,6 +1052,12 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
     { label: "Total Customers",   value: stats?.totalCustomers  ?? 0, icon: UserCheck,  color: "#0EA5E9", money: false },
     { label: "Total Revenue",     value: stats?.totalRevenue    ?? 0, icon: DollarSign, color: "#DB2777", money: true  },
   ];
+  const paymentCards = [
+    { label: "Collected Today",     value: stats?.todayCollection          ?? 0, icon: DollarSign,  color: "#16A34A", money: true  },
+    { label: "Pending Collection",  value: stats?.pendingCollection        ?? 0, icon: AlertCircle, color: "#D97706", money: true  },
+    { label: "Paid & Complete",     value: stats?.completedPaid            ?? 0, icon: CheckCircle, color: "#10B981", money: false },
+    { label: "Awaiting Payment",    value: stats?.completedAwaitingPayment ?? 0, icon: Clock,       color: "#F59E0B", money: false },
+  ];
 
   return (
     <div className="space-y-6 overflow-y-auto">
@@ -1072,6 +1078,29 @@ function DashboardView({ stats, bookings, pros }: { stats: DashboardStats | null
             </div>
           );
         })}
+      </div>
+
+      {/* Payment stats row */}
+      <div>
+        <p className="text-white/40 text-xs mb-3 font-semibold uppercase tracking-wider">Payment Overview</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {paymentCards.map((c) => {
+            const Icon = c.icon;
+            return (
+              <div key={c.label} className="rounded-2xl p-4 border border-white/[0.07]" style={CARD}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-white/40 text-xs">{c.label}</p>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: c.color + "20" }}>
+                    <Icon size={14} color={c.color} />
+                  </div>
+                </div>
+                <p className="text-white font-bold text-2xl">
+                  {c.money ? fmt(c.value as number) : c.value}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

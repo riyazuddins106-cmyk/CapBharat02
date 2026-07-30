@@ -45,6 +45,31 @@ export const adminController = {
       .from(users)
       .where(eq(users.role, 'customer'));
 
+    // Payment stats: completed+paid vs completed+awaiting, today's collection, pending collection
+    const psRaw = await db.execute(sql`
+      SELECT
+        COUNT(*)::int
+          FILTER (WHERE b.status = 'completed'
+            AND (SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1) = 'paid')
+          AS completed_paid,
+        COUNT(*)::int
+          FILTER (WHERE b.status = 'completed'
+            AND COALESCE((SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1), '') != 'paid')
+          AS completed_awaiting,
+        COALESCE(SUM(b.price)
+          FILTER (WHERE
+            (SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1) = 'paid'
+            AND (SELECT updated_at FROM payments WHERE booking_id = b.id AND status = 'paid' ORDER BY created_at DESC LIMIT 1)::date = CURRENT_DATE
+          ), 0)::bigint AS today_collection,
+        COALESCE(SUM(b.price)
+          FILTER (WHERE b.status = 'completed'
+            AND COALESCE((SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1), '') != 'paid'
+          ), 0)::bigint AS pending_collection
+      FROM bookings b
+      WHERE b.deleted_at IS NULL
+    `);
+    const ps: any = (psRaw as any)?.rows?.[0] ?? (Array.isArray(psRaw) ? (psRaw as any[])[0] : {}) ?? {};
+
     res.json({
       success: true,
       data: {
@@ -53,6 +78,10 @@ export const adminController = {
         activeBookings: Number(activeBookingCount?.count ?? 0),
         totalProfessionals: Number(proCount?.count ?? 0),
         totalCustomers: Number(customerCount?.count ?? 0),
+        completedPaid: Number(ps.completed_paid ?? 0),
+        completedAwaitingPayment: Number(ps.completed_awaiting ?? 0),
+        todayCollection: Number(ps.today_collection ?? 0),
+        pendingCollection: Number(ps.pending_collection ?? 0),
       },
     });
   }),

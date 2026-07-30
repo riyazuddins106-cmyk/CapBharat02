@@ -23,6 +23,26 @@ async function awardPoints(customerId: string, bookingId: string, priceRupees: n
   }
 }
 
+/** Notify the assigned partner that payment was received — non-fatal. */
+async function notifyPartner(bookingId: string, amount: number, serviceName: string) {
+  try {
+    const { professionals } = await import('../database/schema/professionals.js');
+    const [bk] = await db.select({ professionalId: bookings.professionalId })
+      .from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+    if (!bk?.professionalId) return;
+    const [pro] = await db.select({ userId: professionals.userId })
+      .from(professionals).where(eq(professionals.id, bk.professionalId)).limit(1);
+    if (!pro?.userId) return;
+    const title = 'Payment Received 💰';
+    const body  = `₹${amount} received for ${serviceName}. Booking #${bookingId.slice(0, 8).toUpperCase()}.`;
+    void notificationService.sendToUser(pro.userId, title, body, { bookingId, type: 'payment_received' });
+    const { notificationDbService } = await import('../services/notificationDb.service.js');
+    void notificationDbService.create({ userId: pro.userId, title, body, type: 'payment', data: { bookingId } });
+  } catch (err) {
+    logger.warn('[payments] failed to notify partner for booking %s', bookingId, err);
+  }
+}
+
 /* ── Helpers to load gateway config from DB ─────────────────────────────── */
 
 async function getPaymentCfg() {
@@ -276,7 +296,10 @@ export const razorpayCallback = asyncHandler(async (req: Request, res: Response)
 
   // Award loyalty points (idempotent, non-fatal)
   const [bk] = await db.select().from(bookings).where(eq(bookings.id, booking_id)).limit(1);
-  if (bk) void awardPoints(bk.customerId, booking_id, bk.price ?? 0);
+  if (bk) {
+    void awardPoints(bk.customerId, booking_id, bk.price ?? 0);
+    void notifyPartner(booking_id, bk.price ?? 0, bk.serviceName ?? 'service');
+  }
 
   // Redirect to deep link so mobile WebView can detect success
   res.redirect(302, `servenow://payment-success?bookingId=${booking_id}&paymentId=${razorpay_payment_id}&gateway=razorpay`);
@@ -416,7 +439,10 @@ export const stripeSuccess = asyncHandler(async (req: Request, res: Response) =>
 
   // Award loyalty points (idempotent, non-fatal)
   const [sbk] = await db.select().from(bookings).where(eq(bookings.id, booking_id)).limit(1);
-  if (sbk) void awardPoints(sbk.customerId, booking_id, sbk.price ?? 0);
+  if (sbk) {
+    void awardPoints(sbk.customerId, booking_id, sbk.price ?? 0);
+    void notifyPartner(booking_id, sbk.price ?? 0, sbk.serviceName ?? 'service');
+  }
 
   res.redirect(302, `servenow://payment-success?bookingId=${booking_id}&gateway=stripe`);
 });
@@ -509,6 +535,9 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
     `Your ${method === 'cash' ? 'cash' : 'UPI'} payment of ₹${booking.price} for ${booking.serviceName} has been recorded. Awaiting confirmation.`,
   );
 
+  // Notify partner that payment was received
+  void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
+
   sendSuccess(res, paymentRecord, 200);
 });
 
@@ -568,6 +597,7 @@ export const verifyRazorpayWeb = asyncHandler(async (req: Request, res: Response
     'Payment Confirmed ✅',
     `Your Razorpay payment of ₹${booking.price} for ${booking.serviceName} has been recorded.`,
   );
+  void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
 
   sendSuccess(res, paymentRecord, 200);
 });

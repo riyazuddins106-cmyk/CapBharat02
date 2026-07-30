@@ -167,6 +167,8 @@ export interface Booking {
   reviewed?: boolean;
   serviceId?: string | null;
   createdAt: string;
+  /** Latest payment status from the payments table (null = no payment record yet) */
+  paymentStatus?: 'created' | 'paid' | 'failed' | 'refunded' | null;
 }
 export interface Review {
   id: string;

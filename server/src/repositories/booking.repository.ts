@@ -3,7 +3,7 @@ import { db } from '../config/database.js';
 import { bookings, type Booking, type NewBooking } from '../database/schema/bookings.js';
 
 export const bookingRepository = {
-  async listForCustomer(customerId: string): Promise<(Booking & { serviceId: string | null })[]> {
+  async listForCustomer(customerId: string): Promise<(Booking & { serviceId: string | null; paymentStatus: string | null })[]> {
     const rows = await db
       .select({
         id: bookings.id,
@@ -31,11 +31,17 @@ export const bookingRepository = {
           ORDER BY created_at
           LIMIT 1
         )`,
+        paymentStatus: sql<string | null>`(
+          SELECT status FROM payments
+          WHERE booking_id = ${bookings.id}
+          ORDER BY created_at DESC
+          LIMIT 1
+        )`,
       })
       .from(bookings)
       .where(and(eq(bookings.customerId, customerId), isNull(bookings.deletedAt)))
       .orderBy(desc(bookings.scheduledAt));
-    return rows as (Booking & { serviceId: string | null })[];
+    return rows as (Booking & { serviceId: string | null; paymentStatus: string | null })[];
   },
 
   async findById(id: string): Promise<Booking | undefined> {
