@@ -1556,8 +1556,7 @@ function CustHome({
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); addToCart(service.id, service.name); }}
-                      disabled={!isLoggedIn}
-                      className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm transition-all"
+                      className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] shadow-sm transition-all"
                     >
                       {isLoggedIn ? '+ Add' : 'Sign in'}
                     </button>
@@ -1597,7 +1596,7 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, favoriteIds, wishlistIds, onToggleFavorite, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange, onServicePress,
+  categories, favoriteIds, wishlistIds, onToggleFavorite, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange, onServicePress, onLoginRequired,
 }: {
   categories: ApiCategory[];
   favoriteIds: Set<string>;
@@ -1608,6 +1607,7 @@ function CustServices({
   isLoggedIn: boolean;
   onCartChange: (cart: ApiCart) => void;
   onServicePress: (id: string) => void;
+  onLoginRequired?: () => void;
 }) {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
@@ -1657,7 +1657,7 @@ function CustServices({
   }, [isLoggedIn, onCartChange]);
 
   const addToCart = async (serviceId: string, serviceName?: string) => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) { onLoginRequired?.(); return; }
     const next = await cartApi.add(serviceId);
     setCart(next); onCartChange(next);
     // Show toast
@@ -1829,8 +1829,7 @@ function CustServices({
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); addToCart(service.id, service.name); }}
-                        disabled={!isLoggedIn}
-                        className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400 shadow-sm"
+                        className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] shadow-sm"
                       >
                         {isLoggedIn ? "+ Add" : "Sign in"}
                       </button>
@@ -3320,8 +3319,10 @@ function ServiceDetailPage({
   function handleAdd() {
     if (!service) return;
     onAddToCart(service.id, service.name);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    if (isLoggedIn) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2000);
+    }
   }
 
   function renderSection(title: string, content: string | null | undefined) {
@@ -3432,11 +3433,10 @@ function ServiceDetailPage({
           </div>
           <button
             onClick={handleAdd}
-            disabled={!isLoggedIn}
             className={`h-11 px-7 rounded-xl text-sm font-bold text-white transition-all shadow-sm ${
               added
                 ? 'bg-green-500'
-                : 'bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-400'
+                : 'bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8]'
             }`}
           >
             {!isLoggedIn ? 'Sign in to book' : added ? '✓ Added' : '+ Add to Cart'}
@@ -3596,7 +3596,7 @@ export default function CustomerApp() {
   }, []);
 
   const addToCart = useCallback(async (serviceId: string, serviceName?: string) => {
-    if (!isLoggedIn) { setActiveTab("profile"); return; }
+    if (!isLoggedIn) { setSelectedServiceId(null); setActiveTab("profile"); return; }
     try {
       const next = await cartApi.add(serviceId);
       setCart(next);
@@ -3616,6 +3616,7 @@ export default function CustomerApp() {
 
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
+    setSelectedServiceId(null);
     setProfileScreen("main");
   }, []);
 
@@ -3752,6 +3753,7 @@ export default function CustomerApp() {
           isLoggedIn={isLoggedIn}
           onCartChange={setCart}
           onServicePress={setSelectedServiceId}
+          onLoginRequired={() => { setSelectedServiceId(null); setActiveTab("profile"); }}
         />
       )}
       {activeTab === "bookings" && (
