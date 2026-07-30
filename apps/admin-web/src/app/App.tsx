@@ -442,8 +442,6 @@ function downloadChart(containerId: string, filename: string, format: "png" | "j
   img.src = url;
 }
 
-/* ── Sticky thead background ─────────────────────────────────────── */
-const THEAD_STICKY = { background: "#0f1117" } as const;
 
 function AccessDenied() {
   return (
@@ -1326,7 +1324,7 @@ function DispatchView({
   ];
 
   return (
-    <div className="flex flex-col gap-5 flex-1 min-h-0">
+    <div className="flex flex-col gap-5 flex-1 overflow-y-auto min-h-0 pb-6">
       <div>
         <h2 className="text-white font-bold text-xl">Customer Booking Operations Control Centre</h2>
         <p className="text-white/40 text-sm mt-1">Monitor customer bookings and coordinate partner assignment.</p>
@@ -1356,7 +1354,7 @@ function DispatchView({
       </div>
 
       {/* Search + filter bar */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex-shrink-0 flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
           <input
@@ -1399,11 +1397,11 @@ function DispatchView({
       </p>
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
         <RowsBar total={dvSorted.length} pageSize={dvPageSize} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 {dvColVis.isVisible("Customer")         && <SortTh label="Customer"         field="customerName"    sort={dvSort} onSort={toggleDvSort} />}
                 {dvColVis.isVisible("Service")          && <SortTh label="Service"          field="serviceName"     sort={dvSort} onSort={toggleDvSort} />}
@@ -1571,7 +1569,7 @@ function BookingsView({
   );
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
       {editTarget && (
         <Modal title="Edit Booking" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
@@ -1607,7 +1605,7 @@ function BookingsView({
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={v => { setSearch(v); setBvPage(1); }} placeholder="Search bookings…" /></div>
         <MultiSelect label="Status" options={BV_STATUS_OPTIONS} selected={selStatuses} onChange={v => { setSelStatuses(v); setBvPage(1); }} />
         <div className="flex items-center gap-1.5 text-xs text-white/50">
@@ -1626,11 +1624,11 @@ function BookingsView({
         <ExportBtn onClick={exportBookings} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
         <RowsBar total={bvSorted.length} pageSize={bvPageSize} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Service"      field="serviceName"  sort={bvSort} onSort={toggleBvSort} />
                 <SortTh label="Customer"     field="customerName" sort={bvSort} onSort={toggleBvSort} />
@@ -1769,11 +1767,11 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
   );
 
   return (
-    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
 
       {/* ── Date range card ── */}
-      <div className="rounded-2xl border border-white/[0.07] p-4 space-y-3" style={CARD}>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex-shrink-0 rounded-2xl border border-white/[0.07] p-4 space-y-3" style={CARD}>
+        <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
           <span className="text-white/40 text-[11px] font-bold tracking-wide uppercase">Date Range</span>
           {(["today","week","month","all"] as const).map(p => (
             <button key={p} onClick={() => applyPreset(p)}
@@ -1812,7 +1810,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       </div>
 
       {/* ── Filters row ── */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
         <SearchBar
           value={search}
           onChange={v => { setSearch(v); resetPage(); }}
@@ -1848,7 +1846,7 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       </div>
 
       {/* ── KPI summary strip ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "Total Bookings",   value: filtered.length.toString(),            color: "#5B3EF5" },
           { label: "Total Revenue",    value: fmt(totalRevenue),                      color: "#16A34A" },
@@ -1865,15 +1863,12 @@ function BookingHistoryView({ bookings }: { bookings: BookingRow[] }) {
       </div>
 
       {/* ── Table ── */}
-      {/* sticky top-0: card scrolls up with the page then locks at the top of the      */}
-      {/* content pane. Solid background hides the date/filter/KPI that scroll behind.  */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col sticky top-0 z-20"
+      <div className="flex-shrink-0 rounded-2xl border border-white/[0.07] overflow-hidden"
         style={{ background: "#161b27" }}>
         <RowsBar total={bhSorted.length} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
-        {/* 100vh - nav(~60px) - content-padding-top/bottom(48px) - RowsBar(44px) - Pagination(44px) ≈ 196px */}
-        <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: "calc(100vh - 196px)" }}>
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">#</th>
                 <SortTh label="Service"      field="serviceName"  sort={bhSort} onSort={toggleBhSort} />
@@ -2323,7 +2318,7 @@ function ProsView({
   const pvSorted = sortPv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
       {editTarget && (
         <Modal title="Edit Professional" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
@@ -2394,7 +2389,7 @@ function ProsView({
         />
       )}
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
         <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" /></div>
         <ColumnVisibilityMenu columns={PV_COLS} hidden={pvColVis.hidden} onToggle={pvColVis.toggle} />
         <ExportBtn onClick={() => exportToExcel(
@@ -2417,11 +2412,11 @@ function ProsView({
         </button>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
         <RowsBar total={proTotal} pageSize={proPageSize} onPageSizeChange={n => { onProPageSizeChange(n); onProPageChange(1); }} />
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 {pvColVis.isVisible("Professional") && <SortTh label="Professional"  field="name"         sort={pvSort} onSort={togglePvSort} />}
                 {pvColVis.isVisible("Category")     && <SortTh label="Category"      field="categoryName" sort={pvSort} onSort={togglePvSort} />}
@@ -2554,7 +2549,7 @@ function UsersView({
   const uvSorted = sortUv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
       {editTarget && (
         <Modal title="Edit User" onClose={() => setEditTarget(null)}>
           <div className="space-y-4">
@@ -2583,7 +2578,7 @@ function UsersView({
         />
       )}
 
-      <div className="flex gap-2 flex-wrap items-center">
+      <div className="flex-shrink-0 flex gap-2 flex-wrap items-center">
         <div className="flex-1 min-w-[200px]">
           <SearchBar value={search} onChange={setSearch} placeholder="Search users…" />
         </div>
@@ -2606,11 +2601,11 @@ function UsersView({
         )} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
         <RowsBar total={userTotal} pageSize={userPageSize} onPageSizeChange={n => { onUserPageSizeChange(n); onUserPageChange(1); }} />
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Name"   field="fullName"  sort={uvSort} onSort={toggleUvSort} />
                 <SortTh label="Email"  field="email"     sort={uvSort} onSort={toggleUvSort} />
@@ -2872,7 +2867,7 @@ function CategoriesView({
   }
 
   return (
-    <div className="flex flex-col gap-5 flex-1 min-h-0">
+    <div className="flex flex-col gap-5 flex-1 overflow-y-auto min-h-0 pb-6">
       {/* Modals */}
       {creating && (
         <Modal title="New Category" onClose={() => setCreating(false)}>
@@ -3450,7 +3445,7 @@ function ReelsView({
   };
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
       {creating && (
         <Modal title="New Reel" onClose={() => setCreating(false)}>
           <ReelFormFields form={form} setForm={setForm} reel={null} onVideoUpload={handleVideoUpload} onThumbUpload={handleThumbUpload} uploadingId={uploadingId} />
@@ -3467,7 +3462,7 @@ function ReelsView({
         <ConfirmDialog title="Move to Trash?" body="This reel will be soft-deleted and can be restored later." confirmLabel="Delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex-shrink-0 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-bold text-lg">Reels</h3>
           <p className="text-white/40 text-sm">Short video clips shown on the customer home screen</p>
@@ -3504,7 +3499,7 @@ function ReelsView({
               <p className="text-white font-semibold mb-1">{r.title}</p>
               {r.description && <p className="text-white/40 text-xs mb-2 line-clamp-2">{r.description}</p>}
               <p className="text-white/30 text-[10px] mb-3 truncate">{r.videoUrl}</p>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
                 <ActionBtn variant="edit" onClick={() => { setForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl, thumbnailUrl: r.thumbnailUrl ?? "", sortOrder: r.sortOrder, isActive: r.isActive }); setEditTarget(r); }}>Edit</ActionBtn>
                 <ActionBtn variant={r.isActive ? "warn" : "green"} onClick={async () => { await onEdit(r.id, { isActive: !r.isActive }); }}>
                   {r.isActive ? "Deactivate" : "Activate"}
@@ -3692,7 +3687,7 @@ function OffersView({
   const statusColor: Record<string, string> = { active: "#16A34A", inactive: "#6B7280", draft: "#D97706" };
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
       {deleteId && (
         <ConfirmDialog title="Delete Banner?" body="This banner will be moved to trash and can be restored later."
           confirmLabel="Yes, delete" saving={saving} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
@@ -4102,7 +4097,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
   const hasFilters = selCustomers.length > 0 || selPros.length > 0 || selServices.length > 0 || search;
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
       {deleteId && (
         <ConfirmDialog
           title="Delete Review?"
@@ -4115,7 +4110,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
       )}
 
       {/* Filters row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
         <SearchBar value={search} onChange={setSearch} placeholder="Search reviews…" />
         <MultiSelect label="Customer"    options={customerOptions} selected={selCustomers} onChange={setSelCustomers} />
         <MultiSelect label="Professional" options={proOptions}     selected={selPros}      onChange={setSelPros} />
@@ -4142,11 +4137,11 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
       <p className="text-white/30 text-xs">{filtered.length} review{filtered.length !== 1 ? "s" : ""} shown</p>
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
         <RowsBar total={rvSorted.length} pageSize={rvPageSize} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Customer"     field="customerName" sort={rvSort} onSort={toggleRvSort} />
                 <SortTh label="Professional" field="proName"      sort={rvSort} onSort={toggleRvSort} />
@@ -4252,8 +4247,8 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
   );
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
+      <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={v => { setSearch(v); setAlPage(1); }} placeholder="Search actions or entity type…" /></div>
         <MultiSelect label="Action"      options={actionOptions}     selected={selActions}     onChange={v => { setSelActions(v); setAlPage(1); }} />
         <MultiSelect label="Entity Type" options={targetTypeOptions} selected={selTargetTypes} onChange={v => { setSelTargetTypes(v); setAlPage(1); }} />
@@ -4273,11 +4268,11 @@ function AuditLogsView({ logs }: { logs: AuditLogRow[] }) {
         <ExportBtn onClick={exportAudit} />
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
         <RowsBar total={alSorted.length} pageSize={alPageSize} onPageSizeChange={n => { setAlPageSize(n); setAlPage(1); }} />
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Action"      field="action"     sort={alSort} onSort={toggleAlSort} />
                 <SortTh label="Target Type" field="targetType" sort={alSort} onSort={toggleAlSort} />
@@ -5417,7 +5412,7 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
             <div className="flex-1 min-w-[200px]">
               <SearchBar value={pvSearch} onChange={setPvSearch} placeholder="Search partner or note…" />
             </div>
@@ -5428,11 +5423,11 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
             <ExportBtn onClick={exportPayouts} />
           </div>
 
-          <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+          <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
             <RowsBar total={pvSorted.length} pageSize={pvPageSize} onPageSizeChange={n => { setPvPageSize(n); setPvPage(1); }} />
-            <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+                <thead>
                   <tr className="border-b border-white/[0.07]">
                     <SortTh label="Partner"   field="partner_name" sort={pvSort} onSort={togglePvSort} />
                     <SortTh label="Amount"    field="amount"       sort={pvSort} onSort={togglePvSort} />
@@ -6020,7 +6015,7 @@ function HelpSupportView({ accessToken }: { accessToken: string }) {
                           style={{ background: "rgba(255,255,255,0.05)" }}
                         />
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
                         {["in_progress", "closed"].map((st) => (
                           <button
                             key={st}
@@ -6261,7 +6256,7 @@ function ServicesView({
   );
 
   return (
-    <div className="flex flex-col gap-5 flex-1 min-h-0">
+    <div className="flex flex-col gap-5 flex-1 overflow-y-auto min-h-0 pb-6">
       {/* Modals */}
       {creating && (
         <Modal title="New Service" onClose={() => setCreating(false)}>
@@ -6336,11 +6331,11 @@ function ServicesView({
           <p className="text-sm">{hasSvFilters ? "No services match the filters." : "No services yet. Create your first service above."}</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden flex flex-col flex-1 min-h-0" style={CARD}>
+        <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
           <RowsBar total={svSorted.length} pageSize={svPageSize} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
-          <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={THEAD_STICKY}>
+            <thead>
               <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <SortTh label="Service"    field="name"           sort={svSort} onSort={toggleSvSort} />
                 <SortTh label="Category"   field="categoryName"   sort={svSort} onSort={toggleSvSort} />
