@@ -17,7 +17,7 @@ async function main() {
 
   console.log('\n=== Partners ===');
   const partners = await db.execute(sql`
-    SELECT p.id, u.full_name, p.availability_status, p.is_verified, p.is_active
+    SELECT p.id, u.full_name, p.availability_status, p.is_active
     FROM professionals p JOIN users u ON u.id = p.user_id
   `);
   for (const p of unwrap(partners)) console.log(JSON.stringify(p));
@@ -36,10 +36,10 @@ async function main() {
 
   console.log('\n=== Partner skills ===');
   const skills = await db.execute(sql`
-    SELECT ps.professional_id, u.full_name, s.name as service, s.id as service_id
+    SELECT ps.partner_id, u.full_name, s.name as service, s.id as service_id
     FROM partner_services ps
     JOIN services s ON s.id = ps.service_id
-    JOIN professionals p ON p.id = ps.professional_id
+    JOIN professionals p ON p.id = ps.partner_id
     JOIN users u ON u.id = p.user_id
     LIMIT 20
   `);
@@ -51,7 +51,7 @@ async function main() {
     FROM booking_partner_requests bpr
     JOIN professionals p ON p.id = bpr.partner_id
     JOIN users u ON u.id = p.user_id
-    ORDER BY bpr.created_at DESC LIMIT 10
+    ORDER BY bpr.sent_at DESC LIMIT 10
   `);
   for (const r of unwrap(reqs)) console.log(JSON.stringify(r));
 

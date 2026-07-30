@@ -178,10 +178,95 @@ export const partnerService = {
       }
     }
 
-    return professionalRepository.update(pro.id, {
+    const updated = await professionalRepository.update(pro.id, {
       availabilityStatus: status,
       currentBookingStatus: status === 'available' ? 'available' : status === 'busy' ? 'busy' : 'available',
     });
+
+    // When going available, immediately send any bookings that were stuck
+    // searching while this partner was offline/busy.
+    if (status === 'available' && pro.userId) {
+      void (async () => {
+        try {
+          const { db } = await import('../config/database.js');
+          const { bookings, bookingItems, partnerServices, bookingPartnerRequests, bookingAssignmentLogs } =
+            await import('../database/schema/index.js');
+          const { eq, and, isNull, inArray } = await import('drizzle-orm');
+
+          // Which services does this partner offer?
+          const myServices = await db
+            .select({ serviceId: partnerServices.serviceId })
+            .from(partnerServices)
+            .where(eq(partnerServices.partnerId, pro.id));
+          if (!myServices.length) return;
+          const myServiceIds = myServices.map((r) => r.serviceId);
+
+          // Find pending bookings that are still searching AND include at least one
+          // of my services AND to which I have NOT already been dispatched.
+          const pending = await db
+            .selectDistinct({
+              id: bookings.id,
+              serviceName: bookings.serviceName,
+              scheduledAt: bookings.scheduledAt,
+              existingRequestId: bookingPartnerRequests.id,
+            })
+            .from(bookings)
+            .innerJoin(bookingItems, eq(bookingItems.bookingId, bookings.id))
+            .leftJoin(
+              bookingPartnerRequests,
+              and(
+                eq(bookingPartnerRequests.bookingId, bookings.id),
+                eq(bookingPartnerRequests.partnerId, pro.id),
+              ),
+            )
+            .where(
+              and(
+                eq(bookings.status, 'pending'),
+                eq(bookings.dispatchStatus, 'searching_partner'),
+                isNull(bookings.deletedAt),
+                inArray(bookingItems.serviceId, myServiceIds),
+                isNull(bookingPartnerRequests.id), // not already dispatched to me
+              ),
+            );
+
+          if (!pending.length) return;
+
+          for (const booking of pending) {
+            await db.insert(bookingPartnerRequests).values({
+              bookingId: booking.id,
+              partnerId: pro.id,
+              status: 'pending',
+            });
+            await db.insert(bookingAssignmentLogs).values({
+              bookingId: booking.id,
+              partnerId: pro.id,
+              action: 'AUTO_SENT',
+            });
+            const title = 'New job request';
+            const body = `${booking.serviceName} is scheduled for ${new Date(booking.scheduledAt).toLocaleString('en-IN')}.`;
+            void notificationService.sendToUser(pro.userId!, title, body, {
+              bookingId: booking.id,
+              type: 'job_request',
+            });
+            const { notificationDbService } = await import('./notificationDb.service.js');
+            void notificationDbService.create({
+              userId: pro.userId!,
+              title,
+              body,
+              type: 'booking',
+              data: { bookingId: booking.id, dispatchType: 'job_request' },
+            });
+          }
+          console.log(
+            `[partner] re-dispatched ${pending.length} pending booking(s) to partner ${pro.id} on going available`,
+          );
+        } catch (e) {
+          console.error('[partner] re-dispatch on available failed:', e);
+        }
+      })();
+    }
+
+    return updated;
   },
 
   async updateLocation(userId: string, latitude: number, longitude: number) {
@@ -236,6 +321,14 @@ export const partnerService = {
     }
 
     const updated = await partnerRepository.updateStatus(bookingId, 'completed');
+
+    // Reset partner back to 'available' now that the job is done.
+    // accept() set them to 'busy'; without this reset they are permanently
+    // filtered out of all future dispatch broadcasts.
+    await professionalRepository.update(pro.id, {
+      availabilityStatus: 'available',
+      currentBookingStatus: 'available',
+    });
 
     if (job.customerId) {
       const title = 'Service completed — please pay';

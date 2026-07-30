@@ -88,7 +88,8 @@ export const bookingController = {
       data: { bookingId: booking.id },
     });
     try {
-      await dispatchService.broadcast(booking, first.service.id);
+      const serviceIds = rows.map(({ service }) => service.id);
+      await dispatchService.broadcast(booking, serviceIds);
     } catch (err) {
       // Non-fatal: booking is created; dispatch failure just means no partner notified yet
       logger.warn(`[checkout] dispatch broadcast failed for booking ${booking.id}`, err);

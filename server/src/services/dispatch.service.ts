@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import {
   bookingAssignmentLogs, bookingItems, bookingPartnerRequests, bookings, professionals, partnerServices,
@@ -33,13 +33,18 @@ async function notifyPartner(pro: { userId: string | null; name: string }, booki
 }
 
 export const dispatchService = {
-  async broadcast(booking: typeof bookings.$inferSelect, serviceId: string) {
+  async broadcast(booking: typeof bookings.$inferSelect, serviceIds: string[]) {
+    // Match partners who offer ANY of the booked services (not just the first).
+    const serviceFilter = serviceIds.length === 1
+      ? eq(partnerServices.serviceId, serviceIds[0])
+      : inArray(partnerServices.serviceId, serviceIds);
+
     const allCandidates = await db.select({ pro: professionals, user: users })
       .from(partnerServices)
       .innerJoin(professionals, eq(partnerServices.partnerId, professionals.id))
       .leftJoin(users, eq(professionals.userId, users.id))
       .where(and(
-        eq(partnerServices.serviceId, serviceId),
+        serviceFilter,
         eq(professionals.isActive, true),
         eq(professionals.availabilityStatus, 'available'),
         isNull(professionals.deletedAt),

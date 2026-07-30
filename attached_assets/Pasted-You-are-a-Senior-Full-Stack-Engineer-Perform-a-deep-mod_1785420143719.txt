@@ -1,0 +1,149 @@
+You are a Senior Full Stack Engineer. Perform a deep, module-by-module investigation of the complete booking flow in this ServeNow monorepo and identify exactly why a booking created in the Customer App does NOT appear in the Partner App, even though it IS visible in the Admin Panel.
+
+Do NOT make assumptions. Do NOT make any code changes. Only read, investigate, and report findings with exact file paths and line numbers.
+
+==========================================
+SYSTEM OVERVIEW
+==========================================
+
+This is a Node.js + Express + Drizzle ORM + PostgreSQL backend serving:
+- Customer Web App (React, port 5000)
+- Admin Panel (React, port 5001)
+- Partner Web (React, port 5002)
+- Customer Mobile App (Expo React Native, apps/mobile/)
+- Partner Mobile App (Expo React Native, apps/mobile-partner/)
+
+==========================================
+INVESTIGATION MODULES — DO ALL OF THEM
+==========================================
+
+MODULE 1: BOOKING CREATION
+- File: server/src/controllers/booking.controller.ts — find the `checkout` function
+- File: server/src/services/booking.service.ts — what does checkout do?
+- What fields are written to the `bookings` table?
+  - What is `status` set to? (pending / upcoming?)
+  - What is `professionalId` set to? (null or a value?)
+  - What is `dispatchStatus` set to?
+- After insert, what happens next? (notifications? dispatch?)
+- Does it call dispatchService.broadcast()? With what arguments?
+
+MODULE 2: DISPATCH SERVICE
+- File: server/src/services/dispatch.service.ts — read the `broadcast` function fully
+- What query finds candidate partners? List every WHERE clause filter:
+  - availabilityStatus filter?
+  - isActive filter?
+  - deletedAt filter?
+  - partnerServices join — what service ID is passed?
+  - Document verification gate — what does it check?
+  - GPS proximity filter — what radius? What happens if no coordinates?
+- What happens when broadcast finds ZERO candidates?
+  - Does it return early? Does the booking status change?
+  - Is any notification sent to anyone?
+- What rows are inserted into bookingPartnerRequests on success?
+- What notification is sent to each candidate partner?
+
+MODULE 3: DATABASE STATE
+- File: server/src/database/schema/bookings.ts — list all columns
+- File: server/src/database/schema/bookingPartnerRequests.ts — list all columns
+- File: server/src/database/schema/professionals.ts — what is the DEFAULT for `availability_status`?
+- File: server/src/database/schema/partnerServices.ts — structure of this table
+
+MODULE 4: PARTNER BOOKING API (Backend)
+- File: server/src/routes/partner.routes.ts — what is the route for GET /partner/jobs?
+- File: server/src/controllers/partner.controller.ts — what does listJobs do?
+- File: server/src/services/partner.service.ts — what does listJobs do?
+- File: server/src/repositories/partner.repository.ts — read the listJobs query COMPLETELY:
+  - What tables does it JOIN?
+  - What is the full WHERE clause?
+  - Does it include bookings where professionalId IS NULL (pending dispatch)?
+  - Does it include bookings that have a bookingPartnerRequest for this partner?
+  - What statuses does it return?
+
+MODULE 5: ADMIN BOOKING API (Backend)
+- File: server/src/routes/admin.routes.ts — what is the route for GET /admin/bookings?
+- File: server/src/controllers/admin.controller.ts — read the getBookings/listBookings function:
+  - What WHERE clauses? 
+  - Does it filter by customerId? By professionalId? By status?
+  - Why does it see ALL bookings regardless of partner assignment?
+
+MODULE 6: PARTNER MOBILE APP
+- File: apps/mobile-partner/lib/api.ts — read the listJobs function:
+  - What HTTP method and URL does it call?
+  - Does it pass any query params (status filter, etc.)?
+  - Does it include the auth token?
+- File: apps/mobile-partner/app/(tabs)/jobs.tsx — read the Jobs screen:
+  - What query key does it use for react-query/tanstack-query?
+  - What refetchInterval is set (if any)?
+  - How does it filter jobs into tabs (Active / Completed / Cancelled)?
+  - What statuses are shown in the "Active" tab?
+  - What does the empty state say?
+
+MODULE 7: PARTNER MOBILE APP — AUTHENTICATION
+- File: apps/mobile-partner/context/AuthContext.tsx
+  - How is the access token stored and retrieved?
+  - Is the token passed to listJobs?
+  - After login, is any data pre-fetched?
+- Verify: when the partner logs in, does the Jobs screen immediately fetch /api/partner/jobs?
+
+MODULE 8: PUSH NOTIFICATIONS
+- File: server/src/services/notification.service.ts — how are push notifications sent?
+- File: apps/mobile-partner/lib/pushNotifications.ts — how does the partner app receive them?
+- Is there a notification tap handler that navigates to the job?
+- Does the partner app register a push token? Is it sent to the server?
+
+MODULE 9: END-TO-END TRACE — THE EXACT FAILURE POINT
+Answer these questions precisely:
+1. After a booking is created via checkout, what is the exact SQL INSERT into bookings? What are the values for status, professional_id, dispatch_status?
+2. Does dispatch.broadcast() get called? What service ID is passed?
+3. Does broadcast find any partners? If not, WHY specifically (which filter eliminates them)?
+4. If broadcast finds partners, does it INSERT rows into booking_partner_requests?
+5. When the partner calls GET /api/partner/jobs, does the SQL query include bookings with pending dispatch requests?
+6. If the booking exists in booking_partner_requests with status='pending' for this partner, does the listJobs query return it?
+7. What is the test partner's current availability_status in the professionals table?
+8. Does the test partner have any rows in partner_services?
+
+==========================================
+SPECIFIC THINGS TO LOOK FOR
+==========================================
+
+Look for these known potential issues:
+
+A) availability_status filter — broadcast() may only select partners with 
+   availabilityStatus = 'available'. If the partner's status is 'offline', 
+   dispatch silently finds no candidates and returns [].
+
+B) partnerServices mismatch — dispatch joins partnerServices to find partners 
+   who offer the specific service being booked. If the partner has no rows in 
+   partner_services matching the booked service IDs, they won't be found.
+
+C) Document gate — dispatch may filter out partners who don't have approved 
+   mandatory documents. Check document_type_configs table for is_mandatory=true rows.
+
+D) listJobs query — the partner repository query must include bookings where:
+   - bookingPartnerRequests.partner_id = this_partner AND status = 'pending'
+   OR
+   - bookings.professional_id = this_partner
+   If this JOIN or WHERE condition is wrong, dispatched jobs won't show.
+
+E) Empty bookingPartnerRequests — if dispatch returns [] (no candidates found),
+   no rows are inserted, and the partner can NEVER see the booking no matter 
+   what the listJobs query does.
+
+F) No polling — if the Partner App has no refetchInterval, the partner won't 
+   see new jobs unless they manually pull-to-refresh.
+
+==========================================
+REPORT FORMAT
+==========================================
+
+For each module, report:
+1. File path and key line numbers
+2. Exact code snippets for critical logic (WHERE clauses, filters, conditions)
+3. What it does correctly vs. what might be wrong
+4. The exact point where the booking "disappears" from the partner's view
+
+Finally, provide:
+- ROOT CAUSE: The single most likely reason the partner doesn't see the booking
+- SECONDARY CAUSES: Any other filters or conditions that could also block it
+- EVIDENCE: Specific file:line references supporting each conclusion
+- SUGGESTED FIX: What to change and where (code-level, not conceptual)
