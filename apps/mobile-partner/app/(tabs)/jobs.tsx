@@ -86,6 +86,9 @@ export default function JobsScreen() {
     queryKey: ['/api/partner/jobs', accessToken],
     queryFn: () => partnerApi.listJobs(accessToken!),
     enabled: !!accessToken,
+    // Auto-refresh every 30 s so incoming dispatch requests appear without
+    // requiring a manual pull-to-refresh.
+    refetchInterval: 30_000,
   });
 
   const activeTab = TABS.find((t) => t.key === tab)!;
@@ -122,7 +125,9 @@ export default function JobsScreen() {
             <Ionicons name="list-outline" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No {activeTab.label.toLowerCase()} jobs</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              {tab === 'active' ? 'New jobs will appear here once assigned.' : 'Your job history will appear here.'}
+              {tab === 'active'
+              ? 'Make sure you are set to Available in your profile — new job requests will appear here automatically.'
+              : 'Your job history will appear here.'}
             </Text>
           </View>
         }

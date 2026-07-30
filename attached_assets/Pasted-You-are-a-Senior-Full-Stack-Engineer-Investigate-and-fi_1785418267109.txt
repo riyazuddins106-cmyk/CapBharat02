@@ -1,0 +1,74 @@
+You are a Senior Full Stack Engineer.
+
+Investigate and fix two issues across the Customer App, Partner App, Backend, APIs, Database, and any realtime/notification services. Do not make assumptions or hardcode fixes. First identify the root cause, then implement a proper solution while preserving the existing architecture.
+
+==========================================
+ISSUE 1: BOOKING NOT RECEIVED IN PARTNER APP
+==========================================
+
+Problem:
+- A customer successfully books a service from the Customer App.
+- The booking appears successful on the Customer App.
+- However, the assigned partner does not receive the booking request in the Partner App and therefore cannot accept or reject it.
+
+Perform a complete investigation of:
+- Customer booking flow
+- Booking creation API
+- Partner assignment logic
+- Database records
+- Booking status
+- Partner booking APIs
+- Realtime updates
+- Push notifications
+- Authentication and authorization
+- Any filters that may prevent the booking from appearing
+
+Identify the exact root cause and fix it permanently.
+
+==========================================
+ISSUE 2: PAY NOW NAVIGATES TO WRONG SCREEN
+==========================================
+
+Problem:
+- When the customer taps the "Pay Now" button, it navigates to the Upcoming Bookings screen instead of the Payment screen.
+
+Investigate:
+- Navigation routes
+- Button actions
+- Navigation stack
+- Route names
+- Screen registration
+- Payment initialization flow
+- Required parameters passed to the payment screen
+
+Fix the navigation so the customer is taken directly to the correct payment page and the payment flow works as intended.
+
+==========================================
+REQUIREMENTS
+==========================================
+
+- Do not redesign the UI.
+- Do not create duplicate screens.
+- Reuse the existing architecture.
+- Preserve existing functionality.
+- Do not introduce regressions.
+- Validate the complete flow after fixing.
+
+Test the complete workflow:
+
+Customer App
+→ Book Service
+→ Booking Created
+→ Partner Receives Booking
+→ Partner Accepts/Rejects
+→ Customer Receives Status Update
+→ Customer Clicks Pay Now
+→ Payment Screen Opens
+→ Payment Completes Successfully
+→ Booking Status Updates Correctly
+
+Finally, provide:
+1. Root cause of each issue.
+2. Files/modules affected.
+3. Changes made.
+4. Confirmation that the complete workflow has been tested successfully.

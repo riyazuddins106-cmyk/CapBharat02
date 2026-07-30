@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { bookingsApi, reviewsApi, getPaymentConfig, API_BASE, type Booking, type Payment } from '@/lib/api';
+import { consumePendingPayId } from '@/lib/pendingPayment';
 import { BookingCard } from '@/components/BookingCard';
 import { queryClient } from '@/lib/queryClient';
 
@@ -291,7 +292,11 @@ export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { accessToken, isAuthenticated } = useAuth();
-  const { payId } = useLocalSearchParams<{ payId?: string }>();
+  const { payId: urlPayId } = useLocalSearchParams<{ payId?: string }>();
+  // Consume from the module-level store set by the checkout Pay Now button.
+  // router.replace from a Stack modal to a nested tab route does not reliably
+  // deliver URL params in Expo Router SDK 54, so we use a synchronous store.
+  const [payId] = useState<string | undefined>(() => urlPayId || consumePendingPayId() || undefined);
   const [tab, setTab] = useState<'searching' | 'upcoming' | 'past'>('upcoming');
   const [reviewModal, setReviewModal] = useState<Booking | null>(null);
   const [payModal, setPayModal] = useState<Booking | null>(null);
@@ -314,6 +319,8 @@ export default function BookingsScreen() {
   }, [payId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-open payment modal once fresh bookings data contains the target booking.
+  // If not found on the first response (the booking was just created and the
+  // server cache may not have settled yet), schedule one retry after 1.5 s.
   useEffect(() => {
     if (!payId || !bookings) return;
     const target = bookings.find((b) => b.id === payId);
@@ -321,8 +328,12 @@ export default function BookingsScreen() {
       setPayModal(target);
       if (target.status === 'pending') setTab('searching');
       else if (['upcoming', 'in_progress'].includes(target.status)) setTab('upcoming');
+    } else {
+      // Booking not in list yet — refetch once after a short delay.
+      const timer = setTimeout(() => refetch(), 1500);
+      return () => clearTimeout(timer);
     }
-  }, [payId, bookings]);
+  }, [payId, bookings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => bookingsApi.cancel(id, accessToken!),

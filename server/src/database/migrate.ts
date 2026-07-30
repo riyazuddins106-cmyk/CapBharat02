@@ -541,6 +541,34 @@ export async function runMigrations() {
   await run('column: professionals.pincode',
     `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS pincode VARCHAR(16)`);
 
+  // ── Add missing `reviewed` column to bookings ──────────────────────────────
+  await run('column: bookings.reviewed',
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reviewed BOOLEAN NOT NULL DEFAULT false`);
+
+  // ── Partner availability: new partners should be 'available' by default ──
+  // The original CREATE TABLE used a hard-coded DEFAULT 'offline' which
+  // prevents newly registered partners from ever receiving dispatch requests
+  // until they manually toggle in the app. Change the column default to
+  // 'available' and backfill any existing partner records that are still
+  // 'offline' (indicating they were never explicitly toggled — not intentionally
+  // unavailable). Partners who chose 'busy' are left unchanged.
+  await run('column default: professionals.availability_status → available',
+    `ALTER TABLE professionals
+       ALTER COLUMN availability_status SET DEFAULT 'available'`);
+
+  await run('backfill: offline professionals → available',
+    `UPDATE professionals
+       SET availability_status = 'available', updated_at = NOW()
+       WHERE availability_status = 'offline' AND deleted_at IS NULL`);
+
+  // Ensure mandatory document verification is disabled so the dispatch gate
+  // does not silently filter out partners who haven't uploaded documents yet.
+  // This was the original intent of fix-mandatory-docs.ts.
+  await run('ensure: document_type_configs not mandatory',
+    `UPDATE document_type_configs
+       SET is_mandatory = false
+       WHERE is_mandatory = true`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

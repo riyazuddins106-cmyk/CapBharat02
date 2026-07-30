@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, integer, text, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, integer, text, pgEnum, boolean } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 import { professionals } from './professionals.js';
 import { serviceCategories } from './serviceCategories.js';
@@ -31,6 +31,7 @@ export const bookings = pgTable('bookings', {
   assignedBy: uuid('assigned_by').references(() => users.id, { onDelete: 'set null' }),
   dispatchStatus: varchar('dispatch_status', { length: 32 }).notNull().default('searching_partner'),
   dispatchDeadline: timestamp('dispatch_deadline', { withTimezone: true }),
+  reviewed: boolean('reviewed').notNull().default(false),
 });
 
 export type Booking = typeof bookings.$inferSelect;

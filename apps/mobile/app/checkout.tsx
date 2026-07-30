@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { cartApi, addressesApi, type Cart, type Address } from '@/lib/api';
+import { setPendingPayId } from '@/lib/pendingPayment';
 import { TIME_SLOTS, SLOT_HOURS } from '@servenow/shared';
 
 function buildScheduledAt(dateLabel: string, slotLabel: string): string {
@@ -399,7 +400,14 @@ export default function CheckoutScreen() {
             </View>
             {createdBookingPrice != null && (
               <TouchableOpacity
-                onPress={() => router.replace({ pathname: '/(tabs)/bookings', params: { payId: createdBookingId ?? '' } })}
+                onPress={() => {
+                  // Store payId before navigating — router.replace from a Stack
+                  // modal to a nested tab route does not reliably pass params via
+                  // useLocalSearchParams in Expo Router SDK 54. The bookings screen
+                  // reads from this module-level store instead.
+                  setPendingPayId(createdBookingId ?? null);
+                  router.dismiss(); // properly closes the modal, returns to tabs
+                }}
                 style={[styles.primaryBtn, { backgroundColor: '#059669', marginTop: 8 }]}
               >
                 <Text style={styles.primaryBtnText}>💳 Pay Now — ₹{createdBookingPrice}</Text>
