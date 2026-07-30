@@ -42,7 +42,6 @@ export const dispatchService = {
         eq(partnerServices.serviceId, serviceId),
         eq(professionals.isActive, true),
         eq(professionals.availabilityStatus, 'available'),
-        eq(professionals.currentBookingStatus, 'available'),
         isNull(professionals.deletedAt),
       ));
 

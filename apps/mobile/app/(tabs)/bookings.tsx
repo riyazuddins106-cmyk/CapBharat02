@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Platform, RefreshControl, ScrollView, ActivityIndicator, Linking } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { WebView } from 'react-native-webview';
@@ -6,7 +6,7 @@ import type { WebViewNavigation } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
@@ -291,6 +291,7 @@ export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { accessToken, isAuthenticated } = useAuth();
+  const { payId } = useLocalSearchParams<{ payId?: string }>();
   const [tab, setTab] = useState<'searching' | 'upcoming' | 'past'>('upcoming');
   const [reviewModal, setReviewModal] = useState<Booking | null>(null);
   const [payModal, setPayModal] = useState<Booking | null>(null);
@@ -303,6 +304,18 @@ export default function BookingsScreen() {
     queryFn: () => bookingsApi.list(accessToken!),
     enabled: !!accessToken,
   });
+
+  // Auto-open payment modal when navigated here with a payId param (from checkout "Pay Now")
+  useEffect(() => {
+    if (!payId || !bookings) return;
+    const target = bookings.find((b) => b.id === payId);
+    if (target) {
+      setPayModal(target);
+      // Switch to the right tab so the booking is visible behind the modal
+      if (target.status === 'pending') setTab('searching');
+      else if (['upcoming', 'in_progress'].includes(target.status)) setTab('upcoming');
+    }
+  }, [payId, bookings]);
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => bookingsApi.cancel(id, accessToken!),

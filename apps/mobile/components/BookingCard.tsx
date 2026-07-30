@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
+import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { bookingsApi, type Booking } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -54,7 +55,11 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.iconWrap}>
+          <TouchableOpacity
+            style={styles.iconWrap}
+            activeOpacity={0.7}
+            onPress={() => (booking as any).serviceId && router.push(`/service/${(booking as any).serviceId}`)}
+          >
             <View style={[styles.icon, { backgroundColor: colors.secondary }]}>
               <Ionicons name="construct-outline" size={18} color={colors.primary} />
             </View>
@@ -66,7 +71,7 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
                 <Text style={[styles.pro, { color: colors.mutedForeground }]}>{booking.proName}</Text>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
           <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
             <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
@@ -102,7 +107,7 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
             </TouchableOpacity>
           )}
-          {booking.status === 'upcoming' && onCancel && (
+          {['pending', 'upcoming'].includes(booking.status) && onCancel && (
             <TouchableOpacity
               onPress={() => onCancel(booking.id)}
               style={[styles.actionBtn, { borderColor: colors.destructive }]}
