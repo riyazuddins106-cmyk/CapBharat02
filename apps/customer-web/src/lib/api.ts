@@ -353,6 +353,10 @@ export const servicesApi = {
     const { data } = await client.get('/services', { params: { featured: 'true' } });
     return data.data as { services: ApiService[]; total: number };
   },
+  async getById(id: string) {
+    const { data } = await client.get(`/services/${id}`);
+    return data.data as ApiService;
+  },
 };
 
 export const cartApi = {

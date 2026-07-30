@@ -3407,25 +3407,27 @@ function ServiceDetailPage({
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-600">
             <Clock size={12} color="#6B7280" /> {durationLabel}
           </div>
-          {service.category && (
+          {((service as any).categoryName || service.category) && (
             <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-600">
-              <Grid size={12} color="#6B7280" /> {service.category}
+              <Grid size={12} color="#6B7280" /> {(service as any).categoryName || service.category}
             </div>
           )}
         </div>
 
         {/* Sections */}
-        {renderSection("What's included", (service as any).whatsIncluded)}
-        {renderSection('What to expect', (service as any).whatToExpect)}
+        {renderSection("What's included", (service as any).whatIncluded)}
+        {renderSection('What to expect', (service as any).serviceProcess)}
         {renderSection('Requirements', (service as any).requirements)}
-        {renderSection('Exclusions', (service as any).exclusions)}
+        {renderSection('Exclusions', (service as any).whatNotIncluded)}
+        {renderSection('Important notes', (service as any).importantNotes)}
+        {renderSection('Cancellation policy', (service as any).cancellationPolicy)}
       </div>
 
       {/* Sticky footer */}
       <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 bg-white/95 backdrop-blur border-t border-gray-100 pt-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div>
-            <p className="text-xl font-black text-gray-900">₹{service.customerPrice.toLocaleString('en-IN')}</p>
+            <p className="text-xl font-black text-gray-900">₹{(service.customerPrice ?? 0).toLocaleString('en-IN')}</p>
             <p className="text-xs text-gray-400">{durationLabel} service</p>
           </div>
           <button
