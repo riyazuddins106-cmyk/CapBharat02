@@ -23,7 +23,11 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#5b3ef5"
       },
-      "package": "com.servenow.app"
+      "package": "com.servenow.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -47,7 +51,21 @@
     },
     "extra": {
       "appStoreId": "",
-      "playStoreId": ""
+      "playStoreId": "",
+      "router": {
+        "origin": "https://6db528d4-e567-46da-a0f8-142afae05892-00-25bhrp07k6v0k.pike.replit.dev",
+        "headOrigin": "https://6db528d4-e567-46da-a0f8-142afae05892-00-25bhrp07k6v0k.pike.replit.dev"
+      },
+      "eas": {
+        "projectId": "a290a039-c096-4437-aa82-0f43b13e08b1"
+      }
+    },
+    "owner": "riyazuddinss-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a290a039-c096-4437-aa82-0f43b13e08b1"
     }
   }
 }
