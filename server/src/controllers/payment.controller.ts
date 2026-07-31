@@ -433,6 +433,12 @@ export const stripeSuccess = asyncHandler(async (req: Request, res: Response) =>
     return res.redirect(302, 'servenow://payment-cancel');
   }
 
+  // Cross-check: ensure the session was created for this booking (prevents spoofing)
+  if (session.metadata?.bookingId && session.metadata.bookingId !== booking_id) {
+    logger.warn('[stripe] booking_id mismatch: query=%s session=%s', booking_id, session.metadata.bookingId);
+    return res.redirect(302, 'servenow://payment-cancel');
+  }
+
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, booking_id)).limit(1);
   if (existing && existing.status !== 'paid') {
     await db.update(payments).set({
@@ -492,6 +498,13 @@ export const stripeWebhook = asyncHandler(async (req: Request, res: Response) =>
           stripePaymentIntentId: session.payment_intent as string,
           updatedAt:             new Date(),
         }).where(eq(payments.id, existing.id));
+
+        // Award loyalty points + notify partner (mirrors stripeSuccess side-effects)
+        const [bk] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+        if (bk) {
+          void awardPoints(bk.customerId, bookingId, bk.price ?? 0);
+          void notifyPartner(bookingId, bk.price ?? 0, bk.serviceName ?? 'service');
+        }
       }
     }
   }
@@ -520,32 +533,42 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
 
+  // Cash is confirmed immediately; UPI manual requires partner confirmation → pending
+  const newStatus = method === 'cash' ? 'paid' : 'created';
+
   let paymentRecord;
   if (existing) {
     const [updated] = await db.update(payments).set({
-      method: method as any, status: 'paid', notes: notes ?? null, updatedAt: new Date(),
+      method: method as any, status: newStatus, notes: notes ?? null, updatedAt: new Date(),
     }).where(eq(payments.id, existing.id)).returning();
     paymentRecord = updated;
   } else {
     const [created] = await db.insert(payments).values({
       bookingId, customerId: userId, amount: booking.price ?? 0,
-      currency: 'INR', status: 'paid', method: method as any, notes: notes ?? null,
+      currency: 'INR', status: newStatus, method: method as any, notes: notes ?? null,
     }).returning();
     paymentRecord = created;
   }
 
-  // Award loyalty points (idempotent, non-fatal)
-  void awardPoints(userId, bookingId, booking.price ?? 0);
-
-  // Notify customer of payment receipt
-  void notificationService.sendToUser(
-    userId,
-    'Payment Recorded ✅',
-    `Your ${method === 'cash' ? 'cash' : 'UPI'} payment of ₹${booking.price} for ${booking.serviceName} has been recorded. Awaiting confirmation.`,
-  );
-
-  // Notify partner that payment was received
-  void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
+  if (method === 'cash') {
+    // Award loyalty points immediately for cash payments
+    void awardPoints(userId, bookingId, booking.price ?? 0);
+    void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
+    void notificationService.sendToUser(
+      userId,
+      'Payment Recorded ✅',
+      `Your cash payment of ₹${booking.price} for ${booking.serviceName} has been confirmed.`,
+    );
+  } else {
+    // UPI: notify customer it's pending partner confirmation
+    void notificationService.sendToUser(
+      userId,
+      'UPI Payment Submitted ⏳',
+      `Your UPI payment of ₹${booking.price} for ${booking.serviceName} is awaiting confirmation from the partner.`,
+    );
+    // Notify partner to confirm the UPI transfer
+    void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
+  }
 
   sendSuccess(res, paymentRecord, 200);
 });
