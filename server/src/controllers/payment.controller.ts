@@ -23,8 +23,10 @@ async function awardPoints(customerId: string, bookingId: string, priceRupees: n
   }
 }
 
-/** Notify the assigned partner that payment was received — non-fatal. */
-async function notifyPartner(bookingId: string, amount: number, serviceName: string) {
+/** Notify the assigned partner that payment was received (or is pending) — non-fatal.
+ *  Pass isPending=true for UPI manual: the money hasn't arrived yet, so the message
+ *  should ask them to confirm receipt rather than announce it's been received. */
+async function notifyPartner(bookingId: string, amount: number, serviceName: string, isPending = false) {
   try {
     const { professionals } = await import('../database/schema/professionals.js');
     const [bk] = await db.select({ professionalId: bookings.professionalId })
@@ -33,9 +35,12 @@ async function notifyPartner(bookingId: string, amount: number, serviceName: str
     const [pro] = await db.select({ userId: professionals.userId })
       .from(professionals).where(eq(professionals.id, bk.professionalId)).limit(1);
     if (!pro?.userId) return;
-    const title = 'Payment Received 💰';
-    const body  = `₹${amount} received for ${serviceName}. Booking #${bookingId.slice(0, 8).toUpperCase()}.`;
-    void notificationService.sendToUser(pro.userId, title, body, { bookingId, type: 'payment_received' });
+    const title = isPending ? 'UPI Payment Pending ⏳' : 'Payment Received 💰';
+    const body  = isPending
+      ? `₹${amount} submitted via UPI for ${serviceName}. Booking #${bookingId.slice(0, 8).toUpperCase()}. Confirm receipt when you receive it.`
+      : `₹${amount} received for ${serviceName}. Booking #${bookingId.slice(0, 8).toUpperCase()}.`;
+    const type  = isPending ? 'payment_pending' : 'payment_received';
+    void notificationService.sendToUser(pro.userId, title, body, { bookingId, type });
     const { notificationDbService } = await import('../services/notificationDb.service.js');
     void notificationDbService.create({ userId: pro.userId, title, body, type: 'payment', data: { bookingId } });
   } catch (err) {
@@ -275,6 +280,17 @@ export const razorpayCallback = asyncHandler(async (req: Request, res: Response)
     throw AppError.badRequest('Payment verification failed. Signature mismatch.');
   }
 
+  // Cross-check: the payment row for this order must belong to this booking.
+  // Signature proves the Razorpay order + payment IDs are genuine, but not which booking_id
+  // was submitted in the form — an attacker with a valid signature for order X could submit
+  // a different booking_id. Look up by order ID to verify ownership.
+  const [existingByOrder] = await db.select().from(payments)
+    .where(eq(payments.razorpayOrderId, razorpay_order_id)).limit(1);
+  if (existingByOrder && existingByOrder.bookingId !== booking_id) {
+    logger.warn('[razorpay] booking_id mismatch: form=%s db=%s', booking_id, existingByOrder.bookingId);
+    throw AppError.badRequest('Payment verification failed. Booking ID mismatch.');
+  }
+
   // Mark payment as paid
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, booking_id)).limit(1);
   if (existing) {
@@ -354,10 +370,13 @@ export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) 
         await db.update(payments)
           .set({ status: 'paid', razorpayPaymentId: paymentId, updatedAt: new Date() })
           .where(eq(payments.razorpayOrderId, orderId));
-        // Award points (idempotent — points service deduplicates by bookingId)
+        // Award points + notify partner (idempotent — points service deduplicates by bookingId)
         if (existing?.bookingId) {
           const [bk] = await db.select().from(bookings).where(eq(bookings.id, existing.bookingId)).limit(1);
-          if (bk) void awardPoints(bk.customerId, existing.bookingId, bk.price ?? 0);
+          if (bk) {
+            void awardPoints(bk.customerId, existing.bookingId, bk.price ?? 0);
+            void notifyPartner(existing.bookingId, bk.price ?? 0, bk.serviceName ?? 'service');
+          }
         }
       }
     }
@@ -433,9 +452,11 @@ export const stripeSuccess = asyncHandler(async (req: Request, res: Response) =>
     return res.redirect(302, 'servenow://payment-cancel');
   }
 
-  // Cross-check: ensure the session was created for this booking (prevents spoofing)
-  if (session.metadata?.bookingId && session.metadata.bookingId !== booking_id) {
-    logger.warn('[stripe] booking_id mismatch: query=%s session=%s', booking_id, session.metadata.bookingId);
+  // Cross-check: session MUST carry metadata.bookingId and it MUST match the query param.
+  // Using || means: reject if metadata is missing OR if it doesn't match — prevents spoofing
+  // via a session created without metadata or for a different booking.
+  if (!session.metadata?.bookingId || session.metadata.bookingId !== booking_id) {
+    logger.warn('[stripe] booking_id mismatch or missing metadata: query=%s session=%s', booking_id, session.metadata?.bookingId);
     return res.redirect(302, 'servenow://payment-cancel');
   }
 
@@ -468,18 +489,23 @@ export const stripeWebhook = asyncHandler(async (req: Request, res: Response) =>
   const cfg = await getPaymentCfg();
   const secret = cfg.stripe?.webhookSecret;
 
+  // Reject all webhook calls when the secret is not configured.
+  // Silently skipping verification would allow anyone to spoof Stripe events.
+  if (!secret) {
+    return res.status(400).json({
+      success: false,
+      error: 'Stripe webhook secret not configured. Set it in Admin → Payment Config before enabling the webhook.',
+    });
+  }
+
   let event: Stripe.Event;
-  if (secret) {
-    const sig = req.headers['stripe-signature'] as string;
-    const rawBody = (req as any).rawBody as Buffer;
-    try {
-      const stripe = makeStripe(cfg.stripe!);
-      event = stripe.webhooks.constructEvent(rawBody, sig, secret);
-    } catch {
-      return res.status(400).json({ success: false, error: 'Webhook signature verification failed' });
-    }
-  } else {
-    event = req.body as Stripe.Event;
+  const sig = req.headers['stripe-signature'] as string;
+  const rawBody = (req as any).rawBody as Buffer;
+  try {
+    const stripe = makeStripe(cfg.stripe!);
+    event = stripe.webhooks.constructEvent(rawBody, sig, secret);
+  } catch {
+    return res.status(400).json({ success: false, error: 'Webhook signature verification failed' });
   }
 
   logger.info('[stripe-webhook] type=%s', event.type);
@@ -566,8 +592,8 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
       'UPI Payment Submitted ⏳',
       `Your UPI payment of ₹${booking.price} for ${booking.serviceName} is awaiting confirmation from the partner.`,
     );
-    // Notify partner to confirm the UPI transfer
-    void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
+    // Notify partner that a UPI transfer is pending their confirmation (not yet received)
+    void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service', true);
   }
 
   sendSuccess(res, paymentRecord, 200);

@@ -1,0 +1,136 @@
+You're right. The AI shouldn't assume features like COD, refunds, Stripe, PhonePe, etc. because if they don't exist, it will waste credits trying to test or even implement them.
+
+Use this prompt instead:
+
+---
+
+## Replit AI Prompt – Comprehensive Existing Payment Flow Testing (No Assumptions)
+
+Analyze the **entire existing project** before performing any testing.
+
+**Important Rules:**
+
+* **Do NOT assume any payment gateways, payment methods, booking flows, or features exist.**
+* **Do NOT add, modify, or implement new functionality.**
+* **Do NOT generate dummy test cases for features that are not already present.**
+* **Only test what actually exists in the current codebase and configuration.**
+
+### Step 1 – Discover Existing Payment System
+
+First inspect the entire project and identify:
+
+* Which payment gateway(s) are currently integrated.
+* Whether the project is configured for Test Mode, Live Mode, or both.
+* Which payment methods are actually enabled.
+* How payment configuration is stored.
+* Which screens participate in the booking and payment flow.
+* Which backend APIs handle payment.
+* Which webhook/callback endpoints exist.
+* Which database tables store payment information.
+* Which booking statuses are used.
+* Which payment statuses are used.
+* Which notifications are triggered after payment.
+* How Customer App, Partner App, and Admin Panel synchronize payment status.
+
+Do not continue until the existing payment architecture has been fully understood.
+
+---
+
+### Step 2 – Generate Test Plan
+
+Based **only** on the existing implementation, automatically generate a complete test plan.
+
+Test every available payment path that already exists.
+
+Do not create tests for unavailable features.
+
+---
+
+### Step 3 – Execute End-to-End Testing
+
+For every existing payment method and booking flow:
+
+* Test successful payment.
+* Test failed payment.
+* Test cancelled payment.
+* Test pending payment (if supported).
+* Test timeout scenarios (if applicable).
+* Test retry payment (if implemented).
+* Test duplicate payment prevention.
+* Test payment verification.
+* Test webhook processing (if present).
+* Test payment status synchronization.
+* Test booking status updates.
+* Test notification flow.
+* Test invoice generation (if implemented).
+* Test booking history updates.
+* Test partner-side payment visibility.
+* Test admin-side payment visibility.
+
+Only execute tests that correspond to existing functionality.
+
+---
+
+### Step 4 – Verify Data Consistency
+
+Verify that payment information remains consistent across:
+
+* Customer App
+* Partner App
+* Admin Panel
+* Backend APIs
+* Database
+* Reports
+* Booking History
+
+Ensure no payment state becomes inconsistent.
+
+---
+
+### Step 5 – Environment Testing
+
+If both Test and Live environments exist:
+
+* Verify switching between them.
+* Verify correct credentials are used.
+* Verify disabled gateways cannot be selected.
+* Verify enabled gateways function correctly.
+
+If only one environment exists, test only that environment.
+
+---
+
+### Step 6 – Error Detection
+
+Identify:
+
+* Broken payment flow
+* Incorrect payment status
+* Missing database updates
+* Booking synchronization issues
+* UI inconsistencies
+* API failures
+* Webhook failures
+* Duplicate transaction risks
+* Missing validations
+* Race conditions
+* Edge cases supported by the existing implementation
+
+---
+
+### Step 7 – Final Report
+
+Produce a detailed report containing:
+
+* Existing payment architecture discovered.
+* Existing payment methods found.
+* Existing booking flow discovered.
+* Test cases executed.
+* Test cases skipped (because functionality does not exist).
+* Bugs found.
+* Root cause of each bug.
+* Severity (Critical, High, Medium, Low).
+* Exact files/modules involved.
+* Recommended fixes.
+
+**Do not stop after the first issue. Continue until every existing payment-related component has been analyzed and tested. Never invent features—test only what already exists in the project.**

@@ -250,6 +250,15 @@ export const adminController = {
     if (payment.status === 'paid' && action === 'confirm')
       throw AppError.badRequest('Payment is already confirmed.');
 
+    // Only allow manual confirmation for cash and UPI — gateway payments (Razorpay, Stripe)
+    // are verified server-side via HMAC/session; manually overriding them would bypass that.
+    const manualMethods = ['cash', 'upi_manual', null];
+    if (action === 'confirm' && !manualMethods.includes(payment.method ?? null)) {
+      throw AppError.badRequest(
+        `Cannot manually confirm a ${payment.method} payment. Verify it in the gateway dashboard instead.`
+      );
+    }
+
     const newStatus = action === 'confirm' ? 'paid' : 'failed';
     const [updated] = await db.update(payments)
       .set({ status: newStatus, notes: notes ?? payment.notes, updatedAt: new Date() })
@@ -265,6 +274,12 @@ export const adminController = {
         ? `Your payment of ₹${booking.price} for ${booking.serviceName} has been confirmed by admin.`
         : `Your payment for ${booking.serviceName} was not accepted. Please contact support.`;
       void notificationService.sendToUser(payment.customerId, title, body);
+
+      // Award loyalty points when admin confirms — same as every other paid path
+      if (action === 'confirm') {
+        const { pointsService } = await import('../services/points.service.js');
+        void pointsService.earnForBooking(payment.customerId, payment.bookingId, booking.price ?? 0);
+      }
     }
 
     await auditLogService.record(req.user!.userId, `payment.${action}`, 'payment', paymentId, { newStatus });

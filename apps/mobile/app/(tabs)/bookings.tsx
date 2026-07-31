@@ -27,6 +27,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   const [selected, setSelected] = useState<string | null>(null);
   const [upiRef, setUpiRef] = useState('');
   const [paid, setPaid] = useState(false);
+  const [upiPending, setUpiPending] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
@@ -109,10 +110,16 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
       if (config?.testMode) return testPay(booking.id, selected, token);
       return bookingsApi.submitPayment(booking.id, { method: selected, notes: upiRef || undefined }, token);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPaid(true);
-      setTimeout(() => { onPaid(); onClose(); }, 1500);
+      if (data.status === 'paid') {
+        // Cash confirmed immediately — close sheet after brief success flash
+        setPaid(true);
+        setTimeout(() => { onPaid(); onClose(); }, 1500);
+      } else {
+        // UPI manual — server records status='created'; awaiting partner confirmation
+        setUpiPending(true);
+      }
     },
     onError: (e: any) => Alert.alert('Payment failed', e.message ?? 'Please try again'),
   });
@@ -166,6 +173,27 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
           <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
           <Text style={[styles.paidTitle, { color: colors.foreground }]}>Payment Recorded!</Text>
           <Text style={[styles.paidSub, { color: colors.mutedForeground }]}>Thank you for using ServeNow</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (upiPending) {
+    return (
+      <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+        <View style={styles.paidSuccess}>
+          <Ionicons name="time-outline" size={48} color="#F59E0B" />
+          <Text style={[styles.paidTitle, { color: colors.foreground }]}>UPI Payment Submitted</Text>
+          <Text style={[styles.paidSub, { color: colors.mutedForeground }]}>
+            Your payment is pending partner confirmation.{'\n'}
+            Share your UTR/transaction ID with the partner to confirm receipt.
+          </Text>
+          <TouchableOpacity
+            onPress={onClose}
+            style={{ marginTop: 16, paddingHorizontal: 28, paddingVertical: 10, backgroundColor: colors.primary, borderRadius: 10 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Got it</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );

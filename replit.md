@@ -42,6 +42,9 @@ pnpm --filter @servenow/server exec tsx src/database/seed-test-accounts.ts
 
 # 4. Link test partner to all active services (so dispatch finds them for any booking)
 pnpm --filter @servenow/server exec tsx src/database/seed-partner-services.ts
+
+# 5. Enable test mode for payment testing (skips real gateways)
+pnpm --filter @servenow/server exec tsx src/database/seed-test-mode.ts
 ```
 
 For Replit development, set the Postgres connection string as `DATABASE_URL`.
