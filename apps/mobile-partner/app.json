@@ -57,17 +57,7 @@
       "router": {
         "origin": "https://6db528d4-e567-46da-a0f8-142afae05892-00-25bhrp07k6v0k.pike.replit.dev",
         "headOrigin": "https://6db528d4-e567-46da-a0f8-142afae05892-00-25bhrp07k6v0k.pike.replit.dev"
-      },
-      "eas": {
-        "projectId": "fc3c1dd9-f990-4f39-8320-29e970317f82"
       }
-    },
-    "owner": "riyazuddinss-team",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/fc3c1dd9-f990-4f39-8320-29e970317f82"
     }
   }
 }

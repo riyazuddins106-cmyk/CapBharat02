@@ -48,6 +48,7 @@ async function notifyPartner(bookingId: string, amount: number, serviceName: str
 async function getPaymentCfg() {
   const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'payment_config'));
   return row ? (JSON.parse(row.value) as {
+    testMode?: { enabled: boolean };
     cod?:      { enabled: boolean };
     upi?:      { enabled: boolean; vpa: string };
     razorpay?: { enabled: boolean; keyId: string; keySecret: string; webhookSecret: string };
@@ -68,18 +69,26 @@ function makeStripe(cfg: { secretKey: string }) {
 /* ── GET /api/payments/config  (public) ─────────────────────────────────── */
 export const getPaymentConfig = asyncHandler(async (_req: Request, res: Response) => {
   const cfg = await getPaymentCfg();
+  const testMode = cfg?.testMode?.enabled ?? false;
+
   const methods: string[] = [];
-  if (cfg?.cod?.enabled)      methods.push('cash');
-  if (cfg?.upi?.enabled)      methods.push('upi_manual');
-  if (cfg?.razorpay?.enabled) methods.push('razorpay');
-  if (cfg?.stripe?.enabled)   methods.push('stripe');
-  if (!methods.length) methods.push('cash');
+  if (testMode) {
+    // In test mode expose ALL methods regardless of enabled flags / missing keys
+    methods.push('cash', 'upi_manual', 'razorpay', 'stripe');
+  } else {
+    if (cfg?.cod?.enabled)      methods.push('cash');
+    if (cfg?.upi?.enabled)      methods.push('upi_manual');
+    if (cfg?.razorpay?.enabled) methods.push('razorpay');
+    if (cfg?.stripe?.enabled)   methods.push('stripe');
+    if (!methods.length) methods.push('cash');
+  }
 
   sendSuccess(res, {
+    testMode,
     methods,
-    upiVpa:             cfg?.upi?.enabled       ? (cfg.upi.vpa ?? '')               : null,
-    razorpayKeyId:      cfg?.razorpay?.enabled   ? (cfg.razorpay.keyId ?? '')        : null,
-    stripePublishableKey: cfg?.stripe?.enabled   ? (cfg.stripe.publishableKey ?? '') : null,
+    upiVpa:               testMode ? 'test@upi'  : (cfg?.upi?.enabled  ? (cfg.upi.vpa ?? '')               : null),
+    razorpayKeyId:        testMode ? 'test_key'  : (cfg?.razorpay?.enabled ? (cfg.razorpay.keyId ?? '')    : null),
+    stripePublishableKey: testMode ? 'test_pk'   : (cfg?.stripe?.enabled   ? (cfg.stripe.publishableKey ?? '') : null),
   });
 });
 
@@ -538,6 +547,52 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
   // Notify partner that payment was received
   void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
 
+  sendSuccess(res, paymentRecord, 200);
+});
+
+/* ── POST /api/bookings/:id/test-pay  (customer auth — test mode only) ──────
+   Immediately marks a booking as paid without calling any real gateway.
+   Only works when testMode is enabled in payment_config.               */
+export const testPay = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { id: bookingId } = req.params;
+  const { method = 'razorpay' } = req.body as { method?: string };
+
+  const cfg = await getPaymentCfg();
+  if (!cfg.testMode?.enabled) throw AppError.badRequest('Test mode is not enabled. Enable it in Admin → Payment Config.');
+
+  const [booking] = await db.select().from(bookings)
+    .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
+  if (!booking) throw AppError.notFound('Booking not found.');
+
+  const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
+  if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
+
+  const fakeRef = `test_${Date.now()}`;
+  let paymentRecord;
+  if (existing) {
+    const [updated] = await db.update(payments).set({
+      method: method as any, status: 'paid',
+      notes: '[TEST MODE] Simulated payment — no real transaction',
+      razorpayOrderId: method === 'razorpay' ? fakeRef : undefined,
+      stripeSessionId: method === 'stripe'   ? fakeRef : undefined,
+      updatedAt: new Date(),
+    }).where(eq(payments.id, existing.id)).returning();
+    paymentRecord = updated;
+  } else {
+    const [created] = await db.insert(payments).values({
+      bookingId, customerId: userId, amount: booking.price ?? 0, currency: 'INR',
+      status: 'paid', method: method as any,
+      notes: '[TEST MODE] Simulated payment — no real transaction',
+      razorpayOrderId: method === 'razorpay' ? fakeRef : undefined,
+      stripeSessionId: method === 'stripe'   ? fakeRef : undefined,
+    }).returning();
+    paymentRecord = created;
+  }
+
+  void awardPoints(userId, bookingId, booking.price ?? 0);
+  void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
+  logger.info('[test-pay] Simulated %s payment for booking %s', method, bookingId);
   sendSuccess(res, paymentRecord, 200);
 });
 

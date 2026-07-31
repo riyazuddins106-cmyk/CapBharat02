@@ -10,7 +10,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { bookingsApi, reviewsApi, getPaymentConfig, API_BASE, type Booking, type Payment } from '@/lib/api';
+import { bookingsApi, reviewsApi, getPaymentConfig, testPay, API_BASE, type Booking, type Payment, type PaymentConfig } from '@/lib/api';
 import { consumePendingPayId } from '@/lib/pendingPayment';
 import { BookingCard } from '@/components/BookingCard';
 import { queryClient } from '@/lib/queryClient';
@@ -23,7 +23,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   onPaid: () => void;
 }) {
   const colors = useColors();
-  const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null; stripePublishableKey: string | null } | null>(null);
+  const [config, setConfig] = useState<PaymentConfig | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [upiRef, setUpiRef] = useState('');
   const [paid, setPaid] = useState(false);
@@ -38,12 +38,28 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
     getPaymentConfig().then(cfg => {
       setConfig(cfg);
       if (cfg.methods.length) setSelected(cfg.methods[0]);
-    }).catch(() => setConfig({ methods: ['cash'], upiVpa: null, razorpayKeyId: null, stripePublishableKey: null }));
+    }).catch(() => setConfig({ testMode: false, methods: ['cash'], upiVpa: null, razorpayKeyId: null, stripePublishableKey: null }));
   }, [booking.id, token]);
+
+  /* ── Test-mode instant pay ─────────────────────────────────────── */
+  const testPayMutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) throw new Error('Select a payment method');
+      return testPay(booking.id, selected, token);
+    },
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setPaid(true);
+      setTimeout(() => { onPaid(); onClose(); }, 1500);
+    },
+    onError: (e: any) => Alert.alert('Test payment failed', e.message ?? 'Please try again'),
+  });
 
   /* ── Gateway WebView checkout ──────────────────────────────────── */
   const openGatewayCheckout = async () => {
     if (!selected) return;
+    // In test mode: bypass gateway, mark paid directly
+    if (config?.testMode) { testPayMutation.mutate(); return; }
     setCheckoutLoading(true);
     try {
       if (selected === 'razorpay') {
@@ -89,6 +105,8 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!selected) throw new Error('Select a payment method');
+      // In test mode cash/upi also go through test-pay for consistency
+      if (config?.testMode) return testPay(booking.id, selected, token);
       return bookingsApi.submitPayment(booking.id, { method: selected, notes: upiRef || undefined }, token);
     },
     onSuccess: () => {
@@ -176,6 +194,14 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
         <Text style={[styles.amountText, { color: colors.primary }]}>₹{booking.price}</Text>
         <Text style={[styles.amountLabel, { color: colors.primary + '88' }]}>total due</Text>
       </View>
+
+      {/* Test mode banner */}
+      {config?.testMode && (
+        <View style={styles.testBanner}>
+          <Text style={styles.testBannerTitle}>🧪 Test Mode Active</Text>
+          <Text style={styles.testBannerSub}>All methods shown · tapping any one simulates payment instantly. No real charge.</Text>
+        </View>
+      )}
 
       {/* Payment methods */}
       <Text style={[styles.methodsLabel, { color: colors.mutedForeground }]}>CHOOSE PAYMENT METHOD</Text>
@@ -603,6 +629,10 @@ const styles = StyleSheet.create({
   reviewInput: { padding: 12, fontSize: 14, textAlignVertical: 'top', minHeight: 80 },
   reviewSubmit: { paddingVertical: 14, alignItems: 'center' },
   reviewSubmitText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  // Test mode banner
+  testBanner: { backgroundColor: '#78350F22', borderWidth: 1, borderColor: '#F59E0B44', borderRadius: 14, padding: 12, marginBottom: 12 },
+  testBannerTitle: { fontSize: 13, fontWeight: '700', color: '#F59E0B', marginBottom: 3 },
+  testBannerSub: { fontSize: 11, color: '#D97706', lineHeight: 16 },
   // Payment sheet
   sheet: { marginHorizontal: 0, paddingHorizontal: 20, paddingBottom: 40, borderTopLeftRadius: 28, borderTopRightRadius: 28, gap: 0 },
   webviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },

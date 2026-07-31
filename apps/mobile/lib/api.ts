@@ -432,8 +432,20 @@ export const bookingsApi = {
       `/api/bookings/${id}/stripe/create-session`, { method: 'POST', body: '{}', token }),
 };
 
-export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null; stripePublishableKey: string | null }> {
-  return request<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null; stripePublishableKey: string | null }>('/api/payments/config');
+export interface PaymentConfig {
+  testMode: boolean;
+  methods: string[];
+  upiVpa: string | null;
+  razorpayKeyId: string | null;
+  stripePublishableKey: string | null;
+}
+export async function getPaymentConfig(): Promise<PaymentConfig> {
+  return request<PaymentConfig>('/api/payments/config');
+}
+export async function testPay(bookingId: string, method: string, token: string): Promise<Payment> {
+  return request<Payment>(`/api/bookings/${bookingId}/test-pay`, {
+    method: 'POST', body: JSON.stringify({ method }), token,
+  });
 }
 
 export interface Payment {

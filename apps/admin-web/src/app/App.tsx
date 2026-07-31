@@ -4663,6 +4663,7 @@ function SecretInput({ value, onChange, placeholder }: { value: string; onChange
 ═══════════════════════════════════════════════════════════════════ */
 
 interface PaymentCfg {
+  testMode: { enabled: boolean };
   cod:      { enabled: boolean };
   upi:      { enabled: boolean; vpa: string };
   razorpay: { enabled: boolean; keyId: string; keySecret: string; webhookSecret: string };
@@ -4670,6 +4671,7 @@ interface PaymentCfg {
 }
 
 const DEFAULT_PAYMENT_CFG: PaymentCfg = {
+  testMode: { enabled: false },
   cod:      { enabled: true },
   upi:      { enabled: false, vpa: "" },
   razorpay: { enabled: false, keyId: "", keySecret: "", webhookSecret: "" },
@@ -4814,6 +4816,48 @@ function PaymentConfigView({ accessToken }: { accessToken: string }) {
         <p className="text-white/40 text-xs mt-0.5">
           Enable or disable payment options customers see at checkout. Keys are stored securely.
         </p>
+      </div>
+
+      {/* ── Test / Sandbox Mode toggle ── */}
+      <div
+        className="rounded-2xl border overflow-hidden"
+        style={{ ...CARD, borderColor: cfg.testMode.enabled ? "#F59E0B44" : "rgba(255,255,255,0.07)" }}
+      >
+        <div className="flex items-center gap-3 px-5 py-4">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+            style={{ background: "#F59E0B22", color: "#F59E0B" }}
+          >
+            🧪
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-white text-sm font-semibold">Test / Sandbox Mode</p>
+              {cfg.testMode.enabled && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  ACTIVE
+                </span>
+              )}
+            </div>
+            <p className="text-white/40 text-xs mt-0.5 leading-snug">
+              When ON — all payment methods appear in the app and payments are simulated instantly with no real charges. Turn OFF to use real gateways with actual API keys.
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={cfg.testMode.enabled}
+            onChange={v => setCfg(c => ({ ...c, testMode: { enabled: v } }))}
+          />
+        </div>
+        {cfg.testMode.enabled && (
+          <div className="px-5 pb-4 pt-2 border-t border-amber-500/10">
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+              <p className="text-amber-400 text-xs font-semibold mb-1">⚠️ Sandbox is active</p>
+              <p className="text-amber-300/70 text-xs leading-relaxed">
+                Customers see all four payment options (Cash, UPI, Razorpay, Stripe). Tapping any of them records the booking as paid immediately — no real gateway call is made and no money moves. Disable test mode before going live.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {methods.map(m => {

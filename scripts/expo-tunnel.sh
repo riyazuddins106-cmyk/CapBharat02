@@ -218,17 +218,62 @@ QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
 
     QR_DONE=0
     set +e
-    # Pipe output through awk to intercept the tunnel URL on first appearance.
+    # Pipe output through a reader that:
+    #  1. Tries to extract exp:// URL directly from Metro stdout (legacy path)
+    #  2. When "Tunnel ready." appears, spawns a background manifest poller
+    #     because Metro SDK 54 no longer prints the exp:// URL to piped stdout.
+    #
+    # Root cause of "failed to download" in Expo Go:
+    #   QR codes in tmp-qr/ are from the previous Metro session. Each new
+    #   `expo start --tunnel` creates a NEW exp.direct subdomain. The old QR
+    #   still encodes the old URL → Expo Go connects to a dead tunnel → "failed
+    #   to download". The grep below never matched because Metro prints
+    #   "Tunnel ready." without the full exp:// URL in piped stdout.
+    #
+    # Fix: poll the Metro manifest API after "Tunnel ready." to derive the URL.
+    poll_manifest_for_url() {
+      local port="$1"
+      for i in $(seq 1 30); do
+        sleep 3
+        MANIFEST=$(curl -s --max-time 4 "http://localhost:${port}" \
+          -H "Expo-Platform: android" 2>/dev/null)
+        BUNDLE_URL=$(echo "$MANIFEST" | node -e "
+let d='';process.stdin.on('data',c=>d+=c);
+process.stdin.on('end',()=>{
+  try {
+    const j=JSON.parse(d);
+    const u=(j.launchAsset&&j.launchAsset.url)||j.bundleUrl||'';
+    const m=u.match(/https?:\/\/([^\/]+\.exp\.direct)/);
+    if(m){process.stdout.write('exp://'+m[1]);}
+  } catch{}
+});" 2>/dev/null)
+        if [[ -n "$BUNDLE_URL" ]]; then
+          echo "[tunnel] Detected URL via manifest poll: $BUNDLE_URL"
+          regenerate_qr "$BUNDLE_URL"
+          return 0
+        fi
+      done
+      echo "[tunnel] Warning: could not detect exp.direct URL after 30 polls"
+    }
+
     pnpm exec expo start --tunnel --port "$PORT" "$@" < "$_FIFO" 2>&1 | \
     while IFS= read -r line; do
       echo "$line"
       if [[ $QR_DONE -eq 0 ]]; then
-        # Metro prints: "Metro waiting on exp[s]://xxxx"  OR  "› Metro waiting on ..."
+        # Path 1: Metro prints exp:// directly (older SDK behaviour)
         TUNNEL_URL=$(echo "$line" | grep -oE 'exp[s]?://[^ ]+' | head -1)
         if [[ -n "$TUNNEL_URL" ]]; then
-          echo "[tunnel] URL: $TUNNEL_URL"
+          echo "[tunnel] URL (stdout): $TUNNEL_URL"
           regenerate_qr "$TUNNEL_URL"
           QR_DONE=1
+        fi
+        # Path 2: SDK 54 — "Tunnel ready." appears but no URL in stdout;
+        #          spawn background manifest poller.
+        if echo "$line" | grep -q "Tunnel ready\\."; then
+          if [[ $QR_DONE -eq 0 ]]; then
+            poll_manifest_for_url "$PORT" &
+            QR_DONE=1   # prevent duplicate pollers
+          fi
         fi
       fi
     done

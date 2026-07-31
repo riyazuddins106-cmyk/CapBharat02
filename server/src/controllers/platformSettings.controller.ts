@@ -102,6 +102,7 @@ interface EmailConfig {
 function getDefaults(key: string): object {
   if (key === 'payment_config') {
     return {
+      testMode: { enabled: false },
       cod:      { enabled: true  },
       upi:      { enabled: false, vpa: '' },
       razorpay: { enabled: false, keyId: '', keySecret: '', webhookSecret: '' },
