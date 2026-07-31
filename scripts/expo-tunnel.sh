@@ -130,16 +130,66 @@ const qrPng = '$QR_PNG';
 const expoUrl = '$url';
 const qrKey = '$QR_KEY';
 const htmlPath = '${QR_DIR}/scanner.html';
+
+// Always write the full scanner page so both QR codes are fresh and
+// the HTML structure is guaranteed to match the update regex.
+const writeFullPage = (custUrl, partUrl) => {
+  return QRCode.toDataURL(custUrl, { width: 320, margin: 2 }).then(cd =>
+    QRCode.toDataURL(partUrl, { width: 320, margin: 2 }).then(pd => {
+      const now = new Date().toISOString();
+      const html = \`<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\"><title>ServeNow QR Codes</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;}
+.wrap{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;padding:28px;}
+.card{background:#fff;border-radius:20px;padding:28px 24px 20px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.10);width:310px;}
+.badge.customer{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;background:#ebf5ff;color:#0066cc;}
+.badge.partner{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;background:#fff3eb;color:#cc4400;}
+h2{font-size:20px;font-weight:700;color:#111;margin-bottom:4px;}
+.sub{font-size:12px;color:#999;margin-bottom:18px;}
+img{border-radius:10px;border:1.5px solid #eee;}
+.url{margin-top:14px;font-size:10px;color:#bbb;word-break:break-all;font-family:monospace;}
+.ts{margin-top:6px;font-size:9px;color:#ddd;}
+</style></head>
+<body><div class=\"wrap\">
+<div class=\"card\">
+  <div class=\"badge customer\">📱 Customer App</div>
+  <h2>Customer</h2><p class=\"sub\">Open Expo Go → scan to launch</p>
+  <img src=\"\${cd}\" width=\"262\" height=\"262\"/>
+  <div class=\"url\">\${custUrl}</div>
+  <div class=\"ts\">Generated \${now}</div>
+</div>
+<div class=\"card\">
+  <div class=\"badge partner\">🔧 Partner App</div>
+  <h2>Partner</h2><p class=\"sub\">Open Expo Go → scan to launch</p>
+  <img src=\"\${pd}\" width=\"262\" height=\"262\"/>
+  <div class=\"url\">\${partUrl}</div>
+  <div class=\"ts\">Generated \${now}</div>
+</div>
+</div></body></html>\`;
+      fs.writeFileSync(htmlPath, html);
+      console.log('[qr] scanner.html fully rewritten (' + custUrl + ' / ' + partUrl + ')');
+    })
+  );
+};
+
 QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
   if (err) { console.error('[qr] Failed:', err.message); return; }
-  console.log('[qr] QR written for ' + expoUrl);
-  try {
-    let html = fs.readFileSync(htmlPath, 'utf8');
-    const re = new RegExp('(<div class=\"badge ' + qrKey + '\">.*?<div class=\"url\">)[^<]*(</div>)', 's');
-    html = html.replace(re, (_, b, a) => b + expoUrl + a);
-    fs.writeFileSync(htmlPath, html);
-    console.log('[qr] scanner.html updated for ' + qrKey);
-  } catch(e) { console.warn('[qr] scanner.html patch failed:', e.message); }
+  console.log('[qr] QR PNG written for ' + expoUrl);
+
+  // Read the sibling QR URL from the other app's PNG data-url or fall back to a placeholder.
+  let existingHtml = '';
+  try { existingHtml = fs.readFileSync(htmlPath, 'utf8'); } catch {}
+
+  // Extract the OTHER key's URL from the existing page.
+  const otherKey = qrKey === 'customer' ? 'partner' : 'customer';
+  const otherMatch = existingHtml.match(new RegExp('<div class=\"badge ' + otherKey + '\">.*?<div class=\"url\">([^<]*)</div>', 's'));
+  const otherUrl = (otherMatch && otherMatch[1].trim()) || (qrKey === 'customer' ? 'exp://partner-pending' : 'exp://customer-pending');
+
+  const custUrl = qrKey === 'customer' ? expoUrl : otherUrl;
+  const partUrl = qrKey === 'partner'  ? expoUrl : otherUrl;
+  writeFullPage(custUrl, partUrl).catch(e => console.warn('[qr] full page write failed:', e.message));
 });
 " 2>/dev/null || true
   }
@@ -149,6 +199,16 @@ QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
 
   for attempt in $(seq 1 $NATIVE_MAX_RETRIES); do
     echo "Starting Expo --tunnel on port $PORT… (attempt $attempt/$NATIVE_MAX_RETRIES)"
+
+    # Kill any stale Metro/Node process occupying this port before we start,
+    # otherwise Expo asks "Use port X+1 instead?" in non-interactive mode and exits.
+    _STALE=$(lsof -ti :"$PORT" 2>/dev/null || true)
+    if [[ -n "$_STALE" ]]; then
+      echo "[cleanup] Killing stale process(es) on port $PORT: $_STALE"
+      kill -9 $_STALE 2>/dev/null || true
+      sleep 1
+    fi
+
     prewarm_bundles "$PORT" &
     PREWARM_PID=$!
 

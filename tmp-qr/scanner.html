@@ -1,126 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ServeNow — Expo QR Codes</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f13;
-      color: #f0f0f0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 32px 16px;
-      gap: 40px;
-    }
-    h1 {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-      color: #fff;
-    }
-    h1 span { color: #7c5ef5; }
-    .cards {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .card {
-      background: #1a1a24;
-      border: 1px solid #2e2e42;
-      border-radius: 20px;
-      padding: 32px 28px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 18px;
-      width: 280px;
-    }
-    .badge {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      padding: 4px 12px;
-      border-radius: 99px;
-    }
-    .badge.customer { background: #1e3a5f; color: #60aaff; }
-    .badge.partner  { background: #2d1f5e; color: #a885ff; }
-    .card img {
-      width: 220px;
-      height: 220px;
-      border-radius: 12px;
-      background: #fff;
-      padding: 8px;
-    }
-    .card h2 { font-size: 17px; font-weight: 600; }
-    .url {
-      font-size: 11px;
-      color: #888;
-      word-break: break-all;
-      text-align: center;
-      font-family: monospace;
-    }
-    .instructions {
-      background: #1a1a24;
-      border: 1px solid #2e2e42;
-      border-radius: 14px;
-      padding: 20px 28px;
-      max-width: 600px;
-      width: 100%;
-    }
-    .instructions h3 { font-size: 14px; color: #aaa; margin-bottom: 12px; font-weight: 500; }
-    .instructions ol { padding-left: 20px; line-height: 2; font-size: 14px; color: #ccc; }
-    .instructions ol li b { color: #fff; }
-    .status {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font-size: 13px;
-      color: #4caf50;
-    }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  </style>
-</head>
-<body>
-  <h1><span>ServeNow</span> — Expo Go QR Codes</h1>
-
-  <div class="status">
-    <div class="dot"></div>
-    Tunnels live · Bundles pre-warmed
-  </div>
-
-  <div class="cards">
-    <div class="card">
-      <div class="badge customer">Customer App</div>
-      <img src="customer-qr.png" alt="Customer App QR" />
-      <h2>ServeNow Customer</h2>
-      <div class="url">exp://87e7fb18-1151-4909-a06e-853cd3a17372-8080-3e1n0zw1q3an.expo.sisko.replit.dev:8080</div>
-    </div>
-
-    <div class="card">
-      <div class="badge partner">Partner App</div>
-      <img src="partner-qr.png" alt="Partner App QR" />
-      <h2>ServeNow Partner</h2>
-      <div class="url">exp://87e7fb18-1151-4909-a06e-853cd3a17372-8099-3e1n0zw1q3an.expo.sisko.replit.dev:8099</div>
-    </div>
-  </div>
-
-  <div class="instructions">
-    <h3>HOW TO OPEN</h3>
-    <ol>
-      <li>Install <b>Expo Go</b> on your phone (App Store / Play Store)</li>
-      <li><b>Android:</b> Open Expo Go → tap <b>Scan QR code</b></li>
-      <li><b>iOS:</b> Use the default <b>Camera app</b> to scan</li>
-      <li>Wait ~5 s for the bundle to load (already pre-warmed)</li>
-    </ol>
-  </div>
-</body>
-</html>
+<html><head><meta charset="utf-8"><title>ServeNow QR Codes</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;}
+.wrap{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;padding:28px;}
+.card{background:#fff;border-radius:20px;padding:28px 24px 20px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.10);width:310px;}
+.badge.customer{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;background:#ebf5ff;color:#0066cc;}
+.badge.partner{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;background:#fff3eb;color:#cc4400;}
+h2{font-size:20px;font-weight:700;color:#111;margin-bottom:4px;}
+.sub{font-size:12px;color:#999;margin-bottom:18px;}
+img{border-radius:10px;border:1.5px solid #eee;}
+.url{margin-top:14px;font-size:10px;color:#bbb;word-break:break-all;font-family:monospace;}
+.ts{margin-top:6px;font-size:9px;color:#ddd;}
+</style></head>
+<body><div class="wrap">
+<div class="card">
+  <div class="badge customer">📱 Customer App</div>
+  <h2>Customer</h2><p class="sub">Open Expo Go → scan to launch</p>
+  <img src="data:image/png;base64,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" width="262" height="262"/>
+  <div class="url">exp://jwalh-4-anonymous-8080.exp.direct</div>
+  <div class="ts">Generated 2026-07-31T13:36:39.733Z</div>
+</div>
+<div class="card">
+  <div class="badge partner">🔧 Partner App</div>
+  <h2>Partner</h2><p class="sub">Open Expo Go → scan to launch</p>
+  <img src="data:image/png;base64,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" width="262" height="262"/>
+  <div class="url">exp://zw7yvfg-anonymous-8099.exp.direct</div>
+  <div class="ts">Generated 2026-07-31T13:36:39.733Z</div>
+</div>
+</div></body></html>
