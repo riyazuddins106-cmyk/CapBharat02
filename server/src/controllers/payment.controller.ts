@@ -105,7 +105,8 @@ export const getPaymentForBooking = asyncHandler(async (req: Request, res: Respo
     .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
   if (!booking) throw AppError.notFound('Booking not found.');
   const [payment] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
-  sendSuccess(res, payment ?? null);
+  if (!payment) throw AppError.notFound('No payment record found for this booking.');
+  sendSuccess(res, payment);
 });
 
 /* ── POST /api/bookings/:id/razorpay/create-order  (customer auth) ──────── */
@@ -469,16 +470,16 @@ export const stripeSuccess = asyncHandler(async (req: Request, res: Response) =>
       stripePaymentIntentId: session.payment_intent as string,
       updatedAt:             new Date(),
     }).where(eq(payments.id, existing.id));
+
+    // Award points and notify partner only on the first confirmation — not on duplicate visits
+    const [sbk] = await db.select().from(bookings).where(eq(bookings.id, booking_id)).limit(1);
+    if (sbk) {
+      void awardPoints(sbk.customerId, booking_id, sbk.price ?? 0);
+      void notifyPartner(booking_id, sbk.price ?? 0, sbk.serviceName ?? 'service');
+    }
   }
 
   logger.info('[stripe] Payment verified for booking %s', booking_id);
-
-  // Award loyalty points (idempotent, non-fatal)
-  const [sbk] = await db.select().from(bookings).where(eq(bookings.id, booking_id)).limit(1);
-  if (sbk) {
-    void awardPoints(sbk.customerId, booking_id, sbk.price ?? 0);
-    void notifyPartner(booking_id, sbk.price ?? 0, sbk.serviceName ?? 'service');
-  }
 
   res.redirect(302, `servenow://payment-success?bookingId=${booking_id}&gateway=stripe`);
 });

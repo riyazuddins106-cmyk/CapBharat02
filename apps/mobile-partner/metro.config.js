@@ -50,6 +50,13 @@ const FORCED_MODULES = {
   'react-dom':               resolveReal('react-dom'),
   'react-native':            resolveReal('react-native'),
   'react-native-reanimated': resolveReal('react-native-reanimated'),
+  // expo-keep-awake is still present in node_modules/.pnpm/node_modules (kept
+  // by expo's own dependency tree) and Metro's nodeModulesPaths includes that
+  // directory, so removing it from package.json is not enough — Metro still
+  // finds and loads the real native module, which throws "Unable to activate
+  // keep awake" on Android Expo Go. Redirect every require('expo-keep-awake')
+  // to a no-op stub so withDevTools succeeds without hitting the native layer.
+  'expo-keep-awake':         path.resolve(projectRoot, 'stubs/expo-keep-awake.js'),
 };
 
 // react-native-worklets declares a "react-native" source entry that points to
