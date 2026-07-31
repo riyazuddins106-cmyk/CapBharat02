@@ -386,7 +386,7 @@
             </div>
             <p class="step-description">Use your phone's camera or Expo Go</p>
             <div class="qr-code" id="qr-code"></div>
-            <a href="exps://EXPS_URL_PLACEHOLDER" class="open-button"
+            <a href="EXPS_URL_ATTRIBUTE_PLACEHOLDER" class="open-button"
               >Open in Expo Go</a
             >
           </div>
@@ -394,7 +394,11 @@
       </div>
     </div>
 
-    <script src="https://unpkg.com/qr-code-styling@1.6.0/lib/qr-code-styling.js"></script>
+    <script
+      src="https://unpkg.com/qr-code-styling@1.6.0/lib/qr-code-styling.js"
+      integrity="sha384-K7D1ZVqZVEPBKpQrjKR0/pDcFaWHQPzUBKNY5k8RRX5aGtd4WGHXEnO0qso4YowQ"
+      crossorigin="anonymous"
+    ></script>
     <script>
       (function () {
         const ua = navigator.userAgent;
@@ -406,7 +410,7 @@
           /iPhone|iPad|iPod/i.test(ua) ||
           (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-        const deepLink = "exps://EXPS_URL_PLACEHOLDER";
+        const deepLink = EXPS_URL_JSON_PLACEHOLDER;
 
         // Adjust store buttons based on platform
         const appStoreBtn = document.getElementById("app-store-btn");

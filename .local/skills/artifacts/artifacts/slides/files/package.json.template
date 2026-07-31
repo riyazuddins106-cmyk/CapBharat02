@@ -25,7 +25,6 @@
     "tailwindcss": "catalog:",
     "tsx": "catalog:",
     "vite": "catalog:",
-    "wouter": "catalog:",
-    "zod": "catalog:"
+    "wouter": "catalog:"
   }
 }

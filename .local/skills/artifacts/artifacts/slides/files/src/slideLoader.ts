@@ -2,8 +2,8 @@ import { createElement, type ComponentType } from 'react';
 import manifestJson from '@/data/slides-manifest.json';
 import {
   parseSlidesManifest,
-  type SlideEntry,
-} from '@/data/slidesManifestSchema';
+  type SlideManifestEntry as SlideEntry,
+} from '@/.sdm/core/slidesManifest';
 import { SdmSlide } from '@/.sdm/SdmSlide';
 
 export interface LoadedSlide extends SlideEntry {
@@ -19,14 +19,19 @@ const sdmModules: Record<string, { default: unknown }> = import.meta.glob(
 );
 
 function loadManifestSlides(): SlideEntry[] {
-  try {
-    return parseSlidesManifest(manifestJson);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : 'unknown error';
-    throw new Error(
-      `Invalid slide manifest. Run "pnpm run validate-slides" for details. ${reason}`,
-    );
+  const parsed = parseSlidesManifest(manifestJson);
+  if (parsed.ok) {
+    return parsed.entries;
   }
+
+  const firstIssue = parsed.issues[0];
+  const issuePath = firstIssue?.path
+    ? firstIssue.path.slice(1).replaceAll('/', '.')
+    : 'manifest';
+  throw new Error(
+    `Invalid slide manifest. Run "pnpm run validate-slides" for details. ` +
+      `Invalid manifest at ${issuePath}: ${firstIssue?.message}`,
+  );
 }
 
 function errorSlide(entry: SlideEntry, message: string) {

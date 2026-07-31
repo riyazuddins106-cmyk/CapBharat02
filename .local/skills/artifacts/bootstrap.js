@@ -5,6 +5,7 @@ const HTML_FILE_EXTENSIONS = new Set(['.html', '.htm']);
 const TOKEN_VALUES = {
   __REPLIT_ARTIFACT_SLUG__: (slug) => slug,
   __REPLIT_ARTIFACT_TITLE__: (_, title) => title,
+  __REPLIT_ARTIFACT_TITLE_JSON__: (_, title) => JSON.stringify(title),
   __REPLIT_ARTIFACT_PACKAGE_NAME__: (slug) => `@workspace/${slug}`,
 };
 
@@ -31,11 +32,13 @@ function parseArgs(parseNodeArgs, argv) {
     allowPositionals: true,
     options: {
       slug: { type: 'string' },
+      template: { type: 'string' },
       title: { type: 'string' },
     },
   });
   const [artifactType] = positionals;
   const slug = values.slug;
+  const template = values.template;
   const title = values.title;
 
   if (!artifactType || !slug || !title) {
@@ -45,7 +48,7 @@ function parseArgs(parseNodeArgs, argv) {
     process.exit(1);
   }
 
-  return { artifactType, slug, title };
+  return { artifactType, slug, template, title };
 }
 
 function interpolate(content, slug, title, isHtml) {
@@ -95,7 +98,10 @@ async function main() {
   const path = await import('node:path');
   const { parseArgs: parseNodeArgs } = await import('node:util');
 
-  const { artifactType, slug, title } = parseArgs(parseNodeArgs, process.argv);
+  const { artifactType, slug, template, title } = parseArgs(
+    parseNodeArgs,
+    process.argv,
+  );
   const workspaceRoot = process.cwd();
   const scriptPath = process.argv[1] ?? 'bootstrap.js';
   const scriptDir = path.dirname(path.resolve(scriptPath));
@@ -103,6 +109,13 @@ async function main() {
   let artifactFilesDir = artifactType;
   if (artifactType === 'data-visualization') {
     artifactFilesDir = 'react-vite';
+  }
+  if (template !== undefined) {
+    if (artifactType !== 'expo' || template !== 'expo-sdk57') {
+      writeStderr(`Unsupported template '${template}' for ${artifactType}`);
+      process.exit(1);
+    }
+    artifactFilesDir = 'expo/templates/sdk57';
   }
 
   const filesDir = path.join(scriptDir, 'artifacts', artifactFilesDir, 'files');

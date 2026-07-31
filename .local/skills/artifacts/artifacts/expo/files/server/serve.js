@@ -39,10 +39,28 @@ function getAppName() {
   try {
     const appJsonPath = path.resolve(__dirname, '..', 'app.json');
     const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
-    return appJson.expo?.name || 'App Landing Page';
+    return typeof appJson.expo?.name === 'string'
+      ? appJson.expo.name
+      : 'App Landing Page';
   } catch {
     return 'App Landing Page';
   }
+}
+
+function escapeHtml(value) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function toScriptString(value) {
+  return JSON.stringify(value)
+    .replaceAll('<', '\\u003c')
+    .replaceAll('>', '\\u003e')
+    .replaceAll('&', '\\u0026');
 }
 
 function serveManifest(platform, res) {
@@ -70,12 +88,13 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
   const protocol = forwardedProto || 'https';
   const host = req.headers['x-forwarded-host'] || req.headers['host'];
   const baseUrl = `${protocol}://${host}`;
-  const expsUrl = `${host}`;
+  const expsUrl = `exps://${host}${basePath}`;
 
   const html = landingPageTemplate
     .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
-    .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
-    .replace(/APP_NAME_PLACEHOLDER/g, appName);
+    .replace(/EXPS_URL_ATTRIBUTE_PLACEHOLDER/g, escapeHtml(expsUrl))
+    .replace(/EXPS_URL_JSON_PLACEHOLDER/g, toScriptString(expsUrl))
+    .replace(/APP_NAME_PLACEHOLDER/g, escapeHtml(appName));
 
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   res.end(html);
