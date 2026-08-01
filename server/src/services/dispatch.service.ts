@@ -176,11 +176,28 @@ export const dispatchService = {
       .from(bookings).innerJoin(users, eq(bookings.customerId, users.id))
       .where(and(isNull(bookings.deletedAt), status ? eq(bookings.dispatchStatus, status) : undefined))
       .orderBy(desc(bookings.createdAt));
-    return Promise.all(rows.map(async ({ booking, customer }) => {
-      const requests = await db.select({ request: bookingPartnerRequests, partner: professionals })
-        .from(bookingPartnerRequests).innerJoin(professionals, eq(bookingPartnerRequests.partnerId, professionals.id))
-        .where(eq(bookingPartnerRequests.bookingId, booking.id));
-      return { ...booking, customerName: customer.fullName, requests };
+
+    if (!rows.length) return [];
+
+    // Fetch ALL partner requests for this result set in ONE query, then group in memory
+    // (replaces the old N+1 loop that fired one DB query per booking row)
+    const bookingIds = rows.map(r => r.booking.id);
+    const allRequests = await db.select({ request: bookingPartnerRequests, partner: professionals })
+      .from(bookingPartnerRequests)
+      .innerJoin(professionals, eq(bookingPartnerRequests.partnerId, professionals.id))
+      .where(inArray(bookingPartnerRequests.bookingId, bookingIds));
+
+    const requestsByBooking = new Map<string, typeof allRequests>();
+    for (const r of allRequests) {
+      const id = r.request.bookingId;
+      if (!requestsByBooking.has(id)) requestsByBooking.set(id, []);
+      requestsByBooking.get(id)!.push(r);
+    }
+
+    return rows.map(({ booking, customer }) => ({
+      ...booking,
+      customerName: customer.fullName,
+      requests: requestsByBooking.get(booking.id) ?? [],
     }));
   },
 

@@ -992,7 +992,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "bookings" ? (
             <BookingsView bookings={bookingList} onEdit={editBooking} onCancel={cancelBooking} onDelete={deleteBooking} />
           ) : activeSection === "booking-history" ? (
-            <BookingHistoryView bookings={bookingList} accessToken={accessToken} onRefresh={load} />
+            <BookingHistoryView accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "pros" ? (
             <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} proPageSize={proPageSize} onProPageSizeChange={setProPageSize} />
           ) : activeSection === "create-pro" ? (
@@ -1776,20 +1776,68 @@ function PaymentStatusCell({ booking, accessToken, onRefresh }: {
   );
 }
 
-function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: BookingRow[]; accessToken: string; onRefresh: () => void }) {
-  const [pageSize, setPageSize]         = useState(50);
-  const [page,         setPage]         = useState(1);
+function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; onRefresh: () => void }) {
+  /* ── Server-side data ── */
+  const [rows,       setRows]       = useState<BookingRow[]>([]);
+  const [serverTotal,       setServerTotal]       = useState(0);
+  const [serverRevenue,     setServerRevenue]     = useState(0);
+  const [serverCompleted,   setServerCompleted]   = useState(0);
+  const [serverCompRevenue, setServerCompRevenue] = useState(0);
+  const [serverCancelled,   setServerCancelled]   = useState(0);
+  const [serverPending,     setServerPending]     = useState(0);
+  const [fetching,   setFetching]   = useState(true);
+
+  /* ── Pagination & UI sort ── */
+  const [page,     setPage]     = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const { sort: bhSort, toggleSort: toggleBhSort, applySortFn: sortBh } = useTableSort();
-  const [search,       setSearch]       = useState("");
-  const [dateFrom,     setDateFrom]     = useState("");
-  const [dateTo,       setDateTo]       = useState("");
-  const [selStatuses,  setSelStatuses]  = useState<string[]>([]);
-  const [selCustomers, setSelCustomers] = useState<string[]>([]);
-  const [selPros,      setSelPros]      = useState<string[]>([]);
+
+  /* ── Filters ── */
+  const [search,      setSearch]      = useState("");
+  const [debouncedQ,  setDebouncedQ]  = useState("");
+  const [dateFrom,    setDateFrom]    = useState("");
+  const [dateTo,      setDateTo]      = useState("");
+  const [selStatuses, setSelStatuses] = useState<string[]>([]);
 
   const resetPage = () => setPage(1);
 
-  const pad = (n: number) => String(n).padStart(2, "0");
+  /* Debounce search input 400 ms so we don't fire on every keystroke */
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  /* ── Server fetch whenever any filter or page changes ── */
+  const fetchData = useCallback(() => {
+    setFetching(true);
+    const eff = pageSize === -1 ? 500 : pageSize;
+    const p   = new URLSearchParams();
+    p.set("limit",  String(eff));
+    p.set("offset", String((page - 1) * eff));
+    if (debouncedQ)             p.set("search",   debouncedQ);
+    if (dateFrom)               p.set("from",     dateFrom.split("T")[0]);
+    if (dateTo)                 p.set("to",       dateTo.split("T")[0]);
+    if (selStatuses.length === 1) p.set("status",  selStatuses[0]);
+    else if (selStatuses.length > 1) p.set("statuses", selStatuses.join(","));
+
+    adminApi.getBookings(accessToken, p.toString())
+      .then(d => {
+        setRows(d.bookings);
+        setServerTotal(d.total);
+        setServerRevenue(d.revenueSum ?? 0);
+        setServerCompleted(d.completedCount ?? 0);
+        setServerCompRevenue(d.completedRevenue ?? 0);
+        setServerCancelled(d.cancelledCount ?? 0);
+        setServerPending(d.pendingCount ?? 0);
+      })
+      .catch(() => {})
+      .finally(() => setFetching(false));
+  }, [accessToken, page, pageSize, debouncedQ, dateFrom, dateTo, selStatuses]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  /* ── Date preset helpers ── */
+  const pad   = (n: number) => String(n).padStart(2, "0");
   const fmtDt = (d: Date, end = false) =>
     `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${end ? "23:59" : "00:00"}`;
 
@@ -1810,53 +1858,21 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
   };
 
   const STATUS_OPTIONS = ["pending", "upcoming", "in_progress", "completed", "cancelled"];
-  const customerOptions = useMemo(() =>
-    [...new Set(bookings.map(b => b.customerName).filter(Boolean) as string[])].sort(), [bookings]);
-  const proOptions = useMemo(() =>
-    [...new Set(bookings.map(b => b.proName).filter(Boolean) as string[])].sort(), [bookings]);
+  const hasFilters = search || dateFrom || dateTo || selStatuses.length > 0;
+  const avgValue   = serverTotal > 0 ? serverRevenue / serverTotal : 0;
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return bookings.filter(b => {
-      if (selStatuses.length > 0  && !selStatuses.includes(b.status))           return false;
-      if (selCustomers.length > 0 && !selCustomers.includes(b.customerName ?? "")) return false;
-      if (selPros.length > 0      && !selPros.includes(b.proName))              return false;
-      if (dateFrom && new Date(b.scheduledAt) < new Date(dateFrom))             return false;
-      if (dateTo   && new Date(b.scheduledAt) > new Date(dateTo))               return false;
-      if (q) return (
-        b.serviceName?.toLowerCase().includes(q) ||
-        (b.customerName ?? "").toLowerCase().includes(q) ||
-        b.proName?.toLowerCase().includes(q) ||
-        (b.customerEmail ?? "").toLowerCase().includes(q)
-      );
-      return true;
-    });
-  }, [bookings, search, dateFrom, dateTo, selStatuses, selCustomers, selPros]);
-
-  // Totals
-  const totalRevenue     = filtered.reduce((s, b) => s + (b.price || 0), 0);
-  const completedItems   = filtered.filter(b => b.status === "completed");
-  const completedRevenue = completedItems.reduce((s, b) => s + (b.price || 0), 0);
-  const completedCount   = completedItems.length;
-  const cancelledCount   = filtered.filter(b => b.status === "cancelled").length;
-  const pendingCount     = filtered.filter(b => b.status === "pending" || b.status === "upcoming").length;
-  const avgValue         = filtered.length > 0 ? totalRevenue / filtered.length : 0;
-
-  const bhSorted = sortBh(filtered as Record<string, unknown>[]) as typeof filtered;
-  const bhEff    = pageSize === -1 ? bhSorted.length : pageSize;
-  const paged    = bhSorted.slice((page - 1) * bhEff, page * bhEff);
-
-  const hasFilters = search || dateFrom || dateTo || selStatuses.length > 0 || selCustomers.length > 0 || selPros.length > 0;
+  /* ── Client-side sort only on the current page of rows ── */
+  const bhSorted = sortBh(rows as Record<string, unknown>[]) as typeof rows;
 
   const exportBookingHistory = () => exportToExcel(
-    bhSorted.map(b => ({
-      "#": bhSorted.indexOf(b) + 1,
+    bhSorted.map((b, i) => ({
+      "#": (page - 1) * (pageSize === -1 ? 500 : pageSize) + i + 1,
       Service: b.serviceName, Customer: b.customerName ?? "—",
       "Customer Email": b.customerEmail ?? "—",
       Professional: b.proName ?? "—",
       Amount: b.price,
       "Scheduled At": new Date(b.scheduledAt).toLocaleString("en-IN"),
-      "Created At": new Date(b.createdAt).toLocaleString("en-IN"),
+      "Created At":   new Date(b.createdAt).toLocaleString("en-IN"),
       Status: b.status, Notes: b.notes ?? "",
     })),
     `BookingHistory_${new Date().toISOString().slice(0, 10)}.xlsx`
@@ -1880,8 +1896,7 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <label className="text-white/40 text-xs whitespace-nowrap">From</label>
-            <input
-              type="datetime-local" value={dateFrom}
+            <input type="datetime-local" value={dateFrom}
               onChange={e => { setDateFrom(e.target.value); resetPage(); }}
               className="rounded-xl px-3 py-2 text-white text-xs border border-white/10 outline-none focus:border-violet-500/60 transition-colors"
               style={{ background: "rgba(255,255,255,0.05)" }}
@@ -1889,8 +1904,7 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
           </div>
           <div className="flex items-center gap-2">
             <label className="text-white/40 text-xs whitespace-nowrap">To</label>
-            <input
-              type="datetime-local" value={dateTo}
+            <input type="datetime-local" value={dateTo}
               onChange={e => { setDateTo(e.target.value); resetPage(); }}
               className="rounded-xl px-3 py-2 text-white text-xs border border-white/10 outline-none focus:border-violet-500/60 transition-colors"
               style={{ background: "rgba(255,255,255,0.05)" }}
@@ -1918,38 +1932,29 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
           selected={selStatuses}
           onChange={v => { setSelStatuses(v); resetPage(); }}
         />
-        <MultiSelect
-          label="Customer"
-          options={customerOptions}
-          selected={selCustomers}
-          onChange={v => { setSelCustomers(v); resetPage(); }}
-        />
-        <MultiSelect
-          label="Professional"
-          options={proOptions}
-          selected={selPros}
-          onChange={v => { setSelPros(v); resetPage(); }}
-        />
         {hasFilters && (
           <button
-            onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setSelStatuses([]); setSelCustomers([]); setSelPros([]); resetPage(); }}
+            onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setSelStatuses([]); resetPage(); }}
             className="text-xs text-white/40 hover:text-white/70 transition-colors px-2"
           >
             Clear all
           </button>
         )}
         <ExportBtn onClick={exportBookingHistory} />
+        {fetching && (
+          <span className="text-white/30 text-xs animate-pulse ml-1">Loading…</span>
+        )}
       </div>
 
-      {/* ── KPI summary strip ── */}
+      {/* ── KPI summary strip — uses server-side aggregates across ALL matching rows ── */}
       <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Bookings",   value: filtered.length.toString(),            color: "#5B3EF5" },
-          { label: "Total Revenue",    value: fmt(totalRevenue),                      color: "#16A34A" },
-          { label: "Completed",        value: `${completedCount} · ${fmt(completedRevenue)}`, color: "#16A34A" },
-          { label: "Pending / Active", value: pendingCount.toString(),                color: "#F59E0B" },
-          { label: "Cancelled",        value: cancelledCount.toString(),              color: "#EF4444" },
-          { label: "Avg. Value",       value: fmt(Math.round(avgValue)),              color: "#0EA5E9" },
+          { label: "Total Bookings",   value: serverTotal.toString(),                              color: "#5B3EF5" },
+          { label: "Total Revenue",    value: fmt(serverRevenue),                                  color: "#16A34A" },
+          { label: "Completed",        value: `${serverCompleted} · ${fmt(serverCompRevenue)}`,    color: "#16A34A" },
+          { label: "Pending / Active", value: serverPending.toString(),                            color: "#F59E0B" },
+          { label: "Cancelled",        value: serverCancelled.toString(),                          color: "#EF4444" },
+          { label: "Avg. Value",       value: fmt(Math.round(avgValue)),                           color: "#0EA5E9" },
         ].map(k => (
           <div key={k.label} className="rounded-xl border border-white/[0.07] px-4 py-3" style={CARD}>
             <p className="text-white/40 text-[10px] font-semibold uppercase tracking-wide mb-1">{k.label}</p>
@@ -1961,7 +1966,7 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
       {/* ── Table ── */}
       <div className="flex-shrink-0 rounded-2xl border border-white/[0.07] overflow-hidden"
         style={{ background: "#161b27" }}>
-        <RowsBar total={bhSorted.length} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
+        <RowsBar total={serverTotal} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -1979,50 +1984,53 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {paged.map((b, i) => (
-                <tr key={b.id} className="hover:bg-white/[0.02]">
-                  <td className="px-4 py-3 text-white/30 text-xs tabular-nums">
-                    {(page - 1) * bhEff + i + 1}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-white font-medium whitespace-nowrap">{b.serviceName}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-white/70 whitespace-nowrap">{b.customerName ?? "—"}</p>
-                    {b.customerEmail && (
-                      <p className="text-white/30 text-[10px] truncate max-w-[160px]">{b.customerEmail}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.proName ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/80 font-semibold whitespace-nowrap">{fmt(b.price)}</td>
-                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
-                    {new Date(b.scheduledAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
-                    {new Date(b.scheduledAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
-                  </td>
-                  <td className="px-4 py-3 text-white/30 text-xs whitespace-nowrap">
-                    {new Date(b.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
-                    {new Date(b.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge label={b.status.replace(/_/g, " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <PaymentStatusCell booking={b} accessToken={accessToken} onRefresh={refetch} />
-                  </td>
-                  <td className="px-4 py-3 text-white/40 text-xs max-w-[200px]">
-                    <p className="truncate" title={b.notes ?? ""}>{b.notes ?? <span className="italic text-white/20">—</span>}</p>
-                  </td>
-                </tr>
-              ))}
-              {paged.length === 0 && <EmptyRow cols={10} text="No bookings match the selected filters" />}
+              {fetching && rows.length === 0
+                ? <EmptyRow cols={10} text="Loading bookings…" />
+                : bhSorted.map((b, i) => (
+                  <tr key={b.id} className="hover:bg-white/[0.02]">
+                    <td className="px-4 py-3 text-white/30 text-xs tabular-nums">
+                      {(page - 1) * (pageSize === -1 ? 500 : pageSize) + i + 1}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-white font-medium whitespace-nowrap">{b.serviceName}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-white/70 whitespace-nowrap">{b.customerName ?? "—"}</p>
+                      {b.customerEmail && (
+                        <p className="text-white/30 text-[10px] truncate max-w-[160px]">{b.customerEmail}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-white/60 whitespace-nowrap">{b.proName ?? "—"}</td>
+                    <td className="px-4 py-3 text-white/80 font-semibold whitespace-nowrap">{fmt(b.price)}</td>
+                    <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                      {new Date(b.scheduledAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                      {new Date(b.scheduledAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                    </td>
+                    <td className="px-4 py-3 text-white/30 text-xs whitespace-nowrap">
+                      {new Date(b.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                      {new Date(b.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge label={b.status.replace(/_/g, " ")} color={STATUS_COLOR[b.status] ?? "#6B7280"} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <PaymentStatusCell booking={b} accessToken={accessToken} onRefresh={fetchData} />
+                    </td>
+                    <td className="px-4 py-3 text-white/40 text-xs max-w-[200px]">
+                      <p className="truncate" title={b.notes ?? ""}>{b.notes ?? <span className="italic text-white/20">—</span>}</p>
+                    </td>
+                  </tr>
+                ))
+              }
+              {!fetching && bhSorted.length === 0 && <EmptyRow cols={10} text="No bookings match the selected filters" />}
             </tbody>
           </table>
         </div>
-        <Pagination page={page} total={bhSorted.length} pageSize={pageSize} onChange={setPage} />
+        <Pagination page={page} total={serverTotal} pageSize={pageSize} onChange={setPage} />
       </div>
 
       {/* ── Totals footer ── */}
-      {filtered.length > 0 && (
+      {serverTotal > 0 && (
         <div className="rounded-2xl border border-violet-500/20 px-6 py-4" style={{ background: "rgba(91,62,245,0.06)" }}>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
@@ -2030,19 +2038,19 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
                 <DollarSign size={14} color="#7C5BF8" />
               </div>
               <span className="text-white/60 text-sm font-semibold">
-                {filtered.length} booking{filtered.length !== 1 ? "s" : ""}
+                {serverTotal} booking{serverTotal !== 1 ? "s" : ""}
                 {(dateFrom || dateTo) ? " in selected period" : ""}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-6">
               <div className="text-center">
                 <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Total Revenue</p>
-                <p className="text-white font-bold text-base">{fmt(totalRevenue)}</p>
+                <p className="text-white font-bold text-base">{fmt(serverRevenue)}</p>
               </div>
               <div className="w-px h-8 bg-white/[0.08]" />
               <div className="text-center">
                 <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Completed</p>
-                <p className="font-bold text-base" style={{ color: "#16A34A" }}>{fmt(completedRevenue)}</p>
+                <p className="font-bold text-base" style={{ color: "#16A34A" }}>{fmt(serverCompRevenue)}</p>
               </div>
               <div className="w-px h-8 bg-white/[0.08]" />
               <div className="text-center">
@@ -2052,7 +2060,7 @@ function BookingHistoryView({ bookings, accessToken, onRefresh }: { bookings: Bo
               <div className="w-px h-8 bg-white/[0.08]" />
               <div className="text-center">
                 <p className="text-white/30 text-[10px] uppercase tracking-wide font-semibold">Cancelled</p>
-                <p className="font-bold text-base" style={{ color: "#EF4444" }}>{cancelledCount}</p>
+                <p className="font-bold text-base" style={{ color: "#EF4444" }}>{serverCancelled}</p>
               </div>
             </div>
           </div>

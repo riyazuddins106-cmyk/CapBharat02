@@ -492,8 +492,16 @@ export const adminApi = {
     request<TimeseriesPoint[]>(`/admin/analytics/timeseries?from=${from}&to=${to}&granularity=${granularity}`, { token }),
 
   // Bookings
-  getBookings: (token: string) =>
-    request<{ bookings: BookingRow[]; total: number }>('/admin/bookings', { token }),
+  getBookings: (token: string, params?: string) =>
+    request<{
+      bookings: BookingRow[];
+      total: number;
+      revenueSum: number;
+      completedCount: number;
+      completedRevenue: number;
+      cancelledCount: number;
+      pendingCount: number;
+    }>(`/admin/bookings${params ? `?${params}` : ''}`, { token }),
   updateBooking: (id: string, data: { status?: string; notes?: string; price?: number; scheduledAt?: string }, token: string) =>
     request<BookingRow>(`/admin/bookings/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   cancelBooking: (id: string, token: string) =>

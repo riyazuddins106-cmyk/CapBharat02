@@ -3,7 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
 import { payments } from '../database/schema/payments.js';
-import { eq, desc, count, sum, ne, isNull, isNotNull, and, avg, sql, gte, lte } from 'drizzle-orm';
+import { eq, desc, count, sum, ne, isNull, isNotNull, and, or, avg, sql, gte, lte, ilike, inArray } from 'drizzle-orm';
 
 /** Most-recent payment status for a booking (null = no payment yet). */
 const paymentStatusSub = (bookingIdCol: typeof bookings.id) =>
@@ -46,24 +46,23 @@ export const adminController = {
       .where(eq(users.role, 'customer'));
 
     // Payment stats: completed+paid vs completed+awaiting, today's collection, pending collection
+    // NOTE: FILTER must appear immediately after the aggregate (before any cast).
+    // Use IS DISTINCT FROM instead of COALESCE(...,'') != 'paid' to avoid casting
+    // empty string to the payment_status enum (which is invalid).
     const psRaw = await db.execute(sql`
       SELECT
-        COUNT(*)::int
-          FILTER (WHERE b.status = 'completed'
+        COUNT(*) FILTER (WHERE b.status = 'completed'
             AND (SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1) = 'paid')
-          AS completed_paid,
-        COUNT(*)::int
-          FILTER (WHERE b.status = 'completed'
-            AND COALESCE((SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1), '') != 'paid')
-          AS completed_awaiting,
-        COALESCE(SUM(b.price)
-          FILTER (WHERE
+          ::int AS completed_paid,
+        COUNT(*) FILTER (WHERE b.status = 'completed'
+            AND (SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1) IS DISTINCT FROM 'paid'::payment_status)
+          ::int AS completed_awaiting,
+        COALESCE(SUM(b.price) FILTER (WHERE
             (SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1) = 'paid'
             AND (SELECT updated_at FROM payments WHERE booking_id = b.id AND status = 'paid' ORDER BY created_at DESC LIMIT 1)::date = CURRENT_DATE
           ), 0)::bigint AS today_collection,
-        COALESCE(SUM(b.price)
-          FILTER (WHERE b.status = 'completed'
-            AND COALESCE((SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1), '') != 'paid'
+        COALESCE(SUM(b.price) FILTER (WHERE b.status = 'completed'
+            AND (SELECT status FROM payments WHERE booking_id = b.id ORDER BY created_at DESC LIMIT 1) IS DISTINCT FROM 'paid'::payment_status
           ), 0)::bigint AS pending_collection
       FROM bookings b
       WHERE b.deleted_at IS NULL
@@ -88,12 +87,14 @@ export const adminController = {
 
   /* ───────────────────────── Bookings ────────────────────────── */
   listBookings: asyncHandler(async (req: Request, res: Response) => {
-    const limit  = Math.min(Number(req.query.limit  ?? 50), 200);
+    const limit  = Math.min(Number(req.query.limit  ?? 50), 500);
     const offset = Number(req.query.offset ?? 0);
 
-    const fromParam   = req.query.from   ? String(req.query.from)   : undefined;
-    const toParam     = req.query.to     ? String(req.query.to)     : undefined;
-    const statusParam = req.query.status ? String(req.query.status) : undefined;
+    const fromParam    = req.query.from     ? String(req.query.from)     : undefined;
+    const toParam      = req.query.to       ? String(req.query.to)       : undefined;
+    const statusParam  = req.query.status   ? String(req.query.status)   : undefined;
+    const statusesRaw  = req.query.statuses ? String(req.query.statuses) : undefined;
+    const searchParam  = req.query.search   ? String(req.query.search).trim() : undefined;
     const VALID_STATUSES = ['pending', 'upcoming', 'in_progress', 'completed', 'cancelled'];
 
     const conditions: any[] = [isNull(bookings.deletedAt)];
@@ -105,46 +106,74 @@ export const adminController = {
       const d = new Date(toParam + 'T23:59:59Z');
       if (!isNaN(d.getTime())) conditions.push(lte(bookings.scheduledAt, d));
     }
-    if (statusParam && VALID_STATUSES.includes(statusParam)) {
-      conditions.push(eq(bookings.status, statusParam as 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled'));
+    // Multi-status (?statuses=completed,cancelled) takes priority over single ?status=
+    const validatedStatuses = statusesRaw
+      ? statusesRaw.split(',').map(s => s.trim()).filter(s => VALID_STATUSES.includes(s))
+      : [];
+    if (validatedStatuses.length > 0) {
+      conditions.push(inArray(bookings.status, validatedStatuses as any[]));
+    } else if (statusParam && VALID_STATUSES.includes(statusParam)) {
+      conditions.push(eq(bookings.status, statusParam as any));
+    }
+    if (searchParam) {
+      conditions.push(or(
+        ilike(bookings.serviceName, `%${searchParam}%`),
+        ilike(bookings.proName,     `%${searchParam}%`),
+        ilike(users.fullName,       `%${searchParam}%`),
+        ilike(users.email,          `%${searchParam}%`),
+      ));
     }
     const where = and(...conditions);
 
-    const rows = await db
-      .select({
-        id: bookings.id,
-        customerId: bookings.customerId,
-        status: bookings.status,
-        serviceName: bookings.serviceName,
-        proName: bookings.proName,
-        price: bookings.price,
-        notes: bookings.notes,
-        scheduledAt: bookings.scheduledAt,
-        createdAt: bookings.createdAt,
-        customerName: users.fullName,
-        customerEmail: users.email,
-        paymentStatus: paymentStatusSub(bookings.id),
-        paymentMethod: paymentMethodSub(bookings.id),
-        paymentId:     paymentIdSub(bookings.id),
-      })
-      .from(bookings)
-      .leftJoin(users, eq(bookings.customerId, users.id))
-      .where(where)
-      .orderBy(desc(bookings.createdAt))
-      .limit(limit)
-      .offset(offset);
+    const selectCols = {
+      id: bookings.id,
+      customerId: bookings.customerId,
+      status: bookings.status,
+      serviceName: bookings.serviceName,
+      proName: bookings.proName,
+      price: bookings.price,
+      notes: bookings.notes,
+      scheduledAt: bookings.scheduledAt,
+      createdAt: bookings.createdAt,
+      customerName: users.fullName,
+      customerEmail: users.email,
+      paymentStatus: paymentStatusSub(bookings.id),
+      paymentMethod: paymentMethodSub(bookings.id),
+      paymentId:     paymentIdSub(bookings.id),
+    };
 
-    const [totals] = await db
-      .select({ total: count(bookings.id), revenueSum: sum(bookings.price) })
-      .from(bookings)
-      .where(where);
+    // Run paginated rows + aggregate counts in parallel — single round trip each
+    const [rows, [agg]] = await Promise.all([
+      db.select(selectCols)
+        .from(bookings)
+        .leftJoin(users, eq(bookings.customerId, users.id))
+        .where(where)
+        .orderBy(desc(bookings.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({
+        total:            count(bookings.id),
+        revenueSum:       sum(bookings.price),
+        completedCount:   sql<number>`COUNT(CASE WHEN ${bookings.status} = 'completed'  THEN 1 END)::int`,
+        completedRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${bookings.status} = 'completed' THEN ${bookings.price} END), 0)::bigint`,
+        cancelledCount:   sql<number>`COUNT(CASE WHEN ${bookings.status} = 'cancelled'  THEN 1 END)::int`,
+        pendingCount:     sql<number>`COUNT(CASE WHEN ${bookings.status} IN ('pending','upcoming') THEN 1 END)::int`,
+      })
+        .from(bookings)
+        .leftJoin(users, eq(bookings.customerId, users.id))
+        .where(where),
+    ]);
 
     res.json({
       success: true,
       data: {
         bookings: rows,
-        total: Number(totals?.total ?? 0),
-        revenueSum: Number(totals?.revenueSum ?? 0),
+        total:            Number(agg?.total            ?? 0),
+        revenueSum:       Number(agg?.revenueSum       ?? 0),
+        completedCount:   Number(agg?.completedCount   ?? 0),
+        completedRevenue: Number(agg?.completedRevenue ?? 0),
+        cancelledCount:   Number(agg?.cancelledCount   ?? 0),
+        pendingCount:     Number(agg?.pendingCount     ?? 0),
       },
     });
   }),
