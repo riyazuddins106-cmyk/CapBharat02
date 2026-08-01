@@ -23,7 +23,7 @@ References:
 
 ## Exporting Slides (PPTX, PDF)
 
-When the user asks to export, download, or share their slides as a PPTX/PDF or otherwise requests a downloadable file, call `exportSlides({ format: "pptx" | "pdf", presentationName?, artifactDirName? })`. A request to save the deck to the workspace, as a template, or for future reuse is NOT an export; follow "Saving a Deck as a Workspace Template" below instead. On export `success`, hand `result.filePath` to `presentAsset` with a clean human-readable title (e.g. `"My Deck (PDF)"`) -- that is what produces the chat card and registers the file in the Library. Never tell the user to "click the export button" or "download from the preview pane" as a substitute for actually producing the file.
+When the user asks to export, download, or share their slides as a PPTX/PDF or otherwise requests a downloadable file, call `exportSlides({ format: "pptx" | "pdf", presentationName?, artifactDirName? })`. A request to save the deck to the Replit workspace, as a template, or for future reuse is NOT an export; follow "Saving a Deck as a Workspace Template" below instead. On export `success`, hand `result.filePath` to `presentAsset` with a clean human-readable title (e.g. `"My Deck (PDF)"`) -- that is what produces the chat card and registers the file in the Library. Never tell the user to "click the export button" or "download from the preview pane" as a substitute for actually producing the file.
 
 References:
 
@@ -32,7 +32,7 @@ References:
 
 ## Saving a Deck as a Workspace Template
 
-When the user asks to save the deck as a template (to their workspace, "for the team", or for reuse on future decks), call the `saveArtifactAsTemplate` callback with the slides artifact -- see the `artifact-templates` skill for the full interface and error handling. Never claim the template is saved without calling it; there is no other save path from chat. Saving is asynchronous: on success report that publishing has *started*, not that it is saved. If the result is `NOT_AUTHORIZED`, explain the permission problem in your own words without quoting the raw message or retrying. This is distinct from exporting: export produces a PPTX/PDF file, saving a template makes the deck's style reusable from the theme picker.
+When the user asks to save the deck as a template (to their Replit workspace, "for the team", or for reuse on future decks), first load and follow the `prepare-artifact-template` skill. Do not start the save until its verification is complete. Then call the `saveArtifactAsTemplate` callback with the slides artifact -- see the `artifact-templates` skill for the full interface and error handling. Never claim the template is saved without calling it; there is no other save path from chat. Saving is asynchronous: on success report that publishing has *started*, not that it is saved. If the result is `NOT_AUTHORIZED`, explain the permission problem in your own words without quoting the raw message or retrying. This is distinct from exporting: export produces a PPTX/PDF file, saving a template makes the deck's style reusable from the theme picker.
 
 ## Template Selection and Pre-Generation Flow
 

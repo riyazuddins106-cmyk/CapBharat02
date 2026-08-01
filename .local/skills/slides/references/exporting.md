@@ -27,6 +27,7 @@ if (result.success) {
   await presentAsset({
     filePath: result.filePath,
     title: "Replit - The AI Agent Company (PDF)",
+    description: "PDF export of the company pitch deck.",
   });
 }
 ```
