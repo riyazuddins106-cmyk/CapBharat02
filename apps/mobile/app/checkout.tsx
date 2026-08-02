@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { cartApi, addressesApi, API_BASE, type Cart, type Address } from '@/lib/api';
 import { setPendingPayId } from '@/lib/pendingPayment';
-import { TIME_SLOTS, SLOT_HOURS } from '@servenow/shared';
+import { SLOT_START_HOURS, getSlotLabel, formatDuration } from '@servenow/shared';
 
 type BookingConfig = {
   minAdvanceMinutes: number;
@@ -28,8 +28,8 @@ const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   closingHour: 20,
 };
 
-function buildScheduledAt(dateLabel: string, slotLabel: string): string {
-  const hour = SLOT_HOURS[slotLabel] ?? 9;
+function buildScheduledAt(dateLabel: string, startHour: number): string {
+  const hour = startHour;
   const base = new Date();
   if (dateLabel === 'Tomorrow') {
     base.setDate(base.getDate() + 1);
@@ -80,7 +80,7 @@ export default function CheckoutScreen() {
     return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   });
   const [selectedDate, setSelectedDate] = useState('Today');
-  const [selectedSlot, setSelectedSlot] = useState('9 AM - 11 AM');
+  const [selectedSlot, setSelectedSlot] = useState<number>(9); // start hour
   const [done, setDone] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdBookingPrice, setCreatedBookingPrice] = useState<number | null>(null);
@@ -96,15 +96,22 @@ export default function CheckoutScreen() {
     staleTime: 5 * 60 * 1000, // cache 5 min — changes are infrequent
   });
 
+  // ── Total duration from cart (sum of quantity × duration per item) ──────────
+  const totalDurationMinutes = useMemo(() => {
+    const items = cart?.items ?? [];
+    if (!items.length) return 60;
+    return items.reduce((sum, item) => sum + item.duration * item.quantity, 0);
+  }, [cart]);
+
   // ── Compute disabled slots for the selected date ───────────────────────────
-  const disabledSlots = useMemo<Set<string>>(() => {
-    const disabled = new Set<string>();
+  const disabledSlots = useMemo<Set<number>>(() => {
+    const disabled = new Set<number>();
     const now = new Date();
     const isToday = selectedDate === 'Today';
 
     // If same-day booking is off and today is selected, all slots are blocked
     if (isToday && !bookingConfig.sameDayBooking) {
-      TIME_SLOTS.forEach(s => disabled.add(s));
+      SLOT_START_HOURS.forEach(h => disabled.add(h));
       return disabled;
     }
 
@@ -119,22 +126,22 @@ export default function CheckoutScreen() {
       ? (now.getHours() + (now.getMinutes() + effectiveMinAdvance) / 60)
       : 0;
 
-    TIME_SLOTS.forEach(slot => {
-      const slotHour = SLOT_HOURS[slot] ?? 0;
-      if (slotHour < bookingConfig.openingHour || slotHour >= bookingConfig.closingHour) {
-        disabled.add(slot); // outside business hours
-      } else if (isToday && slotHour < earliestHour) {
-        disabled.add(slot); // too soon
+    SLOT_START_HOURS.forEach(startH => {
+      const endHour = startH + totalDurationMinutes / 60;
+      if (startH < bookingConfig.openingHour || endHour > bookingConfig.closingHour) {
+        disabled.add(startH); // outside business hours or job runs past closing
+      } else if (isToday && startH < earliestHour) {
+        disabled.add(startH); // too soon
       }
     });
     return disabled;
-  }, [selectedDate, bookingConfig, cart]);
+  }, [selectedDate, bookingConfig, cart, totalDurationMinutes]);
 
   // Auto-select first available slot when date or config changes
   useEffect(() => {
     if (disabledSlots.has(selectedSlot)) {
-      const first = TIME_SLOTS.find(s => !disabledSlots.has(s));
-      if (first) setSelectedSlot(first);
+      const first = SLOT_START_HOURS.find(h => !disabledSlots.has(h));
+      if (first !== undefined) setSelectedSlot(first);
     }
   }, [disabledSlots]);
 
@@ -375,6 +382,13 @@ export default function CheckoutScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
               Pick a time for {selectedDate}
             </Text>
+            {/* Duration pill */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
+              <Text style={{ fontSize: 12, color: colors.mutedForeground }}>
+                Total job duration: <Text style={{ fontWeight: '600', color: colors.foreground }}>{formatDuration(totalDurationMinutes)}</Text>
+              </Text>
+            </View>
             {selectedDate === 'Today' && !bookingConfig.sameDayBooking && (
               <View style={{ backgroundColor: '#FEF3C7', borderRadius: 10, padding: 10, marginBottom: 4 }}>
                 <Text style={{ color: '#92400E', fontSize: 12, textAlign: 'center' }}>
@@ -383,13 +397,14 @@ export default function CheckoutScreen() {
               </View>
             )}
             <View style={styles.slotGrid}>
-              {TIME_SLOTS.map((slot) => {
-                const selected = selectedSlot === slot;
-                const disabled = disabledSlots.has(slot);
+              {SLOT_START_HOURS.map((startH) => {
+                const selected = selectedSlot === startH;
+                const disabled = disabledSlots.has(startH);
+                const label = getSlotLabel(startH, totalDurationMinutes);
                 return (
                   <TouchableOpacity
-                    key={slot}
-                    onPress={() => !disabled && setSelectedSlot(slot)}
+                    key={startH}
+                    onPress={() => !disabled && setSelectedSlot(startH)}
                     disabled={disabled}
                     style={[styles.slotChip, {
                       backgroundColor: disabled ? colors.muted : selected ? colors.primary : colors.card,
@@ -398,13 +413,13 @@ export default function CheckoutScreen() {
                     }]}
                   >
                     <Ionicons name="time-outline" size={16} color={disabled ? colors.mutedForeground : selected ? '#fff' : colors.mutedForeground} />
-                    <Text style={[styles.slotText, { color: disabled ? colors.mutedForeground : selected ? '#fff' : colors.foreground }]}>{slot}</Text>
+                    <Text style={[styles.slotText, { color: disabled ? colors.mutedForeground : selected ? '#fff' : colors.foreground }]}>{label}</Text>
                     {disabled && <Text style={{ fontSize: 9, color: colors.mutedForeground, marginTop: 2 }}>Unavailable</Text>}
                   </TouchableOpacity>
                 );
               })}
             </View>
-            {disabledSlots.size === TIME_SLOTS.length ? (
+            {disabledSlots.size === SLOT_START_HOURS.length ? (
               <TouchableOpacity onPress={() => setStep(2)} style={[styles.outlineBtn, { borderColor: colors.primary }]}>
                 <Ionicons name="arrow-back" size={16} color={colors.primary} />
                 <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Choose Another Date</Text>
@@ -438,7 +453,8 @@ export default function CheckoutScreen() {
 
             {[
               { label: 'Date', value: selectedDate },
-              { label: 'Time', value: selectedSlot },
+              { label: 'Time', value: getSlotLabel(selectedSlot, totalDurationMinutes) },
+              { label: 'Duration', value: formatDuration(totalDurationMinutes) },
               { label: 'Address', value: selectedAddress ? `${selectedAddress.line1}, ${selectedAddress.city}` : 'Not selected' },
             ].map((r) => (
               <View key={r.label} style={[styles.infoRow, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -1873,10 +1873,24 @@ function CustServices({
 /* ═══════════════════════════════════════════════════════════════
    CHECKOUT FLOW  (cart → address → date → time → summary → done)
 ═══════════════════════════════════════════════════════════════ */
-const CHECKOUT_TIME_SLOTS = ["9 AM - 11 AM", "11 AM - 1 PM", "2 PM - 4 PM", "4 PM - 6 PM", "6 PM - 8 PM"];
-const CHECKOUT_SLOT_HOURS: Record<string, number> = {
-  "9 AM - 11 AM": 9, "11 AM - 1 PM": 11, "2 PM - 4 PM": 14, "4 PM - 6 PM": 16, "6 PM - 8 PM": 18,
-};
+const CHECKOUT_SLOT_START_HOURS = [9, 11, 14, 16, 18] as const;
+
+function _fmtMin(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const period = h >= 12 ? "PM" : "AM";
+  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return m === 0 ? `${display} ${period}` : `${display}:${String(m).padStart(2, "0")} ${period}`;
+}
+function getCheckoutSlotLabel(startHour: number, durationMinutes: number): string {
+  return `${_fmtMin(startHour * 60)} - ${_fmtMin(startHour * 60 + durationMinutes)}`;
+}
+function formatCheckoutDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}min`;
+}
 
 type CheckoutBookingConfig = {
   minAdvanceMinutes: number;
@@ -1886,8 +1900,8 @@ type CheckoutBookingConfig = {
 };
 const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = { minAdvanceMinutes: 30, sameDayBooking: true, openingHour: 8, closingHour: 20 };
 
-function buildSlotScheduledAt(dateLabel: string, slotLabel: string): string {
-  const hour = CHECKOUT_SLOT_HOURS[slotLabel] ?? 9;
+function buildSlotScheduledAt(dateLabel: string, startHour: number): string {
+  const hour = startHour;
   const base = new Date();
   if (dateLabel === "Tomorrow") base.setDate(base.getDate() + 1);
   else if (dateLabel !== "Today") {
@@ -1932,7 +1946,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
   });
   const [selectedDate, setSelectedDate] = useState("Today");
-  const [selectedSlot, setSelectedSlot] = useState("9 AM - 11 AM");
+  const [selectedSlot, setSelectedSlot] = useState<number>(9); // start hour
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
   const [bookingCfg, setBookingCfg] = useState<CheckoutBookingConfig>(DEFAULT_CHECKOUT_CFG);
@@ -1945,13 +1959,19 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
       .catch(() => {});
   }, []);
 
+  // ── Total duration from cart (sum of quantity × duration per item) ──────────
+  const totalDurationMinutes = useMemo(() => {
+    if (!cart.items.length) return 60;
+    return cart.items.reduce((sum, item) => sum + item.duration * item.quantity, 0);
+  }, [cart]);
+
   // Compute disabled slots for the selected date
   const disabledSlots = useMemo(() => {
     const now = new Date();
     const isToday = selectedDate === 'Today';
-    const disabled = new Set<string>();
+    const disabled = new Set<number>();
     if (isToday && !bookingCfg.sameDayBooking) {
-      CHECKOUT_TIME_SLOTS.forEach(s => disabled.add(s));
+      CHECKOUT_SLOT_START_HOURS.forEach(h => disabled.add(h));
       return disabled;
     }
     // Effective min advance = strictest of global config + any per-service overrides in cart
@@ -1962,19 +1982,19 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     const earliestHour = isToday
       ? now.getHours() + (now.getMinutes() + effectiveMinAdvance) / 60
       : 0;
-    CHECKOUT_TIME_SLOTS.forEach(slot => {
-      const h = CHECKOUT_SLOT_HOURS[slot] ?? 0;
-      if (h < bookingCfg.openingHour || h >= bookingCfg.closingHour) disabled.add(slot);
-      else if (isToday && h < earliestHour) disabled.add(slot);
+    CHECKOUT_SLOT_START_HOURS.forEach(startH => {
+      const endHour = startH + totalDurationMinutes / 60;
+      if (startH < bookingCfg.openingHour || endHour > bookingCfg.closingHour) disabled.add(startH);
+      else if (isToday && startH < earliestHour) disabled.add(startH);
     });
     return disabled;
-  }, [selectedDate, bookingCfg, cart]);
+  }, [selectedDate, bookingCfg, cart, totalDurationMinutes]);
 
   // Auto-select first available slot when date/config changes
   useEffect(() => {
     if (disabledSlots.has(selectedSlot)) {
-      const first = CHECKOUT_TIME_SLOTS.find(s => !disabledSlots.has(s));
-      if (first) setSelectedSlot(first);
+      const first = CHECKOUT_SLOT_START_HOURS.find(h => !disabledSlots.has(h));
+      if (first !== undefined) setSelectedSlot(first);
     }
   }, [disabledSlots]);
   const [bookingDone, setBookingDone] = useState(false);
@@ -2236,20 +2256,25 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
           {/* ── Step 3: Time Slot ── */}
           {step === 3 && (
             <>
-              <p className="text-xs font-bold text-gray-500 mb-3">Pick a time for {selectedDate}</p>
+              <p className="text-xs font-bold text-gray-500 mb-1">Pick a time for {selectedDate}</p>
+              {/* Duration badge */}
+              <p className="text-xs text-gray-400 mb-3">
+                Total job duration: <span className="font-semibold text-gray-600">{formatCheckoutDuration(totalDurationMinutes)}</span>
+              </p>
               {selectedDate === 'Today' && !bookingCfg.sameDayBooking && (
                 <div className="mb-3 px-3 py-2 rounded-xl text-xs font-medium bg-amber-50 border border-amber-200 text-amber-700">
                   Same-day bookings are unavailable. Please go back and select a future date.
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3 mb-5">
-                {CHECKOUT_TIME_SLOTS.map((slot) => {
-                  const isDisabled = disabledSlots.has(slot);
-                  const isSelected = selectedSlot === slot;
+                {CHECKOUT_SLOT_START_HOURS.map((startH) => {
+                  const isDisabled = disabledSlots.has(startH);
+                  const isSelected = selectedSlot === startH;
+                  const label = getCheckoutSlotLabel(startH, totalDurationMinutes);
                   return (
                     <button
-                      key={slot}
-                      onClick={() => !isDisabled && setSelectedSlot(slot)}
+                      key={startH}
+                      onClick={() => !isDisabled && setSelectedSlot(startH)}
                       disabled={isDisabled}
                       className="py-4 rounded-2xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1.5"
                       style={{
@@ -2261,13 +2286,13 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                       }}
                     >
                       <Clock size={16} color={isDisabled ? "#D1D5DB" : isSelected ? "#fff" : "#9CA3AF"} />
-                      {slot}
+                      {label}
                       {isDisabled && <span style={{ fontSize: 10, color: "#D1D5DB" }}>Unavailable</span>}
                     </button>
                   );
                 })}
               </div>
-              {disabledSlots.size === CHECKOUT_TIME_SLOTS.length ? (
+              {disabledSlots.size === CHECKOUT_SLOT_START_HOURS.length ? (
                 <button
                   onClick={() => setStep(2)}
                   className="w-full py-3.5 rounded-2xl text-sm font-bold border-2 flex items-center justify-center gap-2"
@@ -2306,7 +2331,8 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 </div>
                 {[
                   { label: "Date", value: selectedDate },
-                  { label: "Time", value: selectedSlot },
+                  { label: "Time", value: getCheckoutSlotLabel(selectedSlot, totalDurationMinutes) },
+                  { label: "Duration", value: formatCheckoutDuration(totalDurationMinutes) },
                   {
                     label: "Address",
                     value: selectedAddress
@@ -2359,7 +2385,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 {[
                   { icon: "🔍", label: "Finding a partner", sub: "We're matching a verified pro near you", active: true },
                   { icon: "✅", label: "Partner accepts", sub: "You'll see their name in My Bookings", active: false },
-                  { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + selectedSlot, active: false },
+                  { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + getCheckoutSlotLabel(selectedSlot, totalDurationMinutes), active: false },
                   { icon: "💳", label: "Pay after service", sub: "Cash, UPI, or card — your choice", active: false },
                 ].map((s, i) => (
                   <div key={i} className="flex items-start gap-3 mb-2 last:mb-0">

@@ -58,7 +58,11 @@ export const bookingController = {
     }
 
     // ── Business hours check ──────────────────────────────────────────────────
-    const slotHour = when.getHours();
+    // `when` is a UTC Date. Business hours are in IST (UTC+5:30), so convert
+    // before comparing: shift by +5h30m then read the UTC fields (= IST fields).
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const whenIST = new Date(when.getTime() + IST_OFFSET_MS);
+    const slotHour = whenIST.getUTCHours();
     if (slotHour < openingHour || slotHour >= closingHour) {
       throw AppError.badRequest(`Bookings are only available between ${openingHour}:00 and ${closingHour}:00.`);
     }
@@ -81,6 +85,20 @@ export const bookingController = {
     if (when < earliestAllowed) {
       throw AppError.badRequest(
         `Booking must be at least ${effectiveMinAdvance} minute${effectiveMinAdvance === 1 ? '' : 's'} in advance. Please choose a later time slot.`
+      );
+    }
+
+    // ── End-time check: job must finish within closing hour ───────────────────
+    const totalJobMinutes = rows.reduce(
+      (sum, { item, service }) => sum + item.quantity * (service.duration ?? 60), 0
+    );
+    const endIST = new Date(whenIST.getTime() + totalJobMinutes * 60 * 1000);
+    const endHour = endIST.getUTCHours() + endIST.getUTCMinutes() / 60;
+    if (endHour > closingHour) {
+      const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
+      const endStr = `${pad(endIST.getUTCHours())}:${pad(endIST.getUTCMinutes())}`;
+      throw AppError.badRequest(
+        `Your booking (${Math.round(totalJobMinutes / 60 * 10) / 10}h total) would end at ${endStr}, which is past closing time (${closingHour}:00). Please choose an earlier slot.`
       );
     }
 
