@@ -294,6 +294,16 @@ export const bookingsApi = {
     const { data } = await client.post(`/bookings/${id}/razorpay/verify`, { razorpay_payment_id, razorpay_order_id, razorpay_signature });
     return data.data as ApiPayment;
   },
+
+  async createStripeSession(id: string) {
+    const { data } = await client.post(`/bookings/${id}/stripe/create-session`);
+    return data.data as { checkoutUrl: string | null; sessionId: string; testMode?: boolean };
+  },
+
+  async testPay(id: string, method = 'cash') {
+    const { data } = await client.post(`/bookings/${id}/test-pay`, { method });
+    return data.data as ApiPayment;
+  },
 };
 
 export interface ApiPayment {
@@ -307,7 +317,7 @@ export interface ApiPayment {
   createdAt: string;
 }
 
-export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null }> {
+export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: string | null; razorpayKeyId: string | null; testMode: boolean }> {
   const { data } = await client.get('/payments/config');
   return data.data;
 }

@@ -1,4 +1,17 @@
 # ServeNow — Gotchas & Hard-Won Lessons
+
+---
+
+## ⚠️ AGENT BEHAVIOUR — NON-NEGOTIABLE
+
+### Memory update is NOT optional — do it before ending every task
+**Problem:** Agent completed task, updated ACTIVE_TASK.md, but skipped CURRENT_STATUS.md. User had to manually ask for it to be updated.
+**Rule:** After EVERY completed task, without exception:
+1. Mark step done in `ACTIVE_TASK.md`
+2. Update "Last Session Summary" in `CURRENT_STATUS.md`
+3. Add entry to `GOTCHAS.md` if anything took >1 attempt
+**Why this matters:** The entire point of the AI memory system is continuity. A half-updated memory is as bad as no memory — the next session starts with wrong context and makes bad decisions.
+**Do NOT end a task response without completing all three steps above.**
 > Read this before touching any of the modules listed below.
 > Every entry here cost real debugging time. Don't repeat it.
 > Add a new entry any time a fix took more than one attempt.

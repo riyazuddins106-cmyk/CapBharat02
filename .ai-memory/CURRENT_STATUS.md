@@ -91,6 +91,25 @@ The platform is feature-complete and end-to-end tested. All core flows work. The
 
 ## 🔄 Last Session Summary (2026-08-02)
 
+### Task: Fix checkout → payment flow (6 bugs)
+**Server — `server/src/controllers/payment.controller.ts`:**
+- Removed booking status gate (`in_progress/completed` only) — now allows payment on any non-cancelled booking
+- `getPaymentForBooking` returns null (200) instead of 404 when no payment record exists yet
+- Razorpay test-mode: short-circuits before calling real SDK, returns fake order
+- Stripe test-mode: short-circuits before calling real SDK, returns `testMode: true`
+
+**Frontend — `apps/customer-web/src/lib/api.ts`:**
+- Added `testMode` field to `getPaymentConfig` return type
+- Added `bookingsApi.testPay(id, method)` — calls `/bookings/:id/test-pay`
+- Added `bookingsApi.createStripeSession(id)` — calls `/bookings/:id/stripe/create-session`
+
+**Frontend — `apps/customer-web/src/app/CustomerApp.tsx`:**
+- `PaymentModal.handlePay`: detects `testMode` → calls `testPay` instead of real gateways
+- `PaymentModal.handlePay`: added Stripe branch → calls `createStripeSession`, redirects to `checkoutUrl`
+- Fixed null `proName` crash in PaymentModal header
+- "Pay Now" button in My Bookings now shows for `pending` bookings too (not just upcoming/in_progress/completed)
+- Added `onPaymentComplete` callback to `CheckoutFlow` — after payment, closes cart and navigates to Bookings tab with refreshed data
+
 ### Task: Booking slot config enhancement
 - `server/src/controllers/cart.controller.ts` — added `minAdvanceMinutes` per cart item
 - `server/src/controllers/platformSettings.controller.ts` — added `slotIntervalMinutes: 120` to default

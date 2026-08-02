@@ -105,7 +105,7 @@ export const getPaymentForBooking = asyncHandler(async (req: Request, res: Respo
     .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
   if (!booking) throw AppError.notFound('Booking not found.');
   const [payment] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
-  if (!payment) throw AppError.notFound('No payment record found for this booking.');
+  if (!payment) { sendSuccess(res, null); return; }
   sendSuccess(res, payment);
 });
 
@@ -117,17 +117,30 @@ export const createRazorpayOrder = asyncHandler(async (req: Request, res: Respon
   const [booking] = await db.select().from(bookings)
     .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
   if (!booking) throw AppError.notFound('Booking not found.');
-  if (!['completed', 'in_progress'].includes(booking.status))
-    throw AppError.badRequest('Payment can only be initiated for in-progress or completed bookings.');
+  if (booking.status === 'cancelled')
+    throw AppError.badRequest('Payment cannot be made for a cancelled booking.');
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
 
   const cfg = await getPaymentCfg();
-  if (!cfg.razorpay?.enabled) throw AppError.badRequest('Razorpay is not enabled.');
-  const rz = makeRazorpay(cfg.razorpay);
+  const testMode = cfg?.testMode?.enabled ?? false;
+  if (!testMode && !cfg.razorpay?.enabled) throw AppError.badRequest('Razorpay is not enabled.');
 
   const amountPaise = (booking.price ?? 0) * 100; // Razorpay uses paise
+
+  // ── Test mode: return a fake order immediately, no real Razorpay call ──
+  if (testMode) {
+    const fakeOrderId = `test_order_${Date.now()}`;
+    if (existing) {
+      await db.update(payments).set({ razorpayOrderId: fakeOrderId, method: 'razorpay', status: 'created', updatedAt: new Date() }).where(eq(payments.id, existing.id));
+    } else {
+      await db.insert(payments).values({ bookingId, customerId: userId, amount: booking.price ?? 0, currency: 'INR', status: 'created', method: 'razorpay', razorpayOrderId: fakeOrderId });
+    }
+    return sendSuccess(res, { orderId: fakeOrderId, amount: amountPaise, currency: 'INR', keyId: 'rzp_test_key', bookingId, businessName: 'ServeNow', testMode: true });
+  }
+
+  const rz = makeRazorpay(cfg.razorpay!);
   let order: any;
   try {
     order = await rz.orders.create({
@@ -166,7 +179,7 @@ export const createRazorpayOrder = asyncHandler(async (req: Request, res: Respon
     orderId:   order.id,
     amount:    amountPaise,
     currency:  'INR',
-    keyId:     cfg.razorpay.keyId,
+    keyId:     cfg.razorpay!.keyId,
     bookingId,
     businessName: 'ServeNow',
   });
@@ -394,15 +407,28 @@ export const createStripeSession = asyncHandler(async (req: Request, res: Respon
   const [booking] = await db.select().from(bookings)
     .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
   if (!booking) throw AppError.notFound('Booking not found.');
-  if (!['completed', 'in_progress'].includes(booking.status))
-    throw AppError.badRequest('Payment can only be initiated for in-progress or completed bookings.');
+  if (booking.status === 'cancelled')
+    throw AppError.badRequest('Payment cannot be made for a cancelled booking.');
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
 
   const cfg = await getPaymentCfg();
-  if (!cfg.stripe?.enabled) throw AppError.badRequest('Stripe is not enabled.');
-  const stripe = makeStripe(cfg.stripe);
+  const testMode = cfg?.testMode?.enabled ?? false;
+  if (!testMode && !cfg.stripe?.enabled) throw AppError.badRequest('Stripe is not enabled.');
+
+  // ── Test mode: return a fake session URL immediately, no real Stripe call ──
+  if (testMode) {
+    const fakeSessionId = `test_session_${Date.now()}`;
+    if (existing) {
+      await db.update(payments).set({ stripeSessionId: fakeSessionId, method: 'stripe', status: 'created', updatedAt: new Date() }).where(eq(payments.id, existing.id));
+    } else {
+      await db.insert(payments).values({ bookingId, customerId: userId, amount: booking.price ?? 0, currency: 'INR', status: 'created', method: 'stripe', stripeSessionId: fakeSessionId });
+    }
+    return sendSuccess(res, { checkoutUrl: null, sessionId: fakeSessionId, testMode: true });
+  }
+
+  const stripe = makeStripe(cfg.stripe!);
 
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const session = await stripe.checkout.sessions.create({
@@ -554,8 +580,8 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
   const [booking] = await db.select().from(bookings)
     .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
   if (!booking) throw AppError.notFound('Booking not found.');
-  if (!['completed', 'in_progress'].includes(booking.status))
-    throw AppError.badRequest('Payment can only be submitted for in-progress or completed bookings.');
+  if (booking.status === 'cancelled')
+    throw AppError.badRequest('Payment cannot be made for a cancelled booking.');
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');

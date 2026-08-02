@@ -1,3 +1,4 @@
+- [ServeNow memory update rule](servenow-memory-rule.md) — must update ACTIVE_TASK.md + CURRENT_STATUS.md + GOTCHAS.md after every task, no exceptions.
 - [Env variable contract](env-contract.md) — DATABASE_URL is the preferred Supabase Postgres secret; the server aliases it to the legacy name.
 - [Startup migrations](startup-migrations.md) — Supabase schema changes must be applied idempotently before the API starts serving queries.
 - [Marketplace completion](marketplace-completion.md) — user confirmed the requested marketplace, dispatch, admin, customer, partner, and mobile flows are complete and end-to-end tested.

@@ -1910,10 +1910,11 @@ function buildSlotScheduledAt(dateLabel: string, slotLabel: string): string {
 
 const STEP_TITLES = ["Your Cart", "Select Address", "Select Date", "Select Time Slot", "Booking Summary"];
 
-function CheckoutFlow({ cart, onClose, onChange }: {
+function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
   cart: ApiCart;
   onClose: () => void;
   onChange: (cart: ApiCart) => void;
+  onPaymentComplete?: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
@@ -2403,7 +2404,7 @@ function CheckoutFlow({ cart, onClose, onChange }: {
       <PaymentModal
         booking={createdBooking}
         onClose={() => setPayAfterBook(false)}
-        onPaid={() => { setPayAfterBook(false); onClose(); }}
+        onPaid={() => { setPayAfterBook(false); onClose(); onPaymentComplete?.(); }}
       />
     )}
     </>
@@ -2419,7 +2420,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
   onClose: () => void;
   onPaid: () => void;
 }) {
-  const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null } | null>(null);
+  const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null; testMode: boolean } | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -2438,14 +2439,26 @@ function PaymentModal({ booking, onClose, onPaid }: {
   }, [booking.id]);
 
   const handlePay = async () => {
-    if (!selectedMethod) return;
+    if (!selectedMethod || !config) return;
+    setSubmitting(true);
+
+    // ── Test mode: skip real gateways, use server-side simulation ──
+    if (config.testMode) {
+      try {
+        await bookingsApi.testPay(booking.id, selectedMethod);
+        setPaid(true);
+        setTimeout(() => { onPaid(); onClose(); }, 1500);
+      } catch (e: any) {
+        alert(e?.response?.data?.error?.message ?? e?.response?.data?.message ?? e.message ?? 'Payment failed');
+        setSubmitting(false);
+      }
+      return;
+    }
 
     // ── Razorpay: open in-browser checkout ──────────────────────
     if (selectedMethod === 'razorpay') {
-      setSubmitting(true);
       try {
         const order = await bookingsApi.createRazorpayOrder(booking.id);
-        // Dynamically load Razorpay checkout.js if not already present
         await new Promise<void>((resolve, reject) => {
           if ((window as any).Razorpay) { resolve(); return; }
           const s = document.createElement('script');
@@ -2477,20 +2490,36 @@ function PaymentModal({ booking, onClose, onPaid }: {
         });
         rzp.open();
       } catch (e: any) {
-        alert(e?.response?.data?.message ?? e.message ?? 'Payment failed');
+        alert(e?.response?.data?.error?.message ?? e?.response?.data?.message ?? e.message ?? 'Payment failed');
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // ── Stripe: redirect to hosted checkout page ─────────────────
+    if (selectedMethod === 'stripe') {
+      try {
+        const session = await bookingsApi.createStripeSession(booking.id);
+        if (session.checkoutUrl) {
+          window.location.href = session.checkoutUrl;
+        } else {
+          alert('Stripe checkout is not available. Try another payment method.');
+          setSubmitting(false);
+        }
+      } catch (e: any) {
+        alert(e?.response?.data?.error?.message ?? e?.response?.data?.message ?? e.message ?? 'Payment failed');
         setSubmitting(false);
       }
       return;
     }
 
     // ── Cash / UPI manual ────────────────────────────────────────
-    setSubmitting(true);
     try {
       await bookingsApi.submitPayment(booking.id, selectedMethod, notes || undefined);
       setPaid(true);
       setTimeout(() => { onPaid(); onClose(); }, 1500);
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? e.message ?? 'Payment failed');
+      alert(e?.response?.data?.error?.message ?? e?.response?.data?.message ?? e.message ?? 'Payment failed');
     } finally {
       setSubmitting(false);
     }
@@ -2526,7 +2555,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
             <h3 className="text-base font-bold text-gray-900">Complete Payment</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 leading-none"><X size={20} /></button>
           </div>
-          <p className="text-xs text-gray-500">{booking.serviceName} · {booking.proName}</p>
+          <p className="text-xs text-gray-500">{booking.serviceName}{booking.proName ? ` · ${booking.proName}` : ''}</p>
           <div className="mt-3 bg-violet-50 rounded-xl px-4 py-3 flex items-baseline gap-1">
             <span className="text-2xl font-black text-violet-700">₹{booking.price}</span>
             <span className="text-xs text-violet-400 font-medium">total</span>
@@ -2730,7 +2759,7 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
                     {cancelling === b.id ? "Cancelling…" : "Cancel"}
                   </button>
                 )}
-                {["upcoming", "in_progress", "completed"].includes(b.status) && (
+                {["pending", "upcoming", "in_progress", "completed"].includes(b.status) && (
                   <button
                     onClick={() => setPayBooking(b)}
                     className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
@@ -3193,6 +3222,7 @@ interface AppShellProps {
   cart: ApiCart;
   onCartClose: () => void;
   onCartChange: (c: ApiCart) => void;
+  onCartPaymentComplete?: () => void;
   locationPickerOpen: boolean;
   addresses: ApiAddress[];
   onLocationSelect: (loc: string) => void;
@@ -3202,7 +3232,7 @@ function AppShell({
   title, children,
   activeTab, onTabChange, location, onLocationPress, isLoggedIn, user, onLogout,
   cartCount, onCartOpen,
-  cartOpen, cart, onCartClose, onCartChange,
+  cartOpen, cart, onCartClose, onCartChange, onCartPaymentComplete,
   locationPickerOpen, addresses, onLocationSelect, onLocationPickerClose,
 }: AppShellProps) {
   return (
@@ -3280,7 +3310,7 @@ function AppShell({
 
       {/* Modals */}
       {cartOpen && (
-        <CheckoutFlow cart={cart} onClose={onCartClose} onChange={onCartChange} />
+        <CheckoutFlow cart={cart} onClose={onCartClose} onChange={onCartChange} onPaymentComplete={onCartPaymentComplete} />
       )}
       {locationPickerOpen && (
         <LocationPickerModal
@@ -3756,6 +3786,7 @@ export default function CustomerApp() {
     cart,
     onCartClose: () => setCartGlobalOpen(false),
     onCartChange: setCart,
+    onCartPaymentComplete: () => { setCartGlobalOpen(false); setActiveTab("bookings"); refreshBookings(); },
     locationPickerOpen: showLocationPicker,
     addresses,
     onLocationSelect: handleSelectLocation,

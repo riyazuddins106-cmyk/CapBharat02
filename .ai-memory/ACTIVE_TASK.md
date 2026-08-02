@@ -21,3 +21,4 @@
 | 4 | Add all Supabase + JWT secrets, connect database | user | ✅ Done | 2026-08-02 |
 | 5 | Fix Expo "failed to download" — unset REPLIT_EXPO_DEV_DOMAIN in both workflows | user | ✅ Done | 2026-08-02 |
 | 6 | Complete AI memory system — 10 module INDEX files + GOTCHAS additions | user | ✅ Done | 2026-08-02 |
+| 7 | Fix checkout → payment flow: 6 bugs fixed (status check, test-mode, null proName, Pay Now visibility, post-payment navigation, Stripe/Razorpay test-mode short-circuit) | user | ✅ Done | 2026-08-02 |
