@@ -1,0 +1,234 @@
+Use this prompt with Replit AI:
+
+---
+
+# Replit AI Prompt – Enhance Existing Booking Time Logic with Configurable Minimum Advance Time
+
+## Objective
+
+The booking module is already implemented. **Do not redesign or replace the existing booking flow.**
+
+Enhance the existing booking date and time selection so that booking slots follow configurable business rules while preserving the current architecture and UI.
+
+---
+
+## Requirements
+
+### 1. Default Minimum Advance Booking Time
+
+Add a configurable setting in the **Admin Panel → Settings**.
+
+Example:
+
+```
+Booking Settings
+
+Default Minimum Advance Booking Time
+
+30 Minutes
+```
+
+Requirements:
+
+* Configurable by Admin.
+* Stored in the database.
+* Used automatically for all services unless a service-specific value exists.
+* Changes should take effect immediately without requiring code changes or application restart.
+
+---
+
+### 2. Service-Specific Minimum Advance Time
+
+In the existing **Service Create/Edit** screen, add a new optional field:
+
+```
+Minimum Advance Booking Time
+
+(Default: Use Global Setting)
+
+[None]
+
+or
+
+15 Minutes
+30 Minutes
+45 Minutes
+60 Minutes
+90 Minutes
+120 Minutes
+Custom Minutes
+```
+
+Rules:
+
+* If empty, use the global default.
+* If configured, override the global value only for that service.
+* Existing services should continue working without modification.
+
+---
+
+### 3. Booking Time Slot Logic
+
+Update the existing booking time selection.
+
+Example:
+
+Current Time:
+
+```
+3:43 PM
+```
+
+Global Minimum Advance:
+
+```
+30 Minutes
+```
+
+Earliest allowed booking:
+
+```
+4:13 PM
+```
+
+If booking slots are every 30 minutes:
+
+```
+04:00 PM ❌ Disabled
+04:30 PM ✅ Available
+05:00 PM ✅ Available
+```
+
+Any slot earlier than the required minimum advance time must be disabled and clearly unavailable for selection.
+
+---
+
+### 4. Disable Past Time Slots
+
+When the customer selects **Today's Date**:
+
+* Disable every slot whose time has already passed.
+* Disable every slot that falls inside the minimum advance window.
+* Prevent selection through both UI and backend validation.
+
+Example:
+
+```
+09:00 AM ❌
+10:00 AM ❌
+11:00 AM ❌
+03:00 PM ❌
+03:30 PM ❌
+04:00 PM ❌
+04:30 PM ✅
+05:00 PM ✅
+```
+
+---
+
+### 5. Future Dates
+
+For tomorrow and future dates:
+
+* Do not disable slots because of the current time.
+* Only apply existing business rules such as business hours, holidays, partner availability, or blocked slots.
+
+---
+
+### 6. Backend Validation
+
+Never rely only on frontend validation.
+
+The backend must reject bookings when:
+
+* Slot is already in the past.
+* Slot violates the configured minimum advance time.
+* Slot is unavailable.
+* Business rules prevent booking.
+
+Return a clear validation message.
+
+---
+
+### 7. Admin Settings Module
+
+Create or extend the existing **Settings → Booking Settings** section.
+
+Include:
+
+* Default Minimum Advance Booking Time
+* Slot Interval (if already supported, make it configurable)
+* Enable/Disable Same-Day Booking
+* Maximum Advance Booking Days
+* Business Opening Time (if already supported)
+* Business Closing Time (if already supported)
+
+Do not duplicate existing settings. Extend the existing settings architecture.
+
+---
+
+### 8. Service Management
+
+Extend the existing Service module by adding:
+
+```
+Minimum Advance Booking Time
+
+Use Global Setting
+
+or
+
+Custom Minutes
+```
+
+The UI should clearly indicate when a service is inheriting the global value.
+
+---
+
+### 9. Existing Bookings
+
+Do not affect:
+
+* Existing bookings
+* Booking history
+* Past completed bookings
+
+The new rules should apply only to new bookings.
+
+---
+
+### 10. Validation & Testing
+
+Test all existing booking flows.
+
+Verify:
+
+* Global default works.
+* Service-specific override works.
+* Past time slots are disabled.
+* Minimum advance time is enforced.
+* Backend validation matches frontend validation.
+* Customer App displays only valid slots.
+* Admin changes take effect immediately.
+* No existing booking functionality is broken.
+
+---
+
+## Important Rules
+
+* Do **not** redesign the booking module.
+* Do **not** redesign the Admin Panel.
+* Reuse the existing Settings module.
+* Reuse the existing Service Create/Edit screen.
+* Follow the existing project architecture.
+* Modify only the components necessary for this enhancement.
+* Preserve backward compatibility with all existing bookings and services.
+
+Finally, provide:
+
+1. Files modified.
+2. Database changes (if any).
+3. APIs updated.
+4. Components updated.
+5. Booking logic changes.
+6. Confirmation that the feature has been fully tested and integrated without breaking existing functionality.

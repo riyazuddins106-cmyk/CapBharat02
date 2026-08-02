@@ -30,6 +30,16 @@ export const bookingController = {
     const { scheduledAt, addressId, notes } = req.body as { scheduledAt: string; addressId?: string; notes?: string };
     const when = new Date(scheduledAt);
     if (Number.isNaN(when.getTime())) throw AppError.badRequest('Invalid scheduledAt.');
+
+    // ── Reject past slots ────────────────────────────────────────────────────
+    if (when <= new Date()) throw AppError.badRequest('The selected time slot is in the past. Please choose a future slot.');
+
+    // ── Load booking config and validate minimum advance time ─────────────────
+    const { platformSettings } = await import('../database/schema/index.js');
+    const [cfgRow] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
+    const bookingCfg = cfgRow ? JSON.parse(cfgRow.value) : { minAdvanceMinutes: 30 };
+    const globalMinAdvance: number = bookingCfg.minAdvanceMinutes ?? 30;
+
     const [cart] = await db.select().from(carts).where(eq(carts.customerId, req.user!.userId)).limit(1);
     if (!cart) throw AppError.badRequest('Your cart is empty.');
     const rows = await db.select({ item: cartItems, service: services, category: serviceCategories })
@@ -38,6 +48,19 @@ export const bookingController = {
       .innerJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
       .where(and(eq(cartItems.cartId, cart.id), eq(services.isActive, true), isNull(services.deletedAt)));
     if (!rows.length) throw AppError.badRequest('Your cart is empty.');
+
+    // ── Per-service advance time: use strictest requirement across all items ──
+    const effectiveMinAdvance = rows.reduce((max, { service }) => {
+      const svcMin = service.minAdvanceMinutes ?? globalMinAdvance;
+      return Math.max(max, svcMin);
+    }, globalMinAdvance);
+    const earliestAllowed = new Date(Date.now() + effectiveMinAdvance * 60 * 1000);
+    if (when < earliestAllowed) {
+      throw AppError.badRequest(
+        `Booking must be at least ${effectiveMinAdvance} minute${effectiveMinAdvance === 1 ? '' : 's'} in advance. Please choose a later time slot.`
+      );
+    }
+
     const total = rows.reduce((sum, row) => sum + row.item.quantity * row.service.customerPrice, 0);
     const first = rows[0];
 

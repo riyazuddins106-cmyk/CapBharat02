@@ -2431,7 +2431,10 @@ function PaymentModal({ booking, onClose, onPaid }: {
   if (paid) {
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-        <div className="w-full max-w-sm bg-white rounded-t-3xl p-8 flex flex-col items-center gap-4">
+        <div className="w-full max-w-sm bg-white rounded-t-3xl p-8 flex flex-col items-center gap-4 relative">
+          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1">
+            <X size={22} />
+          </button>
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center"><Check size={32} color="#10B981" /></div>
           <h3 className="text-lg font-bold text-gray-900">Payment Successful!</h3>
           <p className="text-sm text-gray-500 text-center">Thank you for using ServeNow. Your payment has been recorded.</p>
@@ -2442,9 +2445,9 @@ function PaymentModal({ booking, onClose, onPaid }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="w-full max-w-sm bg-white rounded-t-3xl overflow-hidden">
-        {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+      <div className="w-full max-w-sm bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: '88vh' }}>
+        {/* Header — sticky */}
+        <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-base font-bold text-gray-900">Complete Payment</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 leading-none"><X size={20} /></button>
@@ -2456,8 +2459,8 @@ function PaymentModal({ booking, onClose, onPaid }: {
           </div>
         </div>
 
-        {/* Payment methods */}
-        <div className="px-5 py-4">
+        {/* Payment methods — scrollable */}
+        <div className="px-5 py-4 overflow-y-auto flex-1">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Choose payment method</p>
           {!config ? (
             <div className="text-center py-4 text-gray-400 text-sm">Loading…</div>
@@ -2528,8 +2531,8 @@ function PaymentModal({ booking, onClose, onPaid }: {
           )}
         </div>
 
-        {/* Pay button */}
-        <div className="px-5 pb-8">
+        {/* Pay button — sticky */}
+        <div className="px-5 pb-8 pt-2 flex-shrink-0 border-t border-gray-100">
           <button
             onClick={handlePay}
             disabled={!selectedMethod || submitting || !config}

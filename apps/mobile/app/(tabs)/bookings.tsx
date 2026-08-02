@@ -169,6 +169,9 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   if (paid) {
     return (
       <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+        <TouchableOpacity onPress={onClose} style={styles.sheetCloseTopRight}>
+          <Ionicons name="close" size={24} color={colors.mutedForeground} />
+        </TouchableOpacity>
         <View style={styles.paidSuccess}>
           <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
           <Text style={[styles.paidTitle, { color: colors.foreground }]}>Payment Recorded!</Text>
@@ -202,11 +205,11 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   const isGateway = selected === 'razorpay' || selected === 'stripe';
 
   return (
-    <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+    <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: 0, maxHeight: '88%' }]}>
       {/* Handle bar */}
       <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-      {/* Header */}
+      {/* Header — pinned */}
       <View style={styles.sheetHeader}>
         <View>
           <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Complete Payment</Text>
@@ -217,127 +220,137 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
         </TouchableOpacity>
       </View>
 
-      {/* Amount pill */}
-      <View style={[styles.amountPill, { backgroundColor: colors.primary + '15' }]}>
-        <Text style={[styles.amountText, { color: colors.primary }]}>₹{booking.price}</Text>
-        <Text style={[styles.amountLabel, { color: colors.primary + '88' }]}>total due</Text>
-      </View>
-
-      {/* Test mode banner */}
-      {config?.testMode && (
-        <View style={styles.testBanner}>
-          <Text style={styles.testBannerTitle}>🧪 Test Mode Active</Text>
-          <Text style={styles.testBannerSub}>All methods shown · tapping any one simulates payment instantly. No real charge.</Text>
-        </View>
-      )}
-
-      {/* Payment methods */}
-      <Text style={[styles.methodsLabel, { color: colors.mutedForeground }]}>CHOOSE PAYMENT METHOD</Text>
-
-      {!config ? (
-        <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
-      ) : (
-        <View style={styles.methodsList}>
-          {config.methods.map(method => {
-            const info = METHOD_INFO[method] ?? { icon: 'card-outline', label: method, desc: '' };
-            const isSelected = selected === method;
-            return (
-              <TouchableOpacity
-                key={method}
-                onPress={() => setSelected(method)}
-                activeOpacity={0.7}
-                style={[
-                  styles.methodRow,
-                  { borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary + '0F' : colors.muted }
-                ]}
-              >
-                <Ionicons name={info.icon} size={24} color={colors.primary} style={{ width: 28, textAlign: 'center' }} />
-                <View style={styles.methodInfo}>
-                  <Text style={[styles.methodName, { color: colors.foreground }]}>{info.label}</Text>
-                  <Text style={[styles.methodDesc, { color: colors.mutedForeground }]}>{info.desc}</Text>
-                </View>
-                <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}>
-                  {isSelected && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      {/* UPI Payment — QR + VPA */}
-      {selected === 'upi_manual' && config?.upiVpa && (
-        <View style={[styles.upiBox, { backgroundColor: '#EFF6FF' }]}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              const upiUrl = `upi://pay?pa=${encodeURIComponent(config.upiVpa!)}&pn=ServeNow&am=${booking.price}&cu=INR`;
-              Linking.openURL(upiUrl).catch(() => {});
-            }}
-          >
-            <View style={styles.upiQrWrap}>
-              <QRCode
-                value={`upi://pay?pa=${config.upiVpa}&pn=ServeNow&am=${booking.price}&cu=INR`}
-                size={150}
-                color="#1E3A8A"
-                backgroundColor="transparent"
-              />
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.upiQrHint}>Scan with any UPI app  •  Tap to open directly</Text>
-          <View style={styles.upiVpaRow}>
-            <Text style={styles.upiLabel}>UPI ID</Text>
-            <Text style={styles.upiVpa} selectable>{config.upiVpa}</Text>
-          </View>
-          <Text style={styles.upiHint}>₹{booking.price} will be pre-filled. Enter UTR/transaction ID below after payment.</Text>
-        </View>
-      )}
-
-      {selected === 'upi_manual' && (
-        <TextInput
-          value={upiRef}
-          onChangeText={setUpiRef}
-          placeholder="UPI transaction ID / UTR (optional)"
-          placeholderTextColor={colors.mutedForeground}
-          style={[styles.upiInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: 12 }]}
-        />
-      )}
-
-      {/* Gateway info banner */}
-      {selected === 'razorpay' && (
-        <View style={[styles.gatewayBanner, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}>
-          <Text style={[styles.gatewayBannerText, { color: '#92400E' }]}>
-            You'll be redirected to Razorpay's secure checkout to pay by card, net banking, wallet, or UPI.
-          </Text>
-        </View>
-      )}
-      {selected === 'stripe' && (
-        <View style={[styles.gatewayBanner, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
-          <Text style={[styles.gatewayBannerText, { color: '#1E40AF' }]}>
-            You'll be redirected to Stripe's secure checkout. Supports Visa, Mastercard, and international cards.
-          </Text>
-        </View>
-      )}
-
-      {/* Pay button */}
-      <TouchableOpacity
-        onPress={isGateway ? openGatewayCheckout : () => submitMutation.mutate()}
-        disabled={!selected || submitMutation.isPending || checkoutLoading || !config}
-        activeOpacity={0.85}
-        style={[styles.payBtn, { backgroundColor: colors.primary, opacity: (!selected || submitMutation.isPending || checkoutLoading || !config) ? 0.5 : 1 }]}
+      {/* Scrollable content */}
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
       >
-        {(submitMutation.isPending || checkoutLoading) ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.payBtnText}>
-            {selected === 'cash'       ? 'Confirm Cash Payment'
-            : selected === 'upi_manual' ? 'Confirm UPI Payment'
-            : selected === 'razorpay'   ? `Pay ₹${booking.price} via Razorpay`
-            : selected === 'stripe'     ? `Pay ₹${booking.price} via Stripe`
-            : `Pay ₹${booking.price}`}
-          </Text>
+        {/* Amount pill */}
+        <View style={[styles.amountPill, { backgroundColor: colors.primary + '15' }]}>
+          <Text style={[styles.amountText, { color: colors.primary }]}>₹{booking.price}</Text>
+          <Text style={[styles.amountLabel, { color: colors.primary + '88' }]}>total due</Text>
+        </View>
+
+        {/* Test mode banner */}
+        {config?.testMode && (
+          <View style={styles.testBanner}>
+            <Text style={styles.testBannerTitle}>🧪 Test Mode Active</Text>
+            <Text style={styles.testBannerSub}>All methods shown · tapping any one simulates payment instantly. No real charge.</Text>
+          </View>
         )}
-      </TouchableOpacity>
+
+        {/* Payment methods */}
+        <Text style={[styles.methodsLabel, { color: colors.mutedForeground }]}>CHOOSE PAYMENT METHOD</Text>
+
+        {!config ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+        ) : (
+          <View style={styles.methodsList}>
+            {config.methods.map(method => {
+              const info = METHOD_INFO[method] ?? { icon: 'card-outline', label: method, desc: '' };
+              const isSelected = selected === method;
+              return (
+                <TouchableOpacity
+                  key={method}
+                  onPress={() => setSelected(method)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.methodRow,
+                    { borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary + '0F' : colors.muted }
+                  ]}
+                >
+                  <Ionicons name={info.icon} size={24} color={colors.primary} style={{ width: 28, textAlign: 'center' }} />
+                  <View style={styles.methodInfo}>
+                    <Text style={[styles.methodName, { color: colors.foreground }]}>{info.label}</Text>
+                    <Text style={[styles.methodDesc, { color: colors.mutedForeground }]}>{info.desc}</Text>
+                  </View>
+                  <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}>
+                    {isSelected && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* UPI Payment — QR + VPA */}
+        {selected === 'upi_manual' && config?.upiVpa && (
+          <View style={[styles.upiBox, { backgroundColor: '#EFF6FF' }]}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                const upiUrl = `upi://pay?pa=${encodeURIComponent(config.upiVpa!)}&pn=ServeNow&am=${booking.price}&cu=INR`;
+                Linking.openURL(upiUrl).catch(() => {});
+              }}
+            >
+              <View style={styles.upiQrWrap}>
+                <QRCode
+                  value={`upi://pay?pa=${config.upiVpa}&pn=ServeNow&am=${booking.price}&cu=INR`}
+                  size={150}
+                  color="#1E3A8A"
+                  backgroundColor="transparent"
+                />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.upiQrHint}>Scan with any UPI app  •  Tap to open directly</Text>
+            <View style={styles.upiVpaRow}>
+              <Text style={styles.upiLabel}>UPI ID</Text>
+              <Text style={styles.upiVpa} selectable>{config.upiVpa}</Text>
+            </View>
+            <Text style={styles.upiHint}>₹{booking.price} will be pre-filled. Enter UTR/transaction ID below after payment.</Text>
+          </View>
+        )}
+
+        {selected === 'upi_manual' && (
+          <TextInput
+            value={upiRef}
+            onChangeText={setUpiRef}
+            placeholder="UPI transaction ID / UTR (optional)"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.upiInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: 12 }]}
+          />
+        )}
+
+        {/* Gateway info banner */}
+        {selected === 'razorpay' && (
+          <View style={[styles.gatewayBanner, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}>
+            <Text style={[styles.gatewayBannerText, { color: '#92400E' }]}>
+              You'll be redirected to Razorpay's secure checkout to pay by card, net banking, wallet, or UPI.
+            </Text>
+          </View>
+        )}
+        {selected === 'stripe' && (
+          <View style={[styles.gatewayBanner, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+            <Text style={[styles.gatewayBannerText, { color: '#1E40AF' }]}>
+              You'll be redirected to Stripe's secure checkout. Supports Visa, Mastercard, and international cards.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Pay button — pinned at bottom */}
+      <View style={[styles.payBtnWrap, { borderTopColor: colors.border }]}>
+        <TouchableOpacity
+          onPress={isGateway ? openGatewayCheckout : () => submitMutation.mutate()}
+          disabled={!selected || submitMutation.isPending || checkoutLoading || !config}
+          activeOpacity={0.85}
+          style={[styles.payBtn, { backgroundColor: colors.primary, opacity: (!selected || submitMutation.isPending || checkoutLoading || !config) ? 0.5 : 1 }]}
+        >
+          {(submitMutation.isPending || checkoutLoading) ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.payBtnText}>
+              {selected === 'cash'       ? 'Confirm Cash Payment'
+              : selected === 'upi_manual' ? 'Confirm UPI Payment'
+              : selected === 'razorpay'   ? `Pay ₹${booking.price} via Razorpay`
+              : selected === 'stripe'     ? `Pay ₹${booking.price} via Stripe`
+              : `Pay ₹${booking.price}`}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -693,8 +706,10 @@ const styles = StyleSheet.create({
   upiVpa: { fontSize: 15, fontWeight: '700', color: '#1E3A8A', letterSpacing: 0.3 },
   upiHint: { fontSize: 11, color: '#3B82F6', textAlign: 'center' },
   upiInput: { padding: 12, fontSize: 14, marginBottom: 16 },
-  payBtn: { paddingVertical: 16, borderRadius: 18, alignItems: 'center', marginTop: 4 },
+  payBtnWrap: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, borderTopWidth: StyleSheet.hairlineWidth },
+  payBtn: { paddingVertical: 16, borderRadius: 18, alignItems: 'center' },
   payBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  sheetCloseTopRight: { position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 4 },
   paidSuccess: { alignItems: 'center', paddingVertical: 32, gap: 12 },
   paidIcon: { fontSize: 52 },
   paidTitle: { fontSize: 22, fontWeight: '800' },

@@ -12,7 +12,8 @@ export const services = pgTable('services', {
   customerPrice: integer('customer_price').notNull().default(0),
   partnerPayout: integer('partner_payout').notNull().default(0),
   commission:    integer('commission').notNull().default(0),
-  duration:      integer('duration').notNull().default(60), // minutes
+  duration:          integer('duration').notNull().default(60), // minutes
+  minAdvanceMinutes: integer('min_advance_minutes'),           // null = use global booking_config default
   requiredSkill: varchar('required_skill', { length: 255 }),
   badge:               varchar('badge', { length: 64 }),
   featured:            boolean('featured').notNull().default(false),

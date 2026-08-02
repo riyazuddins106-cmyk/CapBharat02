@@ -278,6 +278,7 @@ export interface ServiceRow {
   requirements?: string | null;
   importantNotes?: string | null;
   cancellationPolicy?: string | null;
+  minAdvanceMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -406,6 +407,7 @@ export type ServiceInput = {
   requirements?: string;
   importantNotes?: string;
   cancellationPolicy?: string;
+  minAdvanceMinutes?: number | null;
 };
 
 // ── Base request ─────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import nodemailer from 'nodemailer';
 
 /* ── Allowed setting keys ─────────────────────────────────────────── */
-const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config']);
+const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config', 'booking_config']);
 
 /* ── GET /admin/settings/:key ─────────────────────────────────────── */
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -144,6 +144,15 @@ function getDefaults(key: string): object {
       expiryMinutes: 10,
       maxAttempts:   5,
       codeLength:    6,
+    };
+  }
+  if (key === 'booking_config') {
+    return {
+      minAdvanceMinutes: 30,
+      sameDayBooking:    true,
+      maxAdvanceDays:    7,
+      openingHour:       9,
+      closingHour:       20,
     };
   }
   return {};

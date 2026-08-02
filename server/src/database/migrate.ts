@@ -569,6 +569,10 @@ export async function runMigrations() {
        SET is_mandatory = false
        WHERE is_mandatory = true`);
 
+  // ── Booking config: per-service minimum advance time ──────────────────────
+  await run('column: services.min_advance_minutes',
+    `ALTER TABLE services ADD COLUMN IF NOT EXISTS min_advance_minutes INTEGER`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

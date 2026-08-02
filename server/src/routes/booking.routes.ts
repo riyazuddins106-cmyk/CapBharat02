@@ -11,6 +11,18 @@ import { getPaymentForBooking, submitPayment, createRazorpayOrder, createStripeS
 
 const router = Router();
 
+// ── Public endpoint — booking config (no auth required) ───────────────────
+router.get('/config', asyncHandler(async (_req, res) => {
+  const { db } = await import('../config/database.js');
+  const { platformSettings } = await import('../database/schema/index.js');
+  const { eq } = await import('drizzle-orm');
+  const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
+  const cfg = row ? JSON.parse(row.value) : {
+    minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 7, openingHour: 9, closingHour: 20,
+  };
+  res.json({ success: true, data: cfg });
+}));
+
 router.use(authenticate);
 
 router.get('/', bookingController.list);
