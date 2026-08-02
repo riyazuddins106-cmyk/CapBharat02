@@ -34,11 +34,34 @@ export const bookingController = {
     // ── Reject past slots ────────────────────────────────────────────────────
     if (when <= new Date()) throw AppError.badRequest('The selected time slot is in the past. Please choose a future slot.');
 
-    // ── Load booking config and validate minimum advance time ─────────────────
+    // ── Load booking config and validate all rules ────────────────────────────
     const { platformSettings } = await import('../database/schema/index.js');
     const [cfgRow] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
-    const bookingCfg = cfgRow ? JSON.parse(cfgRow.value) : { minAdvanceMinutes: 30 };
-    const globalMinAdvance: number = bookingCfg.minAdvanceMinutes ?? 30;
+    const bookingCfg = cfgRow ? JSON.parse(cfgRow.value) : {};
+    const globalMinAdvance: number  = bookingCfg.minAdvanceMinutes ?? 30;
+    const sameDayBooking: boolean   = bookingCfg.sameDayBooking !== false; // default true
+    const maxAdvanceDays: number    = bookingCfg.maxAdvanceDays ?? 30;
+    const openingHour: number       = bookingCfg.openingHour ?? 8;
+    const closingHour: number       = bookingCfg.closingHour ?? 20;
+
+    // ── Same-day booking check ────────────────────────────────────────────────
+    const nowDate = new Date();
+    const isToday = when.toDateString() === nowDate.toDateString();
+    if (isToday && !sameDayBooking) {
+      throw AppError.badRequest('Same-day bookings are not available. Please choose a future date.');
+    }
+
+    // ── Max advance days check ────────────────────────────────────────────────
+    const maxDate = new Date(nowDate.getTime() + maxAdvanceDays * 24 * 60 * 60 * 1000);
+    if (when > maxDate) {
+      throw AppError.badRequest(`Bookings can only be made up to ${maxAdvanceDays} days in advance.`);
+    }
+
+    // ── Business hours check ──────────────────────────────────────────────────
+    const slotHour = when.getHours();
+    if (slotHour < openingHour || slotHour >= closingHour) {
+      throw AppError.badRequest(`Bookings are only available between ${openingHour}:00 and ${closingHour}:00.`);
+    }
 
     const [cart] = await db.select().from(carts).where(eq(carts.customerId, req.user!.userId)).limit(1);
     if (!cart) throw AppError.badRequest('Your cart is empty.');

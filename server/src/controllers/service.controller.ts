@@ -21,6 +21,7 @@ function formatService(row: any, cat: any, sub: any) {
     partnerPayout:       row.partnerPayout,
     commission:          row.commission,
     duration:            row.duration,
+    minAdvanceMinutes:   row.minAdvanceMinutes ?? null,
     requiredSkill:       row.requiredSkill,
     badge:               row.badge,
     featured:            row.featured,
@@ -116,12 +117,14 @@ export const serviceController = {
       categoryId, subCategoryId, name, description,
       images, customerPrice, partnerPayout, duration, requiredSkill, isActive,
       whatIncluded, whatNotIncluded, serviceProcess, requirements, importantNotes, cancellationPolicy,
+      minAdvanceMinutes,
     } = req.body as {
       categoryId: string; subCategoryId?: string; name: string; description?: string;
       images?: string[]; customerPrice: number; partnerPayout: number;
       duration?: number; requiredSkill?: string; isActive?: boolean;
       whatIncluded?: string; whatNotIncluded?: string; serviceProcess?: string;
       requirements?: string; importantNotes?: string; cancellationPolicy?: string;
+      minAdvanceMinutes?: number | null;
     };
 
     if (!name?.trim())      throw AppError.badRequest('Name is required');
@@ -147,6 +150,7 @@ export const serviceController = {
       partnerPayout:       pPayout,
       commission,
       duration:            Number(duration ?? 60),
+      minAdvanceMinutes:   minAdvanceMinutes != null ? Number(minAdvanceMinutes) : null,
       requiredSkill:       requiredSkill?.trim() || null,
       isActive:            isActive !== false,
       whatIncluded:        whatIncluded || null,
@@ -182,6 +186,7 @@ export const serviceController = {
       name, categoryId, subCategoryId, description,
       images, customerPrice, partnerPayout, duration, requiredSkill, isActive,
       whatIncluded, whatNotIncluded, serviceProcess, requirements, importantNotes, cancellationPolicy,
+      minAdvanceMinutes,
     } = req.body as Record<string, any>;
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -192,6 +197,7 @@ export const serviceController = {
     if (images        !== undefined) patch.images        = Array.isArray(images) ? images : [];
     if (isActive      !== undefined) patch.isActive      = Boolean(isActive);
     if (duration      !== undefined) patch.duration      = Number(duration);
+    if (minAdvanceMinutes !== undefined) patch.minAdvanceMinutes = minAdvanceMinutes === null ? null : Number(minAdvanceMinutes);
     if (requiredSkill         !== undefined) patch.requiredSkill       = requiredSkill?.trim() || null;
     if (whatIncluded         !== undefined) patch.whatIncluded        = whatIncluded || null;
     if (whatNotIncluded      !== undefined) patch.whatNotIncluded     = whatNotIncluded || null;

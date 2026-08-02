@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, Platform,
@@ -9,9 +9,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { cartApi, addressesApi, type Cart, type Address } from '@/lib/api';
+import { cartApi, addressesApi, API_BASE, type Cart, type Address } from '@/lib/api';
 import { setPendingPayId } from '@/lib/pendingPayment';
 import { TIME_SLOTS, SLOT_HOURS } from '@servenow/shared';
+
+type BookingConfig = {
+  minAdvanceMinutes: number;
+  sameDayBooking: boolean;
+  maxAdvanceDays: number;
+  openingHour: number;
+  closingHour: number;
+};
+const DEFAULT_BOOKING_CONFIG: BookingConfig = {
+  minAdvanceMinutes: 30,
+  sameDayBooking: true,
+  maxAdvanceDays: 30,
+  openingHour: 8,
+  closingHour: 20,
+};
 
 function buildScheduledAt(dateLabel: string, slotLabel: string): string {
   const hour = SLOT_HOURS[slotLabel] ?? 9;
@@ -69,6 +84,53 @@ export default function CheckoutScreen() {
   const [done, setDone] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdBookingPrice, setCreatedBookingPrice] = useState<number | null>(null);
+
+  // ── Fetch booking config (public, no auth) ────────────────────────────────
+  const { data: bookingConfig = DEFAULT_BOOKING_CONFIG } = useQuery<BookingConfig>({
+    queryKey: ['/api/booking-config'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/booking-config`);
+      const json = await res.json();
+      return json.data ?? DEFAULT_BOOKING_CONFIG;
+    },
+    staleTime: 5 * 60 * 1000, // cache 5 min — changes are infrequent
+  });
+
+  // ── Compute disabled slots for the selected date ───────────────────────────
+  const disabledSlots = useMemo<Set<string>>(() => {
+    const disabled = new Set<string>();
+    const now = new Date();
+    const isToday = selectedDate === 'Today';
+
+    // If same-day booking is off and today is selected, all slots are blocked
+    if (isToday && !bookingConfig.sameDayBooking) {
+      TIME_SLOTS.forEach(s => disabled.add(s));
+      return disabled;
+    }
+
+    // For future dates only check business hours; for today also check advance time
+    const earliestHour = isToday
+      ? (now.getHours() + (now.getMinutes() + bookingConfig.minAdvanceMinutes) / 60)
+      : 0;
+
+    TIME_SLOTS.forEach(slot => {
+      const slotHour = SLOT_HOURS[slot] ?? 0;
+      if (slotHour < bookingConfig.openingHour || slotHour >= bookingConfig.closingHour) {
+        disabled.add(slot); // outside business hours
+      } else if (isToday && slotHour < earliestHour) {
+        disabled.add(slot); // too soon
+      }
+    });
+    return disabled;
+  }, [selectedDate, bookingConfig]);
+
+  // Auto-select first available slot when date or config changes
+  useEffect(() => {
+    if (disabledSlots.has(selectedSlot)) {
+      const first = TIME_SLOTS.find(s => !disabledSlots.has(s));
+      if (first) setSelectedSlot(first);
+    }
+  }, [disabledSlots]);
 
   const { data: cart, isLoading: cartLoading } = useQuery({
     queryKey: ['/api/cart', accessToken],
@@ -307,27 +369,49 @@ export default function CheckoutScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
               Pick a time for {selectedDate}
             </Text>
+            {selectedDate === 'Today' && !bookingConfig.sameDayBooking && (
+              <View style={{ backgroundColor: '#FEF3C7', borderRadius: 10, padding: 10, marginBottom: 4 }}>
+                <Text style={{ color: '#92400E', fontSize: 12, textAlign: 'center' }}>
+                  Same-day bookings are not available. Please go back and select a future date.
+                </Text>
+              </View>
+            )}
             <View style={styles.slotGrid}>
               {TIME_SLOTS.map((slot) => {
                 const selected = selectedSlot === slot;
+                const disabled = disabledSlots.has(slot);
                 return (
                   <TouchableOpacity
                     key={slot}
-                    onPress={() => setSelectedSlot(slot)}
+                    onPress={() => !disabled && setSelectedSlot(slot)}
+                    disabled={disabled}
                     style={[styles.slotChip, {
-                      backgroundColor: selected ? colors.primary : colors.card,
-                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: disabled ? colors.muted : selected ? colors.primary : colors.card,
+                      borderColor: disabled ? colors.border : selected ? colors.primary : colors.border,
+                      opacity: disabled ? 0.45 : 1,
                     }]}
                   >
-                    <Ionicons name="time-outline" size={16} color={selected ? '#fff' : colors.mutedForeground} />
-                    <Text style={[styles.slotText, { color: selected ? '#fff' : colors.foreground }]}>{slot}</Text>
+                    <Ionicons name="time-outline" size={16} color={disabled ? colors.mutedForeground : selected ? '#fff' : colors.mutedForeground} />
+                    <Text style={[styles.slotText, { color: disabled ? colors.mutedForeground : selected ? '#fff' : colors.foreground }]}>{slot}</Text>
+                    {disabled && <Text style={{ fontSize: 9, color: colors.mutedForeground, marginTop: 2 }}>Unavailable</Text>}
                   </TouchableOpacity>
                 );
               })}
             </View>
-            <TouchableOpacity onPress={() => setStep(4)} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-              <Text style={styles.primaryBtnText}>Continue →</Text>
-            </TouchableOpacity>
+            {disabledSlots.size === TIME_SLOTS.length ? (
+              <TouchableOpacity onPress={() => setStep(2)} style={[styles.outlineBtn, { borderColor: colors.primary }]}>
+                <Ionicons name="arrow-back" size={16} color={colors.primary} />
+                <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Choose Another Date</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => !disabledSlots.has(selectedSlot) && setStep(4)}
+                disabled={disabledSlots.has(selectedSlot)}
+                style={[styles.primaryBtn, { backgroundColor: disabledSlots.has(selectedSlot) ? colors.muted : colors.primary }]}
+              >
+                <Text style={[styles.primaryBtnText, { color: disabledSlots.has(selectedSlot) ? colors.mutedForeground : '#fff' }]}>Continue →</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 

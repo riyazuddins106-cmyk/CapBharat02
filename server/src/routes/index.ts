@@ -21,11 +21,33 @@ import serviceRoutes from './service.routes.js';
 import cartRoutes from './cart.routes.js';
 import dispatchRoutes from './dispatch.routes.js';
 import serviceWishlistRoutes from './serviceWishlist.routes.js';
+import { db } from '../config/database.js';
 
 const router = Router();
 
 router.get('/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
+});
+
+// ── Public booking config (no auth required) ──────────────────────────────────
+router.get('/booking-config', async (_req, res) => {
+  try {
+    const { platformSettings } = await import('../database/schema/index.js');
+    const { eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
+    const defaults = {
+      minAdvanceMinutes: 30,
+      sameDayBooking: true,
+      maxAdvanceDays: 30,
+      openingHour: 8,
+      closingHour: 20,
+      slotIntervalMinutes: 120,
+    };
+    const config = row ? { ...defaults, ...JSON.parse(row.value) } : defaults;
+    res.json({ success: true, data: config });
+  } catch {
+    res.json({ success: true, data: { minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 30, openingHour: 8, closingHour: 20, slotIntervalMinutes: 120 } });
+  }
 });
 
 router.use('/auth', authRoutes);

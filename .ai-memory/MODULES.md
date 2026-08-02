@@ -1,118 +1,109 @@
-# ServeNow — Module Reference
+# ServeNow — Module Overview
+> High-level map of every domain module. Create a detail file under `modules/<name>/INDEX.md` the first time you work on that module.
 
-## Authentication
-- **Purpose:** JWT-based login/signup + OTP email verification for customers, partners, and admins
-- **Location:** `server/src/controllers/auth.controller.ts`, `server/src/routes/auth.ts`
-- **Key files:** `server/src/middleware/auth.middleware.ts`, `server/src/utils/jwt.ts`, `server/src/database/schema/refreshTokens.ts`
-- **Related:** Profile, Notifications (push token registration on login)
+---
 
-## Customer App (Mobile)
-- **Purpose:** End-to-end customer experience — browse services, book, pay, track, review
-- **Location:** `apps/mobile/`
-- **Key files:** `apps/mobile/app/(tabs)/index.tsx` (Home), `apps/mobile/app/checkout.tsx`, `apps/mobile/app/auth.tsx`
-- **Related:** Booking, Payment, Services, Reviews, Points
+## Module Map
 
-## Partner App (Mobile)
-- **Purpose:** Partner experience — receive job requests, accept/reject, mark complete, upload docs
-- **Location:** `apps/mobile-partner/`
-- **Key files:** `apps/mobile-partner/app/(tabs)/index.tsx` (Dashboard), `apps/mobile-partner/app/job/`, `apps/mobile-partner/app/documents.tsx`
-- **Related:** Booking, Dispatch, Documents, Earnings
+### 🔐 Auth
+- **Files:** `server/src/controllers/auth.controller.ts`, `server/src/routes/auth.routes.ts`, `server/src/repositories/refreshToken.repository.ts`, `server/src/services/email.service.ts`
+- **Flow:** Register → OTP email verify → Login → JWT access+refresh → Refresh → Logout
+- **Key quirk:** `issueTokenPair` must store the *same* token ID that is signed into the JWT — bug was fixed; do not revert.
+- **Mobile screens:** `apps/mobile/app/auth.tsx`, `apps/mobile-partner/app/auth.tsx`
 
-## Admin Panel
-- **Purpose:** Platform management — services catalog, partner verification, bookings, settings
-- **Location:** `apps/admin-web/`
-- **Key files:** `apps/admin-web/src/app/App.tsx`, `apps/admin-web/src/app/DocumentVerification.tsx`, `apps/admin-web/src/lib/api.ts`
-- **Related:** Services, Categories, Partners, Bookings, Offers
+---
 
-## Customer Web
-- **Purpose:** Web portal for customers to browse and book services
-- **Location:** `apps/customer-web/`
-- **Key files:** `apps/customer-web/src/app/App.tsx`, `apps/customer-web/src/app/CustomerApp.tsx`
-- **Related:** Booking, Services, Payment, Profile
+### 📦 Service Catalog
+- **Files:** `server/src/controllers/category.controller.ts`, `server/src/controllers/service.controller.ts`, `server/src/controllers/subCategory.controller.ts`
+- **Schema:** `categories` → `sub_categories` → `services` → `service_details`
+- **Owned by:** Admin only. Partners do not create services.
+- **Seeded by:** `server/src/database/seed-catalog.ts`
+- **Key quirk:** `featured` and `image_url` columns on `service_categories` may be missing on pre-existing DBs — run `run-column-migration.ts` (ALTER TABLE IF NOT EXISTS).
 
-## Partner Web
-- **Purpose:** Web portal for partners to manage their profile and jobs
-- **Location:** `apps/partner-web/`
-- **Key files:** `apps/partner-web/src/app/App.tsx`, `apps/partner-web/src/lib/`
-- **Related:** Booking, Documents, Profile
+---
 
-## Services & Categories
-- **Purpose:** Admin-managed catalog of services and categories (with sub-categories and images)
-- **Location:** `server/src/controllers/service.controller.ts`, `server/src/controllers/category.controller.ts`, `server/src/controllers/subCategory.controller.ts`
-- **Key files:** `server/src/database/schema/services.ts`, `server/src/database/schema/serviceCategories.ts`
-- **Related:** Booking, Admin Panel, Reels
+### 📅 Booking
+- **Files:** `server/src/controllers/booking.controller.ts`, `server/src/services/booking.service.ts`, `server/src/repositories/booking.repository.ts`
+- **Flow:** Customer picks service → Cart → Checkout (apply points/coupon) → Booking created → Dispatch triggered → Partner accepts → Check-in (QR) → Complete → Review
+- **Statuses:** `pending` → `accepted` → `in_progress` → `completed` | `cancelled`
+- **Mobile:** `apps/mobile/app/checkout.tsx`, `apps/mobile/app/(tabs)/bookings.tsx`
 
-## Booking
-- **Purpose:** Full booking lifecycle: create → dispatch → in-progress → complete → review
-- **Location:** `server/src/controllers/booking.controller.ts`, `server/src/services/booking.service.ts`, `server/src/repositories/booking.repository.ts`
-- **Key files:** `server/src/database/schema/bookings.ts`, `server/src/database/schema/bookingItems.ts`
-- **Related:** Dispatch, Payment, Reviews, Notifications, Points
+---
 
-## Dispatch
-- **Purpose:** Automatically assign an available, skill-matched partner to a new booking
-- **Location:** `server/src/controllers/dispatch.controller.ts`, `server/src/services/dispatch.service.ts`
-- **Key files:** `server/src/routes/dispatch.ts`
-- **Related:** Booking, Partner (availability status), Notifications
+### 🚀 Dispatch
+- **Files:** `server/src/controllers/dispatch.controller.ts`, `server/src/services/dispatch.service.ts`
+- **Flow:** On booking creation, find available partners with matching skills → send push notification → partner accepts/rejects → re-dispatch if rejected
+- **Key field:** Partners need `availability_status = 'available'` and linked services in `partner_services` table.
+- **Seeded by:** `server/src/database/seed-partner-services.ts`
 
-## Payment
-- **Purpose:** Payment processing (Razorpay integration + test-mode bypass), wallet/points redemption
-- **Location:** `server/src/controllers/payment.controller.ts`, `server/src/routes/payment.ts`
-- **Key files:** `server/src/database/schema/payments.ts`
-- **Related:** Booking, Points, Cart
+---
 
-## Notifications
-- **Purpose:** Push notifications to mobile apps via Expo Server SDK
-- **Location:** `server/src/controllers/notification.controller.ts`, `server/src/services/notification.service.ts`
-- **Key files:** `server/src/database/schema/notifications.ts`
-- **Related:** Booking, Dispatch
+### 💳 Payments
+- **Files:** `server/src/controllers/payment.controller.ts`, `server/src/services/payment.service.ts`
+- **Test mode:** Set via `seed-test-mode.ts` — skips real gateway calls in dev.
+- **Real gateway:** Hook is present but not wired to a live provider by default.
 
-## Points & Rewards
-- **Purpose:** Loyalty points — earn on spend (1pt per ₹10), redeem at checkout (1pt = ₹1), min 100pts to redeem
-- **Location:** `server/src/controllers/points.controller.ts`, `server/src/routes/points.ts`
-- **Key files:** `server/src/database/schema/pointsLedger.ts`
-- **Related:** Payment, Booking
+---
 
-## Profile & Users
-- **Purpose:** User profiles, saved addresses, document uploads (partners)
-- **Location:** `server/src/controllers/profile.controller.ts`, `server/src/controllers/address.controller.ts`, `server/src/controllers/document.controller.ts`
-- **Key files:** `server/src/database/schema/users.ts`, `server/src/database/schema/professionals.ts`
-- **Related:** Auth, Booking, Partner verification
+### 🌟 Points & Rewards
+- **Files:** `server/src/controllers/points.controller.ts`, `server/src/services/points.service.ts`
+- **Rules:** Earn 1pt per ₹10 spent. Redeem 1pt = ₹1 discount. Minimum redemption: 100 pts.
+- **Mobile:** `apps/mobile/app/points.tsx`
 
-## Reviews
-- **Purpose:** Customers leave reviews on completed bookings; ratings aggregate on partner profiles
-- **Location:** `server/src/controllers/review.controller.ts`, `server/src/routes/review.ts`
-- **Key files:** `server/src/database/schema/reviews.ts`
-- **Related:** Booking, Partner
+---
 
-## Reels
-- **Purpose:** Short video content linked to services (like Instagram Reels for service discovery)
-- **Location:** `server/src/controllers/reel.controller.ts`, `server/src/routes/reel.ts`
-- **Key files:** `server/src/database/schema/reels.ts`
-- **Related:** Services, Supabase Storage
+### 👑 Admin
+- **Files:** `server/src/controllers/admin.controller.ts`, `server/src/routes/admin.routes.ts`
+- **Frontend:** `apps/admin-web/src/app/` — stats, users, bookings, professionals, categories, offers, reviews, audit-logs, payouts, settings
+- **Auth:** Admin role required on all `/api/admin/*` routes.
 
-## Support Tickets
-- **Purpose:** Customers open support tickets; admins resolve them
-- **Location:** `server/src/controllers/supportTicket.controller.ts`, `server/src/routes/supportTicket.ts`
-- **Key files:** `server/src/database/schema/supportTickets.ts`
-- **Related:** Admin Panel, Profile
+---
 
-## Offers
-- **Purpose:** Promo codes and discount offers applied at checkout
-- **Location:** `server/src/controllers/offer.controller.ts`, `server/src/routes/offer.ts`
-- **Key files:** `server/src/database/schema/offers.ts`
-- **Related:** Payment, Booking, Cart
+### 👷 Partner (mobile)
+- **Files:** `apps/mobile-partner/app/` — auth, job list `(tabs)`, documents, notifications
+- **Flow:** Login → View pending jobs → Accept → Navigate to address → QR check-in → Mark complete → Earnings
+- **Key field:** Partner sends `availabilityStatus` (mobile field name) or `status` (legacy web).
 
-## Cart
-- **Purpose:** Temporary service cart before booking checkout
-- **Location:** `server/src/controllers/cart.controller.ts`, `server/src/routes/cart.ts`
-- **Related:** Booking, Services, Payment
+---
 
-## Favorites / Wishlist
-- **Purpose:** Customers save favorite services and partners
-- **Location:** `server/src/controllers/favorite.controller.ts`, `server/src/controllers/wishlist.controller.ts`
-- **Related:** Services, Professional (partner profiles)
+### 📱 Customer Mobile
+- **Files:** `apps/mobile/app/` — auth, `(tabs)` (home, bookings, profile), checkout, subcategories, service, wishlist, points, addresses, help-support, notifications, privacy-security
+- **Tunneling:** `scripts/expo-tunnel.sh` — auto-detects Replit environment, no ngrok needed on Replit.
+- **Expo SDK:** 54.0.35 — do NOT upgrade to SDK 57 (pnpm release-age policy blocks it and partial upgrades corrupt state).
 
-## Shared Package
-- **Purpose:** Shared TypeScript types and constants used across all apps
-- **Location:** `packages/shared/src/`
-- **Key files:** `packages/shared/src/types/user.ts`, `packages/shared/src/constants/timeSlots.ts`
+---
+
+### 🔔 Notifications
+- **Files:** `server/src/controllers/notification.controller.ts`, `server/src/services/notification.service.ts`
+- **Push:** Expo push tokens stored via `PATCH /api/profile/me/push-token`. Sent on: booking created, partner assigned, job status updates.
+- **In-app:** Stored in `notifications` table, fetched by `GET /api/notifications`.
+
+---
+
+### 🎬 Reels
+- **Files:** `server/src/controllers/reel.controller.ts`, `server/src/routes/reel.routes.ts`
+- **Storage:** Supabase storage bucket. **Do not set `fileSizeLimit`** on the reels bucket — Supabase free plan caps it and the upload fails silently.
+
+---
+
+### 🎫 Offers & Coupons
+- **Files:** `server/src/controllers/offer.controller.ts`
+- **Flow:** Admin creates offer with code → Customer applies at checkout → Discount applied before points.
+
+---
+
+### 🎧 Support Tickets
+- **Files:** `server/src/controllers/supportTicket.controller.ts`
+- **Mobile:** `apps/mobile/app/help-support.tsx`
+
+---
+
+## When to Create a Module Detail File
+
+Create `.ai-memory/modules/<name>/INDEX.md` when you are about to make changes to that module. Include:
+- The exact files you will touch
+- The current flow (as you found it)
+- The change you made and why
+- Any gotchas discovered
+
+This keeps the module files lean until they're actually needed.

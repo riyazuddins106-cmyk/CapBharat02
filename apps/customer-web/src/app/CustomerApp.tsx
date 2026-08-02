@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Search, MapPin, Star, ChevronRight, Bell, Heart, Home, Grid, BookOpen,
@@ -1873,10 +1873,18 @@ function CustServices({
 /* ═══════════════════════════════════════════════════════════════
    CHECKOUT FLOW  (cart → address → date → time → summary → done)
 ═══════════════════════════════════════════════════════════════ */
-const CHECKOUT_TIME_SLOTS = ["9 AM - 11 AM", "11 AM - 1 PM", "2 PM - 4 PM", "4 PM - 6 PM"];
+const CHECKOUT_TIME_SLOTS = ["9 AM - 11 AM", "11 AM - 1 PM", "2 PM - 4 PM", "4 PM - 6 PM", "6 PM - 8 PM"];
 const CHECKOUT_SLOT_HOURS: Record<string, number> = {
-  "9 AM - 11 AM": 9, "11 AM - 1 PM": 11, "2 PM - 4 PM": 14, "4 PM - 6 PM": 16,
+  "9 AM - 11 AM": 9, "11 AM - 1 PM": 11, "2 PM - 4 PM": 14, "4 PM - 6 PM": 16, "6 PM - 8 PM": 18,
 };
+
+type CheckoutBookingConfig = {
+  minAdvanceMinutes: number;
+  sameDayBooking: boolean;
+  openingHour: number;
+  closingHour: number;
+};
+const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = { minAdvanceMinutes: 30, sameDayBooking: true, openingHour: 8, closingHour: 20 };
 
 function buildSlotScheduledAt(dateLabel: string, slotLabel: string): string {
   const hour = CHECKOUT_SLOT_HOURS[slotLabel] ?? 9;
@@ -1926,6 +1934,43 @@ function CheckoutFlow({ cart, onClose, onChange }: {
   const [selectedSlot, setSelectedSlot] = useState("9 AM - 11 AM");
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
+  const [bookingCfg, setBookingCfg] = useState<CheckoutBookingConfig>(DEFAULT_CHECKOUT_CFG);
+
+  // Fetch booking config once (public endpoint, no auth)
+  useEffect(() => {
+    fetch('/api/booking-config')
+      .then(r => r.json())
+      .then(json => { if (json?.data) setBookingCfg(prev => ({ ...prev, ...json.data })); })
+      .catch(() => {});
+  }, []);
+
+  // Compute disabled slots for the selected date
+  const disabledSlots = useMemo(() => {
+    const now = new Date();
+    const isToday = selectedDate === 'Today';
+    const disabled = new Set<string>();
+    if (isToday && !bookingCfg.sameDayBooking) {
+      CHECKOUT_TIME_SLOTS.forEach(s => disabled.add(s));
+      return disabled;
+    }
+    const earliestHour = isToday
+      ? now.getHours() + (now.getMinutes() + bookingCfg.minAdvanceMinutes) / 60
+      : 0;
+    CHECKOUT_TIME_SLOTS.forEach(slot => {
+      const h = CHECKOUT_SLOT_HOURS[slot] ?? 0;
+      if (h < bookingCfg.openingHour || h >= bookingCfg.closingHour) disabled.add(slot);
+      else if (isToday && h < earliestHour) disabled.add(slot);
+    });
+    return disabled;
+  }, [selectedDate, bookingCfg]);
+
+  // Auto-select first available slot when date/config changes
+  useEffect(() => {
+    if (disabledSlots.has(selectedSlot)) {
+      const first = CHECKOUT_TIME_SLOTS.find(s => !disabledSlots.has(s));
+      if (first) setSelectedSlot(first);
+    }
+  }, [disabledSlots]);
   const [bookingDone, setBookingDone] = useState(false);
   const [createdBooking, setCreatedBooking] = useState<ApiBooking | null>(null);
   const [payAfterBook, setPayAfterBook] = useState(false);
@@ -2186,30 +2231,54 @@ function CheckoutFlow({ cart, onClose, onChange }: {
           {step === 3 && (
             <>
               <p className="text-xs font-bold text-gray-500 mb-3">Pick a time for {selectedDate}</p>
+              {selectedDate === 'Today' && !bookingCfg.sameDayBooking && (
+                <div className="mb-3 px-3 py-2 rounded-xl text-xs font-medium bg-amber-50 border border-amber-200 text-amber-700">
+                  Same-day bookings are unavailable. Please go back and select a future date.
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 mb-5">
-                {CHECKOUT_TIME_SLOTS.map((slot) => (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedSlot(slot)}
-                    className="py-4 rounded-2xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1.5"
-                    style={{
-                      borderColor: selectedSlot === slot ? "#5B3EF5" : "rgba(0,0,0,0.08)",
-                      background: selectedSlot === slot ? "#5B3EF5" : "#FAFAFA",
-                      color: selectedSlot === slot ? "#fff" : "#374151",
-                    }}
-                  >
-                    <Clock size={16} color={selectedSlot === slot ? "#fff" : "#9CA3AF"} />
-                    {slot}
-                  </button>
-                ))}
+                {CHECKOUT_TIME_SLOTS.map((slot) => {
+                  const isDisabled = disabledSlots.has(slot);
+                  const isSelected = selectedSlot === slot;
+                  return (
+                    <button
+                      key={slot}
+                      onClick={() => !isDisabled && setSelectedSlot(slot)}
+                      disabled={isDisabled}
+                      className="py-4 rounded-2xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1.5"
+                      style={{
+                        borderColor: isDisabled ? "rgba(0,0,0,0.05)" : isSelected ? "#5B3EF5" : "rgba(0,0,0,0.08)",
+                        background: isDisabled ? "#F3F4F6" : isSelected ? "#5B3EF5" : "#FAFAFA",
+                        color: isDisabled ? "#D1D5DB" : isSelected ? "#fff" : "#374151",
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                        opacity: isDisabled ? 0.6 : 1,
+                      }}
+                    >
+                      <Clock size={16} color={isDisabled ? "#D1D5DB" : isSelected ? "#fff" : "#9CA3AF"} />
+                      {slot}
+                      {isDisabled && <span style={{ fontSize: 10, color: "#D1D5DB" }}>Unavailable</span>}
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                onClick={() => setStep(4)}
-                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
-              >
-                Continue <ArrowRight size={16} />
-              </button>
+              {disabledSlots.size === CHECKOUT_TIME_SLOTS.length ? (
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full py-3.5 rounded-2xl text-sm font-bold border-2 flex items-center justify-center gap-2"
+                  style={{ borderColor: "#5B3EF5", color: "#5B3EF5" }}
+                >
+                  ← Choose Another Date
+                </button>
+              ) : (
+                <button
+                  onClick={() => !disabledSlots.has(selectedSlot) && setStep(4)}
+                  disabled={disabledSlots.has(selectedSlot)}
+                  className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+                >
+                  Continue <ArrowRight size={16} />
+                </button>
+              )}
             </>
           )}
 

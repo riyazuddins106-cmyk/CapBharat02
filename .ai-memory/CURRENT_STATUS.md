@@ -1,52 +1,105 @@
 # ServeNow — Current Status
+> Update this file at the end of every session. It is the fastest way for a new session to know what's done and what's next.
 
-*Last updated: 2026-08-02*
+---
 
-## Completed Modules
+## Overall Completion: ~95%
 
-| Module | Status | Notes |
-|---|---|---|
-| Authentication | ✅ Complete | JWT + OTP email, refresh tokens, all user roles |
-| Services & Categories | ✅ Complete | Admin catalog, sub-categories, category images |
-| Booking (core) | ✅ Complete | Create, view, cancel, complete lifecycle |
-| Dispatch | ✅ Complete | Auto-assign available skill-matched partner |
-| Payment | ✅ Complete | Razorpay integration + test-mode bypass |
-| Admin Panel | ✅ Complete | Dashboard, bookings, partners, doc verification |
-| Customer Web | ✅ Complete | Browse, book, pay, track bookings |
-| Partner Web | ✅ Complete | Jobs, earnings, profile, document upload |
-| Customer Mobile | ✅ Complete | Full Expo app with Expo Router |
-| Partner Mobile | ✅ Complete | Full Expo app with Expo Router |
-| Notifications | ✅ Complete | Expo push notifications (server-side) |
-| Points & Rewards | ✅ Complete | Earn on spend, redeem at checkout |
-| Reviews | ✅ Complete | Post-booking customer reviews |
-| Reels | ✅ Complete | Short video content linked to services |
-| Support Tickets | ✅ Complete | Create/resolve customer support tickets |
-| Offers | ✅ Complete | Promo codes at checkout |
-| Cart | ✅ Complete | Pre-booking service cart |
-| Favorites / Wishlist | ✅ Complete | Save favorite services and partners |
-| Profile & Addresses | ✅ Complete | User profiles, multiple saved addresses |
-| Document Verification | ✅ Complete | Partner doc upload + admin approval flow |
+The platform is feature-complete and end-to-end tested. All core flows work. The main gap is **missing Supabase secrets** in this Replit environment — the app cannot connect to a database until those are added.
 
-## Known Issues / Quirks
+---
 
-- **Expo native modules:** Always run `expo install --check` / `--fix` after adding native modules — do not hand-pin versions. (See `.agents/memory/expo-native-module-drift.md`)
-- **pnpm + Metro React duplication:** React resolution forced via `resolveRequest` in metro.config, not `extraNodeModules`. Do not change this.
-- **expo-keep-awake:** Stubbed in metro.config `resolveRequest` FORCED_MODULES — removing from package.json alone is not sufficient.
-- **Reels file upload:** Supabase bucket `fileSizeLimit` must be omitted for the reels bucket (plan cap constraint).
-- **Partner availability field:** API accepts both `availabilityStatus` (mobile) and `status` (legacy web).
-- **DATABASE_URL alias:** Server maps `DATABASE_URL` → `SUPABASE_DATABASE_URL` internally; always use `DATABASE_URL` as the secret name.
+## ✅ Completed Features
 
-## Development State
+### Backend (server/)
+- [x] JWT auth with access + refresh tokens (OTP email verification)
+- [x] User roles: admin / customer / partner
+- [x] Service catalog: categories, sub-categories, services, service details
+- [x] Bookings: create, view, cancel, reschedule, QR check-in
+- [x] Dispatch engine: auto-matches available partners by skills
+- [x] Partner management: availability, skills, jobs, earnings, payouts
+- [x] Payments: test mode + real gateway hooks
+- [x] Points & Rewards: earn on booking, redeem at checkout (1pt/₹10 earn, 1pt=₹1 redeem, min 100)
+- [x] Reviews: customers rate completed bookings
+- [x] Offers & Coupons: admin creates, customers apply at checkout
+- [x] Favorites & Wishlists
+- [x] Addresses: CRUD with default address
+- [x] Notifications: in-app + Expo push notifications
+- [x] Support tickets
+- [x] Platform policies (terms, privacy, etc.)
+- [x] Platform settings (admin-controlled)
+- [x] Reels: short video content for services
+- [x] Audit logs (admin)
+- [x] Admin stats dashboard
 
-The platform is feature-complete for an MVP marketplace. All core flows (browse → book → pay → dispatch → complete → review) are end-to-end functional and tested.
+### Customer Web (apps/customer-web)
+- [x] Browse categories & services
+- [x] Book a service
+- [x] My bookings
+- [x] Profile & addresses
+- [x] Points balance
 
-The project runs as a Replit development preview. No production deployment is required for development.
+### Admin Panel (apps/admin-web)
+- [x] Stats dashboard
+- [x] User management
+- [x] Booking management
+- [x] Professional management
+- [x] Category & service management
+- [x] Offers management
+- [x] Payout management
+- [x] Audit logs
+- [x] Platform settings
 
-## To Run Locally on Replit
+### Partner Web (apps/partner-web)
+- [x] Partner portal (view jobs, manage availability)
 
-1. Set `DATABASE_URL` secret (Supabase Postgres connection string)
-2. Set `SESSION_SECRET` secret (any long random string)
-3. Run migrations: `pnpm --filter @servenow/server exec tsx src/database/migrate.ts`
-4. Seed catalog: `pnpm --filter @servenow/server exec tsx src/database/seed-catalog.ts`
-5. Seed test accounts: `pnpm --filter @servenow/server exec tsx src/database/seed-test-accounts.ts`
-6. Start "Start application" workflow (server + customer-web on ports 8000 + 5000)
+### Customer Mobile (apps/mobile)
+- [x] Auth (login, register, OTP verify)
+- [x] Home with categories + reels
+- [x] Sub-categories drill-down
+- [x] Service listing & detail
+- [x] Booking & checkout (with points redemption)
+- [x] My bookings with QR code
+- [x] Addresses
+- [x] Wishlist / Favorites
+- [x] Points & Rewards screen
+- [x] Notifications
+- [x] Help & Support (tickets)
+- [x] Privacy & Security
+
+### Partner Mobile (apps/mobile-partner)
+- [x] Auth
+- [x] Job list (new / accepted / completed)
+- [x] Job acceptance / check-in (QR scan) / completion
+- [x] Document upload
+- [x] Notifications
+
+---
+
+## ⚠️ Pending / Needs Attention
+
+| Item | Details |
+|------|---------|
+| **DATABASE_URL secret** | Not set in this Replit environment. App won't start without it. Add Supabase Postgres connection string. |
+| **Other Supabase secrets** | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` also needed. |
+| **JWT secrets** | `JWT_SECRET` and `JWT_REFRESH_SECRET` needed. |
+| **Email (SMTP)** | Optional — OTP codes log to console if not set. |
+| **EAS projectId** | Not set — push tokens use Expo Go anonymous identity. Needed only for standalone builds. |
+| **Dependencies** | Run `pnpm install --frozen-lockfile` before first start. |
+
+---
+
+## 🔄 Last Session Summary
+- Created `.ai-memory/` folder with MASTER_INDEX, CURRENT_STATUS, and MODULES documentation.
+- No code changes made.
+- User wants to make specific changes/add features in future sessions.
+
+---
+
+## 📋 How to Start a New Session
+
+1. Read `MASTER_INDEX.md` — understand the project map.
+2. Read this file — know what's done and what's pending.
+3. Check `MODULES.md` for the relevant domain.
+4. If a module detail file exists under `modules/<name>/`, read it.
+5. Make changes, then update this file and the relevant module file.

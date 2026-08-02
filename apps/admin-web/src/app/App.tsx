@@ -567,8 +567,9 @@ const ADMIN_SIDEBAR = [
   { id: "payment-config", icon: CreditCard,  label: "Payment Config", adminOnly: true },
   { id: "email-config",   icon: Mail,        label: "Email Config",   adminOnly: true },
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config",     adminOnly: true },
-  { id: "otp-settings",   icon: KeyRound,    label: "OTP Settings",   adminOnly: true },
-  { id: "settings",       icon: Settings,    label: "Settings",       adminOnly: true },
+  { id: "otp-settings",       icon: KeyRound,    label: "OTP Settings",       adminOnly: true },
+  { id: "booking-settings",   icon: Clock,       label: "Booking Settings",   adminOnly: true },
+  { id: "settings",           icon: Settings,    label: "Settings",           adminOnly: true },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -1051,6 +1052,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             isAdmin ? <SmsConfigView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "otp-settings" ? (
             isAdmin ? <OtpSettingsView accessToken={accessToken} /> : <AccessDenied />
+          ) : activeSection === "booking-settings" ? (
+            isAdmin ? <BookingSettingsView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
           ) : activeSection === "payouts" ? (
@@ -5699,6 +5702,204 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
    SETTINGS
 ═══════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════
+   BOOKING SETTINGS
+═══════════════════════════════════════════════════════════════════ */
+
+type BookingCfg = {
+  minAdvanceMinutes: number;
+  sameDayBooking: boolean;
+  maxAdvanceDays: number;
+  openingHour: number;
+  closingHour: number;
+  slotIntervalMinutes: number;
+};
+const DEFAULT_BOOKING_CFG: BookingCfg = {
+  minAdvanceMinutes: 30,
+  sameDayBooking: true,
+  maxAdvanceDays: 30,
+  openingHour: 8,
+  closingHour: 20,
+  slotIntervalMinutes: 120,
+};
+
+function BookingSettingsView({ accessToken }: { accessToken: string }) {
+  const [cfg, setCfg]         = useState<BookingCfg>(DEFAULT_BOOKING_CFG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi.getSettings("booking_config", accessToken)
+      .then(res => setCfg(prev => ({ ...prev, ...(res.value as Partial<BookingCfg>) })))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  const showMsg = (text: string, type: "success" | "error") => {
+    setMsg({ text, type });
+    setTimeout(() => setMsg(null), 5000);
+  };
+
+  const save = async () => {
+    if (cfg.openingHour >= cfg.closingHour) {
+      showMsg("Opening hour must be before closing hour.", "error"); return;
+    }
+    setSaving(true);
+    try {
+      await adminApi.saveSettings("booking_config", cfg, accessToken);
+      showMsg("Booking settings saved. Changes take effect immediately.", "success");
+    } catch {
+      showMsg("Failed to save. Please try again.", "error");
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48">
+      <Loader2 size={28} className="animate-spin text-violet-500" />
+    </div>
+  );
+
+  return (
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-xl space-y-5">
+      <div className="mb-1">
+        <h2 className="text-white font-bold text-base">Booking Settings</h2>
+        <p className="text-white/40 text-xs mt-0.5">
+          Control when customers can book. All rules apply to new bookings only — existing bookings are not affected.
+        </p>
+      </div>
+
+      {msg && (
+        <div className="px-3 py-2 rounded-lg text-xs font-medium border" style={{ background: msg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: msg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: msg.type === "error" ? "#f87171" : "#4ade80" }}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* ── Minimum Advance Time ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold flex items-center gap-2">
+          <Clock size={15} className="text-violet-400" /> Minimum Advance Booking Time
+        </h3>
+        <p className="text-white/40 text-xs -mt-2">
+          How far in advance a customer must book, relative to the current time. Individual services can override this.
+        </p>
+        <div>
+          <Field label="Global Default (minutes)">
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={0} max={240} step={15}
+                value={cfg.minAdvanceMinutes}
+                onChange={e => setCfg(c => ({ ...c, minAdvanceMinutes: Number(e.target.value) }))}
+                className="flex-1 accent-violet-500"
+              />
+              <span className="text-white font-bold text-sm w-16 text-right">
+                {cfg.minAdvanceMinutes} min
+              </span>
+            </div>
+          </Field>
+          <p className="text-white/30 text-xs mt-1">
+            Example: 30 min → if now is 3:43 PM, earliest slot is 4:13 PM (rounds to 4:30 PM slot). Default: 30 minutes.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Same-Day & Advance Window ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold">Booking Window</h3>
+
+        <div className="flex items-center justify-between py-2 border-b border-white/[0.05]">
+          <div>
+            <p className="text-white/80 text-sm font-medium">Allow Same-Day Bookings</p>
+            <p className="text-white/40 text-xs mt-0.5">If off, customers cannot book for today — must choose tomorrow or later.</p>
+          </div>
+          <ToggleSwitch checked={cfg.sameDayBooking} onChange={v => setCfg(c => ({ ...c, sameDayBooking: v }))} />
+        </div>
+
+        <div>
+          <Field label="Maximum Advance Booking (days)">
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={1} max={90} step={1}
+                value={cfg.maxAdvanceDays}
+                onChange={e => setCfg(c => ({ ...c, maxAdvanceDays: Number(e.target.value) }))}
+                className="flex-1 accent-violet-500"
+              />
+              <span className="text-white font-bold text-sm w-16 text-right">
+                {cfg.maxAdvanceDays} days
+              </span>
+            </div>
+          </Field>
+          <p className="text-white/30 text-xs mt-1">
+            Customers cannot book more than this many days in the future. Default: 30 days.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Business Hours ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold">Business Hours</h3>
+        <p className="text-white/40 text-xs -mt-2">Bookings outside these hours are rejected at checkout.</p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Field label="Opening Hour (24h)">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range" min={0} max={12} step={1}
+                  value={cfg.openingHour}
+                  onChange={e => setCfg(c => ({ ...c, openingHour: Number(e.target.value) }))}
+                  className="flex-1 accent-violet-500"
+                />
+                <span className="text-white font-bold text-sm w-12 text-right">
+                  {cfg.openingHour}:00
+                </span>
+              </div>
+            </Field>
+          </div>
+          <div>
+            <Field label="Closing Hour (24h)">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range" min={12} max={23} step={1}
+                  value={cfg.closingHour}
+                  onChange={e => setCfg(c => ({ ...c, closingHour: Number(e.target.value) }))}
+                  className="flex-1 accent-violet-500"
+                />
+                <span className="text-white font-bold text-sm w-12 text-right">
+                  {cfg.closingHour}:00
+                </span>
+              </div>
+            </Field>
+          </div>
+        </div>
+        <p className="text-white/30 text-xs">
+          Current window: {cfg.openingHour}:00 – {cfg.closingHour}:00
+          {cfg.openingHour >= cfg.closingHour && <span className="text-red-400 ml-2">⚠ Opening must be before closing</span>}
+        </p>
+      </div>
+
+      {/* Info */}
+      <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 text-xs text-violet-300 space-y-1">
+        <p className="font-semibold text-violet-400">How it works</p>
+        <p>• Minimum advance time is enforced on both frontend (slot disabling) and backend (API validation).</p>
+        <p>• Service-specific overrides take precedence over this global setting.</p>
+        <p>• Changes apply immediately — no restart needed.</p>
+        <p>• Existing bookings are never modified by these settings.</p>
+      </div>
+
+      <button
+        onClick={save}
+        disabled={saving}
+        className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+        style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+      >
+        {saving ? "Saving…" : "Save Booking Settings"}
+      </button>
+    </div>
+  );
+}
+
 function SettingsView({ user }: { user: AdminUser }) {
   return (
     <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-lg space-y-4">
@@ -6263,12 +6464,14 @@ type SvcForm = {
   name: string; categoryId: string; subCategoryId: string;
   description: string; customerPrice: string; partnerPayout: string;
   duration: string; requiredSkill: string; isActive: boolean;
+  minAdvanceMinutes: string;
   whatIncluded: string; whatNotIncluded: string; serviceProcess: string;
   requirements: string; importantNotes: string; cancellationPolicy: string;
 };
 const EMPTY_SVC: SvcForm = {
   name: "", categoryId: "", subCategoryId: "", description: "",
   customerPrice: "", partnerPayout: "", duration: "60", requiredSkill: "", isActive: true,
+  minAdvanceMinutes: "",
   whatIncluded: "", whatNotIncluded: "", serviceProcess: "",
   requirements: "", importantNotes: "", cancellationPolicy: "",
 };
@@ -6329,6 +6532,25 @@ function ServiceFormFields({
           <TextInput value={form.requiredSkill} onChange={v => setForm(f => ({ ...f, requiredSkill: v }))} placeholder="e.g. Floor Cleaning" />
         </Field>
       </div>
+      <Field label="Min. Advance Booking Time (minutes)">
+        <div className="space-y-1">
+          <SelectInput
+            value={form.minAdvanceMinutes === "" ? "__global__" : form.minAdvanceMinutes}
+            onChange={v => setForm(f => ({ ...f, minAdvanceMinutes: v === "__global__" ? "" : v }))}
+          >
+            <option value="__global__">Use Global Default</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="45">45 minutes</option>
+            <option value="60">60 minutes</option>
+            <option value="90">90 minutes</option>
+            <option value="120">120 minutes</option>
+          </SelectInput>
+          <p className="text-white/30 text-[10px]">
+            Overrides the global minimum for this service only. "Use Global Default" inherits from Booking Settings.
+          </p>
+        </div>
+      </Field>
       <div className="flex items-center gap-3 cursor-pointer" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}>
         <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.isActive ? "bg-violet-600" : "bg-white/10"}`}>
           <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.isActive ? "translate-x-5" : ""}`} />
@@ -6400,6 +6622,7 @@ function ServicesView({
       description: s.description ?? "", customerPrice: String(s.customerPrice),
       partnerPayout: String(s.partnerPayout), duration: String(s.duration),
       requiredSkill: s.requiredSkill ?? "", isActive: s.isActive,
+      minAdvanceMinutes: s.minAdvanceMinutes != null ? String(s.minAdvanceMinutes) : "",
       whatIncluded: s.whatIncluded ?? "", whatNotIncluded: s.whatNotIncluded ?? "",
       serviceProcess: s.serviceProcess ?? "", requirements: s.requirements ?? "",
       importantNotes: s.importantNotes ?? "", cancellationPolicy: s.cancellationPolicy ?? "",
@@ -6416,6 +6639,7 @@ function ServicesView({
     duration: Number(f.duration) || 60,
     requiredSkill: f.requiredSkill || undefined,
     isActive: f.isActive,
+    minAdvanceMinutes: f.minAdvanceMinutes ? Number(f.minAdvanceMinutes) : null,
     whatIncluded: f.whatIncluded || undefined,
     whatNotIncluded: f.whatNotIncluded || undefined,
     serviceProcess: f.serviceProcess || undefined,
