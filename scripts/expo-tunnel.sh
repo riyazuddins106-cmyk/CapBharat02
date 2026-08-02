@@ -209,8 +209,11 @@ QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
       sleep 1
     fi
 
-    prewarm_bundles "$PORT" &
-    PREWARM_PID=$!
+    # NOTE: prewarm_bundles disabled in Replit-native mode.
+    # The two parallel 180-s curl downloads consume all container RAM,
+    # triggering the OOM killer which SIGKILLs expo → tunnel dies →
+    # new subdomain → stale QR → "failed to download" in Expo Go.
+    PREWARM_PID=""
 
     _FIFO="$(mktemp -u -p /tmp expo_stdin_XXXXXX)"
     mkfifo "$_FIFO"

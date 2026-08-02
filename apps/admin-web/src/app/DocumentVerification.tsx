@@ -1396,7 +1396,7 @@ export function DocumentVerificationView({ accessToken }: { accessToken: string 
   }
 
   return (
-    <div>
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6">
       {/* Global toast */}
       {msg && (
         <div

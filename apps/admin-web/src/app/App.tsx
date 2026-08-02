@@ -89,6 +89,30 @@ function TextInput({ value, onChange, type = "text", placeholder }: {
   return (
     <input
       type={type} value={value} onChange={e => onChange(e.target.value)}
+      // Prevent accidental scroll-wheel changes on number inputs
+      onWheel={type === "number" ? e => (e.target as HTMLInputElement).blur() : undefined}
+      placeholder={placeholder}
+      className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+      style={INPUT_STYLE}
+    />
+  );
+}
+
+/** Numeric-only text input — stores value as string, blocks non-numeric chars,
+ *  prevents scroll-wheel from changing the value, and allows transient empty/partial states. */
+function NumberInput({ value, onChange, placeholder, allowDecimal = false }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; allowDecimal?: boolean;
+}) {
+  const pattern = allowDecimal ? /^\d*\.?\d*$/ : /^\d*$/;
+  return (
+    <input
+      type="text"
+      inputMode={allowDecimal ? "decimal" : "numeric"}
+      value={value}
+      onChange={e => {
+        const v = e.target.value;
+        if (v === "" || pattern.test(v)) onChange(v);
+      }}
       placeholder={placeholder}
       className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
       style={INPUT_STYLE}
@@ -4498,7 +4522,7 @@ function AnalyticsView({ stats, accessToken }: { stats: DashboardStats | null; a
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 space-y-6">
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((i) => {
@@ -4818,7 +4842,7 @@ function PaymentConfigView({ accessToken }: { accessToken: string }) {
   ];
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-xl space-y-4">
       <div className="mb-1">
         <h2 className="text-white font-bold text-base">Payment Methods</h2>
         <p className="text-white/40 text-xs mt-0.5">
@@ -5010,7 +5034,7 @@ function EmailConfigView({ accessToken, adminEmail }: { accessToken: string; adm
   ];
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-xl space-y-5">
       <div className="mb-1">
         <h2 className="text-white font-bold text-base">Email Configuration</h2>
         <p className="text-white/40 text-xs mt-0.5">
@@ -5214,7 +5238,7 @@ function SmsConfigView({ accessToken }: { accessToken: string }) {
   );
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-xl space-y-5">
       <div className="mb-1">
         <h2 className="text-white font-bold text-base">SMS Configuration</h2>
         <p className="text-white/40 text-xs mt-0.5">
@@ -5339,7 +5363,7 @@ function OtpSettingsView({ accessToken }: { accessToken: string }) {
   );
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-xl space-y-5">
       <div className="mb-1">
         <h2 className="text-white font-bold text-base">OTP Settings</h2>
         <p className="text-white/40 text-xs mt-0.5">
@@ -5677,7 +5701,7 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
 
 function SettingsView({ user }: { user: AdminUser }) {
   return (
-    <div className="max-w-lg space-y-4">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-lg space-y-4">
       <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
         <h3 className="text-white font-bold text-sm mb-4">Account Info</h3>
         <div className="space-y-4">
@@ -5820,7 +5844,7 @@ function PrivacySecurityView({ user, accessToken, onUserUpdate }: { user: AdminU
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-2xl space-y-6">
       {/* Update Profile */}
       <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
         <div className="flex items-center gap-2 mb-5">
@@ -6112,7 +6136,7 @@ function HelpSupportView({ accessToken }: { accessToken: string }) {
   };
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-3xl space-y-5">
       {msg && (
         <div className="px-3 py-2 rounded-xl text-xs font-medium border" style={{ background: msg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)", borderColor: msg.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)", color: msg.type === "error" ? "#f87171" : "#4ade80" }}>
           {msg.text}
@@ -6249,6 +6273,95 @@ const EMPTY_SVC: SvcForm = {
   requirements: "", importantNotes: "", cancellationPolicy: "",
 };
 
+/** Extracted outside ServicesView so React never unmounts it on parent re-renders (prevents focus loss). */
+function ServiceFormFields({
+  form, setForm, categories, subCats, subCatsLoading, commission,
+}: {
+  form: SvcForm;
+  setForm: React.Dispatch<React.SetStateAction<SvcForm>>;
+  categories: Category[];
+  subCats: SubCategory[];
+  subCatsLoading: boolean;
+  commission: number;
+}) {
+  return (
+    <div className="space-y-4">
+      <Field label="Service Name *">
+        <TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Deep Floor Cleaning" />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Category *">
+          <SelectInput value={form.categoryId} onChange={v => setForm(f => ({ ...f, categoryId: v, subCategoryId: "" }))} >
+            <option value="">— select —</option>
+            {categories.filter(c => c.isActive).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </SelectInput>
+        </Field>
+        <Field label="Sub-category">
+          <SelectInput value={form.subCategoryId} onChange={v => setForm(f => ({ ...f, subCategoryId: v }))} disabled={!form.categoryId || subCatsLoading}>
+            <option value="">— none —</option>
+            {subCats.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </SelectInput>
+        </Field>
+      </div>
+      <Field label="Description">
+        <TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="What's included in this service…" rows={2} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Customer Price (₹) *">
+          <NumberInput allowDecimal value={form.customerPrice} onChange={v => setForm(f => ({ ...f, customerPrice: v }))} placeholder="999" />
+        </Field>
+        <Field label="Partner Payout (₹) *">
+          <NumberInput allowDecimal value={form.partnerPayout} onChange={v => setForm(f => ({ ...f, partnerPayout: v }))} placeholder="600" />
+        </Field>
+      </div>
+      {/* Auto-calculated commission */}
+      <div className="rounded-xl px-4 py-3 border border-white/10 flex items-center justify-between" style={{ background: "rgba(91,62,245,0.07)" }}>
+        <span className="text-white/50 text-xs">Platform Commission</span>
+        <span className={`font-bold text-sm ${commission >= 0 ? "text-violet-400" : "text-red-400"}`}>
+          ₹{commission.toLocaleString("en-IN")}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Duration (minutes)">
+          <NumberInput value={form.duration} onChange={v => setForm(f => ({ ...f, duration: v }))} placeholder="60" />
+        </Field>
+        <Field label="Required Skill">
+          <TextInput value={form.requiredSkill} onChange={v => setForm(f => ({ ...f, requiredSkill: v }))} placeholder="e.g. Floor Cleaning" />
+        </Field>
+      </div>
+      <div className="flex items-center gap-3 cursor-pointer" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}>
+        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.isActive ? "bg-violet-600" : "bg-white/10"}`}>
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.isActive ? "translate-x-5" : ""}`} />
+        </div>
+        <span className="text-white/60 text-xs">{form.isActive ? "Active" : "Inactive"} — customers can book this service</span>
+      </div>
+
+      {/* ── Service Detail Fields ── */}
+      <div className="border-t border-white/10 pt-4 space-y-4">
+        <p className="text-white/40 text-xs font-semibold uppercase tracking-widest">Service Details (shown on detail page)</p>
+        <Field label="What's Included">
+          <TextArea value={form.whatIncluded} onChange={v => setForm(f => ({ ...f, whatIncluded: v }))} placeholder={"• Professional equipment and supplies\n• Deep cleaning of all surfaces\n• Post-service cleanup"} rows={4} />
+        </Field>
+        <Field label="What's Not Included">
+          <TextArea value={form.whatNotIncluded} onChange={v => setForm(f => ({ ...f, whatNotIncluded: v }))} placeholder={"• Exterior window cleaning\n• Furniture moving"} rows={3} />
+        </Field>
+        <Field label="Service Process">
+          <TextArea value={form.serviceProcess} onChange={v => setForm(f => ({ ...f, serviceProcess: v }))} placeholder={"1. Technician arrives and assesses the area\n2. Equipment is set up\n3. Service is performed\n4. Quality check and sign-off"} rows={4} />
+        </Field>
+        <Field label="Requirements">
+          <TextArea value={form.requirements} onChange={v => setForm(f => ({ ...f, requirements: v }))} placeholder={"• Ensure water and electricity access\n• Clear the area before arrival"} rows={3} />
+        </Field>
+        <Field label="Important Notes">
+          <TextArea value={form.importantNotes} onChange={v => setForm(f => ({ ...f, importantNotes: v }))} placeholder={"• Please ensure someone is home during the service\n• Pets should be kept away from the work area"} rows={3} />
+        </Field>
+        <Field label="Cancellation Policy">
+          <TextArea value={form.cancellationPolicy} onChange={v => setForm(f => ({ ...f, cancellationPolicy: v }))} placeholder={"Free cancellation up to 2 hours before the scheduled time. Late cancellations may incur a fee."} rows={3} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
 function ServicesView({
   services, categories, accessToken, onCreate, onEdit, onDelete, onRefresh,
 }: {
@@ -6367,95 +6480,18 @@ function ServicesView({
     `Services_${new Date().toISOString().slice(0, 10)}.xlsx`
   );
 
-  const ServiceForm = () => (
-    <div className="space-y-4">
-      <Field label="Service Name *">
-        <TextInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Deep Floor Cleaning" />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Category *">
-          <SelectInput value={form.categoryId} onChange={v => setForm(f => ({ ...f, categoryId: v, subCategoryId: "" }))} >
-            <option value="">— select —</option>
-            {categories.filter(c => c.isActive).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </SelectInput>
-        </Field>
-        <Field label="Sub-category">
-          <SelectInput value={form.subCategoryId} onChange={v => setForm(f => ({ ...f, subCategoryId: v }))} disabled={!form.categoryId || subCatsLoading}>
-            <option value="">— none —</option>
-            {subCats.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </SelectInput>
-        </Field>
-      </div>
-      <Field label="Description">
-        <TextArea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="What's included in this service…" rows={2} />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Customer Price (₹) *">
-          <TextInput type="number" value={form.customerPrice} onChange={v => setForm(f => ({ ...f, customerPrice: v }))} placeholder="999" />
-        </Field>
-        <Field label="Partner Payout (₹) *">
-          <TextInput type="number" value={form.partnerPayout} onChange={v => setForm(f => ({ ...f, partnerPayout: v }))} placeholder="600" />
-        </Field>
-      </div>
-      {/* Auto-calculated commission */}
-      <div className="rounded-xl px-4 py-3 border border-white/10 flex items-center justify-between" style={{ background: "rgba(91,62,245,0.07)" }}>
-        <span className="text-white/50 text-xs">Platform Commission</span>
-        <span className={`font-bold text-sm ${commission >= 0 ? "text-violet-400" : "text-red-400"}`}>
-          ₹{commission.toLocaleString("en-IN")}
-        </span>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Duration (minutes)">
-          <TextInput type="number" value={form.duration} onChange={v => setForm(f => ({ ...f, duration: v }))} placeholder="60" />
-        </Field>
-        <Field label="Required Skill">
-          <TextInput value={form.requiredSkill} onChange={v => setForm(f => ({ ...f, requiredSkill: v }))} placeholder="e.g. Floor Cleaning" />
-        </Field>
-      </div>
-      <div className="flex items-center gap-3 cursor-pointer" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}>
-        <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${form.isActive ? "bg-violet-600" : "bg-white/10"}`}>
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.isActive ? "translate-x-5" : ""}`} />
-        </div>
-        <span className="text-white/60 text-xs">{form.isActive ? "Active" : "Inactive"} — customers can book this service</span>
-      </div>
-
-      {/* ── Service Detail Fields ── */}
-      <div className="border-t border-white/10 pt-4 space-y-4">
-        <p className="text-white/40 text-xs font-semibold uppercase tracking-widest">Service Details (shown on detail page)</p>
-        <Field label="What's Included">
-          <TextArea value={form.whatIncluded} onChange={v => setForm(f => ({ ...f, whatIncluded: v }))} placeholder={"• Professional equipment and supplies\n• Deep cleaning of all surfaces\n• Post-service cleanup"} rows={4} />
-        </Field>
-        <Field label="What's Not Included">
-          <TextArea value={form.whatNotIncluded} onChange={v => setForm(f => ({ ...f, whatNotIncluded: v }))} placeholder={"• Exterior window cleaning\n• Furniture moving"} rows={3} />
-        </Field>
-        <Field label="Service Process">
-          <TextArea value={form.serviceProcess} onChange={v => setForm(f => ({ ...f, serviceProcess: v }))} placeholder={"1. Technician arrives and assesses the area\n2. Equipment is set up\n3. Service is performed\n4. Quality check and sign-off"} rows={4} />
-        </Field>
-        <Field label="Requirements">
-          <TextArea value={form.requirements} onChange={v => setForm(f => ({ ...f, requirements: v }))} placeholder={"• Ensure water and electricity access\n• Clear the area before arrival"} rows={3} />
-        </Field>
-        <Field label="Important Notes">
-          <TextArea value={form.importantNotes} onChange={v => setForm(f => ({ ...f, importantNotes: v }))} placeholder={"• Please ensure someone is home during the service\n• Pets should be kept away from the work area"} rows={3} />
-        </Field>
-        <Field label="Cancellation Policy">
-          <TextArea value={form.cancellationPolicy} onChange={v => setForm(f => ({ ...f, cancellationPolicy: v }))} placeholder={"Free cancellation up to 2 hours before the scheduled time. Late cancellations may incur a fee."} rows={3} />
-        </Field>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex flex-col gap-5 flex-1 overflow-y-auto min-h-0 pb-6">
       {/* Modals */}
       {creating && (
         <Modal title="New Service" onClose={() => setCreating(false)}>
-          <ServiceForm />
+          <ServiceFormFields form={form} setForm={setForm} categories={categories} subCats={subCats} subCatsLoading={subCatsLoading} commission={commission} />
           <SaveCancelButtons onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} saveLabel="Create service" />
         </Modal>
       )}
       {editTarget && (
         <Modal title="Edit Service" onClose={() => setEditTarget(null)}>
-          <ServiceForm />
+          <ServiceFormFields form={form} setForm={setForm} categories={categories} subCats={subCats} subCatsLoading={subCatsLoading} commission={commission} />
           <SaveCancelButtons onSave={handleSave} onCancel={() => setEditTarget(null)} saving={saving} />
         </Modal>
       )}
