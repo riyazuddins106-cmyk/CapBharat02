@@ -1953,8 +1953,13 @@ function CheckoutFlow({ cart, onClose, onChange }: {
       CHECKOUT_TIME_SLOTS.forEach(s => disabled.add(s));
       return disabled;
     }
+    // Effective min advance = strictest of global config + any per-service overrides in cart
+    const cartItemOverrides = cart.items
+      .map(item => item.minAdvanceMinutes)
+      .filter((v): v is number => v != null);
+    const effectiveMinAdvance = Math.max(bookingCfg.minAdvanceMinutes, ...cartItemOverrides);
     const earliestHour = isToday
-      ? now.getHours() + (now.getMinutes() + bookingCfg.minAdvanceMinutes) / 60
+      ? now.getHours() + (now.getMinutes() + effectiveMinAdvance) / 60
       : 0;
     CHECKOUT_TIME_SLOTS.forEach(slot => {
       const h = CHECKOUT_SLOT_HOURS[slot] ?? 0;
@@ -1962,7 +1967,7 @@ function CheckoutFlow({ cart, onClose, onChange }: {
       else if (isToday && h < earliestHour) disabled.add(slot);
     });
     return disabled;
-  }, [selectedDate, bookingCfg]);
+  }, [selectedDate, bookingCfg, cart]);
 
   // Auto-select first available slot when date/config changes
   useEffect(() => {

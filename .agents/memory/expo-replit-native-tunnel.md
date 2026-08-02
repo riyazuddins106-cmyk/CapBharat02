@@ -6,9 +6,9 @@ description: How to run Expo Go on Replit — Replit-native mode broken on sisko
 # Expo Replit-native tunnel
 
 ## Rule
-**Do NOT use the Replit-native (REPLIT_EXPO_DEV_DOMAIN) mode on sisko.replit.dev.** The per-port subdomain substitution (replacing `-00-` with `-8080-` or `-8099-`) returns 404 — Replit's sisko proxy only routes the default port (-00-). Always force ngrok.
+**Always force ngrok — never use the Replit-native (REPLIT_EXPO_DEV_DOMAIN) path.** This applies to both `pike.replit.dev` and `sisko.replit.dev`. The exp.direct `--tunnel` path triggered by `REPLIT_EXPO_DEV_DOMAIN` causes "failed to download" in Expo Go on Replit (bundle download fails). ngrok with HTTPS works reliably.
 
-**Why:** The old `pike.replit.dev` proxy routed per-port subdomains. The newer `sisko.replit.dev` proxy does not — only the default (-00-) port subdomain works. The `REPLIT_EXPO_DEV_DOMAIN` variable is present but the derived per-port domain is unreachable externally, causing "failed to download" in Expo Go.
+**Why:** When `REPLIT_EXPO_DEV_DOMAIN` is set, `expo-tunnel.sh` takes the Replit-native branch and runs `expo start --tunnel` (exp.direct). The exp.direct bundle download fails in Expo Go on this environment. Unsetting the variable forces the ngrok branch which generates correct HTTPS bundle URLs.
 
 **How to apply:** In both Expo workflow commands, prefix with `unset REPLIT_EXPO_DEV_DOMAIN &&` so the script's Replit-native block is skipped and the ngrok fallback runs.
 

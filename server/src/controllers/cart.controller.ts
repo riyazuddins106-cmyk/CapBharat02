@@ -15,6 +15,7 @@ async function getCart(customerId: string) {
     id: item.id, serviceId: service.id, name: service.name, image: (service.images as string[])[0] ?? null,
     quantity: item.quantity, unitPrice: service.customerPrice, duration: service.duration,
     lineTotal: item.quantity * service.customerPrice,
+    minAdvanceMinutes: service.minAdvanceMinutes ?? null, // null = inherit global booking_config
   }));
   return { id: cart.id, items: data, total: data.reduce((sum, item) => sum + item.lineTotal, 0) };
 }

@@ -116,3 +116,6 @@ Full CRUD regression test log for customer/partner/admin flows is in `QA_TEST_RE
 - Use existing project structure and stack — no migration or restructure
 - Expo SDK 54 (latest: 54.0.35)
 - No Replit cloud deployment needed
+- Do NOT suggest or ask the user to add tasks/prompts to `.ai-memory/START_HERE.md` — update the memory files automatically after every task without prompting the user to do anything
+- ACTIVE_TASK.md must be updated after EVERY individual step (each file edit, each API built, each bug fixed) — not batched at the end. Write the task into ACTIVE_TASK.md before starting, check off each step immediately after completing it. This is critical: if credits run out mid-task, the next session must know exactly which steps are done and which aren't.
+- When searching for files, ALWAYS check .ai-memory/MASTER_INDEX.md first → find the relevant module → read modules/<name>/INDEX.md for exact file paths. Do not grep/explore blindly when the module index already has the answer. Also read GOTCHAS.md before touching any module to avoid known pitfalls.

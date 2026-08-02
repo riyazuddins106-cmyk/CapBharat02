@@ -5879,11 +5879,36 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
         </p>
       </div>
 
+      {/* ── Slot Interval ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold">Time Slot Interval</h3>
+        <p className="text-white/40 text-xs -mt-2">Duration of each booking slot shown to customers during checkout.</p>
+        <div>
+          <Field label="Slot Duration (minutes)">
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={30} max={240} step={30}
+                value={cfg.slotIntervalMinutes}
+                onChange={e => setCfg(c => ({ ...c, slotIntervalMinutes: Number(e.target.value) }))}
+                className="flex-1 accent-violet-500"
+              />
+              <span className="text-white font-bold text-sm w-16 text-right">
+                {cfg.slotIntervalMinutes} min
+              </span>
+            </div>
+          </Field>
+          <p className="text-white/30 text-xs mt-1">
+            Default: 120 min (2 hours). Current slots: 9–11 AM, 11 AM–1 PM, 2–4 PM, 4–6 PM, 6–8 PM.
+          </p>
+        </div>
+      </div>
+
       {/* Info */}
       <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 text-xs text-violet-300 space-y-1">
         <p className="font-semibold text-violet-400">How it works</p>
         <p>• Minimum advance time is enforced on both frontend (slot disabling) and backend (API validation).</p>
         <p>• Service-specific overrides take precedence over this global setting.</p>
+        <p>• If a cart has multiple services, the strictest advance-time requirement wins.</p>
         <p>• Changes apply immediately — no restart needed.</p>
         <p>• Existing bookings are never modified by these settings.</p>
       </div>

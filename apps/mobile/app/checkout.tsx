@@ -108,9 +108,15 @@ export default function CheckoutScreen() {
       return disabled;
     }
 
+    // Effective min advance = strictest of global config + any per-service overrides in cart
+    const cartItemOverrides = (cart?.items ?? [])
+      .map(item => item.minAdvanceMinutes)
+      .filter((v): v is number => v != null);
+    const effectiveMinAdvance = Math.max(bookingConfig.minAdvanceMinutes, ...cartItemOverrides);
+
     // For future dates only check business hours; for today also check advance time
     const earliestHour = isToday
-      ? (now.getHours() + (now.getMinutes() + bookingConfig.minAdvanceMinutes) / 60)
+      ? (now.getHours() + (now.getMinutes() + effectiveMinAdvance) / 60)
       : 0;
 
     TIME_SLOTS.forEach(slot => {
@@ -122,7 +128,7 @@ export default function CheckoutScreen() {
       }
     });
     return disabled;
-  }, [selectedDate, bookingConfig]);
+  }, [selectedDate, bookingConfig, cart]);
 
   // Auto-select first available slot when date or config changes
   useEffect(() => {

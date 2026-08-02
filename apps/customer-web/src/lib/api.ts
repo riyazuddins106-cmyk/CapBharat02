@@ -129,6 +129,7 @@ export interface ApiCartItem {
   unitPrice: number;
   duration: number;
   lineTotal: number;
+  minAdvanceMinutes: number | null; // null = inherit global booking_config
 }
 
 export interface ApiCart {

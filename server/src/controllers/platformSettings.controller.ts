@@ -148,11 +148,12 @@ function getDefaults(key: string): object {
   }
   if (key === 'booking_config') {
     return {
-      minAdvanceMinutes: 30,
-      sameDayBooking:    true,
-      maxAdvanceDays:    7,
-      openingHour:       9,
-      closingHour:       20,
+      minAdvanceMinutes:   30,
+      sameDayBooking:      true,
+      maxAdvanceDays:      7,
+      openingHour:         9,
+      closingHour:         20,
+      slotIntervalMinutes: 120,
     };
   }
   return {};

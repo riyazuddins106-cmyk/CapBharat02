@@ -151,6 +151,7 @@ export interface CartItem {
   unitPrice: number;
   duration: number;
   lineTotal: number;
+  minAdvanceMinutes: number | null; // null = inherit global booking_config
 }
 export interface Cart { id: string; items: CartItem[]; total: number; }
 export interface Booking {

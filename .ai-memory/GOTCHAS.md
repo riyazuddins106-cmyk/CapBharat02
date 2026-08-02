@@ -103,3 +103,62 @@
 **Problem:** Partner app sends `availabilityStatus` but the server sometimes expects `status`.
 **Fix:** The controller must accept both `availabilityStatus` (mobile) and `status` (legacy web). Do not change mobile to send `status` — it breaks the mobile app.
 **Files:** `server/src/controllers/partner.controller.ts`
+
+---
+
+## Expo Tunnel (Replit)
+
+### Expo — "failed to download" in Expo Go on Replit
+**Problem:** Scanning the QR code opens Expo Go but it shows "failed to download" and never loads the app.
+**Fix:** Prefix both Expo workflow commands with `unset REPLIT_EXPO_DEV_DOMAIN &&`. When that variable is set, `expo-tunnel.sh` uses `expo start --tunnel` (exp.direct) which fails on Replit. Unsetting it forces the ngrok branch which works.
+**Files:** Expo Customer App workflow, Expo Partner App workflow (configured in Replit)
+**Correct commands:**
+- Customer: `unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile && ../../scripts/expo-tunnel.sh 8080 2>&1 | tee /tmp/metro-live.log`
+- Partner: `unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile-partner && ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25`
+**Warning:** Do not check if this is sisko or pike — unset it on ALL Replit hosts.
+
+### Expo — Metro resolves from workspace root instead of app folder
+**Problem:** `Unable to resolve module ./index from /home/runner/workspace/.` — note the trailing dot. All module paths resolve from the wrong directory.
+**Fix:** Delete any `app.json` at the monorepo workspace root that contains an `expo` key. Expo walks up the directory tree and stops at the first `app.json` with `"expo"` — if one exists at root, Metro treats root as the project.
+**Files:** `/home/runner/workspace/app.json` — delete it if it exists
+**Warning:** Symptom is misleading — looks like a Metro config problem but it's a project root detection issue.
+
+### Expo — native module version mismatch after `pnpm install`
+**Problem:** Expo CLI warns about incompatible native module versions; Expo Go shows unexpected behavior or crashes.
+**Fix:** Never hand-pin native module versions. Always run `pnpm exec expo install --check` and `pnpm exec expo install --fix` after adding any native module. Let Expo pick the compatible version from its `bundledNativeModules.json`.
+**Warning:** `expo-device`, `expo-notifications` etc. are versioned independently — their package version does NOT match the SDK number.
+
+### Expo — worklets crash: "installTurboModule called with 1 arguments"
+**Problem:** App crashes immediately in Expo Go on SDK 54.
+**Fix:** Pin exactly: `"react-native-reanimated": "4.1.1"` and `"react-native-worklets": "0.5.1"` in both mobile app package.json files. Use exact pins — `~4.1.1` resolves to `4.1.7` which pulls worklets `0.8.3` which breaks the Expo Go binary.
+**Files:** `apps/mobile/package.json`, `apps/mobile-partner/package.json`
+
+### Expo — useFonts hangs forever over public HTTPS tunnel
+**Problem:** App shows a blank screen forever — `useFonts()` never resolves over the ngrok/exp.direct public URL even though fonts load fine locally.
+**Fix:** Add a `setTimeout` fallback (e.g. 3000ms) to force `fontsLoaded = true` even if the promise never resolves.
+**Warning:** The hang is tunnel-specific and does not reproduce in local dev or on device via LAN.
+
+---
+
+## API Field Names
+
+### API — field names differ from obvious guesses
+**Problem:** API calls fail with validation errors because field names don't match what seems obvious.
+**Verified correct names:**
+- `POST /auth/register`: `fullName` (not `name`), no `role` field
+- `POST /auth/verify-otp`: `code` (not `otp`), `purpose` required (`"signup" | "login" | "password_reset"`)
+- `POST/PATCH /addresses`: `postalCode` (not `pincode`)
+- `POST /support-tickets`: `name`, `email`, `subject`, `message` all required
+- Payout approve: status must be `"paid"` or `"rejected"` (not `"approved"`)
+- OTP in dev: logged to server console as `[otp] Verification code for <email> (<purpose>): <code>`
+**Files:** `server/src/validators/` — always verify field names from Zod schemas, not from guessing.
+
+---
+
+## Categories
+
+### Category serviceCount — stored column is stale, use live JOIN
+**Problem:** `serviceCount` stored in `service_categories` table drifts from reality. Categories show wrong counts; filtering by `serviceCount > 0` gives wrong results.
+**Fix:** `category.repository.ts` `findAll()` does a live `LEFT JOIN` to services and computes `COUNT(CASE WHEN is_active = true THEN 1 END)`. The stored column is irrelevant for display.
+**Files:** `server/src/repositories/category.repository.ts`
+**Warning:** Do not seed or update the stored `service_count` column — the live JOIN overrides it anyway.

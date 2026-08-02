@@ -89,10 +89,27 @@ The platform is feature-complete and end-to-end tested. All core flows work. The
 
 ---
 
-## 🔄 Last Session Summary
-- Created `.ai-memory/` folder with MASTER_INDEX, CURRENT_STATUS, and MODULES documentation.
-- No code changes made.
-- User wants to make specific changes/add features in future sessions.
+## 🔄 Last Session Summary (2026-08-02)
+
+### Task: Booking slot config enhancement
+- `server/src/controllers/cart.controller.ts` — added `minAdvanceMinutes` per cart item
+- `server/src/controllers/platformSettings.controller.ts` — added `slotIntervalMinutes: 120` to default
+- `apps/admin-web/src/app/App.tsx` — added Slot Duration slider in Booking Settings
+- `apps/mobile/lib/api.ts` + `apps/mobile/app/checkout.tsx` — effectiveMinAdvance from cart items
+- `apps/customer-web/src/lib/api.ts` + `apps/customer-web/src/app/CustomerApp.tsx` — same
+
+### Task: Secrets + database connected
+- All 8 secrets added: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET, NGROK_AUTHTOKEN, NGROK_AUTHTOKEN_2
+- Server started, migrations ran successfully, DB connected ✅
+
+### Task: Expo tunnel fix
+- Root cause: `REPLIT_EXPO_DEV_DOMAIN` set → script took exp.direct path → "failed to download" in Expo Go
+- Fix: both Expo workflow commands now prepend `unset REPLIT_EXPO_DEV_DOMAIN &&`
+- Both ngrok tunnels confirmed working. QR codes live at port 3000.
+
+### Task: AI memory system completed
+- Created all 10 module INDEX.md files: auth, booking, dispatch, payment, admin, mobile-customer, mobile-partner, catalog, points, notifications
+- Added 7 new entries to GOTCHAS.md: Expo tunnel fix, Metro project root, native module drift, worklets crash, useFonts hang, API field names, category serviceCount
 
 ---
 
