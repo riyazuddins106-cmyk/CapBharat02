@@ -5,6 +5,7 @@ import {
   Star, RefreshCw, X, Check, AlertCircle, Pencil, Lock,
   Calendar, Phone, FileText, Menu, BarChart2, Zap,
   Upload, Shield, ChevronRight, ArrowLeft, Eye, Trash2, History as HistoryIcon,
+  QrCode, Wrench,
 } from 'lucide-react';
 import {
   authApi, partnerApi, notificationsApi, categoriesApi, payoutsApi, documentsApi, setRefreshHandler,
@@ -12,6 +13,7 @@ import {
   type AppNotification, type AuthTokens, type Payout, type PartnerDocument,
   type DocumentTypeConfig, type PartnerDocumentHistory,
 } from '@/lib/api';
+import { QRScannerModal } from '@/components/QRScannerModal';
 
 /* ─── Design tokens (exact match to admin panel) ──────────────────── */
 const CARD      = { background: 'rgba(255,255,255,0.04)' } as const;
@@ -667,14 +669,16 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
 
 /* ─── Jobs ────────────────────────────────────────────────────────── */
 function Jobs({ token }: { token: string }) {
-  const [jobs,      setJobs]      = useState<Job[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [selected,  setSelected]  = useState<Job | null>(null);
-  const [completing,setCompleting]= useState(false);
-  const [accepting, setAccepting] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [checkingIn,setCheckingIn]= useState(false);
-  const [filter,    setFilter]    = useState<JobStatus | 'all'>('all');
+  const [jobs,        setJobs]        = useState<Job[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [selected,    setSelected]    = useState<Job | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [completing,  setCompleting]  = useState(false);
+  const [accepting,   setAccepting]   = useState(false);
+  const [rejecting,   setRejecting]   = useState(false);
+  const [checkingIn,  setCheckingIn]  = useState(false);
+  const [showQR,      setShowQR]      = useState(false);
+  const [filter,      setFilter]      = useState<JobStatus | 'all'>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -714,11 +718,30 @@ function Jobs({ token }: { token: string }) {
     } finally { setRejecting(false); }
   }
 
-  async function checkin(id: string) {
+  // Open job modal — fetch full detail (includes services breakdown) in the background
+  async function openJob(j: Job) {
+    setSelected(j);
+    setDetailLoading(true);
+    try {
+      const full = await partnerApi.getJob(j.id, token);
+      setSelected(full);
+    } catch { /* keep the list-level data already shown */ }
+    finally { setDetailLoading(false); }
+  }
+
+  // Check-in: open QR scanner; actual API call happens after a valid scan
+  function startCheckin() { setShowQR(true); }
+
+  async function handleQRScanned(qrToken: string) {
+    setShowQR(false);
+    if (!selected) return;
     setCheckingIn(true);
     try {
-      const j = await partnerApi.checkinJob(id, token);
-      setJobs(prev => prev.map(x => x.id === id ? j : x)); setSelected(j);
+      const j = await partnerApi.checkinJob(selected.id, token, qrToken);
+      setJobs(prev => prev.map(x => x.id === j.id ? j : x));
+      setSelected(j);
+    } catch (e: any) {
+      alert(e?.message ?? 'Check-in failed. Make sure the QR code belongs to this booking.');
     } finally { setCheckingIn(false); }
   }
 
@@ -729,15 +752,12 @@ function Jobs({ token }: { token: string }) {
 
   return (
     <div>
-
       {/* Filter tabs */}
       <div className="flex gap-2 flex-wrap mb-5">
         {statuses.map(s => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              filter === s
-                ? 'text-white'
-                : 'border border-white/10 text-white/50 hover:bg-white/5'
+              filter === s ? 'text-white' : 'border border-white/10 text-white/50 hover:bg-white/5'
             }`}
             style={filter === s ? { background: ACCENT } : {}}>
             {s === 'all' ? 'All' : s.replace('_', ' ')}
@@ -769,7 +789,7 @@ function Jobs({ token }: { token: string }) {
                   {filtered.map(j => (
                     <tr key={j.id}
                       className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition-colors cursor-pointer"
-                      onClick={() => setSelected(j)}>
+                      onClick={() => openJob(j)}>
                       <td className="px-4 py-3">
                         <p className="text-white font-semibold leading-snug">{j.serviceName}</p>
                         {j.notes && <p className="text-white/35 text-xs mt-0.5 truncate max-w-[180px]">{j.notes}</p>}
@@ -788,7 +808,7 @@ function Jobs({ token }: { token: string }) {
                       <td className="px-4 py-3 text-white font-bold">{fmt(j.price)}</td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={e => { e.stopPropagation(); setSelected(j); }}
+                          onClick={e => { e.stopPropagation(); openJob(j); }}
                           className="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors hover:bg-violet-500/10"
                           style={{ borderColor: 'rgba(91,62,245,0.3)', color: '#7C5BF8' }}>
                           View
@@ -802,12 +822,13 @@ function Jobs({ token }: { token: string }) {
           )
       }
 
+      {/* Job detail modal */}
       {selected && (
         <Modal title="Job Details" onClose={() => setSelected(null)}>
           <div className="space-y-3">
+            {/* Info grid */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               {[
-                ['Service',   selected.serviceName],
                 ['Customer',  selected.customerName ?? '—'],
                 ['Phone',     selected.customerPhone ?? '—'],
                 ['Scheduled', fmtDate(selected.scheduledAt)],
@@ -821,12 +842,48 @@ function Jobs({ token }: { token: string }) {
                 </div>
               ))}
             </div>
+
+            {/* Services to Complete */}
+            <div className="rounded-xl border border-white/[0.06] overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.06]">
+                <Wrench size={13} className="text-violet-400" />
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wide">Services to Complete</p>
+                {detailLoading && <Loader2 size={12} className="animate-spin text-white/30 ml-auto" />}
+              </div>
+              {selected.services && selected.services.length > 0 ? (
+                selected.services.map((svc, idx) => (
+                  <div key={idx} className={`px-3 py-2.5 flex items-center justify-between gap-3 ${idx > 0 ? 'border-t border-white/[0.04]' : ''}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Wrench size={12} className="text-violet-400 flex-shrink-0" />
+                      <span className="text-white text-sm font-semibold truncate">{svc.name}</span>
+                      {svc.quantity > 1 && (
+                        <span className="text-white/40 text-xs flex-shrink-0">×{svc.quantity}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                      <span className="text-white/40 flex items-center gap-1">
+                        <Clock size={11}/> {svc.duration} min
+                      </span>
+                      <span className="font-bold" style={{ color: '#7C5BF8' }}>₹{svc.unitPartnerPayout} payout</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="px-3 py-2.5">
+                  <p className="text-white font-semibold text-sm">{selected.serviceName}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
             {selected.notes && (
               <div className="rounded-xl p-3 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <p className="text-white/40 text-xs mb-1">Notes</p>
                 <p className="text-white text-sm leading-relaxed">{selected.notes}</p>
               </div>
             )}
+
+            {/* Actions */}
             {selected.status === 'pending' && (
               <div className="flex gap-3 mt-2">
                 <PrimaryBtn loading={accepting} onClick={() => accept(selected.id)} className="flex-1 justify-center">
@@ -840,10 +897,13 @@ function Jobs({ token }: { token: string }) {
               </div>
             )}
             {selected.status === 'upcoming' && (
-              <div className="flex gap-3 mt-2">
-                <PrimaryBtn loading={checkingIn} onClick={() => checkin(selected.id)} className="flex-1 justify-center">
-                  <TrendingUp size={14}/> Check In / Start Job
+              <div className="mt-2">
+                <PrimaryBtn loading={checkingIn} onClick={startCheckin} className="w-full justify-center">
+                  <QrCode size={14}/> Scan QR to Check In
                 </PrimaryBtn>
+                <p className="text-white/30 text-xs text-center mt-2">
+                  Ask the customer to open their booking and show you the QR code
+                </p>
               </div>
             )}
             {selected.status === 'in_progress' && (
@@ -855,6 +915,14 @@ function Jobs({ token }: { token: string }) {
             )}
           </div>
         </Modal>
+      )}
+
+      {/* QR scanner overlay */}
+      {showQR && (
+        <QRScannerModal
+          onScanned={handleQRScanned}
+          onClose={() => setShowQR(false)}
+        />
       )}
     </div>
   );

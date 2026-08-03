@@ -64,12 +64,20 @@ export interface PartnerProfile {
   subCategoryId: string | null;
 }
 export type JobStatus = 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+export interface JobService {
+  serviceId: string;
+  name: string;
+  quantity: number;
+  duration: number;        // minutes
+  unitPartnerPayout: number;
+}
 export interface Job {
   id: string; customerId: string; professionalId: string; serviceName: string;
   proName: string; scheduledAt: string; status: JobStatus; notes: string | null;
   price: number; createdAt: string; updatedAt: string;
   customerName: string | null; customerPhone: string | null;
   paymentStatus?: string | null;
+  services?: JobService[];
 }
 export interface Earnings {
   total: number; thisMonth: number; today: number;
@@ -196,8 +204,8 @@ export const partnerApi = {
     request<Job>(`/api/partner/jobs/${id}/accept`, { method: 'PATCH', token }),
   rejectJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/reject`, { method: 'PATCH', token }),
-  checkinJob: (id: string, token: string) =>
-    request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', token }),
+  checkinJob: (id: string, token: string, qrToken: string) =>
+    request<Job>(`/api/partner/jobs/${id}/checkin`, { method: 'PATCH', body: JSON.stringify({ qrToken }), token }),
   getEarnings: (token: string) => request<Earnings>('/api/partner/earnings', { token }),
   updateAvailability: (status: 'available' | 'busy' | 'offline', token: string) =>
     request<PartnerProfile>('/api/partner/availability', { method: 'PATCH', body: JSON.stringify({ status }), token }),

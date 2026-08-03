@@ -1305,7 +1305,7 @@ function ProfileEditModal({ user, onSave, onClose }: {
    HOME TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
-  user, categories, professionals, featuredServices, favoriteIds, wishlistIds, offers, reels, location,
+  user, categories, professionals: _professionals, featuredServices, favoriteIds, wishlistIds, offers, reels, location,
   onToggleFavorite, onToggleWishlist, onCategorySelect, onLocationPress, isLoggedIn, addToCart, onServicePress,
 }: {
   user: ApiUser | null;
@@ -1385,6 +1385,7 @@ function CustHome({
                       <p className="text-white/75 text-xs leading-snug">{offer.subtitle}</p>
                     )}
                     <button
+                      onClick={() => onCategorySelect("")}
                       className="mt-1 bg-white text-xs font-bold px-4 py-2 rounded-full self-start"
                       style={{ color: offer.bgColor || "#5B3EF5" }}
                     >
