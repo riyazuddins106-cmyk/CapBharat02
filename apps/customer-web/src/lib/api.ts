@@ -75,22 +75,6 @@ export interface ApiCategory {
   sortOrder: number;
 }
 
-export interface ApiProfessional {
-  id: string;
-  name: string;
-  title: string;
-  bio: string | null;
-  rating: number;
-  reviewCount: number;
-  basePrice: number;
-  priceUnit: string;
-  badge: string | null;
-  avatarUrl: string | null;
-  tags: string[];
-  isFavorite: boolean;
-  categoryId: string;
-}
-
 export interface ApiBooking {
   id: string;
   serviceName: string;
@@ -240,19 +224,6 @@ export const subcategoriesApi = {
   },
 };
 
-// ─── Professionals API ────────────────────────────────────────────────────────
-export const professionalsApi = {
-  async list(params?: { categoryId?: string; subCategoryId?: string; search?: string; sort?: string; limit?: number; offset?: number }) {
-    const { data } = await client.get('/professionals', { params });
-    return data.data as ApiProfessional[];
-  },
-
-  async getById(id: string) {
-    const { data } = await client.get(`/professionals/${id}`);
-    return data.data as ApiProfessional & { reviews: ApiReview[] };
-  },
-};
-
 // ─── Bookings API ─────────────────────────────────────────────────────────────
 export const bookingsApi = {
   async list() {
@@ -260,8 +231,8 @@ export const bookingsApi = {
     return data.data as ApiBooking[];
   },
 
-  async create(professionalId: string, scheduledAt: string, notes?: string, addressId?: string) {
-    const { data } = await client.post('/bookings', { professionalId, scheduledAt, notes, addressId });
+  async create(scheduledAt: string, notes?: string, addressId?: string) {
+    const { data } = await client.post('/bookings', { scheduledAt, notes, addressId });
     return data.data as ApiBooking;
   },
 
@@ -321,19 +292,6 @@ export async function getPaymentConfig(): Promise<{ methods: string[]; upiVpa: s
   const { data } = await client.get('/payments/config');
   return data.data;
 }
-
-// ─── Favorites API ────────────────────────────────────────────────────────────
-export const favoritesApi = {
-  async list() {
-    const { data } = await client.get('/favorites');
-    return data.data as ApiProfessional[];
-  },
-
-  async toggle(professionalId: string) {
-    const { data } = await client.post(`/favorites/${professionalId}`);
-    return data.data as { isFavorite: boolean };
-  },
-};
 
 // ─── Reviews API ──────────────────────────────────────────────────────────────
 export const reviewsApi = {

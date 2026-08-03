@@ -8,7 +8,6 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { categoriesApi, subcategoriesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
-import { ProCardShimmer } from '@/components/Shimmer';
 import { queryClient } from '@/lib/queryClient';
 
 const serviceTypeIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -252,7 +251,7 @@ export default function ServicesScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           catalogueLoading ? (
-            <>{[0, 1, 2, 3].map((i) => <ProCardShimmer key={i} />)}</>
+            <>{[0, 1, 2, 3].map((i) => <View key={i} style={{ height: 80, borderRadius: 12, backgroundColor: '#F3F4F6', marginBottom: 12 }} />)}</>
           ) : (
             <View style={styles.empty}>
               <Ionicons name="search-outline" size={40} color={colors.mutedForeground} />

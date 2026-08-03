@@ -125,7 +125,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   });
 
   const METHOD_INFO: Record<string, { icon: any; label: string; desc: string }> = {
-    cash:       { icon: 'cash-outline', label: 'Cash on Delivery',   desc: 'Pay the professional in cash' },
+    cash:       { icon: 'cash-outline', label: 'Cash on Delivery',   desc: 'Pay on delivery in cash' },
     upi_manual: { icon: 'phone-portrait-outline', label: 'UPI Payment',        desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : 'Pay via UPI app' },
     razorpay:   { icon: 'card-outline', label: 'Razorpay',           desc: 'Cards, Net Banking, Wallets & UPI' },
     stripe:     { icon: 'globe-outline', label: 'Card (International)',desc: 'Visa, Mastercard & more via Stripe' },
@@ -509,9 +509,9 @@ export default function BookingsScreen() {
               <View style={styles.searchingRow}>
                 <ActivityIndicator size="small" color="#7C3AED" />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.searchingTitle}>Finding your professional</Text>
+                  <Text style={styles.searchingTitle}>Finding your service provider</Text>
                   <Text style={styles.searchingText}>
-                    We're matching the best available professional to your booking. This usually takes a few minutes. You'll get a notification once confirmed.
+                    We're matching the best available service provider to your booking. This usually takes a few minutes. You'll get a notification once confirmed.
                   </Text>
                 </View>
               </View>
@@ -541,7 +541,7 @@ export default function BookingsScreen() {
                 <>
                   <Ionicons name="search-outline" size={44} color={colors.mutedForeground} />
                   <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No pending bookings</Text>
-                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Bookings waiting for a professional will appear here</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Bookings being matched to a provider will appear here</Text>
                 </>
               ) : tab === 'upcoming' ? (
                 <>

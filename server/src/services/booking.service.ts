@@ -17,36 +17,43 @@ export const bookingService = {
   },
 
   async create(customerId: string, input: CreateBookingInput) {
-    const pro = await professionalRepository.findById(input.professionalId);
-    if (!pro || !pro.isActive) throw AppError.notFound('Professional not found or unavailable.');
-
     const scheduledAt = new Date(input.scheduledAt);
-    const duplicate = await bookingRepository.findActiveDuplicate(customerId, pro.id, scheduledAt);
-    if (duplicate) {
-      throw AppError.conflict('Booking already done. You already have a booking with this professional at this date and time.');
+
+    // Legacy path: professionalId provided (kept for backwards compat)
+    if (input.professionalId) {
+      const pro = await professionalRepository.findById(input.professionalId);
+      if (!pro || !pro.isActive) throw AppError.notFound('Professional not found or unavailable.');
+
+      const duplicate = await bookingRepository.findActiveDuplicate(customerId, pro.id, scheduledAt);
+      if (duplicate) {
+        throw AppError.conflict('You already have a booking at this date and time.');
+      }
+
+      const booking = await bookingRepository.create({
+        customerId,
+        professionalId: pro.id,
+        categoryId: pro.categoryId,
+        addressId: input.addressId ?? null,
+        serviceName: pro.title,
+        proName: pro.name,
+        scheduledAt,
+        notes: input.notes ?? null,
+        price: pro.basePrice,
+        status: 'upcoming',
+      });
+
+      if (pro.userId) {
+        const title = 'New booking request';
+        const body = `You have a new booking for ${pro.title}.`;
+        void notificationService.sendToUser(pro.userId, title, body, { bookingId: booking.id, type: 'booking_created' });
+        void notificationDbService.create({ userId: pro.userId, title, body, type: 'booking', data: { bookingId: booking.id } });
+      }
+
+      return booking;
     }
 
-    const booking = await bookingRepository.create({
-      customerId,
-      professionalId: pro.id,
-      categoryId: pro.categoryId,
-      addressId: input.addressId ?? null,
-      serviceName: pro.title,
-      proName: pro.name,
-      scheduledAt,
-      notes: input.notes ?? null,
-      price: pro.basePrice,
-      status: 'upcoming',
-    });
-
-    if (pro.userId) {
-      const title = 'New booking request';
-      const body = `You have a new booking for ${pro.title}.`;
-      void notificationService.sendToUser(pro.userId, title, body, { bookingId: booking.id, type: 'booking_created' });
-      void notificationDbService.create({ userId: pro.userId, title, body, type: 'booking', data: { bookingId: booking.id } });
-    }
-
-    return booking;
+    // Service-booking path: no professional pre-selected — dispatch will assign one
+    throw AppError.badRequest('Please use the cart checkout to place a booking.');
   },
 
   async cancel(customerId: string, bookingId: string) {

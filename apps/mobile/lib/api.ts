@@ -105,21 +105,6 @@ export interface Category {
   imageUrl?: string | null;
   serviceCount: number;
 }
-export interface Professional {
-  id: string;
-  name: string;
-  title: string;
-  bio: string;
-  rating: number;
-  reviewCount: number;
-  basePrice: number;
-  priceUnit: string;
-  badge: string | null;
-  avatarUrl: string | null;
-  tags: string[];
-  categoryId: string;
-  reviews?: Review[];
-}
 export interface Service {
   id: string;
   categoryId: string;
@@ -317,17 +302,6 @@ export const subcategoriesApi = {
     request<SubCategory[]>(`/api/categories/${categoryId}/subcategories`),
 };
 
-// ── Professionals ──────────────────────────────────────────
-export const professionalsApi = {
-  list: (params?: { categoryId?: string; subCategoryId?: string; search?: string }) => {
-    const qs = new URLSearchParams(
-      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>
-    ).toString();
-    return request<Professional[]>(`/api/professionals${qs ? `?${qs}` : ''}`);
-  },
-  get: (id: string) => request<Professional>(`/api/professionals/${id}`),
-};
-
 export const servicesApi = {
   list: (params?: { categoryId?: string; subCategoryId?: string; q?: string }) => {
     const qs = new URLSearchParams(Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>).toString();
@@ -478,13 +452,6 @@ export const serviceWishlistApi = {
   toggle: (serviceId: string, token: string) =>
     request<{ isWishlisted: boolean }>(`/api/service-wishlist/${serviceId}`, { method: 'POST', token }),
   getIds: (token: string) => request<{ ids: string[] }>('/api/service-wishlist/ids', { token }),
-};
-
-// ── Favorites ──────────────────────────────────────────────
-export const favoritesApi = {
-  list: (token: string) => request<Professional[]>('/api/favorites', { token }),
-  toggle: (professionalId: string, token: string) =>
-    request<{ isFavorite: boolean }>(`/api/favorites/${professionalId}`, { method: 'POST', token }),
 };
 
 // ── Reviews ────────────────────────────────────────────────

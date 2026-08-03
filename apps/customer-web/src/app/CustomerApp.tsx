@@ -11,10 +11,10 @@ import {
   Sofa, Shirt, Package, WashingMachine, Tag, Waves, Banknote, Smartphone, CreditCard,
 } from "lucide-react";
 import {
-  auth, authApi, categoriesApi, subcategoriesApi, professionalsApi, bookingsApi, favoritesApi,
+  auth, authApi, categoriesApi, subcategoriesApi, bookingsApi,
   addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig, servicesApi, cartApi,
   notificationsApi, pointsApi, serviceWishlistApi, supportTicketsApi, platformPoliciesApi, reviewsApi,
-  type ApiUser, type ApiCategory, type ApiSubCategory, type ApiProfessional, type ApiBooking,
+  type ApiUser, type ApiCategory, type ApiSubCategory, type ApiBooking,
   type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment, type ApiService, type ApiCart,
   type ApiNotification, type ApiPointsSummary, type ApiWishlistedService,
   type ApiSupportTicket, type ApiPolicy,
@@ -365,60 +365,6 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PRO CARD
-═══════════════════════════════════════════════════════════════ */
-function ProCard({ pro, wishlisted, onWishlist }: {
-  pro: ApiProfessional;
-  wishlisted: boolean;
-  onWishlist: () => void;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-black/[0.08] overflow-hidden shadow-sm">
-      <div className="flex gap-3 p-3">
-        <div className="relative flex-shrink-0">
-          <img
-            src={pro.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(pro.name)}&size=64`}
-            alt={pro.name}
-            className="w-16 h-16 rounded-xl object-cover bg-gray-100"
-          />
-          {pro.badge && (
-            <span className="absolute -top-1 -right-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
-              style={{ background: pro.badge === "Top Rated" ? "#5B3EF5" : "#16A34A" }}>{pro.badge}</span>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <div>
-              <h4 className="text-sm font-bold text-foreground">{pro.name}</h4>
-              <p className="text-xs text-gray-400">{pro.title}</p>
-            </div>
-            <button onClick={onWishlist} className="p-1 -mt-0.5">
-              <Heart size={16} fill={wishlisted ? "#EF4444" : "none"} color={wishlisted ? "#EF4444" : "#9CA3AF"} />
-            </button>
-          </div>
-          <div className="flex items-center gap-1 mt-1">
-            <Star size={12} fill="#FBBF24" color="#FBBF24" />
-            <span className="text-xs font-bold">{pro.rating.toFixed(1)}</span>
-            <span className="text-xs text-gray-400">({pro.reviewCount})</span>
-          </div>
-          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-            {(pro.tags as string[]).map((t) => (
-              <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#EDE9FD", color: "#5B3EF5" }}>{t}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center justify-between px-3 pb-3">
-        <div>
-          <span className="text-lg font-bold text-foreground">₹{pro.basePrice}</span>
-          <span className="text-xs text-gray-400">{pro.priceUnit}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
    WISHLIST SCREEN  (saved services)
 ═══════════════════════════════════════════════════════════════ */
 function WishlistScreen({ onBack }: { onBack: () => void }) {
@@ -708,163 +654,6 @@ function isPastTimeSlot(timeLabel: string, dateLabel: string): boolean {
   const slotMinutes = h * 60 + m;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return slotMinutes <= nowMinutes;
-}
-
-function BookingModal({ pro, onClose, onBooked }: {
-  pro: ApiProfessional;
-  onClose: () => void;
-  onBooked: (booking: ApiBooking) => void;
-}) {
-  const times = ["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM", "7:00 PM"];
-
-  const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState("Today");
-  const [selectedTime, setSelectedTime] = useState(
-    () => times.find((t) => !isPastTimeSlot(t, "Today")) ?? times[0]
-  );
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const today = new Date();
-  const dates = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    if (i === 0) return "Today";
-    if (i === 1) return "Tomorrow";
-    return d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
-  });
-
-  function handleDateChange(d: string) {
-    setSelectedDate(d);
-    // reset time to first available slot for the new date
-    const first = times.find((t) => !isPastTimeSlot(t, d)) ?? times[0];
-    setSelectedTime(first);
-  }
-
-  async function confirmBooking() {
-    setError(""); setLoading(true);
-    try {
-      const scheduledAt = buildScheduledAt(selectedDate, selectedTime);
-      const booking = await bookingsApi.create(pro.id, scheduledAt, notes || undefined);
-      setStep(3);
-      onBooked(booking);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? "Booking failed. Please try again.");
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <div className="absolute inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="flex-1" onClick={onClose} />
-      <div className="bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: "80%" }}>
-        <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
-        {step < 3 && (
-          <div className="flex items-center justify-between px-5 pb-3">
-            <div className="flex items-center gap-2">
-              {step > 1 && <button onClick={() => setStep(step - 1)} className="p-1"><ChevronLeft size={20} /></button>}
-              <h3 className="text-base font-bold">{step === 1 ? "Pick a Date & Time" : "Confirm Booking"}</h3>
-            </div>
-            <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
-          </div>
-        )}
-        <div className="px-5 pb-6 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-          {step === 1 && <>
-            <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3 mb-5">
-              <img src={pro.avatarUrl ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(pro.name)}&size=48`} alt={pro.name} className="w-12 h-12 rounded-xl object-cover" />
-              <div>
-                <p className="text-sm font-bold">{pro.name}</p>
-                <p className="text-xs text-gray-400">{pro.title}</p>
-                <div className="flex items-center gap-1 mt-0.5"><Star size={11} fill="#FBBF24" color="#FBBF24" /><span className="text-xs font-bold">{pro.rating.toFixed(1)}</span></div>
-              </div>
-              <div className="ml-auto text-right">
-                <p className="text-sm font-bold">₹{pro.basePrice}</p>
-                <p className="text-xs text-gray-400">{pro.priceUnit}</p>
-              </div>
-            </div>
-            <p className="text-xs font-bold mb-2.5">Select Date</p>
-            <div className="flex gap-2 mb-5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {dates.map((d) => (
-                <button key={d} onClick={() => handleDateChange(d)}
-                  className="flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all"
-                  style={{ background: selectedDate === d ? "#5B3EF5" : "#fff", color: selectedDate === d ? "#fff" : "#6B7280", borderColor: selectedDate === d ? "#5B3EF5" : "rgba(0,0,0,0.1)" }}>
-                  {d}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs font-bold mb-2.5">Select Time</p>
-            <div className="grid grid-cols-3 gap-2 mb-5">
-              {times.map((t) => {
-                const past = isPastTimeSlot(t, selectedDate);
-                const sel = selectedTime === t;
-                return (
-                  <button key={t}
-                    onClick={() => { if (!past) setSelectedTime(t); }}
-                    disabled={past}
-                    className="py-2.5 rounded-xl text-xs font-bold border transition-all"
-                    style={{
-                      background: past ? "#F3F4F6" : sel ? "#5B3EF5" : "#fff",
-                      color: past ? "#D1D5DB" : sel ? "#fff" : "#6B7280",
-                      borderColor: past ? "#E5E7EB" : sel ? "#5B3EF5" : "rgba(0,0,0,0.1)",
-                      cursor: past ? "not-allowed" : "pointer",
-                      opacity: past ? 0.6 : 1,
-                    }}>
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
-            <button onClick={() => setStep(2)} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-              Continue <ArrowRight size={16} />
-            </button>
-          </>}
-
-          {step === 2 && <>
-            <div className="flex flex-col gap-3 mb-5">
-              {[
-                { label: "Professional", value: pro.name },
-                { label: "Service", value: pro.title },
-                { label: "Date", value: selectedDate },
-                { label: "Time", value: selectedTime },
-                { label: "Amount", value: `₹${pro.basePrice}${pro.priceUnit}` },
-              ].map((r) => (
-                <div key={r.label} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                  <span className="text-xs text-gray-400">{r.label}</span>
-                  <span className="text-xs font-bold">{r.value}</span>
-                </div>
-              ))}
-            </div>
-            <textarea
-              placeholder="Add notes for the professional (optional)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none resize-none mb-4"
-              rows={2}
-            />
-            {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
-            <button
-              onClick={confirmBooking}
-              disabled={loading}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-              {loading ? "Booking…" : "Confirm Booking"}
-            </button>
-          </>}
-
-          {step === 3 && (
-            <div className="flex flex-col items-center py-6">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: "#DCFCE7" }}>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M6 16L13 23L26 9" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-              <h3 className="text-lg font-bold mb-1">Booking Confirmed!</h3>
-              <p className="text-xs text-gray-400 text-center mb-6">{pro.name} has been booked for {selectedDate} at {selectedTime}.</p>
-              <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>Done</button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1305,19 +1094,16 @@ function ProfileEditModal({ user, onSave, onClose }: {
    HOME TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustHome({
-  user, categories, professionals: _professionals, featuredServices, favoriteIds, wishlistIds, offers, reels, location,
-  onToggleFavorite, onToggleWishlist, onCategorySelect, onLocationPress, isLoggedIn, addToCart, onServicePress,
+  user, categories, featuredServices, wishlistIds, offers, reels, location,
+  onToggleWishlist, onCategorySelect, onLocationPress, isLoggedIn, addToCart, onServicePress,
 }: {
   user: ApiUser | null;
   categories: ApiCategory[];
-  professionals: ApiProfessional[];
   featuredServices: ApiService[];
-  favoriteIds: Set<string>;
   wishlistIds: Set<string>;
   offers: ApiOffer[];
   reels: ApiReel[];
   location: string;
-  onToggleFavorite: (id: string) => void;
   onToggleWishlist: (id: string) => void;
   onCategorySelect: (id: string) => void;
   onLocationPress: () => void;
@@ -1597,12 +1383,10 @@ function CustHome({
    SERVICES TAB
 ═══════════════════════════════════════════════════════════════ */
 function CustServices({
-  categories, favoriteIds, wishlistIds, onToggleFavorite, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange, onServicePress, onLoginRequired,
+  categories, wishlistIds, onToggleWishlist, initialCategoryId, isLoggedIn, onCartChange, onServicePress, onLoginRequired,
 }: {
   categories: ApiCategory[];
-  favoriteIds: Set<string>;
   wishlistIds: Set<string>;
-  onToggleFavorite: (id: string) => void;
   onToggleWishlist: (id: string) => void;
   initialCategoryId?: string | null;
   isLoggedIn: boolean;
@@ -1613,8 +1397,6 @@ function CustServices({
   const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subs, setSubs] = useState<ApiSubCategory[]>([]);
-  const [pros, setPros] = useState<ApiProfessional[]>([]);
-  const [prosLoading, setProsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [catalogue, setCatalogue] = useState<ApiService[]>([]);
   const [cart, setCart] = useState<ApiCart | null>(null);
@@ -1633,18 +1415,6 @@ function CustServices({
     if (!selectedCatId) { setSubs([]); return; }
     subcategoriesApi.listByCategory(selectedCatId).then(setSubs).catch(() => setSubs([]));
   }, [selectedCatId]);
-
-  // Fetch professionals when filters change
-  useEffect(() => {
-    setProsLoading(true);
-    const params: { categoryId?: string; subCategoryId?: string } = {};
-    if (selectedCatId) params.categoryId = selectedCatId;
-    if (selectedSubId) params.subCategoryId = selectedSubId;
-    professionalsApi.list(params)
-      .then(setPros)
-      .catch(() => setPros([]))
-      .finally(() => setProsLoading(false));
-  }, [selectedCatId, selectedSubId]);
 
   useEffect(() => {
     servicesApi.list({ categoryId: selectedCatId ?? undefined, subCategoryId: selectedSubId ?? undefined, q: search || undefined })
@@ -1669,9 +1439,6 @@ function CustServices({
 
   const selectedCat = selectedCatId ? categories.find((c) => c.id === selectedCatId) : null;
   const selectedSub = selectedSubId ? subs.find((s) => s.id === selectedSubId) : null;
-
-  // Never gate the list — show professionals immediately; subcategory is just a filter
-  const awaitingSubSelection = false;
 
   return (
     <div className="flex flex-col">
@@ -2377,14 +2144,14 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
               </div>
               <h3 className="text-lg font-bold mb-1">Booking Confirmed!</h3>
               <p className="text-xs text-gray-500 text-center mb-4">
-                Your booking is placed. We're finding the best available professional near you.
+                Your booking is placed. We're finding the best available service provider near you.
               </p>
 
               {/* Status timeline */}
               <div className="w-full bg-gray-50 rounded-2xl p-4 mb-4 text-left">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">What happens next</p>
                 {[
-                  { icon: "🔍", label: "Finding a partner", sub: "We're matching a verified pro near you", active: true },
+                  { icon: "🔍", label: "Finding a service provider", sub: "We're matching a verified provider near you", active: true },
                   { icon: "✅", label: "Partner accepts", sub: "You'll see their name in My Bookings", active: false },
                   { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + getCheckoutSlotLabel(selectedSlot, totalDurationMinutes), active: false },
                   { icon: "💳", label: "Pay after service", sub: "Cash, UPI, or card — your choice", active: false },
@@ -2553,7 +2320,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
   };
 
   const METHOD_LABELS: Record<string, { icon: React.ReactNode; label: string; desc: string }> = {
-    cash:       { icon: <Banknote size={20} color="#10B981" />, label: "Cash on Delivery", desc: "Pay the professional in cash" },
+    cash:       { icon: <Banknote size={20} color="#10B981" />, label: "Cash on Delivery", desc: "Pay on delivery in cash" },
     upi_manual: { icon: <Smartphone size={20} color="#3B82F6" />, label: "UPI Payment",      desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : "Pay via UPI" },
     razorpay:   { icon: <CreditCard size={20} color="#6366F1" />, label: "Card / Net Banking / UPI", desc: "Secure online payment" },
   };
@@ -2750,9 +2517,9 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
             <div className="w-3 h-3 rounded-full animate-pulse" style={{ background: "#7C3AED" }} />
           </div>
           <div>
-            <p className="text-sm font-bold" style={{ color: "#6D28D9" }}>Finding your professional</p>
+            <p className="text-sm font-bold" style={{ color: "#6D28D9" }}>Finding your service provider</p>
             <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "#7C3AED" }}>
-              We're matching the best available professional to your booking. This usually takes a few minutes — you'll be notified once confirmed.
+              We're matching the best available service provider to your booking. This usually takes a few minutes — you'll be notified once confirmed.
             </p>
           </div>
         </div>
@@ -2767,7 +2534,7 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
                 <div>
                   <h4 className="text-sm font-bold">{b.serviceName}</h4>
                   {b.status === "pending" ? (
-                    <p className="text-xs mt-0.5 italic font-medium" style={{ color: "#7C3AED" }}>Searching for professional…</p>
+                    <p className="text-xs mt-0.5 italic font-medium" style={{ color: "#7C3AED" }}>Matching a service provider…</p>
                   ) : (
                     <p className="text-xs text-gray-400 mt-0.5">{b.proName}</p>
                   )}
@@ -2822,7 +2589,7 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
               {tab === "searching" ? "No pending bookings" : tab === "upcoming" ? "No upcoming bookings" : "No past bookings"}
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              {tab === "searching" ? "Bookings waiting for a professional will appear here"
+              {tab === "searching" ? "Bookings being matched to a provider will appear here"
                : tab === "upcoming" ? "Book a service to get started"
                : "Completed and cancelled bookings will appear here"}
             </p>
@@ -3639,10 +3406,9 @@ export default function CustomerApp() {
   // Data
   const [categories, setCategories]           = useState<ApiCategory[]>([]);
   const [servicesInitCatId, setServicesInitCatId] = useState<string | null>(null);
-  const [professionals, setProfessionals]     = useState<ApiProfessional[]>([]);
   const [featuredServices, setFeaturedServices] = useState<ApiService[]>([]);
   const [bookings, setBookings]               = useState<ApiBooking[]>([]);
-  const [favoriteIds, setFavoriteIds]         = useState<Set<string>>(new Set());
+  const [favoriteIds, setFavoriteIds]         = useState<Set<string>>(new Set()); // kept for wishlist toggle compat
   const [wishlistIds, setWishlistIds]         = useState<Set<string>>(new Set());
   const [offers, setOffers]                   = useState<ApiOffer[]>([]);
   const [reels, setReels]                     = useState<ApiReel[]>([]);
@@ -3661,10 +3427,6 @@ export default function CustomerApp() {
   // Load public data on mount
   useEffect(() => {
     categoriesApi.list().then(setCategories).catch(console.error);
-    professionalsApi.list().then((data) => {
-      setProfessionals(data);
-      setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
-    }).catch(console.error);
     servicesApi.featured().then((data) => setFeaturedServices(data.services)).catch(console.error);
     offersApi.list().then(setOffers).catch(console.error);
     reelsApi.listActive().then(setReels).catch(console.error);
@@ -3674,10 +3436,6 @@ export default function CustomerApp() {
   useEffect(() => {
     if (!isLoggedIn) return;
     bookingsApi.list().then(setBookings).catch(console.error);
-    professionalsApi.list().then((data) => {
-      setProfessionals(data);
-      setFavoriteIds(new Set(data.filter((p) => p.isFavorite).map((p) => p.id)));
-    }).catch(console.error);
     addressesApi.list().then(setAddresses).catch(console.error);
     serviceWishlistApi.getIds().then(({ ids }) => setWishlistIds(new Set(ids))).catch(console.error);
   }, [isLoggedIn]);
@@ -3721,29 +3479,6 @@ export default function CustomerApp() {
       setWishlistIds((prev) => {
         const next = new Set(prev);
         next.has(serviceId) ? next.delete(serviceId) : next.add(serviceId);
-        return next;
-      });
-    }
-  }, [isLoggedIn]);
-
-  const handleToggleFavorite = useCallback(async (id: string) => {
-    if (!isLoggedIn) { setActiveTab("profile"); return; }
-    setFavoriteIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-    try {
-      const { isFavorite } = await favoritesApi.toggle(id);
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        isFavorite ? next.add(id) : next.delete(id);
-        return next;
-      });
-    } catch {
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        next.has(id) ? next.delete(id) : next.add(id);
         return next;
       });
     }
@@ -3907,13 +3642,10 @@ export default function CustomerApp() {
           featuredServices={featuredServices}
           user={user}
           categories={categories}
-          professionals={professionals}
-          favoriteIds={favoriteIds}
           wishlistIds={wishlistIds}
           offers={offers}
           reels={reels}
           location={location}
-          onToggleFavorite={handleToggleFavorite}
           onToggleWishlist={handleToggleWishlist}
           onCategorySelect={handleCategorySelect}
           onLocationPress={() => setShowLocationPicker(true)}
@@ -3925,9 +3657,7 @@ export default function CustomerApp() {
       {activeTab === "services" && (
         <CustServices
           categories={categories}
-          favoriteIds={favoriteIds}
           wishlistIds={wishlistIds}
-          onToggleFavorite={handleToggleFavorite}
           onToggleWishlist={handleToggleWishlist}
           initialCategoryId={servicesInitCatId}
           isLoggedIn={isLoggedIn}

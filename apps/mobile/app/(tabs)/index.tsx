@@ -11,8 +11,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi, professionalsApi, offersApi, addressesApi, notificationsApi, reelsApi, servicesApi, cartApi, type Offer, type Reel } from '@/lib/api';
-import { ProCardShimmer } from '@/components/Shimmer';
+import { categoriesApi, offersApi, addressesApi, notificationsApi, reelsApi, servicesApi, cartApi, type Offer, type Reel } from '@/lib/api';
 import { storage } from '@/lib/storage';
 import { WebView } from 'react-native-webview';
 
@@ -200,11 +199,6 @@ export default function HomeScreen() {
   });
   const availableCategories = (categories ?? []).filter((category) => category.serviceCount > 0);
 
-  const { data: professionals, isLoading: prosLoading, refetch } = useQuery({
-    queryKey: ['/api/professionals'],
-    queryFn: () => professionalsApi.list(),
-  });
-
   const { data: offers = [], isLoading: offersLoading } = useQuery({
     queryKey: ['/api/offers'],
     queryFn: offersApi.listActive,
@@ -269,9 +263,9 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetchCategories()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetchCategories]);
 
   const { data: featuredCatalogue, isLoading: featuredServicesLoading } = useQuery({
     queryKey: ['/api/services/featured'],
@@ -413,7 +407,7 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Featured Services</Text>
         </View>
         {featuredServicesLoading ? (
-          [0, 1, 2].map((i) => <ProCardShimmer key={i} />)
+          [0, 1, 2].map((i) => <View key={i} style={{ height: 80, borderRadius: 12, backgroundColor: colors.muted, marginBottom: 12 }} />)
         ) : (
           featuredServices.slice(0, 6).map((service) => (
             <TouchableOpacity
