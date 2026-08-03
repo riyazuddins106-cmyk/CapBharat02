@@ -5,7 +5,7 @@
 
 ## Overall Completion: ~97%
 
-The platform is feature-complete and end-to-end tested. All core flows work. The main gap is **missing Supabase secrets** in this Replit environment — the app cannot connect to a database until those are added.
+The platform is feature-complete and end-to-end tested. All core flows work. Supabase and JWT secrets are configured, dependencies are installed, migrations are applied idempotently, and the main customer web/API workflow is running in preview.
 
 ---
 
@@ -120,6 +120,12 @@ The platform is feature-complete and end-to-end tested. All core flows work. The
 ### Task: Secrets + database connected
 - All 8 secrets added: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET, NGROK_AUTHTOKEN, NGROK_AUTHTOKEN_2
 - Server started, migrations ran successfully, DB connected ✅
+
+### Task: Imported master prompt and project setup verified (2026-08-03)
+- Read the uploaded marketplace requirements from `attached_assets/`.
+- Installed the locked pnpm workspace dependencies successfully.
+- Started the main application workflow and confirmed the customer web preview renders.
+- Confirmed the database startup migration path is idempotent against the configured Supabase database.
 
 ### Task: Expo tunnel fix
 - Root cause: `REPLIT_EXPO_DEV_DOMAIN` set → script took exp.direct path → "failed to download" in Expo Go

@@ -20,7 +20,6 @@ Use this skill when:
 - Runtime errors or logic bugs (use logs and debugging)
 - Small changes that don't need LSP validation
 - Code search (use grep/glob tools)
-- Reverting a Clerk authentication migration -- load the `replit-auth` skill instead, which has the full procedure.
 
 ## Available Functions
 

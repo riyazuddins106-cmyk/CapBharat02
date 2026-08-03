@@ -8,7 +8,7 @@
 
 ## ▶ Current Task
 **Task:** Enable booking multiple different services in one order (foundation overhaul)
-**Status:** IN_PROGRESS — backend complete, migrations pending (need DB secrets)
+**Status:** COMPLETE — backend, migrations, secrets, and server startup verified
 
 ### Checklist
 - [x] DB Schema: `orders.ts` — master order table + orderStatusEnum
