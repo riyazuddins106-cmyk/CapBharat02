@@ -1,0 +1,622 @@
+# PROJECT: Build Advanced Marketplace Booking System (Urban Company Style)
+
+## Team Development Instructions
+
+You are part of a development team.
+
+The application already contains:
+
+- Customer Mobile App (React Native Expo)
+- Customer Web App (React)
+- Partner Mobile App
+- Admin Panel
+- Backend APIs
+- Database
+
+The current booking flow exists, but the business requirement is changing.
+
+Current flow:
+
+Customer
+→ Single Service
+→ Single Partner
+→ Payment
+
+
+New required flow:
+
+Customer
+→ Multiple Services Cart
+→ Master Order
+→ Individual Service Bookings
+→ Multiple Partner Assignment
+→ Service-wise Payment
+→ Partner Earnings
+→ Admin Management
+
+
+Important Rules:
+
+- Do not redesign UI.
+- Do not remove existing working features unnecessarily.
+- Follow existing project architecture.
+- Maintain backward compatibility where possible.
+- Do not create duplicate logic.
+- Analyze existing code before making changes.
+- Keep database and API changes documented.
+- Test your assigned module before completion.
+
+
+====================================================
+
+MEMBER 1 — CORE BOOKING ARCHITECTURE + DATABASE
+====================================================
+
+Responsible for backend foundation.
+
+Implement:
+
+Master Order architecture:
+
+Master Order
+ |
+ |-- Service Booking 1
+ |       |
+ |       Partner Assignment
+ |
+ |-- Service Booking 2
+         |
+         Partner Assignment
+
+
+Create/update database models:
+
+Master Order:
+
+- Order ID
+- Customer ID
+- Address
+- Booking Date
+- Preferred Start Time
+- Total Amount
+- Payment Summary
+- Overall Order Status
+
+
+Service Booking:
+
+- Master Order ID
+- Service ID
+- Category
+- Duration
+- Price
+- Partner ID
+- Partner Status
+- Service Status
+- Payment Status
+- Partner Earnings
+
+
+Create required backend APIs.
+
+Support:
+
+- Multiple services in one order
+- Multiple partners in one order
+- Existing single-service bookings
+
+
+Provide:
+
+- Database changes
+- API changes
+- Files modified
+- Testing report
+
+
+====================================================
+
+MEMBER 2 — CUSTOMER CART + MULTI SERVICE CHECKOUT
+====================================================
+
+Implement new customer ordering system.
+
+Customer should be able to:
+
+Add multiple services:
+
+Example:
+
+AC Service
+₹500
+
+Bathroom Cleaning
+₹1200
+
+
+Checkout creates:
+
+One Master Order
+
+Multiple Service Bookings
+
+
+Update:
+
+Customer Mobile:
+
+- Cart
+- Add/remove services
+- Checkout
+- Booking creation
+
+
+Customer Web:
+
+- Cart
+- Checkout
+- Booking creation
+
+
+Backend integration:
+
+- Send multiple services
+- Create master order
+- Create child service bookings
+
+
+Do not redesign existing UI.
+
+
+====================================================
+
+MEMBER 3 — SCHEDULING + TIME SLOT ENGINE
+====================================================
+
+Implement professional scheduling.
+
+Remove fixed duration slots.
+
+Do not use:
+
+1 PM - 3 PM
+3 PM - 6 PM
+
+
+Use arrival start times:
+
+9:00 AM
+9:30 AM
+10:00 AM
+10:30 AM
+
+
+Customer selects:
+
+10:00 AM
+
+
+System calculates:
+
+AC Service:
+
+10 AM - 11 AM
+
+
+Cleaning:
+
+10 AM - 1 PM
+
+
+Customer display:
+
+Expected Service Window:
+
+10 AM - 1 PM
+
+
+Important:
+
+Use longest service duration.
+
+Do not add durations.
+
+
+Implement:
+
+- Time slot calculation
+- Service duration engine
+- Booking window calculation
+- Partner availability calculation
+
+
+====================================================
+
+MEMBER 4 — PARTNER SEARCH + ASSIGNMENT ENGINE
+====================================================
+
+Implement automatic partner matching.
+
+
+After order creation:
+
+Status:
+
+Searching For Partners
+
+
+Search separately:
+
+AC Service:
+
+Find AC technicians
+
+
+Cleaning:
+
+Find cleaning partners
+
+
+Matching rules:
+
+- Skill
+- Category
+- Location
+- Working hours
+- Availability
+- Existing bookings
+
+
+Implement:
+
+- Partner calendar
+- Duration blocking
+- Search timeout
+- Retry search
+- Radius expansion
+
+
+Example:
+
+AC Partner:
+
+10 AM - 11 AM
+
+
+Cleaning Partner:
+
+10 AM - 1 PM
+
+
+====================================================
+
+MEMBER 5 — PARTNER MOBILE APP
+====================================================
+
+Update Partner App.
+
+Partner sees only assigned services.
+
+
+Example:
+
+AC Technician:
+
+
+AC Service
+
+Customer details
+
+Time:
+
+10 AM
+
+Duration:
+
+1 hour
+
+
+Implement:
+
+- Booking request
+- Accept
+- Reject
+- Customer details
+- Navigation
+- Check-in
+- Start service
+- Complete service
+
+
+Partner should not see customer's other services.
+
+
+====================================================
+
+MEMBER 6 — CUSTOMER MOBILE APP
+====================================================
+
+Update Customer Mobile App.
+
+Implement:
+
+- Service browsing
+- Cart
+- Checkout
+- Booking confirmation
+- Upcoming bookings
+- Booking details
+- Notifications
+- Payment status
+
+
+Customer display:
+
+
+Order #1001
+
+
+AC Service
+
+Partner:
+Raj
+
+10 AM - 11 AM
+
+Payment:
+Paid
+
+
+Bathroom Cleaning
+
+Searching Partner
+
+
+Show individual service status.
+
+
+====================================================
+
+MEMBER 7 — CUSTOMER WEB APP
+====================================================
+
+Implement same workflow in Customer Web.
+
+
+Customer Web must match Mobile behavior.
+
+
+Implement:
+
+- Service listing
+- Multi-service cart
+- Checkout
+- Booking creation
+- Booking history
+- Upcoming bookings
+- Booking details
+- Notifications
+- Payment screens
+
+
+Data must sync through backend APIs.
+
+
+Example:
+
+Mobile booking created:
+
+Visible on Web
+
+
+Partner accepted:
+
+Visible everywhere
+
+
+====================================================
+
+MEMBER 8 — PAYMENT + WALLET + EARNINGS
+====================================================
+
+Implement service-level payment.
+
+
+Rules:
+
+
+Before partner assignment:
+
+Payment:
+
+Waiting for partner confirmation
+
+
+After acceptance:
+
+Payment:
+
+Pending
+
+
+After partner check-in:
+
+Generate payment request.
+
+
+Example:
+
+
+AC Service:
+
+₹500
+
+Pay Now
+
+
+Cleaning:
+
+₹1200
+
+Pay Now
+
+
+Implement:
+
+- Service payments
+- Transactions
+- Commission
+- Partner wallet
+- Partner earnings
+- Payout records
+
+
+Example:
+
+₹500:
+
+Commission 20%
+
+Partner:
+₹400
+
+Platform:
+₹100
+
+
+====================================================
+
+MEMBER 9 — ADMIN PANEL MARKETPLACE MANAGEMENT
+====================================================
+
+Update Admin Panel.
+
+
+Admin should see:
+
+
+Order #1001
+
+
+AC Service
+
+Partner:
+Raj
+
+Status:
+Completed
+
+Amount:
+₹500
+
+
+Cleaning Service
+
+Partner:
+Searching
+
+Amount:
+₹1200
+
+
+Implement:
+
+Admin controls:
+
+- Service duration
+- Partner assignment rules
+- Search timeout
+- Commission
+- Payments
+- Earnings
+- Refunds
+
+
+Maintain existing admin functionality.
+
+
+====================================================
+
+MEMBER 10 — FINAL INTEGRATION + TESTING
+====================================================
+
+Perform complete system testing.
+
+
+Test:
+
+1. Single service booking
+
+2. Multiple service booking
+
+3. Two different partners
+
+4. Partner acceptance
+
+5. Partial confirmation
+
+6. Continue searching
+
+7. Cancel individual service
+
+8. Partner check-in
+
+9. Service-wise payment
+
+10. Partner earnings
+
+11. Admin visibility
+
+12. Mobile-Web synchronization
+
+
+Check:
+
+Customer Mobile
+Customer Web
+Partner App
+Admin Panel
+Backend
+Database
+
+
+Fix:
+
+- API issues
+- Data sync issues
+- UI bugs
+- Workflow problems
+
+
+Provide final report:
+
+- Issues found
+- Fixes applied
+- Remaining issues
+
+
+====================================================
+
+FINAL DEVELOPMENT FLOW
+
+Member 1
+↓
+Member 2
+↓
+Member 3
+↓
+Member 4
+↓
+Member 5
+↓
+Member 6
+↓
+Member 7
+↓
+Member 8
+↓
+Member 9
+↓
+Member 10
+
+Each member must commit/save changes before next member continues.
