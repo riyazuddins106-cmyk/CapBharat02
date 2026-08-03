@@ -76,6 +76,9 @@ importers:
 
   apps/customer-web:
     dependencies:
+      '@servenow/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@emotion/react':
         specifier: 11.14.0
         version: 11.14.0(@types/react@18.3.12)(react@18.3.1)

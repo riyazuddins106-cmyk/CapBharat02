@@ -7,10 +7,26 @@
 ---
 
 ## ▶ Current Task
-**Task:** Enable booking multiple different services in one order (foundation overhaul)
-**Status:** COMPLETE — backend, migrations, secrets, and server startup verified
+**Task:** Add dynamic 30-minute booking start times and longest-duration service windows
+**Status:** IN PROGRESS
 
 ### Checklist
+- [x] Replace fixed time-slot list with configurable 30-minute start times
+- [x] Update customer mobile checkout to use generated start times
+- [x] Update customer web checkout to use generated start times
+- [x] Validate booking windows using the longest cart-item duration
+- [x] Verify affected TypeScript packages and update project memory
+
+### Verification Notes
+- Customer web production build passed.
+- Admin panel production build passed.
+- Main application workflow started successfully; API migrations completed and API is listening.
+- Server build still reports four pre-existing logger signature errors in `server/src/controllers/payment.controller.ts`; no unrelated changes were made.
+- Shared slot utility check was blocked by the filtered package runner not exposing `tsx`; the customer web build exercises the shared utility import successfully.
+
+**Status:** COMPLETE
+
+### Previous Task — Complete
 - [x] DB Schema: `orders.ts` — master order table + orderStatusEnum
 - [x] DB Schema: `orderItems.ts` — per-service order_items table + orderItemStatusEnum
 - [x] DB Schema: `orderItemRequests.ts` — per-item partner request tracking

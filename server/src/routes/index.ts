@@ -40,12 +40,12 @@ router.get('/booking-config', async (_req, res) => {
       maxAdvanceDays: 30,
       openingHour: 8,
       closingHour: 20,
-      slotIntervalMinutes: 120,
+      slotIntervalMinutes: 30,
     };
     const config = row ? { ...defaults, ...JSON.parse(row.value) } : defaults;
     res.json({ success: true, data: config });
   } catch {
-    res.json({ success: true, data: { minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 30, openingHour: 8, closingHour: 20, slotIntervalMinutes: 120 } });
+    res.json({ success: true, data: { minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 30, openingHour: 8, closingHour: 20, slotIntervalMinutes: 30 } });
   }
 });
 

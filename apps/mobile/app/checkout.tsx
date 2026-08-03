@@ -19,6 +19,7 @@ type BookingConfig = {
   maxAdvanceDays: number;
   openingHour: number;
   closingHour: number;
+  slotIntervalMinutes: number;
 };
 const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   minAdvanceMinutes: 30,
@@ -26,6 +27,7 @@ const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   maxAdvanceDays: 30,
   openingHour: 8,
   closingHour: 20,
+  slotIntervalMinutes: 30,
 };
 
 function buildScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
@@ -100,8 +102,13 @@ export default function CheckoutScreen() {
 
   // ── Dynamic 30-min slot list based on booking config ──────────────────────
   const timeSlots = useMemo(() =>
-    generateTimeSlots(bookingConfig.openingHour, bookingConfig.closingHour, 30, maxDurationMinutes),
-    [bookingConfig.openingHour, bookingConfig.closingHour, maxDurationMinutes],
+    generateTimeSlots(
+      bookingConfig.openingHour,
+      bookingConfig.closingHour,
+      bookingConfig.slotIntervalMinutes,
+      maxDurationMinutes,
+    ),
+    [bookingConfig.openingHour, bookingConfig.closingHour, bookingConfig.slotIntervalMinutes, maxDurationMinutes],
   );
 
   // ── Compute disabled slots for the selected date ───────────────────────────
@@ -378,7 +385,7 @@ export default function CheckoutScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
               <Text style={{ fontSize: 12, color: colors.mutedForeground }}>
-                Total job duration: <Text style={{ fontWeight: '600', color: colors.foreground }}>{formatDuration(totalDurationMinutes)}</Text>
+                Longest service duration: <Text style={{ fontWeight: '600', color: colors.foreground }}>{formatDuration(maxDurationMinutes)}</Text>
               </Text>
             </View>
             {selectedDate === 'Today' && !bookingConfig.sameDayBooking && (
@@ -455,8 +462,8 @@ export default function CheckoutScreen() {
 
             {[
               { label: 'Date', value: selectedDate },
-              { label: 'Time', value: getSlotLabel(selectedSlot, totalDurationMinutes) },
-              { label: 'Duration', value: formatDuration(totalDurationMinutes) },
+              { label: 'Time', value: getServiceWindowLabel(selectedSlot, maxDurationMinutes) },
+              { label: 'Duration', value: formatDuration(maxDurationMinutes) },
               { label: 'Address', value: selectedAddress ? `${selectedAddress.line1}, ${selectedAddress.city}` : 'Not selected' },
             ].map((r) => (
               <View key={r.label} style={[styles.infoRow, { backgroundColor: colors.card, borderColor: colors.border }]}>

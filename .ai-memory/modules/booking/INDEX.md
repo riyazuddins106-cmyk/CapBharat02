@@ -22,7 +22,7 @@
   "maxAdvanceDays": 30,
   "openingHour": 8,
   "closingHour": 20,
-  "slotIntervalMinutes": 120
+  "slotIntervalMinutes": 30
 }
 ```
 Admin configures at Admin Panel → Settings → Booking Settings. Changes apply immediately.
@@ -39,5 +39,8 @@ Checks in order: past slot → same-day → max advance days → business hours 
 ## Public Endpoint
 `GET /api/booking-config` — no auth required, used by checkout UI to load config.
 
-## Time Slots (fixed 2-hour blocks)
-`9 AM - 11 AM` | `11 AM - 1 PM` | `2 PM - 4 PM` | `4 PM - 6 PM` | `6 PM - 8 PM`
+## Time Slots
+- Checkout generates start times at the configured interval (30 minutes by default).
+- A start time is shown only when the longest service duration in the cart ends by the configured closing hour.
+- The customer-facing service window is calculated as `start + max(cart item durations)` because services may run in parallel.
+- Legacy fixed-slot exports remain only for backward compatibility.

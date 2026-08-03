@@ -5720,7 +5720,7 @@ const DEFAULT_BOOKING_CFG: BookingCfg = {
   maxAdvanceDays: 30,
   openingHour: 8,
   closingHour: 20,
-  slotIntervalMinutes: 120,
+  slotIntervalMinutes: 30,
 };
 
 function BookingSettingsView({ accessToken }: { accessToken: string }) {

@@ -3,7 +3,7 @@
  * Start hours only — end time is computed dynamically from cart duration.
  */
 
-/** Fixed slot start hours (24-h). @deprecated use generateTimeSlots instead */
+/** Legacy fixed slot start hours (24-h). @deprecated use generateTimeSlots instead */
 export const SLOT_START_HOURS = [9, 11, 14, 16, 18] as const;
 export type SlotStartHour = (typeof SLOT_START_HOURS)[number];
 
@@ -80,7 +80,7 @@ export function formatDuration(minutes: number): string {
 }
 
 // ─── Legacy exports (kept for any existing consumers) ────────────────────────
-/** @deprecated Use SLOT_START_HOURS + getSlotLabel instead. */
+/** @deprecated Use generateTimeSlots + formatSlotTime instead. */
 export const TIME_SLOTS = [
   '9 AM - 11 AM',
   '11 AM - 1 PM',
@@ -91,7 +91,7 @@ export const TIME_SLOTS = [
 
 export type TimeSlot = (typeof TIME_SLOTS)[number];
 
-/** @deprecated Use SLOT_START_HOURS + getSlotLabel instead. */
+/** @deprecated Use generateTimeSlots + formatSlotTime instead. */
 export const SLOT_HOURS: Record<string, number> = {
   '9 AM - 11 AM': 9,
   '11 AM - 1 PM': 11,

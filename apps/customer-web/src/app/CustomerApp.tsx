@@ -19,6 +19,7 @@ import {
   type ApiNotification, type ApiPointsSummary, type ApiWishlistedService,
   type ApiSupportTicket, type ApiPolicy,
 } from "../lib/api";
+import { generateTimeSlots, formatSlotTime, getServiceWindowLabel, formatDuration } from "@servenow/shared";
 
 /* ─────────────────────────── Category icon map ─────────────────── */
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -1641,39 +1642,21 @@ function CustServices({
 /* ═══════════════════════════════════════════════════════════════
    CHECKOUT FLOW  (cart → address → date → time → summary → done)
 ═══════════════════════════════════════════════════════════════ */
-function _fmtSlotTime(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const period = h >= 12 ? "PM" : "AM";
-  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return m === 0 ? `${display} ${period}` : `${display}:${String(m).padStart(2, "0")} ${period}`;
-}
-function getServiceWindowStr(startTotalMinutes: number, maxDurationMinutes: number): string {
-  const end = startTotalMinutes + maxDurationMinutes;
-  const h = Math.floor(maxDurationMinutes / 60), min = maxDurationMinutes % 60;
-  const dur = min === 0 ? `${h}h` : `${h}h ${min}min`;
-  return `${_fmtSlotTime(startTotalMinutes)} – ${_fmtSlotTime(end)} · Approx ${dur}`;
-}
-function generateCheckoutSlots(openingHour: number, closingHour: number, maxDurationMinutes: number): number[] {
-  const slots: number[] = [];
-  const open = openingHour * 60, close = closingHour * 60;
-  for (let m = open; m + maxDurationMinutes <= close; m += 30) slots.push(m);
-  return slots;
-}
-function formatCheckoutDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}min`;
-}
 
 type CheckoutBookingConfig = {
   minAdvanceMinutes: number;
   sameDayBooking: boolean;
   openingHour: number;
   closingHour: number;
+  slotIntervalMinutes: number;
 };
-const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = { minAdvanceMinutes: 30, sameDayBooking: true, openingHour: 8, closingHour: 20 };
+const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = {
+  minAdvanceMinutes: 30,
+  sameDayBooking: true,
+  openingHour: 8,
+  closingHour: 20,
+  slotIntervalMinutes: 30,
+};
 
 function buildSlotScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
   const base = new Date();
@@ -1741,8 +1724,13 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
 
   // ── Dynamic 30-min slots ──────────────────────────────────────────────────
   const timeSlots = useMemo(() =>
-    generateCheckoutSlots(bookingCfg.openingHour, bookingCfg.closingHour, maxDurationMinutes),
-    [bookingCfg.openingHour, bookingCfg.closingHour, maxDurationMinutes],
+    generateTimeSlots(
+      bookingCfg.openingHour,
+      bookingCfg.closingHour,
+      bookingCfg.slotIntervalMinutes,
+      maxDurationMinutes,
+    ),
+    [bookingCfg.openingHour, bookingCfg.closingHour, bookingCfg.slotIntervalMinutes, maxDurationMinutes],
   );
 
   // Compute disabled slots for the selected date
@@ -2036,7 +2024,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
               <p className="text-xs font-bold text-gray-500 mb-1">Pick a time for {selectedDate}</p>
               {/* Duration badge */}
               <p className="text-xs text-gray-400 mb-3">
-                Total job duration: <span className="font-semibold text-gray-600">{formatCheckoutDuration(totalDurationMinutes)}</span>
+                 Longest service duration: <span className="font-semibold text-gray-600">{formatDuration(maxDurationMinutes)}</span>
               </p>
               {selectedDate === 'Today' && !bookingCfg.sameDayBooking && (
                 <div className="mb-3 px-3 py-2 rounded-xl text-xs font-medium bg-amber-50 border border-amber-200 text-amber-700">
@@ -2048,7 +2036,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 <Clock size={18} color="#5B3EF5" />
                 <div>
                   <p className="text-xs font-semibold text-purple-400 mb-0.5">Expected service window</p>
-                  <p className="text-sm font-bold text-purple-900">{getServiceWindowStr(selectedSlot, maxDurationMinutes)}</p>
+                 <p className="text-sm font-bold text-purple-900">{getServiceWindowLabel(selectedSlot, maxDurationMinutes)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2 mb-5">
@@ -2069,7 +2057,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                         opacity: isDisabled ? 0.6 : 1,
                       }}
                     >
-                      {_fmtSlotTime(startM)}
+                       {formatSlotTime(startM)}
                       {isDisabled && <span style={{ fontSize: 9, color: "#D1D5DB" }}>Unavailable</span>}
                     </button>
                   );
@@ -2114,8 +2102,8 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 </div>
                 {[
                   { label: "Date", value: selectedDate },
-                  { label: "Time", value: getCheckoutSlotLabel(selectedSlot, totalDurationMinutes) },
-                  { label: "Duration", value: formatCheckoutDuration(totalDurationMinutes) },
+                   { label: "Time", value: getServiceWindowLabel(selectedSlot, maxDurationMinutes) },
+                   { label: "Duration", value: formatDuration(maxDurationMinutes) },
                   {
                     label: "Address",
                     value: selectedAddress
@@ -2168,7 +2156,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 {[
                   { icon: "🔍", label: "Finding a service provider", sub: "We're matching a verified provider near you", active: true },
                   { icon: "✅", label: "Partner accepts", sub: "You'll see their name in My Bookings", active: false },
-                  { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + getCheckoutSlotLabel(selectedSlot, totalDurationMinutes), active: false },
+                   { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + getServiceWindowLabel(selectedSlot, maxDurationMinutes), active: false },
                   { icon: "💳", label: "Pay after service", sub: "Cash, UPI, or card — your choice", active: false },
                 ].map((s, i) => (
                   <div key={i} className="flex items-start gap-3 mb-2 last:mb-0">

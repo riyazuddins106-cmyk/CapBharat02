@@ -153,7 +153,7 @@ function getDefaults(key: string): object {
       maxAdvanceDays:      7,
       openingHour:         9,
       closingHour:         20,
-      slotIntervalMinutes: 120,
+      slotIntervalMinutes: 30,
     };
   }
   return {};

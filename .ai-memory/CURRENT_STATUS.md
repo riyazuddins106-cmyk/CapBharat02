@@ -110,9 +110,18 @@ The platform is feature-complete and end-to-end tested. All core flows work. Sup
 - "Pay Now" button in My Bookings now shows for `pending` bookings too (not just upcoming/in_progress/completed)
 - Added `onPaymentComplete` callback to `CheckoutFlow` — after payment, closes cart and navigates to Bookings tab with refreshed data
 
+### Task: Dynamic 30-minute booking start times and longest-duration windows (2026-08-03)
+- Replaced stale fixed-slot checkout references with the shared 30-minute slot generator.
+- Both customer web and mobile now honor the configured `slotIntervalMinutes` and only show starts that fit the longest service duration before closing.
+- Checkout summaries and expected-window displays now use the longest parallel service duration rather than a summed duration.
+- Aligned public API, admin settings, and client fallback defaults to a 30-minute interval.
+- Customer web now declares its workspace dependency on `@servenow/shared`.
+- Customer web and admin production builds passed; main workflow migrations and API startup passed.
+- Server build remains blocked by four pre-existing logger signature errors in `server/src/controllers/payment.controller.ts`.
+
 ### Task: Booking slot config enhancement
 - `server/src/controllers/cart.controller.ts` — added `minAdvanceMinutes` per cart item
-- `server/src/controllers/platformSettings.controller.ts` — added `slotIntervalMinutes: 120` to default
+- `server/src/controllers/platformSettings.controller.ts` — added configurable `slotIntervalMinutes` to default
 - `apps/admin-web/src/app/App.tsx` — added Slot Duration slider in Booking Settings
 - `apps/mobile/lib/api.ts` + `apps/mobile/app/checkout.tsx` — effectiveMinAdvance from cart items
 - `apps/customer-web/src/lib/api.ts` + `apps/customer-web/src/app/CustomerApp.tsx` — same
