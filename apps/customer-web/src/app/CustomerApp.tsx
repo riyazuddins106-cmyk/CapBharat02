@@ -1641,17 +1641,24 @@ function CustServices({
 /* ═══════════════════════════════════════════════════════════════
    CHECKOUT FLOW  (cart → address → date → time → summary → done)
 ═══════════════════════════════════════════════════════════════ */
-const CHECKOUT_SLOT_START_HOURS = [9, 11, 14, 16, 18] as const;
-
-function _fmtMin(totalMinutes: number): string {
+function _fmtSlotTime(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   const period = h >= 12 ? "PM" : "AM";
   const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
   return m === 0 ? `${display} ${period}` : `${display}:${String(m).padStart(2, "0")} ${period}`;
 }
-function getCheckoutSlotLabel(startHour: number, durationMinutes: number): string {
-  return `${_fmtMin(startHour * 60)} - ${_fmtMin(startHour * 60 + durationMinutes)}`;
+function getServiceWindowStr(startTotalMinutes: number, maxDurationMinutes: number): string {
+  const end = startTotalMinutes + maxDurationMinutes;
+  const h = Math.floor(maxDurationMinutes / 60), min = maxDurationMinutes % 60;
+  const dur = min === 0 ? `${h}h` : `${h}h ${min}min`;
+  return `${_fmtSlotTime(startTotalMinutes)} – ${_fmtSlotTime(end)} · Approx ${dur}`;
+}
+function generateCheckoutSlots(openingHour: number, closingHour: number, maxDurationMinutes: number): number[] {
+  const slots: number[] = [];
+  const open = openingHour * 60, close = closingHour * 60;
+  for (let m = open; m + maxDurationMinutes <= close; m += 30) slots.push(m);
+  return slots;
 }
 function formatCheckoutDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -1668,8 +1675,7 @@ type CheckoutBookingConfig = {
 };
 const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = { minAdvanceMinutes: 30, sameDayBooking: true, openingHour: 8, closingHour: 20 };
 
-function buildSlotScheduledAt(dateLabel: string, startHour: number): string {
-  const hour = startHour;
+function buildSlotScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
   const base = new Date();
   if (dateLabel === "Tomorrow") base.setDate(base.getDate() + 1);
   else if (dateLabel !== "Today") {
@@ -1686,7 +1692,7 @@ function buildSlotScheduledAt(dateLabel: string, startHour: number): string {
       }
     }
   }
-  base.setHours(hour, 0, 0, 0);
+  base.setHours(Math.floor(slotTotalMinutes / 60), slotTotalMinutes % 60, 0, 0);
   return base.toISOString();
 }
 
@@ -1714,7 +1720,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
   });
   const [selectedDate, setSelectedDate] = useState("Today");
-  const [selectedSlot, setSelectedSlot] = useState<number>(9); // start hour
+  const [selectedSlot, setSelectedSlot] = useState<number>(9 * 60); // total minutes since midnight
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
   const [bookingCfg, setBookingCfg] = useState<CheckoutBookingConfig>(DEFAULT_CHECKOUT_CFG);
@@ -1727,11 +1733,17 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
       .catch(() => {});
   }, []);
 
-  // ── Total duration from cart (sum of quantity × duration per item) ──────────
-  const totalDurationMinutes = useMemo(() => {
+  // ── Max service duration (services run in parallel — use longest, not sum) ──
+  const maxDurationMinutes = useMemo(() => {
     if (!cart.items.length) return 60;
-    return cart.items.reduce((sum, item) => sum + item.duration * item.quantity, 0);
+    return cart.items.reduce((max, item) => Math.max(max, item.duration * item.quantity), 60);
   }, [cart]);
+
+  // ── Dynamic 30-min slots ──────────────────────────────────────────────────
+  const timeSlots = useMemo(() =>
+    generateCheckoutSlots(bookingCfg.openingHour, bookingCfg.closingHour, maxDurationMinutes),
+    [bookingCfg.openingHour, bookingCfg.closingHour, maxDurationMinutes],
+  );
 
   // Compute disabled slots for the selected date
   const disabledSlots = useMemo(() => {
@@ -1739,32 +1751,29 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     const isToday = selectedDate === 'Today';
     const disabled = new Set<number>();
     if (isToday && !bookingCfg.sameDayBooking) {
-      CHECKOUT_SLOT_START_HOURS.forEach(h => disabled.add(h));
+      timeSlots.forEach(m => disabled.add(m));
       return disabled;
     }
-    // Effective min advance = strictest of global config + any per-service overrides in cart
     const cartItemOverrides = cart.items
       .map(item => item.minAdvanceMinutes)
       .filter((v): v is number => v != null);
     const effectiveMinAdvance = Math.max(bookingCfg.minAdvanceMinutes, ...cartItemOverrides);
-    const earliestHour = isToday
-      ? now.getHours() + (now.getMinutes() + effectiveMinAdvance) / 60
+    const earliestMinutes = isToday
+      ? now.getHours() * 60 + now.getMinutes() + effectiveMinAdvance
       : 0;
-    CHECKOUT_SLOT_START_HOURS.forEach(startH => {
-      const endHour = startH + totalDurationMinutes / 60;
-      if (startH < bookingCfg.openingHour || endHour > bookingCfg.closingHour) disabled.add(startH);
-      else if (isToday && startH < earliestHour) disabled.add(startH);
+    timeSlots.forEach(startM => {
+      if (isToday && startM < earliestMinutes) disabled.add(startM);
     });
     return disabled;
-  }, [selectedDate, bookingCfg, cart, totalDurationMinutes]);
+  }, [selectedDate, bookingCfg, cart, timeSlots]);
 
   // Auto-select first available slot when date/config changes
   useEffect(() => {
-    if (disabledSlots.has(selectedSlot)) {
-      const first = CHECKOUT_SLOT_START_HOURS.find(h => !disabledSlots.has(h));
+    if (disabledSlots.has(selectedSlot) || !timeSlots.includes(selectedSlot)) {
+      const first = timeSlots.find(m => !disabledSlots.has(m));
       if (first !== undefined) setSelectedSlot(first);
     }
-  }, [disabledSlots]);
+  }, [disabledSlots, timeSlots]);
   const [bookingDone, setBookingDone] = useState(false);
   const [createdBooking, setCreatedBooking] = useState<ApiBooking | null>(null);
   const [payAfterBook, setPayAfterBook] = useState(false);
@@ -2034,17 +2043,24 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                   Same-day bookings are unavailable. Please go back and select a future date.
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                {CHECKOUT_SLOT_START_HOURS.map((startH) => {
-                  const isDisabled = disabledSlots.has(startH);
-                  const isSelected = selectedSlot === startH;
-                  const label = getCheckoutSlotLabel(startH, totalDurationMinutes);
+              {/* Service window summary */}
+              <div className="mb-4 px-4 py-3 rounded-2xl flex items-center gap-3" style={{ background: "#F5F3FF", border: "1.5px solid #DDD6FE" }}>
+                <Clock size={18} color="#5B3EF5" />
+                <div>
+                  <p className="text-xs font-semibold text-purple-400 mb-0.5">Expected service window</p>
+                  <p className="text-sm font-bold text-purple-900">{getServiceWindowStr(selectedSlot, maxDurationMinutes)}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-5">
+                {timeSlots.map((startM) => {
+                  const isDisabled = disabledSlots.has(startM);
+                  const isSelected = selectedSlot === startM;
                   return (
                     <button
-                      key={startH}
-                      onClick={() => !isDisabled && setSelectedSlot(startH)}
+                      key={startM}
+                      onClick={() => !isDisabled && setSelectedSlot(startM)}
                       disabled={isDisabled}
-                      className="py-4 rounded-2xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1.5"
+                      className="py-3 rounded-2xl text-xs font-bold border-2 transition-all flex flex-col items-center gap-1"
                       style={{
                         borderColor: isDisabled ? "rgba(0,0,0,0.05)" : isSelected ? "#5B3EF5" : "rgba(0,0,0,0.08)",
                         background: isDisabled ? "#F3F4F6" : isSelected ? "#5B3EF5" : "#FAFAFA",
@@ -2053,14 +2069,13 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                         opacity: isDisabled ? 0.6 : 1,
                       }}
                     >
-                      <Clock size={16} color={isDisabled ? "#D1D5DB" : isSelected ? "#fff" : "#9CA3AF"} />
-                      {label}
-                      {isDisabled && <span style={{ fontSize: 10, color: "#D1D5DB" }}>Unavailable</span>}
+                      {_fmtSlotTime(startM)}
+                      {isDisabled && <span style={{ fontSize: 9, color: "#D1D5DB" }}>Unavailable</span>}
                     </button>
                   );
                 })}
               </div>
-              {disabledSlots.size === CHECKOUT_SLOT_START_HOURS.length ? (
+              {disabledSlots.size === timeSlots.length ? (
                 <button
                   onClick={() => setStep(2)}
                   className="w-full py-3.5 rounded-2xl text-sm font-bold border-2 flex items-center justify-center gap-2"

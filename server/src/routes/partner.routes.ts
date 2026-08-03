@@ -28,6 +28,13 @@ router.get('/earnings',            partnerController.getEarnings);
 router.post('/payouts',            partnerController.requestPayout);
 router.get('/payouts',             partnerController.listPayoutRequests);
 
+// ── Order-item jobs (new multi-service dispatch system) ───────────────────
+router.get('/order-item-jobs',                              partnerController.listOrderItemJobs);
+router.patch('/order-item-jobs/:requestId/accept',          partnerController.acceptOrderItemJob);
+router.patch('/order-item-jobs/:requestId/reject',          partnerController.rejectOrderItemJob);
+router.patch('/order-item-jobs/:itemId/checkin',            partnerController.checkInOrderItem);
+router.patch('/order-item-jobs/:itemId/complete',           partnerController.completeOrderItem);
+
 // KYC / verification documents
 // NOTE: specific routes must come before /:id to avoid conflicts
 router.get('/documents/types',             documentController.listDocumentTypes);

@@ -573,6 +573,96 @@ export async function runMigrations() {
   await run('column: services.min_advance_minutes',
     `ALTER TABLE services ADD COLUMN IF NOT EXISTS min_advance_minutes INTEGER`);
 
+  // ── Orders / Order Items (multi-service booking architecture) ──────────────
+  await run('enum: order_status',
+    `CREATE TYPE order_status AS ENUM (
+      'created', 'searching_partners', 'partially_confirmed', 'fully_confirmed',
+      'in_progress', 'partially_completed', 'completed', 'cancelled'
+    )`);
+
+  await run('enum: order_item_status',
+    `CREATE TYPE order_item_status AS ENUM (
+      'searching_partner', 'assigned', 'partner_accepted', 'partner_arrived',
+      'payment_pending', 'payment_completed', 'service_started', 'service_completed', 'cancelled'
+    )`);
+
+  await run('table: orders', `
+    CREATE TABLE IF NOT EXISTS orders (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      customer_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      address_id   UUID REFERENCES addresses(id) ON DELETE SET NULL,
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      status       order_status NOT NULL DEFAULT 'created',
+      total_amount INTEGER NOT NULL DEFAULT 0,
+      notes        TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: orders_customer',
+    `CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)`);
+  await run('index: orders_status',
+    `CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`);
+
+  await run('table: order_items', `
+    CREATE TABLE IF NOT EXISTS order_items (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id         UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      service_id       UUID NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+      partner_id       UUID REFERENCES professionals(id) ON DELETE SET NULL,
+      status           order_item_status NOT NULL DEFAULT 'searching_partner',
+      scheduled_at     TIMESTAMPTZ NOT NULL,
+      duration_minutes INTEGER NOT NULL DEFAULT 60,
+      customer_price   INTEGER NOT NULL,
+      partner_payout   INTEGER NOT NULL,
+      quantity         INTEGER NOT NULL DEFAULT 1,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: order_items_order',
+    `CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)`);
+  await run('index: order_items_partner',
+    `CREATE INDEX IF NOT EXISTS idx_order_items_partner ON order_items(partner_id)`);
+  await run('index: order_items_service',
+    `CREATE INDEX IF NOT EXISTS idx_order_items_service ON order_items(service_id)`);
+
+  await run('table: order_item_requests', `
+    CREATE TABLE IF NOT EXISTS order_item_requests (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_item_id UUID NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+      partner_id    UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      status        VARCHAR(32) NOT NULL DEFAULT 'pending',
+      responded_at  TIMESTAMPTZ,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: order_item_requests_item',
+    `CREATE INDEX IF NOT EXISTS idx_oir_item ON order_item_requests(order_item_id)`);
+  await run('index: order_item_requests_partner',
+    `CREATE INDEX IF NOT EXISTS idx_oir_partner ON order_item_requests(partner_id)`);
+
+  await run('table: order_item_payments', `
+    CREATE TABLE IF NOT EXISTS order_item_payments (
+      id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_item_id            UUID NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+      order_id                 UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      customer_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount                   INTEGER NOT NULL,
+      currency                 VARCHAR(8) NOT NULL DEFAULT 'INR',
+      status                   payment_status NOT NULL DEFAULT 'created',
+      method                   payment_method,
+      razorpay_order_id        VARCHAR(128),
+      razorpay_payment_id      VARCHAR(128),
+      razorpay_signature       VARCHAR(256),
+      stripe_session_id        VARCHAR(256),
+      stripe_payment_intent_id VARCHAR(256),
+      notes                    VARCHAR(512),
+      created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await run('index: order_item_payments_item',
+    `CREATE INDEX IF NOT EXISTS idx_oip_item ON order_item_payments(order_item_id)`);
+  await run('index: order_item_payments_customer',
+    `CREATE INDEX IF NOT EXISTS idx_oip_customer ON order_item_payments(customer_id)`);
+
   console.log('[migrate] Done ✓');
   await sql.end();
 }

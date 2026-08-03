@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { cartApi, addressesApi, API_BASE, type Cart, type Address } from '@/lib/api';
 import { setPendingPayId } from '@/lib/pendingPayment';
-import { SLOT_START_HOURS, getSlotLabel, formatDuration } from '@servenow/shared';
+import { generateTimeSlots, formatSlotTime, getServiceWindowLabel, formatDuration } from '@servenow/shared';
 
 type BookingConfig = {
   minAdvanceMinutes: number;
@@ -28,21 +28,16 @@ const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   closingHour: 20,
 };
 
-function buildScheduledAt(dateLabel: string, startHour: number): string {
-  const hour = startHour;
+function buildScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
   const base = new Date();
   if (dateLabel === 'Tomorrow') {
     base.setDate(base.getDate() + 1);
   } else if (dateLabel !== 'Today') {
-    // toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' })
-    // returns strings like "Wed, 26 Mar" or "Wed 26 Mar" depending on platform.
-    // Extract the first run of digits (day) and the first 3-letter word that is a month abbreviation.
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const dayMatch = dateLabel.match(/\b(\d{1,2})\b/);
     const monthMatch = dateLabel.match(/\b([A-Za-z]{3})\b/g);
     if (dayMatch && monthMatch) {
       const day = parseInt(dayMatch[1]);
-      // Find the first token that is a valid month abbreviation (case-insensitive)
       let monthIdx = -1;
       for (const token of monthMatch) {
         const idx = months.findIndex(m => m.toLowerCase() === token.toLowerCase());
@@ -56,7 +51,7 @@ function buildScheduledAt(dateLabel: string, startHour: number): string {
       }
     }
   }
-  base.setHours(hour, 0, 0, 0);
+  base.setHours(Math.floor(slotTotalMinutes / 60), slotTotalMinutes % 60, 0, 0);
   return base.toISOString();
 }
 
@@ -80,7 +75,7 @@ export default function CheckoutScreen() {
     return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   });
   const [selectedDate, setSelectedDate] = useState('Today');
-  const [selectedSlot, setSelectedSlot] = useState<number>(9); // start hour
+  const [selectedSlot, setSelectedSlot] = useState<number>(9 * 60); // total minutes since midnight
   const [done, setDone] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdBookingPrice, setCreatedBookingPrice] = useState<number | null>(null);
@@ -96,12 +91,18 @@ export default function CheckoutScreen() {
     staleTime: 5 * 60 * 1000, // cache 5 min — changes are infrequent
   });
 
-  // ── Total duration from cart (sum of quantity × duration per item) ──────────
-  const totalDurationMinutes = useMemo(() => {
+  // ── Max service duration (longest single service — services run in parallel) ──
+  const maxDurationMinutes = useMemo(() => {
     const items = cart?.items ?? [];
     if (!items.length) return 60;
-    return items.reduce((sum, item) => sum + item.duration * item.quantity, 0);
+    return items.reduce((max, item) => Math.max(max, item.duration * item.quantity), 60);
   }, [cart]);
+
+  // ── Dynamic 30-min slot list based on booking config ──────────────────────
+  const timeSlots = useMemo(() =>
+    generateTimeSlots(bookingConfig.openingHour, bookingConfig.closingHour, 30, maxDurationMinutes),
+    [bookingConfig.openingHour, bookingConfig.closingHour, maxDurationMinutes],
+  );
 
   // ── Compute disabled slots for the selected date ───────────────────────────
   const disabledSlots = useMemo<Set<number>>(() => {
@@ -109,41 +110,32 @@ export default function CheckoutScreen() {
     const now = new Date();
     const isToday = selectedDate === 'Today';
 
-    // If same-day booking is off and today is selected, all slots are blocked
     if (isToday && !bookingConfig.sameDayBooking) {
-      SLOT_START_HOURS.forEach(h => disabled.add(h));
+      timeSlots.forEach(m => disabled.add(m));
       return disabled;
     }
 
-    // Effective min advance = strictest of global config + any per-service overrides in cart
     const cartItemOverrides = (cart?.items ?? [])
       .map(item => item.minAdvanceMinutes)
       .filter((v): v is number => v != null);
     const effectiveMinAdvance = Math.max(bookingConfig.minAdvanceMinutes, ...cartItemOverrides);
-
-    // For future dates only check business hours; for today also check advance time
-    const earliestHour = isToday
-      ? (now.getHours() + (now.getMinutes() + effectiveMinAdvance) / 60)
+    const earliestMinutes = isToday
+      ? (now.getHours() * 60 + now.getMinutes() + effectiveMinAdvance)
       : 0;
 
-    SLOT_START_HOURS.forEach(startH => {
-      const endHour = startH + totalDurationMinutes / 60;
-      if (startH < bookingConfig.openingHour || endHour > bookingConfig.closingHour) {
-        disabled.add(startH); // outside business hours or job runs past closing
-      } else if (isToday && startH < earliestHour) {
-        disabled.add(startH); // too soon
-      }
+    timeSlots.forEach(startM => {
+      if (isToday && startM < earliestMinutes) disabled.add(startM);
     });
     return disabled;
-  }, [selectedDate, bookingConfig, cart, totalDurationMinutes]);
+  }, [selectedDate, bookingConfig, cart, timeSlots]);
 
   // Auto-select first available slot when date or config changes
   useEffect(() => {
-    if (disabledSlots.has(selectedSlot)) {
-      const first = SLOT_START_HOURS.find(h => !disabledSlots.has(h));
+    if (disabledSlots.has(selectedSlot) || !timeSlots.includes(selectedSlot)) {
+      const first = timeSlots.find(m => !disabledSlots.has(m));
       if (first !== undefined) setSelectedSlot(first);
     }
-  }, [disabledSlots]);
+  }, [disabledSlots, timeSlots]);
 
   const { data: cart, isLoading: cartLoading } = useQuery({
     queryKey: ['/api/cart', accessToken],
@@ -396,15 +388,25 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
             )}
+            {/* Service window summary */}
+            <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="time-outline" size={16} color={colors.primary} />
+              <View>
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontWeight: '500' }}>Expected service window</Text>
+                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: '700' }}>
+                  {getServiceWindowLabel(selectedSlot, maxDurationMinutes)}
+                </Text>
+              </View>
+            </View>
             <View style={styles.slotGrid}>
-              {SLOT_START_HOURS.map((startH) => {
-                const selected = selectedSlot === startH;
-                const disabled = disabledSlots.has(startH);
-                const label = getSlotLabel(startH, totalDurationMinutes);
+              {timeSlots.map((startM) => {
+                const selected = selectedSlot === startM;
+                const disabled = disabledSlots.has(startM);
+                const label = formatSlotTime(startM);
                 return (
                   <TouchableOpacity
-                    key={startH}
-                    onPress={() => !disabled && setSelectedSlot(startH)}
+                    key={startM}
+                    onPress={() => !disabled && setSelectedSlot(startM)}
                     disabled={disabled}
                     style={[styles.slotChip, {
                       backgroundColor: disabled ? colors.muted : selected ? colors.primary : colors.card,
@@ -419,7 +421,7 @@ export default function CheckoutScreen() {
                 );
               })}
             </View>
-            {disabledSlots.size === SLOT_START_HOURS.length ? (
+            {disabledSlots.size === timeSlots.length ? (
               <TouchableOpacity onPress={() => setStep(2)} style={[styles.outlineBtn, { borderColor: colors.primary }]}>
                 <Ionicons name="arrow-back" size={16} color={colors.primary} />
                 <Text style={[styles.outlineBtnText, { color: colors.primary }]}>Choose Another Date</Text>

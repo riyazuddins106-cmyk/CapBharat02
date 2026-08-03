@@ -3,6 +3,10 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { partnerService } from '../services/partner.service.js';
 import { storageService } from '../services/storage.service.js';
 import { AppError } from '../utils/AppError.js';
+import { orderDispatchService } from '../services/orderDispatch.service.js';
+import { db } from '../config/database.js';
+import { and, eq, inArray } from 'drizzle-orm';
+import { orderItemRequests, orderItems, orders, professionals } from '../database/schema/index.js';
 
 export const partnerController = {
   getProfile: asyncHandler(async (req: Request, res: Response) => {
@@ -88,6 +92,128 @@ export const partnerController = {
     if (!req.file) throw AppError.badRequest('No file uploaded. Use the "avatar" field.');
     const avatarUrl = await storageService.uploadAvatar(req.user!.userId, req.file);
     const data = await partnerService.updateAvatar(req.user!.userId, avatarUrl);
+    res.json({ success: true, data });
+  }),
+
+  // ── Order-item job endpoints (new multi-service dispatch system) ──────────
+
+  /** GET /api/partner/order-item-jobs — list open requests + assigned items for this partner */
+  listOrderItemJobs: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals)
+      .where(eq(professionals.userId, req.user!.userId))
+      .limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    // Pending requests waiting for accept/reject
+    const pendingRequests = await db.select({ request: orderItemRequests, item: orderItems, order: orders })
+      .from(orderItemRequests)
+      .innerJoin(orderItems, eq(orderItemRequests.orderItemId, orderItems.id))
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(eq(orderItemRequests.partnerId, pro.id), eq(orderItemRequests.status, 'pending')));
+
+    // Active assigned items (accepted → in progress)
+    const activeItems = await db.select({ item: orderItems, order: orders })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(
+        eq(orderItems.partnerId, pro.id),
+        inArray(orderItems.status, ['partner_accepted', 'partner_arrived', 'service_started']),
+      ));
+
+    // Completed items (last 30 days)
+    const completedItems = await db.select({ item: orderItems, order: orders })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(
+        eq(orderItems.partnerId, pro.id),
+        eq(orderItems.status, 'service_completed'),
+      ));
+
+    res.json({
+      success: true,
+      data: {
+        pendingRequests: pendingRequests.map(r => ({
+          requestId: r.request.id,
+          orderItemId: r.item.id,
+          orderId: r.order.id,
+          serviceId: r.item.serviceId,
+          scheduledAt: r.item.scheduledAt,
+          durationMinutes: r.item.durationMinutes,
+          partnerPayout: r.item.partnerPayout,
+          customerPrice: r.item.customerPrice,
+          orderStatus: r.order.status,
+          createdAt: r.request.createdAt,
+        })),
+        activeJobs: activeItems.map(r => ({
+          orderItemId: r.item.id,
+          orderId: r.order.id,
+          serviceId: r.item.serviceId,
+          status: r.item.status,
+          scheduledAt: r.item.scheduledAt,
+          durationMinutes: r.item.durationMinutes,
+          partnerPayout: r.item.partnerPayout,
+          customerPrice: r.item.customerPrice,
+        })),
+        completedJobs: completedItems.map(r => ({
+          orderItemId: r.item.id,
+          orderId: r.order.id,
+          serviceId: r.item.serviceId,
+          status: r.item.status,
+          scheduledAt: r.item.scheduledAt,
+          partnerPayout: r.item.partnerPayout,
+        })),
+      },
+    });
+  }),
+
+  /** PATCH /api/partner/order-item-jobs/:requestId/accept */
+  acceptOrderItemJob: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const [request] = await db.select().from(orderItemRequests)
+      .where(and(eq(orderItemRequests.id, req.params.requestId), eq(orderItemRequests.partnerId, pro.id)))
+      .limit(1);
+    if (!request) throw AppError.notFound('Job request not found.');
+
+    const data = await orderDispatchService.acceptItem(request.orderItemId, pro.id);
+    res.json({ success: true, data });
+  }),
+
+  /** PATCH /api/partner/order-item-jobs/:requestId/reject */
+  rejectOrderItemJob: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const [request] = await db.select().from(orderItemRequests)
+      .where(and(eq(orderItemRequests.id, req.params.requestId), eq(orderItemRequests.partnerId, pro.id)))
+      .limit(1);
+    if (!request) throw AppError.notFound('Job request not found.');
+
+    await orderDispatchService.rejectItem(request.orderItemId, pro.id);
+    res.json({ success: true, data: { message: 'Job request rejected.' } });
+  }),
+
+  /** PATCH /api/partner/order-item-jobs/:itemId/checkin — partner arrives */
+  checkInOrderItem: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const data = await orderDispatchService.checkInItem(req.params.itemId, pro.id);
+    res.json({ success: true, data });
+  }),
+
+  /** PATCH /api/partner/order-item-jobs/:itemId/complete — service done */
+  completeOrderItem: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const data = await orderDispatchService.completeItem(req.params.itemId, pro.id);
     res.json({ success: true, data });
   }),
 };

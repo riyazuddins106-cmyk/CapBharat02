@@ -3,7 +3,7 @@
 
 ---
 
-## Overall Completion: ~95%
+## Overall Completion: ~97%
 
 The platform is feature-complete and end-to-end tested. All core flows work. The main gap is **missing Supabase secrets** in this Replit environment — the app cannot connect to a database until those are added.
 

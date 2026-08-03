@@ -89,16 +89,17 @@ export const bookingController = {
     }
 
     // ── End-time check: job must finish within closing hour ───────────────────
-    const totalJobMinutes = rows.reduce(
-      (sum, { item, service }) => sum + item.quantity * (service.duration ?? 60), 0
+    // Use the LONGEST individual service duration (not sum) — services run in parallel.
+    const maxJobMinutes = rows.reduce(
+      (max, { item, service }) => Math.max(max, item.quantity * (service.duration ?? 60)), 0
     );
-    const endIST = new Date(whenIST.getTime() + totalJobMinutes * 60 * 1000);
+    const endIST = new Date(whenIST.getTime() + maxJobMinutes * 60 * 1000);
     const endHour = endIST.getUTCHours() + endIST.getUTCMinutes() / 60;
     if (endHour > closingHour) {
       const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
       const endStr = `${pad(endIST.getUTCHours())}:${pad(endIST.getUTCMinutes())}`;
       throw AppError.badRequest(
-        `Your booking (${Math.round(totalJobMinutes / 60 * 10) / 10}h total) would end at ${endStr}, which is past closing time (${closingHour}:00). Please choose an earlier slot.`
+        `Your booking would end at ${endStr}, which is past closing time (${closingHour}:00). Please choose an earlier slot.`
       );
     }
 

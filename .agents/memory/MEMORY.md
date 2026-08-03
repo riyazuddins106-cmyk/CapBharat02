@@ -33,3 +33,4 @@
 - [Expo ngrok workflows](expo-ngrok-workflows.md) — when ngrok is explicitly requested, use separate agents/inspector ports and Expo LAN mode for stable QR tunnels.
 - [No-professional booking model](no-professional-booking.md) — platform is dispatch-based; customers never pick a professional; favorites removed; booking validator professionalId is optional.
 - [Master Prompt Status](master-prompt-status.md) — full audit of Urban Company-style marketplace requirements: 14 done, 11 partial, 24 not built; includes recommended build order.
+- [Project Handoff](HANDOFF.md) — READ THIS FIRST in any new session: full project state, secrets, setup commands, what's done/partial/missing, 8-step build order, gotchas index.
