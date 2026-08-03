@@ -32,3 +32,4 @@
 - [expo-tunnel set -e retry](expo-tunnel-set-e-retry.md) — set -e kills retry loop; wrap pnpm expo start with set +e / set -e to capture exit code.
 - [Expo ngrok workflows](expo-ngrok-workflows.md) — when ngrok is explicitly requested, use separate agents/inspector ports and Expo LAN mode for stable QR tunnels.
 - [No-professional booking model](no-professional-booking.md) — platform is dispatch-based; customers never pick a professional; favorites removed; booking validator professionalId is optional.
+- [Master Prompt Status](master-prompt-status.md) — full audit of Urban Company-style marketplace requirements: 14 done, 11 partial, 24 not built; includes recommended build order.

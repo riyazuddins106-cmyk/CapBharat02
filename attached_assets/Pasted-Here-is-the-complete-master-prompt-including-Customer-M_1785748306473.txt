@@ -1,0 +1,915 @@
+Here is the **complete master prompt** including **Customer Mobile App + Customer Web App + Partner App + Admin Panel** requirements.
+
+Copy and paste this into Replit AI.
+
+---
+
+# Replit AI Master Prompt – Implement Advanced Marketplace Booking, Scheduling & Service-Wise Payment System
+
+## Objective
+
+Upgrade the existing application into a professional **Urban Company-style marketplace platform**.
+
+The current system already has:
+
+* Customer Mobile App (React Native / Expo)
+* Customer Web App (React)
+* Partner Mobile App
+* Admin Panel
+* Backend APIs and Database
+
+**Do not redesign the UI.**
+**Do not replace existing architecture.**
+**Do not break existing functionality.**
+
+Analyze the existing codebase and enhance the current booking workflow.
+
+The goal is to support:
+
+* Multiple services in one order
+* Multiple partners in one order
+* Different service durations
+* Parallel service execution
+* Dynamic time slot booking
+* Partner availability management
+* Service-wise payments
+* Partial partner acceptance
+* Individual service cancellation
+* Complete marketplace workflow
+
+---
+
+# 1. New Booking Architecture
+
+Currently:
+
+```
+One Booking = One Service = One Partner
+```
+
+Change to:
+
+```
+Master Order
+
+        |
+        |
+        ├── Service Booking 1
+        |          |
+        |          └── Partner Assignment
+        |
+        ├── Service Booking 2
+        |          |
+        |          └── Partner Assignment
+        |
+        └── Service Booking 3
+                   |
+                   └── Partner Assignment
+```
+
+One customer checkout can create multiple service bookings.
+
+---
+
+# 2. Master Order
+
+Create a parent order containing:
+
+* Order ID
+* Customer details
+* Address
+* Date
+* Preferred start time
+* Total amount
+* Payment summary
+* Overall order status
+
+Example:
+
+```
+Order #1001
+
+Customer:
+Riyaz
+
+Date:
+10 August
+
+Start Time:
+10:00 AM
+
+Status:
+Partially Confirmed
+```
+
+---
+
+# 3. Individual Service Booking
+
+Every selected service should have its own record.
+
+Each service booking should contain:
+
+* Service name
+* Category
+* Required skill
+* Duration
+* Price
+* Assigned partner
+* Partner status
+* Service status
+* Payment status
+* Partner earnings
+
+Example:
+
+```
+Service Booking
+
+AC Service
+
+Duration:
+1 Hour
+
+Partner:
+Raj
+
+Status:
+Assigned
+```
+
+---
+
+# 4. Multiple Service Logic
+
+Example customer cart:
+
+```
+AC Service
+Duration: 1 Hour
+Price: ₹500
+
+
+Bathroom Cleaning
+Duration: 3 Hours
+Price: ₹1200
+```
+
+System creates:
+
+```
+Order #1001
+
+
+AC Service
+        |
+        |
+        AC Technician
+
+
+Bathroom Cleaning
+        |
+        |
+        Cleaning Partner
+```
+
+Different categories should be assigned to different skilled partners.
+
+---
+
+# 5. Dynamic Time Slot System
+
+Remove fixed duration slots.
+
+Do NOT use:
+
+```
+1 PM - 3 PM
+3 PM - 6 PM
+```
+
+Instead show only start times.
+
+Example:
+
+```
+Choose Arrival Time
+
+9:00 AM
+9:30 AM
+10:00 AM
+10:30 AM
+11:00 AM
+```
+
+---
+
+# 6. Service Duration Calculation
+
+Customer selects:
+
+```
+10:00 AM
+```
+
+System calculates:
+
+Example:
+
+AC Service:
+
+```
+10:00 AM - 11:00 AM
+```
+
+Bathroom Cleaning:
+
+```
+10:00 AM - 1:00 PM
+```
+
+Both can run simultaneously.
+
+---
+
+# 7. Customer Displayed Service Window
+
+Customer should see:
+
+```
+Expected Service Window
+
+10:00 AM - 1:00 PM
+
+Approx Duration:
+3 Hours
+```
+
+The customer duration should be based on the longest service.
+
+Do not add durations together.
+
+Wrong:
+
+```
+AC 1 hour
++
+Cleaning 3 hours
+
+Total 4 hours ❌
+```
+
+Correct:
+
+```
+Longest service = 3 hours ✅
+```
+
+---
+
+# 8. Partner Calendar Management
+
+Each partner calendar should block only their assigned service duration.
+
+Example:
+
+AC Technician:
+
+```
+10:00 AM - 11:00 AM
+```
+
+Cleaning Partner:
+
+```
+10:00 AM - 1:00 PM
+```
+
+AC technician becomes available after 11 AM.
+
+Cleaning partner becomes available after 1 PM.
+
+---
+
+# 9. Booking Creation Availability
+
+Customer should be able to create bookings 24/7.
+
+Example:
+
+Customer can book at:
+
+```
+12:30 AM
+3:00 AM
+11:00 PM
+```
+
+However, available service slots depend on:
+
+* Partner working hours
+* Partner availability
+* Existing bookings
+* Service duration
+* Location
+
+---
+
+# 10. Partner Search Flow
+
+After customer confirms booking:
+
+Status:
+
+```
+Searching For Partners
+```
+
+System searches separately.
+
+Example:
+
+```
+AC Service
+
+Searching AC Partners
+
+
+Bathroom Cleaning
+
+Searching Cleaning Partners
+```
+
+---
+
+# 11. Partner Acceptance Logic
+
+## Case 1: All Partners Accept
+
+Example:
+
+```
+AC Partner
+Accepted ✅
+
+
+Cleaning Partner
+Accepted ✅
+```
+
+Order:
+
+```
+Fully Confirmed
+```
+
+---
+
+## Case 2: One Partner Accepts, Another Does Not
+
+Example:
+
+```
+AC Service
+
+Partner Accepted ✅
+
+
+Bathroom Cleaning
+
+No Partner Found
+```
+
+Do NOT cancel entire order.
+
+Order status:
+
+```
+Partially Confirmed
+```
+
+---
+
+# 12. Continue Searching Option
+
+Customer should have control.
+
+Example:
+
+```
+Bathroom Cleaning
+
+Finding Partner...
+
+[Continue Searching]
+
+[Cancel Service]
+```
+
+---
+
+# 13. Search Optimization
+
+Do not search forever.
+
+Implement controlled searching:
+
+First:
+
+* Nearby partners
+* Available partners
+* Matching skills
+
+Then:
+
+* Expand search radius
+* Retry periodically
+
+Stop searching when:
+
+* Partner accepts
+* Customer cancels service
+* Search timeout reached
+* Service time expires
+
+Admin should be able to configure timeout.
+
+---
+
+# 14. Service-Level Cancellation
+
+Customer can cancel only unavailable services.
+
+Example:
+
+```
+Order #1001
+
+
+AC Service
+
+Confirmed
+
+
+Bathroom Cleaning
+
+Cancelled
+```
+
+Remaining services continue.
+
+---
+
+# 15. Payment Workflow
+
+Payment should be service-wise.
+
+Do NOT collect payment before partner availability.
+
+---
+
+## Before Partner Assignment
+
+Show:
+
+```
+Payment:
+Waiting for partner confirmation
+```
+
+No Pay button.
+
+---
+
+## Partner Accepted
+
+Still:
+
+```
+Payment Pending
+```
+
+---
+
+## Partner Arrival / Check-In
+
+Partner clicks:
+
+```
+Start Service / Check-In
+```
+
+Now generate payment request.
+
+---
+
+Example:
+
+AC Partner arrives:
+
+```
+AC Service
+
+Amount:
+₹500
+
+Pay Now
+```
+
+Customer pays.
+
+---
+
+Cleaning Partner arrives:
+
+```
+Bathroom Cleaning
+
+Amount:
+₹1200
+
+Pay Now
+```
+
+Customer pays separately.
+
+---
+
+# 16. Payment Distribution
+
+Customer pays platform.
+
+Split internally.
+
+Example:
+
+AC Service ₹500
+
+```
+Commission:
+20%
+
+Partner:
+₹400
+
+Platform:
+₹100
+```
+
+Cleaning ₹1200
+
+```
+Partner:
+₹960
+
+Platform:
+₹240
+```
+
+Maintain:
+
+* Transactions
+* Partner wallet
+* Commission
+* Payout records
+
+---
+
+# 17. Customer Mobile App Changes
+
+Implement this complete workflow in Customer Mobile App.
+
+Update:
+
+* Service listing
+* Service details
+* Cart
+* Checkout
+* Date/time selection
+* Booking confirmation
+* Upcoming bookings
+* Booking details
+* Payment screens
+* Notifications
+
+Customer mobile should show:
+
+```
+Order #1001
+
+
+AC Service
+
+Partner:
+Raj
+
+10:00 AM - 11:00 AM
+
+Payment:
+Paid
+
+
+Bathroom Cleaning
+
+Searching Partner
+
+[Continue Searching]
+
+[Cancel Service]
+```
+
+---
+
+# 18. Customer Web App Changes
+
+Implement the same functionality in Customer Web App.
+
+Update:
+
+* Service browsing
+* Cart
+* Checkout
+* Booking creation
+* Booking history
+* Upcoming bookings
+* Booking details
+* Payment flow
+* Notifications
+
+Web and Mobile must behave identically.
+
+---
+
+# 19. Data Synchronization
+
+Both Customer Mobile and Customer Web must use the same backend APIs.
+
+Changes must sync instantly.
+
+Examples:
+
+Booking created from mobile:
+
+→ Visible on web
+
+Partner accepts:
+
+→ Visible on mobile and web
+
+Customer cancels service:
+
+→ Updated everywhere
+
+Payment completed:
+
+→ Updated everywhere
+
+Service completed:
+
+→ Updated everywhere
+
+---
+
+# 20. Partner App Changes
+
+Partner should only see assigned services.
+
+Example:
+
+AC Technician:
+
+```
+AC Service
+
+Customer Details
+
+Time:
+10 AM
+
+Duration:
+1 Hour
+
+Payment Status
+```
+
+Partner should NOT see other services from the same customer order.
+
+Implement:
+
+* Booking request
+* Accept/reject
+* Navigation
+* Check-in
+* Start service
+* Complete service
+* Earnings update
+
+---
+
+# 21. Admin Panel Changes
+
+Admin should see complete order hierarchy.
+
+Example:
+
+```
+Order #1001
+
+
+AC Service
+
+Partner:
+Raj
+
+Status:
+Completed
+
+Amount:
+₹500
+
+
+Bathroom Cleaning
+
+Partner:
+Amit
+
+Status:
+Searching
+
+Amount:
+₹1200
+```
+
+Admin should manage:
+
+* Service duration
+* Partner assignment rules
+* Search timeout
+* Commission
+* Payments
+* Earnings
+* Refunds
+
+---
+
+# 22. Order Status Flow
+
+Master Order:
+
+```
+Created
+
+↓
+
+Searching Partners
+
+↓
+
+Partially Confirmed
+
+↓
+
+Fully Confirmed
+
+↓
+
+In Progress
+
+↓
+
+Partially Completed
+
+↓
+
+Completed
+```
+
+---
+
+# 23. Individual Service Status Flow
+
+Each service:
+
+```
+Searching Partner
+
+↓
+
+Assigned
+
+↓
+
+Partner Accepted
+
+↓
+
+Partner Arrived
+
+↓
+
+Payment Pending
+
+↓
+
+Payment Completed
+
+↓
+
+Service Started
+
+↓
+
+Service Completed
+```
+
+---
+
+# 24. Final End-to-End Workflow
+
+```
+Customer selects multiple services
+
+↓
+
+Select date and arrival time
+
+↓
+
+System checks partner availability
+
+↓
+
+Creates Master Order
+
+↓
+
+Creates individual Service Bookings
+
+↓
+
+Search partners separately
+
+↓
+
+Partners accept
+
+↓
+
+Confirmed services start
+
+↓
+
+Partner reaches location
+
+↓
+
+Customer pays for that service
+
+↓
+
+Service starts
+
+↓
+
+Partner completes work
+
+↓
+
+Partner earnings generated
+
+↓
+
+Order completed
+```
+
+---
+
+# Important Implementation Rules
+
+* Maintain backward compatibility with existing single-service bookings.
+* Do not break existing APIs.
+* Do not remove existing features.
+* Update database models if required.
+* Update backend APIs.
+* Update Customer Mobile App.
+* Update Customer Web App.
+* Update Partner App.
+* Update Admin Panel.
+* Test complete workflow end-to-end.
+
+Testing scenarios:
+
+1. Single service booking
+2. Multiple service booking
+3. Two different partners
+4. One partner accepts, one partner unavailable
+5. Continue searching
+6. Cancel individual service
+7. Partner check-in payment
+8. Separate service payments
+9. Service completion
+10. Partner earnings generation
+
+---
+
+This prompt tells Replit AI to build the **complete marketplace booking engine**, not just modify one screen.
