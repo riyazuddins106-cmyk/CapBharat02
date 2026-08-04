@@ -28,10 +28,10 @@ import type {
    SHARED UI HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 
-const CARD = { background: "#1b1c20" } as const;
-const MODAL_BG = { background: "#1b1c20" } as const;
+const CARD = { background: "rgba(255,255,255,0.04)" } as const;
+const MODAL_BG = { background: "#1a2035" } as const;
 const INPUT_STYLE = {
-  background: "#24252a",
+  background: "rgba(255,255,255,0.05)",
   WebkitAppearance: "none",
 } as const;
 
@@ -144,7 +144,7 @@ function SelectInput({ value, onChange, children, disabled }: {
       value={value} onChange={e => onChange(e.target.value)}
       disabled={disabled}
       className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors disabled:opacity-40"
-      style={{ background: "#24252a" }}
+      style={{ background: "#1a2035" }}
     >
       {children}
     </select>
@@ -152,13 +152,14 @@ function SelectInput({ value, onChange, children, disabled }: {
 }
 
 function ThemedSelect({
-  value, onChange, options, disabled = false, minWidth = 160,
+  value, onChange, options, disabled = false, minWidth = 160, neutral = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
   disabled?: boolean;
   minWidth?: number;
+  neutral?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -179,7 +180,7 @@ function ThemedSelect({
         disabled={disabled}
         onClick={() => setOpen(current => !current)}
         className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm text-white outline-none border border-white/10 hover:border-white/20 focus:border-violet-500/60 transition-colors disabled:opacity-40"
-        style={INPUT_STYLE}
+        style={neutral ? { background: "#24252a" } : INPUT_STYLE}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -189,7 +190,7 @@ function ThemedSelect({
       {open && (
         <div
           className="absolute left-0 right-0 z-[70] mt-1 overflow-hidden rounded-xl border border-white/10 py-1 shadow-2xl"
-          style={{ background: "#24252a" }}
+          style={{ background: neutral ? "#24252a" : "#1b1b22" }}
           role="listbox"
         >
           {options.map(option => {
@@ -478,7 +479,7 @@ function ColumnVisibilityMenu({ columns, labels, hidden, onToggle }: {
       {open && (
         <div
           className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-white/[0.1] py-2 min-w-[160px]"
-          style={{ background: "#1b1c20", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+          style={{ background: "#1a2035", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
         >
           <p className="px-3 pb-1.5 text-[10px] font-bold text-white/30 uppercase tracking-widest">Columns</p>
           {columns.map(col => (
@@ -571,15 +572,15 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#151619" }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#0f1117" }}>
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#3a3c42" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
             <Sparkles size={20} color="white" />
           </div>
           <span className="text-white font-bold text-xl">ServeNow Admin</span>
         </div>
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#1b1c20" }}>
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#161B27" }}>
           <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
           <p className="text-white/40 text-sm mb-6">Sign in to the admin panel</p>
           {error && (
@@ -955,7 +956,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#151619" }}>
+    <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#0f1117" }}>
       {/* Toast */}
       {actionMsg && (
         <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm text-white border shadow-xl"
@@ -966,10 +967,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
 
       {/* Sidebar */}
       <div className="flex flex-col border-r border-white/[0.08] transition-all duration-200 flex-shrink-0 h-full"
-        style={{ width: sidebarOpen ? 220 : 64, background: "#1b1c20" }}>
+        style={{ width: sidebarOpen ? 220 : 64, background: "#161B27" }}>
         <div className="px-4 py-5 flex items-center gap-3 border-b border-white/[0.08]">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 cursor-pointer"
-            style={{ background: "#3a3c42" }}
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
             onClick={() => setSidebarOpen(v => !v)}>
             <Sparkles size={16} color="white" />
           </div>
@@ -983,7 +984,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             return (
               <button key={item.id} onClick={() => setActiveSection(item.id)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left w-full"
-                style={{ background: active ? "rgba(255,255,255,0.09)" : "transparent", color: active ? "#f1f1f2" : "rgba(255,255,255,0.45)" }}>
+                style={{ background: active ? "rgba(91,62,245,0.15)" : "transparent", color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)" }}>
                 <Icon size={18} className="flex-shrink-0" />
                 {sidebarOpen && <span className="text-sm font-semibold">{item.label}</span>}
               </button>
@@ -994,7 +995,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         <div className="p-3 border-t border-white/[0.08]">
           {sidebarOpen && (
             <div className="flex items-center gap-2 mb-2 px-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#3a3c42" }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
                 {localUser.fullName?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -7197,7 +7198,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
               placeholder="e.g. Operations Admin"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={INPUT_STYLE}
+              style={{ ...INPUT_STYLE, background: "#24252a" }}
             />
           </label>
           <label className="block">
@@ -7208,7 +7209,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="admin@example.com"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={INPUT_STYLE}
+              style={{ ...INPUT_STYLE, background: "#24252a" }}
             />
           </label>
           <label className="block">
@@ -7219,7 +7220,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               placeholder="+91 98765 43210"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={INPUT_STYLE}
+              style={{ ...INPUT_STYLE, background: "#24252a" }}
             />
           </label>
           <label className="block">
@@ -7232,6 +7233,7 @@ function AdminManagementView({
                 { value: "operations_manager", label: "Operations" },
               ]}
               minWidth={0}
+              neutral
             />
           </label>
           <label className="block sm:col-span-2">
@@ -7242,7 +7244,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               placeholder="At least 8 characters, with uppercase, lowercase, and number"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={INPUT_STYLE}
+              style={{ ...INPUT_STYLE, background: "#24252a" }}
             />
           </label>
         </div>
@@ -7250,7 +7252,7 @@ function AdminManagementView({
           onClick={() => void create()}
           disabled={creating}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg,#2563eb,#38bdf8)" }}
+          style={{ background: "#3a3c42", border: "1px solid #4a4c52" }}
         >
           {creating && <Loader2 size={14} className="animate-spin" />}
           {creating ? "Creating…" : "Create account"}
@@ -8394,8 +8396,8 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#151619" }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: "#a1a1aa" }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0f1117" }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: "#5B3EF5" }} />
       </div>
     );
   }

@@ -216,7 +216,7 @@ The service-level order implementation is complete for customer web/mobile, part
 - Expo Go failure investigation found the ngrok QR generator wrote `exps://` links; the live HTTPS manifests and Android bundles were healthy. The generator now writes `exp://` links, and fresh Customer/Partner QR codes were validated.
 - Partner Mobile Earnings now fetches and displays the same payout history as Partner Web, including amount, optional note, requested date, Pending/Processing/Paid/Rejected status, pull-to-refresh, and immediate insertion after a successful request. Mobile payout API calls returned HTTP 200; Partner Mobile type check and Partner Web production build passed.
 - Admin Management's Create Admin Account card now uses a calmer slate surface with sky-blue borders, icon, focus states, and action button instead of the heavy purple treatment. Admin Web production build passed.
-- Admin Panel now follows the uploaded neutral charcoal reference: near-black page background, graphite surfaces, gray inputs, soft borders, muted primary actions, and semantic status colors preserved. Admin Web production build passed, the workflow restarted cleanly, and the live login preview was visually verified.
+- The uploaded neutral charcoal reference is scoped only to the Admin Management Create Admin Account form. The wider Admin Panel shell, login page, navigation, shared controls, and other sections retain the original purple theme. Admin Web production build passed, the workflow restarted cleanly, and the restored purple login preview was visually verified.
 
 
 ### Task: Add Admin service detail views and booking operations controls
