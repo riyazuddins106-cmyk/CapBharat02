@@ -28,10 +28,10 @@ import type {
    SHARED UI HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 
-const CARD = { background: "rgba(255,255,255,0.04)" } as const;
-const MODAL_BG = { background: "#1a2035" } as const;
+const CARD = { background: "#1b1c20" } as const;
+const MODAL_BG = { background: "#1b1c20" } as const;
 const INPUT_STYLE = {
-  background: "rgba(255,255,255,0.05)",
+  background: "#24252a",
   WebkitAppearance: "none",
 } as const;
 
@@ -144,7 +144,7 @@ function SelectInput({ value, onChange, children, disabled }: {
       value={value} onChange={e => onChange(e.target.value)}
       disabled={disabled}
       className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors disabled:opacity-40"
-      style={{ background: "#1a2035" }}
+      style={{ background: "#24252a" }}
     >
       {children}
     </select>
@@ -189,7 +189,7 @@ function ThemedSelect({
       {open && (
         <div
           className="absolute left-0 right-0 z-[70] mt-1 overflow-hidden rounded-xl border border-white/10 py-1 shadow-2xl"
-          style={{ background: "#1b1b22" }}
+          style={{ background: "#24252a" }}
           role="listbox"
         >
           {options.map(option => {
@@ -478,7 +478,7 @@ function ColumnVisibilityMenu({ columns, labels, hidden, onToggle }: {
       {open && (
         <div
           className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-white/[0.1] py-2 min-w-[160px]"
-          style={{ background: "#1a2035", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+          style={{ background: "#1b1c20", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
         >
           <p className="px-3 pb-1.5 text-[10px] font-bold text-white/30 uppercase tracking-widest">Columns</p>
           {columns.map(col => (
@@ -571,15 +571,15 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#0f1117" }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "#151619" }}>
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#3a3c42" }}>
             <Sparkles size={20} color="white" />
           </div>
           <span className="text-white font-bold text-xl">ServeNow Admin</span>
         </div>
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#161B27" }}>
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#1b1c20" }}>
           <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
           <p className="text-white/40 text-sm mb-6">Sign in to the admin panel</p>
           {error && (
@@ -955,7 +955,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#0f1117" }}>
+    <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#151619" }}>
       {/* Toast */}
       {actionMsg && (
         <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm text-white border shadow-xl"
@@ -966,10 +966,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
 
       {/* Sidebar */}
       <div className="flex flex-col border-r border-white/[0.08] transition-all duration-200 flex-shrink-0 h-full"
-        style={{ width: sidebarOpen ? 220 : 64, background: "#161B27" }}>
+        style={{ width: sidebarOpen ? 220 : 64, background: "#1b1c20" }}>
         <div className="px-4 py-5 flex items-center gap-3 border-b border-white/[0.08]">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 cursor-pointer"
-            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+            style={{ background: "#3a3c42" }}
             onClick={() => setSidebarOpen(v => !v)}>
             <Sparkles size={16} color="white" />
           </div>
@@ -983,7 +983,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             return (
               <button key={item.id} onClick={() => setActiveSection(item.id)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left w-full"
-                style={{ background: active ? "rgba(91,62,245,0.15)" : "transparent", color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)" }}>
+                style={{ background: active ? "rgba(255,255,255,0.09)" : "transparent", color: active ? "#f1f1f2" : "rgba(255,255,255,0.45)" }}>
                 <Icon size={18} className="flex-shrink-0" />
                 {sidebarOpen && <span className="text-sm font-semibold">{item.label}</span>}
               </button>
@@ -994,7 +994,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         <div className="p-3 border-t border-white/[0.08]">
           {sidebarOpen && (
             <div className="flex items-center gap-2 mb-2 px-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#3a3c42" }}>
                 {localUser.fullName?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -8394,8 +8394,8 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0f1117" }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: "#5B3EF5" }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#151619" }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: "#a1a1aa" }} />
       </div>
     );
   }

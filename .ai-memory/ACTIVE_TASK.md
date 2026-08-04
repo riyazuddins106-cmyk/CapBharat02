@@ -23,6 +23,8 @@
 - [x] Fixed Expo Go QR deep-link scheme from `exps://` to `exp://` after validating live manifests and bundles
 - [x] Added Partner Mobile payout history parity with Partner Web, including payout notes, statuses, dates, pull-to-refresh, and immediate post-request updates
 - [x] Recolored the Admin Management create-account card from saturated violet to slate and sky-blue accents
+- [x] Applied the uploaded neutral charcoal reference theme across the Admin Panel shell, forms, inputs, dropdowns, modals, and shared accent utilities
+- [x] Verified the Admin Panel production build, restarted the workflow, captured the charcoal login preview, and passed git diff checks
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients

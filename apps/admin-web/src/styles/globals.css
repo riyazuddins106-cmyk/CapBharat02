@@ -6,14 +6,38 @@ body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: #0f1117;
+  background: #151619;
   color: #fff;
+}
+
+/* ── Neutral charcoal admin theme ─────────────────────────────── */
+:root {
+  color-scheme: dark;
+  --admin-page: #151619;
+  --admin-surface: #1b1c20;
+  --admin-input: #24252a;
+  --admin-border: #383a40;
+  --admin-border-soft: rgba(255,255,255,0.09);
+  --admin-text: #f1f1f2;
+  --admin-muted: #92949b;
+  --admin-accent: #c4c7ce;
+}
+
+/* Keep global violet utility accents from overpowering the charcoal theme. */
+[class*="text-violet-"] { color: var(--admin-accent) !important; }
+[class*="border-violet-"] { border-color: var(--admin-border) !important; }
+[class*="bg-violet-"] { background-color: rgba(255,255,255,0.08) !important; }
+[class*="accent-violet-"] { accent-color: #a1a1aa !important; }
+[style*="rgba(91,62,245"] { background: rgba(255,255,255,0.06) !important; }
+[style*="linear-gradient(135deg"] {
+  background: #3a3c42 !important;
+  border: 1px solid #4a4c52;
 }
 
 /* ── Thin blending scrollbars (dark theme) ── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2d3e transparent;
+  scrollbar-color: #383a40 transparent;
 }
 
 ::-webkit-scrollbar {
@@ -26,12 +50,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2d3e;
+  background: #383a40;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3d4060;
+  background: #4a4c52;
 }
 
 ::-webkit-scrollbar-corner {

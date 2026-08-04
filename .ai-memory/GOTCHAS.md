@@ -274,6 +274,11 @@
 **Fix:** Use a slate card surface with sky-blue border/icon/focus accents and a blue gradient action button, while leaving the broader Admin Panel theme unchanged.
 **Warning:** Do not recolor the whole Admin Panel for a local section-level contrast issue; keep navigation and global actions consistent.
 
+### Admin Panel — apply reference themes through shared tokens
+**Problem:** Replacing one purple card did not make the Admin Panel match a neutral charcoal reference because legacy colors were distributed across shared helpers, shell styles, utility classes, and the document module.
+**Fix:** Centralize the charcoal palette in shared card/input constants and global theme overrides, then update shell-level surfaces directly. Preserve semantic green, amber, and red status colors.
+**Warning:** Avoid a broad violet-to-gray replacement that changes status meaning; primary accents can be muted, but success, warning, and error colors must remain distinguishable.
+
 ### Partner App Ionicons need a native font grace period
 **Problem:** The Partner App dashboard and tab labels rendered, but Ionicons were blank because the root layout forced rendering after a 300ms `useFonts` timeout.
 **Fix:** Keep the native font gate open for 3 seconds and only use a shorter 1-second fallback on web. The Customer App already used a longer native grace period.
