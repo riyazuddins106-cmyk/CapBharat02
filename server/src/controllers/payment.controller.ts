@@ -6,6 +6,10 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/response.js';
 import { db } from '../config/database.js';
 import { payments } from '../database/schema/payments.js';
+import { orderItemPayments } from '../database/schema/orderItemPayments.js';
+import { orderItems } from '../database/schema/orderItems.js';
+import { orders } from '../database/schema/orders.js';
+import { services } from '../database/schema/services.js';
 import { bookings } from '../database/schema/bookings.js';
 import { platformSettings } from '../database/schema/platformSettings.js';
 import { eq, and } from 'drizzle-orm';
@@ -13,6 +17,7 @@ import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { pointsService } from '../services/points.service.js';
 import { notificationService } from '../services/notification.service.js';
+import { recomputeOrderStatus } from '../services/orderDispatch.service.js';
 
 /** Award loyalty points for a paid booking — non-fatal, swallowed on error */
 async function awardPoints(customerId: string, bookingId: string, priceRupees: number) {
@@ -69,6 +74,260 @@ function makeRazorpay(cfg: { keyId: string; keySecret: string }) {
 function makeStripe(cfg: { secretKey: string }) {
   if (!cfg.secretKey) throw AppError.badRequest('Stripe is not configured. Add Secret Key in Admin → Payment Config.');
   return new Stripe(cfg.secretKey);
+}
+
+async function getCustomerOrderItem(itemId: string, customerId: string) {
+  const [row] = await db.select({
+    item: orderItems,
+    order: orders,
+    serviceName: services.name,
+  })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .leftJoin(services, eq(orderItems.serviceId, services.id))
+    .where(and(eq(orderItems.id, itemId), eq(orders.customerId, customerId)))
+    .limit(1);
+  if (!row) throw AppError.notFound('Service order item not found.');
+  if (row.item.status === 'cancelled') throw AppError.badRequest('Payment cannot be made for a cancelled service.');
+  return row;
+}
+
+async function markOrderItemPaid(
+  itemId: string,
+  orderId: string,
+  updates: Partial<typeof orderItemPayments.$inferInsert>,
+) {
+  const [existing] = await db.select().from(orderItemPayments)
+    .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
+  if (existing) {
+    const [updated] = await db.update(orderItemPayments).set({
+      ...updates,
+      status: 'paid',
+      updatedAt: new Date(),
+    }).where(eq(orderItemPayments.id, existing.id)).returning();
+    await db.update(orderItems).set({ status: 'service_started', updatedAt: new Date() })
+      .where(eq(orderItems.id, itemId));
+    await recomputeOrderStatus(orderId);
+    return updated;
+  }
+  const [created] = await db.insert(orderItemPayments).values({
+    orderItemId: itemId,
+    orderId,
+    customerId: updates.customerId!,
+    amount: updates.amount!,
+    currency: 'INR',
+    ...updates,
+    status: 'paid',
+  }).returning();
+  await db.update(orderItems).set({ status: 'service_started', updatedAt: new Date() })
+    .where(eq(orderItems.id, itemId));
+  await recomputeOrderStatus(orderId);
+  return created;
+}
+
+/** POST /api/orders/:orderId/items/:itemId/razorpay/create-order */
+export const createRazorpayOrderForItem = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { orderId, itemId } = req.params;
+  const { item, order, serviceName } = await getCustomerOrderItem(itemId, userId);
+  if (item.orderId !== orderId) throw AppError.notFound('Service order item not found.');
+
+  const [existing] = await db.select().from(orderItemPayments)
+    .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
+  if (existing?.status === 'paid') throw AppError.badRequest('This service has already been paid.');
+
+  const cfg = await getPaymentCfg();
+  const testMode = cfg?.testMode?.enabled ?? false;
+  if (!testMode && !cfg.razorpay?.enabled) throw AppError.badRequest('Razorpay is not enabled.');
+  const amountPaise = item.customerPrice * 100;
+
+  let razorpayOrderId: string;
+  let keyId = cfg.razorpay?.keyId ?? 'rzp_test_key';
+  if (testMode) {
+    razorpayOrderId = `test_order_item_${Date.now()}`;
+  } else {
+    const razorpay = makeRazorpay(cfg.razorpay!);
+    try {
+      const gatewayOrder = await razorpay.orders.create({
+        amount: amountPaise,
+        currency: 'INR',
+        receipt: `order_item_${itemId.slice(0, 20)}`,
+      });
+      razorpayOrderId = gatewayOrder.id;
+    } catch (err: unknown) {
+      const gatewayError = err as { error?: { description?: string }; message?: string };
+      throw AppError.badRequest(gatewayError?.error?.description ?? gatewayError?.message ?? 'Razorpay order creation failed');
+    }
+  }
+
+  const values = {
+    orderItemId: itemId,
+    orderId: order.id,
+    customerId: userId,
+    amount: item.customerPrice,
+    currency: 'INR',
+    status: 'created' as const,
+    method: 'razorpay' as const,
+    razorpayOrderId,
+    notes: testMode ? '[TEST MODE] Razorpay order' : null,
+    updatedAt: new Date(),
+  };
+  if (existing) {
+    await db.update(orderItemPayments).set(values).where(eq(orderItemPayments.id, existing.id));
+  } else {
+    await db.insert(orderItemPayments).values(values);
+  }
+
+  sendSuccess(res, {
+    orderId: razorpayOrderId,
+    amount: amountPaise,
+    currency: 'INR',
+    keyId,
+    itemId,
+    bookingId: order.id,
+    serviceName: serviceName ?? 'Service',
+    testMode,
+  });
+});
+
+/** POST /api/orders/:orderId/items/:itemId/razorpay/verify */
+export const verifyRazorpayForItem = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { orderId, itemId } = req.params;
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature } =
+    req.body as Record<string, string>;
+  if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+    throw AppError.badRequest('Missing payment verification fields.');
+  }
+  const { item, order } = await getCustomerOrderItem(itemId, userId);
+  if (item.orderId !== orderId) throw AppError.notFound('Service order item not found.');
+
+  const cfg = await getPaymentCfg();
+  if (!cfg.razorpay?.keySecret) throw AppError.internal('Razorpay not configured.');
+  const expectedSignature = crypto.createHmac('sha256', cfg.razorpay.keySecret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest('hex');
+  if (expectedSignature !== razorpay_signature) {
+    throw AppError.badRequest('Payment verification failed. Signature mismatch.');
+  }
+
+  const [payment] = await db.select().from(orderItemPayments)
+    .where(and(
+      eq(orderItemPayments.orderItemId, itemId),
+      eq(orderItemPayments.razorpayOrderId, razorpay_order_id),
+    )).limit(1);
+  if (!payment) throw AppError.badRequest('Payment order does not match this service.');
+
+  const paymentRecord = await markOrderItemPaid(itemId, order.id, {
+    customerId: userId,
+    amount: item.customerPrice,
+    method: 'razorpay',
+    razorpayOrderId: razorpay_order_id,
+    razorpayPaymentId: razorpay_payment_id,
+    razorpaySignature: razorpay_signature,
+  });
+  sendSuccess(res, paymentRecord);
+});
+
+/** POST /api/orders/:orderId/items/:itemId/stripe/create-session */
+export const createStripeSessionForItem = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { orderId, itemId } = req.params;
+  const { item, order, serviceName } = await getCustomerOrderItem(itemId, userId);
+  if (item.orderId !== orderId) throw AppError.notFound('Service order item not found.');
+
+  const [existing] = await db.select().from(orderItemPayments)
+    .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
+  if (existing?.status === 'paid') throw AppError.badRequest('This service has already been paid.');
+
+  const cfg = await getPaymentCfg();
+  const testMode = cfg?.testMode?.enabled ?? false;
+  if (!testMode && !cfg.stripe?.enabled) throw AppError.badRequest('Stripe is not enabled.');
+
+  if (testMode) {
+    const sessionId = `test_session_item_${Date.now()}`;
+    const values = {
+      orderItemId: itemId, orderId: order.id, customerId: userId,
+      amount: item.customerPrice, currency: 'INR', status: 'created' as const,
+      method: 'stripe' as const, stripeSessionId: sessionId,
+      notes: '[TEST MODE] Stripe session', updatedAt: new Date(),
+    };
+    if (existing) await db.update(orderItemPayments).set(values).where(eq(orderItemPayments.id, existing.id));
+    else await db.insert(orderItemPayments).values(values);
+    return sendSuccess(res, { checkoutUrl: null, sessionId, itemId, orderId: order.id, testMode: true });
+  }
+
+  const stripe = makeStripe(cfg.stripe!);
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [{
+      price_data: {
+        currency: 'inr',
+        unit_amount: item.customerPrice * 100,
+        product_data: { name: serviceName ?? 'Service', description: `Service order #${itemId.slice(0, 8).toUpperCase()}` },
+      },
+      quantity: 1,
+    }],
+    mode: 'payment',
+    success_url: `${baseUrl}/api/payments/stripe/item-success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}&item_id=${itemId}`,
+    cancel_url: 'servenow://payment-cancel',
+    metadata: { orderId: order.id, itemId, userId },
+  });
+  const values = {
+    orderItemId: itemId, orderId: order.id, customerId: userId,
+    amount: item.customerPrice, currency: 'INR', status: 'created' as const,
+    method: 'stripe' as const, stripeSessionId: session.id, updatedAt: new Date(),
+  };
+  if (existing) await db.update(orderItemPayments).set(values).where(eq(orderItemPayments.id, existing.id));
+  else await db.insert(orderItemPayments).values(values);
+  sendSuccess(res, { checkoutUrl: session.url, sessionId: session.id, itemId, orderId: order.id });
+});
+
+/** GET /api/payments/stripe/item-success */
+export const stripeItemSuccess = asyncHandler(async (req: Request, res: Response) => {
+  const { session_id, order_id, item_id } = req.query as Record<string, string>;
+  if (!session_id || !order_id || !item_id) throw AppError.badRequest('Missing payment parameters.');
+  const cfg = await getPaymentCfg();
+  if (!cfg.stripe?.secretKey) throw AppError.internal('Stripe not configured.');
+  const stripe = makeStripe(cfg.stripe);
+  const session = await stripe.checkout.sessions.retrieve(session_id);
+  if (session.payment_status !== 'paid' || session.metadata?.orderId !== order_id || session.metadata?.itemId !== item_id) {
+    return res.redirect(302, 'servenow://payment-cancel');
+  }
+  const [item] = await db.select().from(orderItems).where(and(eq(orderItems.id, item_id), eq(orderItems.orderId, order_id))).limit(1);
+  if (!item) throw AppError.notFound('Service order item not found.');
+  const paymentRecord = await markOrderItemPaid(item_id, order_id, {
+    customerId: session.metadata?.userId ?? '',
+    amount: item.customerPrice,
+    method: 'stripe',
+    stripeSessionId: session.id,
+    stripePaymentIntentId: session.payment_intent as string,
+  });
+  void paymentRecord;
+  res.redirect(302, `servenow://payment-success?orderId=${order_id}&itemId=${item_id}&gateway=stripe`);
+});
+
+export async function refundOrderItemPayment(paymentId: string) {
+  const [payment] = await db.select().from(orderItemPayments)
+    .where(eq(orderItemPayments.id, paymentId)).limit(1);
+  if (!payment) throw AppError.notFound('Service payment not found.');
+  if (payment.status === 'refunded') throw AppError.badRequest('This service is already refunded.');
+  if (payment.status !== 'paid') throw AppError.badRequest('Only paid services can be refunded.');
+
+  const cfg = await getPaymentCfg();
+  if (payment.method === 'razorpay' && payment.razorpayPaymentId) {
+    const razorpay = makeRazorpay(cfg.razorpay!);
+    await razorpay.payments.refund(payment.razorpayPaymentId, { amount: payment.amount * 100 });
+  } else if (payment.method === 'stripe' && payment.stripePaymentIntentId) {
+    const stripe = makeStripe(cfg.stripe!);
+    await stripe.refunds.create({ payment_intent: payment.stripePaymentIntentId, amount: payment.amount * 100 });
+  }
+  const [updated] = await db.update(orderItemPayments)
+    .set({ status: 'refunded', updatedAt: new Date() })
+    .where(eq(orderItemPayments.id, payment.id))
+    .returning();
+  return updated;
 }
 
 /* ── GET /api/payments/config  (public) ─────────────────────────────────── */
@@ -189,8 +448,8 @@ export const createRazorpayOrder = asyncHandler(async (req: Request, res: Respon
    Returns an HTML page that loads Razorpay checkout.js so mobile WebView
    can show the native-like payment sheet without requiring a native SDK.   */
 export const serveRazorpayCheckout = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId, amount, keyId, bookingId, name, description } = req.query as Record<string, string>;
-  if (!orderId || !amount || !keyId || !bookingId) throw AppError.badRequest('Missing required params');
+  const { orderId, amount, keyId, bookingId, itemId, name, description } = req.query as Record<string, string>;
+  if (!orderId || !amount || !keyId || (!bookingId && !itemId)) throw AppError.badRequest('Missing required params');
 
   const callbackUrl = `${req.protocol}://${req.get('host')}/api/payments/razorpay/callback`;
   const cancelUrl   = 'servenow://payment-cancel';
@@ -245,7 +504,8 @@ function startPayment() {
         ['razorpay_payment_id', response.razorpay_payment_id],
         ['razorpay_order_id',   response.razorpay_order_id],
         ['razorpay_signature',  response.razorpay_signature],
-        ['booking_id',          '${bookingId}'],
+        ['booking_id',          '${bookingId || ''}'],
+        ['item_id',             '${itemId || ''}'],
       ].forEach(function(p) {
         var i = document.createElement('input');
         i.type='hidden'; i.name=p[0]; i.value=p[1]; form.appendChild(i);
@@ -275,7 +535,32 @@ window.onload = startPayment;
 
 /* ── POST /api/payments/razorpay/callback  (public, called by Razorpay) ── */
 export const razorpayCallback = asyncHandler(async (req: Request, res: Response) => {
-  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, booking_id } = req.body as Record<string, string>;
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, booking_id, item_id } = req.body as Record<string, string>;
+
+  if (item_id) {
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      throw AppError.badRequest('Missing payment fields.');
+    }
+    const cfg = await getPaymentCfg();
+    if (!cfg.razorpay?.keySecret) throw AppError.internal('Razorpay not configured.');
+    const expectedSig = crypto.createHmac('sha256', cfg.razorpay.keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+    if (expectedSig !== razorpay_signature) throw AppError.badRequest('Payment verification failed. Signature mismatch.');
+    const [payment] = await db.select().from(orderItemPayments)
+      .where(and(eq(orderItemPayments.orderItemId, item_id), eq(orderItemPayments.razorpayOrderId, razorpay_order_id)))
+      .limit(1);
+    if (!payment) throw AppError.badRequest('Payment order does not match this service.');
+    await markOrderItemPaid(item_id, payment.orderId, {
+      customerId: payment.customerId,
+      amount: payment.amount,
+      method: 'razorpay',
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+    });
+    return res.redirect(302, `servenow://payment-success?orderId=${payment.orderId}&itemId=${item_id}&gateway=razorpay`);
+  }
 
   if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !booking_id) {
     throw AppError.badRequest('Missing payment fields.');

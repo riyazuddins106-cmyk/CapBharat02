@@ -348,6 +348,21 @@ export const ordersApi = {
     const { data } = await client.post(`/orders/${orderId}/items/${itemId}/test-pay`, { method });
     return data.data;
   },
+
+  async createRazorpayOrder(orderId: string, itemId: string) {
+    const { data } = await client.post(`/orders/${orderId}/items/${itemId}/razorpay/create-order`);
+    return data.data as { orderId: string; amount: number; currency: string; keyId: string; itemId: string; serviceName: string; testMode?: boolean };
+  },
+
+  async verifyRazorpay(orderId: string, itemId: string, payload: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
+    const { data } = await client.post(`/orders/${orderId}/items/${itemId}/razorpay/verify`, payload);
+    return data.data;
+  },
+
+  async createStripeSession(orderId: string, itemId: string) {
+    const { data } = await client.post(`/orders/${orderId}/items/${itemId}/stripe/create-session`);
+    return data.data as { checkoutUrl: string | null; sessionId: string; testMode?: boolean };
+  },
 };
 
 export interface ApiPayment {

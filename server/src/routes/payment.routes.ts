@@ -5,6 +5,7 @@ import {
   razorpayCallback,
   razorpayWebhook,
   stripeSuccess,
+  stripeItemSuccess,
   stripeWebhook,
 } from '../controllers/payment.controller.js';
 
@@ -25,6 +26,7 @@ router.post('/razorpay/webhook', razorpayWebhook);
 
 // Stripe — redirect after successful checkout session
 router.get('/stripe/success', stripeSuccess);
+router.get('/stripe/item-success', stripeItemSuccess);
 
 // Stripe — async webhook
 router.post('/stripe/webhook', stripeWebhook);

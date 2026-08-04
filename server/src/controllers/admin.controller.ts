@@ -24,6 +24,7 @@ import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { storageService } from '../services/storage.service.js';
 import { hashPassword } from '../utils/password.js';
+import { refundOrderItemPayment } from './payment.controller.js';
 
 export const adminController = {
   /** Master orders with per-service status, dispatch, earnings and payment state. */
@@ -108,8 +109,7 @@ export const adminController = {
       .where(eq(orderItemPayments.orderItemId, item.id)).limit(1);
     if (!payment) throw AppError.badRequest('No payment exists for this service.');
     if (payment.status === 'refunded') throw AppError.badRequest('This service is already refunded.');
-    await db.update(orderItemPayments).set({ status: 'refunded', updatedAt: new Date() })
-      .where(eq(orderItemPayments.id, payment.id));
+    await refundOrderItemPayment(payment.id);
     await db.update(orderItems).set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(orderItems.id, item.id));
     res.json({ success: true, data: { message: 'Service payment refunded.' } });

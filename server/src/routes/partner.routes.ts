@@ -30,6 +30,7 @@ router.get('/payouts',             partnerController.listPayoutRequests);
 
 // ── Order-item jobs (new multi-service dispatch system) ───────────────────
 router.get('/order-item-jobs',                              partnerController.listOrderItemJobs);
+router.get('/order-item-jobs/:itemId',                      partnerController.getOrderItemJob);
 router.patch('/order-item-jobs/:requestId/accept',          partnerController.acceptOrderItemJob);
 router.patch('/order-item-jobs/:requestId/reject',          partnerController.rejectOrderItemJob);
 router.patch('/order-item-jobs/:itemId/checkin',            partnerController.checkInOrderItem);

@@ -5,8 +5,11 @@ import { storageService } from '../services/storage.service.js';
 import { AppError } from '../utils/AppError.js';
 import { orderDispatchService } from '../services/orderDispatch.service.js';
 import { db } from '../config/database.js';
-import { and, eq, inArray } from 'drizzle-orm';
-import { orderItemRequests, orderItems, orders, professionals } from '../database/schema/index.js';
+import { and, eq, inArray, or } from 'drizzle-orm';
+import {
+  orderItemRequests, orderItems, orderItemPayments, orders, professionals,
+  services, users, addresses,
+} from '../database/schema/index.js';
 
 export const partnerController = {
   getProfile: asyncHandler(async (req: Request, res: Response) => {
@@ -163,6 +166,58 @@ export const partnerController = {
           scheduledAt: r.item.scheduledAt,
           partnerPayout: r.item.partnerPayout,
         })),
+      },
+    });
+  }),
+
+  /** GET /api/partner/order-item-jobs/:itemId — full service-level job detail */
+  getOrderItemJob: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals)
+      .where(eq(professionals.userId, req.user!.userId))
+      .limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const [row] = await db.select({
+      item: orderItems,
+      order: orders,
+      service: { id: services.id, name: services.name, categoryId: services.categoryId },
+      customer: { id: users.id, name: users.fullName, phone: users.phone },
+      address: addresses,
+      payment: orderItemPayments,
+      request: { id: orderItemRequests.id, status: orderItemRequests.status },
+    })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(services, eq(orderItems.serviceId, services.id))
+      .innerJoin(users, eq(orders.customerId, users.id))
+      .leftJoin(addresses, eq(orders.addressId, addresses.id))
+      .leftJoin(orderItemPayments, eq(orderItemPayments.orderItemId, orderItems.id))
+      .leftJoin(orderItemRequests, and(
+        eq(orderItemRequests.orderItemId, orderItems.id),
+        eq(orderItemRequests.partnerId, pro.id),
+        eq(orderItemRequests.status, 'pending'),
+      ))
+      .where(and(
+        eq(orderItems.id, req.params.itemId),
+        or(eq(orderItems.partnerId, pro.id), eq(orderItemRequests.partnerId, pro.id)),
+      ))
+      .limit(1);
+
+    if (!row) throw AppError.notFound('Service job not found.');
+    res.json({
+      success: true,
+      data: {
+        ...row.item,
+        orderId: row.order.id,
+        orderStatus: row.order.status,
+        orderNotes: row.order.notes,
+        serviceName: row.service?.name ?? 'Service',
+        customer: row.customer,
+        address: row.address,
+        payment: row.payment,
+        requestId: row.request?.id ?? null,
+        endTime: new Date(new Date(row.item.scheduledAt).getTime() + row.item.durationMinutes * 60_000),
       },
     });
   }),

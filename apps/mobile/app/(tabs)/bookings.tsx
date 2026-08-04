@@ -361,6 +361,104 @@ function formatOrderTime(iso: string) {
   });
 }
 
+function OrderItemPaymentSheet({ order, item, token, onClose, onPaid }: {
+  order: Order;
+  item: OrderItem;
+  token: string;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const colors = useColors();
+  const [config, setConfig] = useState<PaymentConfig | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getPaymentConfig().then((value) => {
+      setConfig(value);
+      setSelected(value.methods[0] ?? 'cash');
+    }).catch(() => setConfig({ testMode: false, methods: ['cash'], upiVpa: null, razorpayKeyId: null, stripePublishableKey: null }));
+  }, []);
+
+  const complete = () => {
+    setCheckoutUrl(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onPaid();
+  };
+
+  const submit = async () => {
+    if (!selected || !config) return;
+    setBusy(true);
+    try {
+      if (config.testMode) {
+        await ordersApi.testPayItem(order.id, item.id, selected, token);
+        complete();
+      } else if (selected === 'cash' || selected === 'upi_manual') {
+        await ordersApi.payItem(order.id, item.id, selected, undefined, token);
+        complete();
+      } else if (selected === 'razorpay') {
+        const gatewayOrder = await ordersApi.createRazorpayOrder(order.id, item.id, token);
+        const params = new URLSearchParams({
+          orderId: gatewayOrder.orderId,
+          amount: String(gatewayOrder.amount),
+          keyId: gatewayOrder.keyId,
+          bookingId: order.id,
+          itemId: item.id,
+          name: 'ServeNow',
+          description: item.serviceName ?? gatewayOrder.serviceName,
+        });
+        setCheckoutUrl(`${API_BASE}/api/payments/razorpay/checkout?${params.toString()}`);
+      } else {
+        const session = await ordersApi.createStripeSession(order.id, item.id, token);
+        if (!session.checkoutUrl) throw new Error('Stripe checkout is not available.');
+        setCheckoutUrl(session.checkoutUrl);
+      }
+    } catch (error: any) {
+      Alert.alert('Payment error', error.message ?? 'Could not start payment.');
+      setBusy(false);
+    }
+  };
+
+  if (checkoutUrl) {
+    return <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <View style={[styles.webviewHeader, { paddingTop: 18 }]}>
+        <Text style={styles.webviewTitle}>Pay ₹{item.customerPrice}</Text>
+        <TouchableOpacity onPress={() => { setCheckoutUrl(null); setBusy(false); }} style={styles.webviewClose}><Ionicons name="close" size={24} color="#fff" /></TouchableOpacity>
+      </View>
+      <WebView
+        source={{ uri: checkoutUrl }}
+        onNavigationStateChange={(state) => {
+          if (state.url.startsWith('servenow://payment-success')) complete();
+          if (state.url.startsWith('servenow://payment-cancel')) { setCheckoutUrl(null); setBusy(false); }
+        }}
+        startInLoadingState
+        renderLoading={() => <ActivityIndicator style={StyleSheet.absoluteFill} color="#fff" />}
+      />
+    </View>;
+  }
+
+  return <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+    <View style={styles.handle} />
+    <View style={styles.sheetHeader}>
+      <View><Text style={[styles.sheetTitle, { color: colors.foreground }]}>Pay for {item.serviceName ?? 'Service'}</Text><Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>Payment is required to start this service</Text></View>
+      <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.mutedForeground} /></TouchableOpacity>
+    </View>
+    <View style={[styles.amountPill, { backgroundColor: colors.muted }]}><Text style={[styles.amountText, { color: colors.primary }]}>₹{item.customerPrice}</Text><Text style={[styles.amountLabel, { color: colors.mutedForeground }]}>Service amount</Text></View>
+    <Text style={[styles.methodsLabel, { color: colors.mutedForeground }]}>CHOOSE PAYMENT METHOD</Text>
+    <View style={styles.methodsList}>
+      {(config?.methods.length ? config.methods : ['cash']).map((method) => (
+        <TouchableOpacity key={method} onPress={() => setSelected(method)} style={[styles.methodRow, { borderColor: selected === method ? colors.primary : colors.border, backgroundColor: selected === method ? colors.secondary : colors.card }]}>
+          <Text style={styles.methodIcon}>{method === 'cash' ? '💵' : method === 'upi_manual' ? '📱' : method === 'stripe' ? '💳' : '🔒'}</Text>
+          <View style={styles.methodInfo}><Text style={[styles.methodName, { color: colors.foreground }]}>{method.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</Text><Text style={[styles.methodDesc, { color: colors.mutedForeground }]}>{method === 'cash' ? 'Pay the partner in cash' : `Secure ${method} checkout`}</Text></View>
+          <View style={[styles.radio, { borderColor: selected === method ? colors.primary : colors.border }]}>{selected === method && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}</View>
+        </TouchableOpacity>
+      ))}
+    </View>
+    <TouchableOpacity onPress={submit} disabled={!selected || !config || busy} style={[styles.payBtn, { backgroundColor: colors.primary, opacity: (!selected || !config || busy) ? 0.5 : 1 }]}><Text style={styles.payBtnText}>{busy ? 'Processing…' : `Pay ₹${item.customerPrice}`}</Text></TouchableOpacity>
+  </View>;
+}
+
 function OrderServiceCard({ order, item, onAction, busy }: {
   order: Order;
   item: OrderItem;
@@ -451,6 +549,7 @@ export default function BookingsScreen() {
   const [comment, setComment] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [orderActionBusy, setOrderActionBusy] = useState<string | null>(null);
+  const [itemPayment, setItemPayment] = useState<{ order: Order; item: OrderItem } | null>(null);
 
   const { data: bookings, isLoading, refetch } = useQuery({
     queryKey: ['/api/bookings', accessToken],
@@ -521,7 +620,12 @@ export default function BookingsScreen() {
     try {
       if (action === 'cancel') await ordersApi.cancelItem(orderId, itemId, accessToken!);
       if (action === 'continue') await ordersApi.continueSearching(orderId, itemId, accessToken!);
-      if (action === 'pay') await ordersApi.payItem(orderId, itemId, 'cash', undefined, accessToken!);
+      if (action === 'pay') {
+        const order = orders.find((candidate) => candidate.id === orderId);
+        const item = order?.items.find((candidate) => candidate.id === itemId);
+        if (order && item) setItemPayment({ order, item });
+        return;
+      }
       await refetchOrders();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
@@ -753,6 +857,22 @@ export default function BookingsScreen() {
               onPaid={() => {
                 setPayModal(null);
                 queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
+              }}
+            />
+          )}
+        </View>
+      </Modal>
+      <Modal visible={!!itemPayment} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.modalBackdrop}>
+          {itemPayment && accessToken && (
+            <OrderItemPaymentSheet
+              order={itemPayment.order}
+              item={itemPayment.item}
+              token={accessToken}
+              onClose={() => setItemPayment(null)}
+              onPaid={() => {
+                setItemPayment(null);
+                refetchOrders();
               }}
             />
           )}

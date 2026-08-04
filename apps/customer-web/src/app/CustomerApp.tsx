@@ -2454,6 +2454,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
   const [reviewErr, setReviewErr] = useState("");
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [orderAction, setOrderAction] = useState<string | null>(null);
+  const [payItemTarget, setPayItemTarget] = useState<{ orderId: string; item: ApiOrder["items"][number] } | null>(null);
 
   const searchingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings  = bookings.filter((b) => ["upcoming", "in_progress"].includes(b.status));
@@ -2487,7 +2488,12 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
     try {
       if (action === "cancel") await ordersApi.cancelItem(orderId, itemId);
       if (action === "continue") await ordersApi.continueSearching(orderId, itemId);
-      if (action === "pay") await ordersApi.payItem(orderId, itemId, "cash");
+      if (action === "pay") {
+        const order = orders.find((candidate) => candidate.id === orderId);
+        const item = order?.items.find((candidate) => candidate.id === itemId);
+        if (item) setPayItemTarget({ orderId, item });
+        return;
+      }
       onRefresh();
     } catch (e: any) {
       alert(e?.response?.data?.error?.message ?? e?.message ?? "Could not update this service.");
@@ -2687,6 +2693,15 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
       </div>
     </div>
 
+    {payItemTarget && (
+      <OrderItemPaymentModal
+        orderId={payItemTarget.orderId}
+        item={payItemTarget.item}
+        onClose={() => setPayItemTarget(null)}
+        onPaid={() => { setPayItemTarget(null); onRefresh(); }}
+      />
+    )}
+
     {payBooking && (
       <PaymentModal
         booking={payBooking}
@@ -2737,6 +2752,112 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
       </div>
     )}
     </>
+  );
+}
+
+function OrderItemPaymentModal({ orderId, item, onClose, onPaid }: {
+  orderId: string;
+  item: ApiOrder["items"][number];
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null; testMode: boolean } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [paid, setPaid] = useState(false);
+
+  useEffect(() => {
+    getPaymentConfig().then((value) => {
+      setConfig(value);
+      setSelected(value.methods[0] ?? "cash");
+    }).catch(() => setConfig({ methods: ["cash"], upiVpa: null, testMode: false }));
+  }, []);
+
+  const finish = () => {
+    setPaid(true);
+    window.setTimeout(() => { onPaid(); }, 900);
+  };
+
+  const pay = async () => {
+    if (!config || !selected) return;
+    setBusy(true);
+    try {
+      if (config.testMode) {
+        await ordersApi.testPayItem(orderId, item.id, selected);
+        finish();
+        return;
+      }
+      if (selected === "cash" || selected === "upi_manual") {
+        await ordersApi.payItem(orderId, item.id, selected, notes || undefined);
+        finish();
+        return;
+      }
+      if (selected === "stripe") {
+        const session = await ordersApi.createStripeSession(orderId, item.id);
+        if (!session.checkoutUrl) throw new Error("Stripe checkout is not available.");
+        window.location.href = session.checkoutUrl;
+        return;
+      }
+      const gatewayOrder = await ordersApi.createRazorpayOrder(orderId, item.id);
+      await new Promise<void>((resolve, reject) => {
+        if ((window as any).Razorpay) return resolve();
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Could not load Razorpay checkout."));
+        document.body.appendChild(script);
+      });
+      const razorpay = new (window as any).Razorpay({
+        key: gatewayOrder.keyId,
+        amount: gatewayOrder.amount,
+        currency: gatewayOrder.currency,
+        name: "ServeNow",
+        description: item.serviceName ?? gatewayOrder.serviceName,
+        order_id: gatewayOrder.orderId,
+        handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          await ordersApi.verifyRazorpay(orderId, item.id, response);
+          finish();
+        },
+        modal: { ondismiss: () => setBusy(false) },
+        theme: { color: "#5B3EF5" },
+      });
+      razorpay.open();
+    } catch (error: any) {
+      alert(error?.response?.data?.error?.message ?? error?.message ?? "Payment failed.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Service payment</p>
+            <h3 className="text-lg font-bold text-gray-900">{item.serviceName ?? "Service"}</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400"><X size={18} /></button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">₹{item.customerPrice} · Payment unlocks service start.</p>
+        {paid ? (
+          <div className="rounded-xl bg-emerald-50 p-4 text-center text-emerald-700 font-bold">Payment successful</div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              {(config?.methods.length ? config.methods : ["cash"]).map((method) => (
+                <button key={method} onClick={() => setSelected(method)} className={`rounded-xl border p-3 text-left ${selected === method ? "border-violet-500 bg-violet-50" : "border-gray-200"}`}>
+                  <span className="font-semibold text-sm capitalize">{method.replace("_", " ")}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{method === "cash" ? "Pay the partner in cash" : method === "upi_manual" ? (config?.upiVpa ? `Pay to ${config.upiVpa}` : "Manual UPI payment") : `Secure ${method} checkout`}</span>
+                </button>
+              ))}
+            </div>
+            {selected === "upi_manual" && <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional UPI reference" className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />}
+            <button onClick={pay} disabled={busy || !config} className="mt-4 w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "Processing…" : `Pay ₹${item.customerPrice}`}</button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

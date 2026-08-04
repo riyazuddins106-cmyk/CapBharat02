@@ -175,3 +175,12 @@
 **Fix:** `category.repository.ts` `findAll()` does a live `LEFT JOIN` to services and computes `COUNT(CASE WHEN is_active = true THEN 1 END)`. The stored column is irrelevant for display.
 **Files:** `server/src/repositories/category.repository.ts`
 **Warning:** Do not seed or update the stored `service_count` column — the live JOIN overrides it anyway.
+
+---
+
+## Service Orders / Validation
+
+### E2E — legacy booking tests can mask service-order regressions
+**Problem:** The older full-flow scripts call `POST /cart` and `/bookings/checkout`, while the current multi-service contract uses `POST /cart/items` and `/orders/checkout`; those scripts fail before exercising service-order behavior.
+**Fix:** Use `server/src/e2e/order-item-flow.e2e.ts` as the service-order smoke test, and update legacy scripts before treating them as full release gates.
+**Warning:** Do not interpret failures from the retired booking/cart paths as failures in the current order-item implementation.

@@ -3,9 +3,9 @@
 
 ---
 
-## Overall Completion: ~98%
+## Overall Completion: ~99%
 
-The service-level order implementation is complete for customer web/mobile, partner mobile, payment gating, and admin controls. The main customer web/API/admin workflows are running in preview. Full end-to-end validation of every new order-item state remains the next verification phase.
+The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, and admin controls. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 17/17 checks; live gateway transactions still require Razorpay/Stripe provider configuration.
 
 ---
 
@@ -74,13 +74,21 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Document upload
 - [x] Notifications
 
+### Service-level order completion (2026-08-04)
+- [x] Added full partner service-job detail route and screen, including pending request accept/reject, customer contact/address, timing, notes, payout, payment status, check-in, and completion.
+- [x] Added per-service Razorpay order creation/signature verification and Stripe Checkout session/success handling.
+- [x] Added provider-aware admin refunds for real Razorpay/Stripe payments, with status-only handling for cash/test payments.
+- [x] Customer web and mobile service payment sheets now use item-level payment endpoints instead of silently defaulting to legacy booking cash payment.
+- [x] Current-contract smoke test: 17/17 passed across health, auth, multi-service cart, `/orders/checkout`, item listing, cancellation, continue-searching, test payment, and auth protection.
+- [!] Existing legacy `full-flow.e2e.ts` and `dispatch.e2e.ts` scripts still assert retired booking/cart contracts and were not used as release gates.
+
 ---
 
 ## ⚠️ Pending / Needs Attention
 
 | Item | Details |
 |------|---------|
-| **Full service-order E2E validation** | Run customer checkout → partner accept/check-in → per-item payment → completion, plus cancellation, re-dispatch, refund, and admin controls. |
+| **Live gateway verification** | Execute a real Razorpay/Stripe transaction and provider refund after enabling provider credentials in Admin → Payment Config. |
 | **Email (SMTP)** | Optional — OTP codes log to console if not set. |
 | **EAS projectId** | Not set — push tokens use Expo Go anonymous identity. Needed only for standalone builds. |
 | **Dependencies** | Run `pnpm install --frozen-lockfile` before first start. |

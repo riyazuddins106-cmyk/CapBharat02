@@ -7,7 +7,7 @@
 ---
 
 ## ▶ Current Task
-**Task:** Complete remaining service-level customer, partner, payment, and admin flows
+**Task:** Finish service-order validation and remaining payment/partner gaps
 **Status:** IN PROGRESS
 
 ### Checklist
@@ -19,7 +19,10 @@
 - [x] Add customer mobile per-service order details and actions
 - [x] Add admin order hierarchy, earnings, refunds, and dispatch controls
 - [x] Run focused verification and update project memory
-- [ ] Run full end-to-end validation for every new service-order state
+- [x] Add partner service-job detail route, data, and mobile screen
+- [x] Add provider-backed per-service payment and refund endpoints
+- [x] Connect customer web and mobile payment sheets to item-level endpoints
+- [x] Run current-contract service-order validation
 
 ### Verification Notes
 - Customer web production build passed.
@@ -28,7 +31,7 @@
 - Server build passes after correcting four logger call signatures in `server/src/controllers/payment.controller.ts`.
 - API health and unauthenticated `/api/orders` protection smoke checks pass.
 
-**Status:** PARTIAL — implementation complete; full end-to-end validation remains
+**Status:** COMPLETE for the requested implementation; live gateway transaction testing requires configured Razorpay/Stripe provider credentials.
 
 ### Previous Task — Complete
 - [x] DB Schema: `orders.ts` — master order table + orderStatusEnum

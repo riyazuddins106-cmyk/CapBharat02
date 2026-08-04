@@ -100,7 +100,11 @@ function ServiceJobCard({ item, type, onAction }: {
   const pending = type === 'pending';
   const active = type === 'active';
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+    <TouchableOpacity
+      onPress={() => router.push(`/service-job/${item.orderItemId}`)}
+      activeOpacity={0.85}
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}
+    >
       <View style={styles.cardHeader}>
         <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
           <Ionicons name="layers-outline" size={18} color={colors.primary} />
@@ -148,7 +152,7 @@ function ServiceJobCard({ item, type, onAction }: {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

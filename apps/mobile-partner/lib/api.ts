@@ -165,6 +165,23 @@ export interface OrderItemJob {
   createdAt?: string;
 }
 
+export interface OrderItemJobDetail extends OrderItemJob {
+  requestId?: string | null;
+  serviceName: string;
+  orderStatus: string;
+  orderNotes?: string | null;
+  endTime: string;
+  customer: { id: string; name: string; phone: string | null };
+  address: {
+    line1: string;
+    line2?: string | null;
+    city: string;
+    state: string;
+    postalCode: string;
+  } | null;
+  payment: { status: string; method?: string | null; amount: number } | null;
+}
+
 export interface OrderItemJobs {
   pendingRequests: OrderItemJob[];
   activeJobs: OrderItemJob[];
@@ -293,6 +310,9 @@ export const partnerApi = {
 
   listOrderItemJobs: (token: string) =>
     request<OrderItemJobs>('/api/partner/order-item-jobs', { token }),
+
+  getOrderItemJob: (itemId: string, token: string) =>
+    request<OrderItemJobDetail>(`/api/partner/order-item-jobs/${itemId}`, { token }),
 
   acceptOrderItemJob: (requestId: string, token: string) =>
     request<OrderItemJob>(`/api/partner/order-item-jobs/${requestId}/accept`, { method: 'PATCH', token }),

@@ -379,6 +379,14 @@ export const ordersApi = {
     request(`/api/orders/${orderId}/items/${itemId}/pay`, { method: 'POST', body: JSON.stringify({ method, notes }), token }),
   testPayItem: (orderId: string, itemId: string, method: string, token: string) =>
     request(`/api/orders/${orderId}/items/${itemId}/test-pay`, { method: 'POST', body: JSON.stringify({ method }), token }),
+  createRazorpayOrder: (orderId: string, itemId: string, token: string) =>
+    request<{ orderId: string; amount: number; currency: string; keyId: string; itemId: string; serviceName: string; testMode?: boolean }>(
+      `/api/orders/${orderId}/items/${itemId}/razorpay/create-order`, { method: 'POST', body: '{}', token }),
+  verifyRazorpay: (orderId: string, itemId: string, payload: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }, token: string) =>
+    request(`/api/orders/${orderId}/items/${itemId}/razorpay/verify`, { method: 'POST', body: JSON.stringify(payload), token }),
+  createStripeSession: (orderId: string, itemId: string, token: string) =>
+    request<{ checkoutUrl: string | null; sessionId: string; testMode?: boolean }>(
+      `/api/orders/${orderId}/items/${itemId}/stripe/create-session`, { method: 'POST', body: '{}', token }),
 };
 
 // ── Offers / Banners ───────────────────────────────────────
