@@ -13,6 +13,12 @@ supportedArchitectures:
     - glibc
 # Refuse packages published < 7 days ago, matching the root pnpm-workspace.yaml.
 minimumReleaseAge: 10080
+packageExtensions:
+  react-native-worklets@0.5.1:
+    dependencies:
+      '@babel/generator': 7.29.7
+      '@babel/traverse': 7.29.7
+      '@babel/types': 7.29.7
 allowBuilds:
   '@tailwindcss/oxide': true
   esbuild: true
