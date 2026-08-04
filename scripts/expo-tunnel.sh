@@ -76,9 +76,10 @@ done
 
 # Native Expo builds need an absolute API origin. When using ngrok for the
 # Metro tunnel, the API remains available through the project's public dev
-# domain; pass it into Metro so Expo Go does not try to fetch a relative URL.
+# domain on port 8000; pass it into Metro so Expo Go does not try to fetch a
+# relative URL or accidentally send API requests to the customer web server.
 if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
-  export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
+  export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN:8000"
 fi
 
 # Optional startup delay (stagger Partner App behind Customer App)
@@ -103,7 +104,7 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   echo "=== Replit: using expo --tunnel (HTTPS bundle URLs required) ==="
 
   if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
-    export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN"
+    export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN:8000"
   fi
   echo "API URL: $EXPO_PUBLIC_API_URL"
 

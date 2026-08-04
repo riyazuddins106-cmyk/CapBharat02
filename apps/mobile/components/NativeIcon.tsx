@@ -10,11 +10,24 @@ type NativeIconProps = {
 const SERVICE_EMOJI: Record<string, string> = {
   broom: '🧹',
   'pipe-wrench': '🔧',
+  'water-pump': '🚰',
+  pipe: '🪠',
+  toilet: '🚽',
+  thermometer: '🌡️',
   'lightning-bolt': '⚡',
   'content-cut': '✂️',
   'format-paint': '🖌️',
   'air-conditioner': '❄️',
   'washing-machine': '🧺',
+  'home-heart': '🏠',
+  'shower-head': '🚿',
+  'silverware-fork-knife': '🍴',
+  stove: '🍳',
+  sofa: '🛋️',
+  rug: '🧶',
+  'truck-delivery': '🚚',
+  'office-building': '🏢',
+  'tag-outline': '🏷️',
   'dots-grid': '⋯',
   grid: '▦',
   'grid-outline': '▦',
@@ -34,6 +47,36 @@ const SERVICE_EMOJI: Record<string, string> = {
   'layers-outline': '▱',
   'time-outline': '◷',
 };
+
+const SERVICE_TYPE_ICON_RULES: Array<[string[], string]> = [
+  [['deep home', 'home clean', 'full home'], 'home-heart'],
+  [['bathroom', 'toilet'], 'shower-head'],
+  [['kitchen', 'chimney', 'stove'], 'silverware-fork-knife'],
+  [['sofa', 'upholstery'], 'sofa'],
+  [['carpet'], 'rug'],
+  [['move-in', 'move-out', 'move in', 'move out', 'handover'], 'truck-delivery'],
+  [['office', 'commercial'], 'office-building'],
+  [['pipe', 'leak', 'burst'], 'pipe-wrench'],
+  [['tap', 'faucet', 'mixer'], 'water-pump'],
+  [['geyser', 'water heater', 'boiler'], 'thermometer'],
+  [['drain', 'blockage', 'clog', 'sewer'], 'pipe'],
+  [['wiring', 'rewiring', 'short circuit'], 'lightning-bolt'],
+  [['fan', 'light', 'led', 'chandelier'], 'lightning-bolt'],
+  [['haircut', 'hair cut', 'barber'], 'content-cut'],
+  [['facial', 'skincare', 'clean-up'], 'sparkles-outline'],
+  [['nail', 'manicure', 'pedicure'], 'content-cut'],
+  [['paint', 'putty', 'primer', 'polish'], 'format-paint'],
+  [['ac', 'refrigerator', 'fridge'], 'air-conditioner'],
+  [['washing machine', 'washer', 'laundry'], 'washing-machine'],
+];
+
+export function getNativeServiceTypeIcon(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  for (const [keywords, icon] of SERVICE_TYPE_ICON_RULES) {
+    if (keywords.some((keyword) => normalized.includes(keyword))) return icon;
+  }
+  return 'tag-outline';
+}
 
 /**
  * Small font-independent icon set for the primary navigation and category

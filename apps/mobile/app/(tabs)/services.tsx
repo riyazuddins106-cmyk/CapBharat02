@@ -9,25 +9,9 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { categoriesApi, subcategoriesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
-import { NativeIcon } from '@/components/NativeIcon';
+import { NativeIcon, getNativeServiceTypeIcon } from '@/components/NativeIcon';
 
-const serviceTypeIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
-  all: 'grid-outline',
-  cleaning: 'sparkles-outline',
-  plumbing: 'water-outline',
-  electrical: 'flash-outline',
-  salon: 'cut-outline',
-  painting: 'color-palette-outline',
-  'ac repair': 'snow-outline',
-  laundry: 'shirt-outline',
-  appliance: 'home-outline',
-  default: 'sparkles-outline',
-};
-
-function getServiceTypeIcon(name: string): keyof typeof Ionicons.glyphMap {
-  const normalized = name.trim().toLowerCase();
-  return serviceTypeIcons[normalized] ?? serviceTypeIcons.default;
-}
+const hasRealImage = (url?: string | null) => !!url && !url.includes('placeholder');
 
 export default function ServicesScreen() {
   const colors = useColors();
@@ -153,10 +137,10 @@ export default function ServicesScreen() {
                 style={styles.serviceTypeTile}
               >
                 <View style={[styles.serviceTypeIcon, { backgroundColor: colors.primary }]}>
-                  {item.imageUrl ? (
-                    <Image source={{ uri: item.imageUrl }} style={styles.serviceTypeImage} />
+                  {hasRealImage(item.imageUrl) ? (
+                    <Image source={{ uri: item.imageUrl! }} style={styles.serviceTypeImage} />
                   ) : (
-                    <NativeIcon name={getServiceTypeIcon(item.name)} size={28} color="#fff" />
+                    <NativeIcon name={getNativeServiceTypeIcon(item.name)} size={28} color="#fff" />
                   )}
                 </View>
                 <Text numberOfLines={2} style={[styles.serviceTypeLabel, { color: selectedSubCat === item.id ? colors.primary : colors.foreground, fontWeight: selectedSubCat === item.id ? '700' : '500' }]}>

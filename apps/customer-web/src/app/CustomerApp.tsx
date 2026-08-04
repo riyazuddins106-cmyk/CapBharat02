@@ -93,6 +93,30 @@ function getSubIcon(name: string): LucideIcon {
   return Grid; // fallback
 }
 
+function SubcategoryTileVisual({ sub, selected }: { sub: ApiSubCategory; selected: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = hasRealImage(sub.imageUrl) && !imageFailed;
+  const Icon = getSubIcon(sub.name);
+
+  return (
+    <div
+      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all overflow-hidden"
+      style={{ background: showImage ? "transparent" : (selected ? "#5B3EF5" : (sub.color || "#5B3EF5")) }}
+    >
+      {showImage ? (
+        <img
+          src={sub.imageUrl!}
+          alt={sub.name}
+          className="w-full h-full object-cover rounded-2xl"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <Icon size={22} color={sub.iconColor || "#fff"} />
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────────── Address label config ───────────────── */
 const ADDR_LABELS = ["Home", "Work", "Other"] as const;
 type AddrLabel = typeof ADDR_LABELS[number];
@@ -1533,15 +1557,7 @@ function CustServices({
                     onClick={() => setSelectedSubId(isSelected ? null : s.id)}
                     className="flex flex-col items-center gap-1.5"
                   >
-                    <div
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-all overflow-hidden"
-                      style={{ background: hasRealImage(s.imageUrl) ? "transparent" : (isSelected ? "#5B3EF5" : (s.color || "#5B3EF5")) }}
-                    >
-                      {hasRealImage(s.imageUrl)
-                        ? <img src={s.imageUrl!} alt={s.name} className="w-full h-full object-cover rounded-2xl" />
-                        : (() => { const SubIcon = getSubIcon(s.name); return <SubIcon size={22} color={s.iconColor || "#fff"} />; })()
-                      }
-                    </div>
+                    <SubcategoryTileVisual sub={s} selected={isSelected} />
                     <span
                       className="text-[11px] font-semibold text-center leading-tight"
                       style={{ color: isSelected ? "#5B3EF5" : undefined }}

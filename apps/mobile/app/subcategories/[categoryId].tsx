@@ -13,6 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { subcategoriesApi, servicesApi, cartApi } from '@/lib/api';
 import type { Service, Cart } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
+import { NativeIcon, getNativeServiceTypeIcon } from '@/components/NativeIcon';
 
 // ── Icon mapping ─────────────────────────────────────────────
 const SUBCAT_ICONS: Array<[string, keyof typeof MaterialCommunityIcons.glyphMap]> = [
@@ -249,11 +250,7 @@ export default function SubcategoriesScreen() {
               const isAll = item.id === ALL_ID;
               const isSelected = selectedSubCat === item.id;
               const accent = isAll ? colors.primary : (item.color || ACCENTS[(index - 1) % ACCENTS.length]);
-              const iconName: keyof typeof MaterialCommunityIcons.glyphMap = isAll
-                ? 'view-grid'
-                : ((item as any).iconName && (item as any).iconName !== 'tag-outline'
-                    ? (item as any).iconName
-                    : getSubcatIcon(item.name));
+              const iconName = isAll ? 'grid-outline' : getNativeServiceTypeIcon(item.name);
               const iconColor = isAll ? '#fff' : ((item as any).iconColor || '#fff');
               return (
                 <TouchableOpacity
@@ -269,7 +266,7 @@ export default function SubcategoriesScreen() {
                   ]}>
                     {hasRealImage((item as any).imageUrl)
                       ? <Image source={{ uri: (item as any).imageUrl }} style={styles.tileImage} resizeMode="cover" />
-                      : <MaterialCommunityIcons name={iconName} size={24} color={iconColor} />
+                      : <NativeIcon name={iconName} size={24} color={iconColor} />
                     }
                   </View>
                   <Text
