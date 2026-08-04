@@ -35,6 +35,23 @@ const INPUT_STYLE = {
   WebkitAppearance: "none",
 } as const;
 
+// The Create Admin Account card intentionally uses the supplied charcoal/navy
+// reference palette without changing the rest of the Admin Panel theme.
+const ADMIN_FORM_CARD_STYLE = {
+  ...CARD,
+  background: "#1b2638",
+  border: "1px solid rgba(14,165,233,0.3)",
+} as const;
+const ADMIN_FORM_INPUT_STYLE = {
+  ...INPUT_STYLE,
+  background: "#24252a",
+  borderColor: "#3b3d44",
+} as const;
+const ADMIN_FORM_BUTTON_STYLE = {
+  background: "#3a3c42",
+  border: "1px solid #4a4c52",
+} as const;
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
@@ -184,7 +201,7 @@ function ThemedSelect({
             ? "border-[#3b3d44] hover:border-sky-400/40 focus:border-sky-400"
             : "border-white/10 hover:border-white/20 focus:border-violet-500/60"
         }`}
-        style={neutral ? { background: "#24252a" } : INPUT_STYLE}
+        style={neutral ? ADMIN_FORM_INPUT_STYLE : INPUT_STYLE}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -194,7 +211,7 @@ function ThemedSelect({
       {open && (
         <div
           className="absolute left-0 right-0 z-[70] mt-1 overflow-hidden rounded-xl border border-white/10 py-1 shadow-2xl"
-          style={{ background: neutral ? "#24252a" : "#1b1b22" }}
+          style={{ background: neutral ? ADMIN_FORM_INPUT_STYLE.background : "#1b1b22" }}
           role="listbox"
         >
           {options.map(option => {
@@ -7179,7 +7196,7 @@ function AdminManagementView({
 
       <div
         className="rounded-2xl p-5 space-y-4"
-        style={{ ...CARD, background: "#1b2638", border: "1px solid rgba(14,165,233,0.3)" }}
+        style={ADMIN_FORM_CARD_STYLE}
       >
         <div className="flex items-center gap-2">
           <UserPlus size={17} className="text-sky-300" />
@@ -7205,7 +7222,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
               placeholder="e.g. Operations Admin"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
+              style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
           <label className="block">
@@ -7216,7 +7233,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="admin@example.com"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
+              style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
           <label className="block">
@@ -7227,7 +7244,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               placeholder="+91 98765 43210"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
+              style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
           <label className="block">
@@ -7251,7 +7268,7 @@ function AdminManagementView({
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               placeholder="At least 8 characters, with uppercase, lowercase, and number"
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
+              style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
         </div>
@@ -7259,7 +7276,7 @@ function AdminManagementView({
           onClick={() => void create()}
           disabled={creating}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-          style={{ background: "#3a3c42", border: "1px solid #4a4c52" }}
+          style={ADMIN_FORM_BUTTON_STYLE}
         >
           {creating && <Loader2 size={14} className="animate-spin" />}
           {creating ? "Creating…" : "Create account"}

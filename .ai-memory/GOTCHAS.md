@@ -279,6 +279,11 @@
 **Fix:** Restore the original global purple theme and keep the neutral slate/graphite treatment local to the account-creation card, its fields, role select, and button.
 **Warning:** When a screenshot shows a single form or card, do not change shared theme tokens or global utility colors unless the user explicitly asks for a full-panel redesign. If shared inline tokens make the local treatment too subtle, use explicit styles inside that component rather than broad overrides.
 
+### Admin account form — sample reference colors before styling
+**Problem:** Repeated visual feedback indicated the form color change was not obvious enough when it inherited shared card/input tokens.
+**Fix:** Sample the supplied reference images and lock the card, control, border, and button colors into dedicated local constants used only by the form.
+**Warning:** Keep the local constants separate from `CARD` and `INPUT_STYLE`; changing shared tokens will unintentionally recolor the rest of the Admin Panel.
+
 ### Partner App Ionicons need a native font grace period
 **Problem:** The Partner App dashboard and tab labels rendered, but Ionicons were blank because the root layout forced rendering after a 300ms `useFonts` timeout.
 **Fix:** Keep the native font gate open for 3 seconds and only use a shorter 1-second fallback on web. The Customer App already used a longer native grace period.

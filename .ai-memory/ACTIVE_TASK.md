@@ -28,6 +28,8 @@
 - [x] Verified the restored purple Admin Panel preview, rebuilt Admin Web, restarted the workflow, and passed git diff checks
 - [x] Strengthened the form-only colors with solid inline navy/graphite values after the first scoped styling remained too subtle
 - [x] Rebuilt Admin Web, restarted the workflow, and confirmed no global theme files changed in the final correction
+- [x] Matched the Create Admin Account form to the newly supplied reference palette and locked its colors into dedicated local style constants
+- [x] Rebuilt Admin Web, restarted the workflow, and passed the final scoped diff check
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients
