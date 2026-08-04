@@ -219,6 +219,7 @@ The service-level order implementation is complete for customer web/mobile, part
 - The uploaded neutral charcoal reference is scoped only to the Admin Management Create Admin Account form. The wider Admin Panel shell, login page, navigation, shared controls, and other sections retain the original purple theme. Admin Web production build passed, the workflow restarted cleanly, and the restored purple login preview was visually verified.
 - The Create Admin Account form now uses explicit solid colors: navy card `#1b2638`, graphite controls `#24252a`, defined gray borders, sky-blue focus accents, and a neutral gray action button. These values are local to Admin Management; the global Admin Panel theme remains unchanged. Admin Web build and workflow restart passed.
 - The latest Create Admin Account references were sampled directly: card `#1B2638`, controls `#24252A`, borders `#3B3D44`, and button `#3A3C42`. These are now dedicated Admin Management-only style constants; the global purple Admin Panel theme remains unchanged. Admin Web build and workflow restart passed.
+- The newest Create Admin Account reference supersedes the neutral button/icon treatment: the form now uses charcoal card `#181A20`, controls `#24262B`, borders `#3B3D42`, a purple icon badge `#232041`/`#8B5CF6`, purple focus states, and a `#6446F6` to `#7252F7` button gradient. The change remains scoped to Admin Management; Admin Web build and workflow restart passed.
 
 
 ### Task: Add Admin service detail views and booking operations controls

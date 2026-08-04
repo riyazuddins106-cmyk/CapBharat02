@@ -284,6 +284,11 @@
 **Fix:** Sample the supplied reference images and lock the card, control, border, and button colors into dedicated local constants used only by the form.
 **Warning:** Keep the local constants separate from `CARD` and `INPUT_STYLE`; changing shared tokens will unintentionally recolor the rest of the Admin Panel.
 
+### Admin account form — later references can supersede earlier accents
+**Problem:** A later reference changed the requested local accents from neutral gray/sky-blue to purple while retaining the charcoal surfaces.
+**Fix:** Treat the newest supplied image as authoritative for the requested component and update only its local icon, button, border, and focus accents.
+**Warning:** Do not preserve older screenshot colors when a newer reference explicitly changes the same component.
+
 ### Partner App Ionicons need a native font grace period
 **Problem:** The Partner App dashboard and tab labels rendered, but Ionicons were blank because the root layout forced rendering after a 300ms `useFonts` timeout.
 **Fix:** Keep the native font gate open for 3 seconds and only use a shorter 1-second fallback on web. The Customer App already used a longer native grace period.

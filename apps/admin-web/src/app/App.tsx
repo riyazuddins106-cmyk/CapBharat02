@@ -35,21 +35,25 @@ const INPUT_STYLE = {
   WebkitAppearance: "none",
 } as const;
 
-// The Create Admin Account card intentionally uses the supplied charcoal/navy
+// The Create Admin Account card intentionally uses the supplied charcoal
 // reference palette without changing the rest of the Admin Panel theme.
 const ADMIN_FORM_CARD_STYLE = {
   ...CARD,
-  background: "#1b2638",
-  border: "1px solid rgba(14,165,233,0.3)",
+  background: "#181a20",
+  border: "1px solid #1d1f25",
 } as const;
 const ADMIN_FORM_INPUT_STYLE = {
   ...INPUT_STYLE,
-  background: "#24252a",
-  borderColor: "#3b3d44",
+  background: "#24262b",
+  borderColor: "#3b3d42",
+} as const;
+const ADMIN_FORM_ICON_STYLE = {
+  background: "#232041",
+  color: "#8b5cf6",
 } as const;
 const ADMIN_FORM_BUTTON_STYLE = {
-  background: "#3a3c42",
-  border: "1px solid #4a4c52",
+  background: "linear-gradient(135deg, #6446f6 0%, #7252f7 100%)",
+  border: "1px solid #6446f6",
 } as const;
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -198,7 +202,7 @@ function ThemedSelect({
         onClick={() => setOpen(current => !current)}
         className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm text-white outline-none border transition-colors disabled:opacity-40 ${
           neutral
-            ? "border-[#3b3d44] hover:border-sky-400/40 focus:border-sky-400"
+            ? "border-[#3b3d42] hover:border-violet-400/40 focus:border-violet-400"
             : "border-white/10 hover:border-white/20 focus:border-violet-500/60"
         }`}
         style={neutral ? ADMIN_FORM_INPUT_STYLE : INPUT_STYLE}
@@ -7199,7 +7203,9 @@ function AdminManagementView({
         style={ADMIN_FORM_CARD_STYLE}
       >
         <div className="flex items-center gap-2">
-          <UserPlus size={17} className="text-sky-300" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={ADMIN_FORM_ICON_STYLE}>
+            <UserPlus size={17} />
+          </span>
           <h3 className="text-white font-semibold text-sm">Create Admin Account</h3>
         </div>
         {message && (
@@ -7221,7 +7227,7 @@ function AdminManagementView({
               value={form.fullName}
               onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
               placeholder="e.g. Operations Admin"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d42] focus:border-violet-400"
               style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
@@ -7232,7 +7238,7 @@ function AdminManagementView({
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="admin@example.com"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d42] focus:border-violet-400"
               style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
@@ -7243,7 +7249,7 @@ function AdminManagementView({
               value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               placeholder="+91 98765 43210"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d42] focus:border-violet-400"
               style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>
@@ -7267,7 +7273,7 @@ function AdminManagementView({
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               placeholder="At least 8 characters, with uppercase, lowercase, and number"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d42] focus:border-violet-400"
               style={ADMIN_FORM_INPUT_STYLE}
             />
           </label>

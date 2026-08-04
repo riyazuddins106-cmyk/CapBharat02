@@ -30,6 +30,8 @@
 - [x] Rebuilt Admin Web, restarted the workflow, and confirmed no global theme files changed in the final correction
 - [x] Matched the Create Admin Account form to the newly supplied reference palette and locked its colors into dedicated local style constants
 - [x] Rebuilt Admin Web, restarted the workflow, and passed the final scoped diff check
+- [x] Matched the latest reference's purple icon badge, purple gradient button, charcoal form surfaces, and purple focus states
+- [x] Rebuilt Admin Web, restarted the workflow, and confirmed the final Admin Panel workflow is serving cleanly
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients
