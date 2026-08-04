@@ -867,9 +867,9 @@ export const adminApi = {
     request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/refund`, { method: 'PATCH', token }),
 
   // Platform Settings
-  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config', token: string) =>
+  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config' | 'languages', token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { token }),
-  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config', value: unknown, token: string) =>
+  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config' | 'languages', value: unknown, token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { method: 'PUT', token, body: JSON.stringify(value) }),
   sendTestEmail: (to: string, token: string) =>
     request<{ message: string }>('/admin/settings/email/test', { method: 'POST', token, body: JSON.stringify({ to }) }),

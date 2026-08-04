@@ -7,7 +7,43 @@ import { AppError } from '../utils/AppError.js';
 import nodemailer from 'nodemailer';
 
 /* ── Allowed setting keys ─────────────────────────────────────────── */
-const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config', 'booking_config', 'payout_config']);
+const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config', 'booking_config', 'payout_config', 'languages']);
+
+export const DEFAULT_LANGUAGE_CONFIG = {
+  defaultLocale: 'en',
+  enabledLocales: ['en', 'hi', 'mr', 'ar', 'ur'],
+} as const;
+
+const VALID_LOCALES = new Set(DEFAULT_LANGUAGE_CONFIG.enabledLocales);
+
+function normalizeLanguageConfig(value: unknown) {
+  const input = (value && typeof value === 'object' ? value : {}) as {
+    defaultLocale?: unknown;
+    enabledLocales?: unknown;
+  };
+  const enabledLocales = Array.isArray(input.enabledLocales)
+    ? [...new Set(input.enabledLocales.filter((locale): locale is string => (
+      typeof locale === 'string' && VALID_LOCALES.has(locale as typeof DEFAULT_LANGUAGE_CONFIG.enabledLocales[number])
+    )))]
+    : [...DEFAULT_LANGUAGE_CONFIG.enabledLocales];
+  if (!enabledLocales.includes('en')) enabledLocales.unshift('en');
+  // ServeNow launches in English. The setting controls availability, while
+  // English remains the mandatory default and fallback for every client.
+  return { defaultLocale: 'en', enabledLocales };
+}
+
+export const getPublicLanguages = asyncHandler(async (_req: Request, res: Response) => {
+  try {
+    const [row] = await db
+      .select()
+      .from(platformSettings)
+      .where(eq(platformSettings.key, 'languages'));
+    const value = row ? normalizeLanguageConfig(JSON.parse(row.value)) : DEFAULT_LANGUAGE_CONFIG;
+    res.json({ success: true, data: value });
+  } catch {
+    res.json({ success: true, data: DEFAULT_LANGUAGE_CONFIG });
+  }
+});
 
 /* ── GET /admin/settings/:key ─────────────────────────────────────── */
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -20,7 +56,9 @@ export const getSettings = asyncHandler(async (req: Request, res: Response) => {
     .where(eq(platformSettings.key, key));
 
   // Return empty defaults if not yet configured
-  const value = row ? JSON.parse(row.value) : getDefaults(key);
+  const value = key === 'languages'
+    ? normalizeLanguageConfig(row ? JSON.parse(row.value) : DEFAULT_LANGUAGE_CONFIG)
+    : row ? JSON.parse(row.value) : getDefaults(key);
   res.json({ success: true, data: { key, value } });
 });
 
@@ -29,7 +67,7 @@ export const upsertSettings = asyncHandler(async (req: Request, res: Response) =
   const { key } = req.params;
   if (!ALLOWED_KEYS.has(key)) throw AppError.badRequest(`Unknown settings key: ${key}`);
 
-  const value = req.body;
+  const value = key === 'languages' ? normalizeLanguageConfig(req.body) : req.body;
   if (typeof value !== 'object' || value === null) {
     throw AppError.badRequest('Request body must be a JSON object');
   }
@@ -168,5 +206,6 @@ function getDefaults(key: string): object {
       maxAmountPerRun: 100000,
     };
   }
+  if (key === 'languages') return DEFAULT_LANGUAGE_CONFIG;
   return {};
 }

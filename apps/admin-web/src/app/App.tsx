@@ -7,13 +7,14 @@ import {
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
-  Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
+  Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff, Globe2,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
   AlertCircle, History as HistoryIcon, X, KeyRound, Download, Columns2, Camera,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import * as XLSX from "xlsx";
 import { DocumentVerificationView } from "./DocumentVerification";
+import { LOCALE_LABELS, SUPPORTED_LOCALES, useLanguage } from "@/lib/language";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   AdminAccount,
@@ -316,6 +317,7 @@ function EmptyRow({ cols, text }: { cols: number; text: string }) {
 function Pagination({ page, total, pageSize, onChange }: {
   page: number; total: number; pageSize: number; onChange: (p: number) => void;
 }) {
+  const { tx } = useLanguage();
   const effectiveSize = pageSize === -1 ? total : pageSize;
   const totalPages = Math.max(1, pageSize === -1 ? 1 : Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * effectiveSize + 1;
@@ -323,18 +325,18 @@ function Pagination({ page, total, pageSize, onChange }: {
   return (
     <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
       <span className="text-white/40 text-xs tabular-nums">
-        {total === 0 ? "No results" : pageSize === -1 ? `All ${total} records` : `${from}–${to} of ${total}`}
+        {total === 0 ? tx("No results") : pageSize === -1 ? tx("All {count} records").replace("{count}", String(total)) : tx("{from}–{to} of {total}").replace("{from}", String(from)).replace("{to}", String(to)).replace("{total}", String(total))}
       </span>
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => onChange(page - 1)} disabled={page <= 1}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >Prev</button>
+        >{tx("Previous")}</button>
         <span className="px-2 text-white/40 text-xs font-medium tabular-nums">{page} / {totalPages}</span>
         <button
           onClick={() => onChange(page + 1)} disabled={page >= totalPages}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >Next</button>
+        >{tx("Next")}</button>
       </div>
     </div>
   );
@@ -563,13 +565,14 @@ function downloadChart(containerId: string, filename: string, format: "png" | "j
 
 
 function AccessDenied() {
+  const { tx } = useLanguage();
   return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)" }}>
         <ShieldCheck size={28} color="#EF4444" />
       </div>
-      <p className="text-white font-semibold text-base">Access Restricted</p>
-      <p className="text-white/40 text-sm max-w-xs">This section is only available to admin accounts.</p>
+      <p className="text-white font-semibold text-base">{tx("Access Restricted")}</p>
+      <p className="text-white/40 text-sm max-w-xs">{tx("This section is only available to admin accounts.")}</p>
     </div>
   );
 }
@@ -579,6 +582,7 @@ function AccessDenied() {
 ═══════════════════════════════════════════════════════════════════ */
 
 function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, refresh: string) => void }) {
+  const { tx } = useLanguage();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -592,7 +596,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
       adminAuth.store(data.accessToken, data.refreshToken, data.user);
       onLogin(data.user, data.accessToken, data.refreshToken);
     } catch (err: any) {
-      setError(err.message ?? "Login failed");
+      setError(err.message ?? tx("Login failed"));
     } finally { setLoading(false); }
   };
 
@@ -606,8 +610,8 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
           <span className="text-white font-bold text-xl">ServeNow Admin</span>
         </div>
         <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#161B27" }}>
-          <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
-          <p className="text-white/40 text-sm mb-6">Sign in to the admin panel</p>
+          <h2 className="text-white font-bold text-lg mb-1">{tx("Welcome back")}</h2>
+          <p className="text-white/40 text-sm mb-6">{tx("Sign in to the admin panel")}</p>
           {error && (
             <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20" style={{ background: "rgba(239,68,68,0.08)" }}>
               {error}
@@ -627,7 +631,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? tx("Signing in…") : tx("Sign in")}
           </button>
         </form>
       </div>
@@ -665,6 +669,7 @@ const ADMIN_SIDEBAR = [
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config",     adminOnly: true },
   { id: "otp-settings",       icon: KeyRound,    label: "OTP Settings",       adminOnly: true },
   { id: "booking-settings",   icon: Clock,       label: "Booking Settings",   adminOnly: true },
+  { id: "languages",          icon: Globe2,      label: "Languages",          adminOnly: true },
   { id: "admin-management",   icon: UserPlus,    label: "Admin Management",   adminOnly: true },
   { id: "settings",           icon: Settings,    label: "Settings",           adminOnly: true },
 ];
@@ -688,7 +693,7 @@ function adminShowError(msg: string) {
 
 const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch","orders",
   "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
-  "payment-config","email-config","sms-config","otp-settings","documents","payouts","admin-management"] as const;
+  "payment-config","email-config","sms-config","otp-settings","documents","payouts","languages","admin-management"] as const;
 
 // Sections that only role === 'admin' may access
 const ADMIN_ONLY_SECTIONS = new Set(
@@ -1165,6 +1170,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             isAdmin ? <OtpSettingsView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "booking-settings" ? (
             isAdmin ? <BookingSettingsView accessToken={accessToken} /> : <AccessDenied />
+          ) : activeSection === "languages" ? (
+            isAdmin ? <LanguagesView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
           ) : activeSection === "payouts" ? (
@@ -6964,6 +6971,128 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
       >
         {saving ? "Saving…" : "Save Booking Settings"}
       </button>
+    </div>
+  );
+}
+
+function LanguagesView({ accessToken }: { accessToken: string }) {
+  const [enabledLocales, setEnabledLocales] = useState<string[]>([...SUPPORTED_LOCALES]);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    adminApi.getSettings("languages", accessToken)
+      .then(({ value }) => {
+        const configured = value as { enabledLocales?: unknown };
+        const values = Array.isArray(configured?.enabledLocales)
+          ? configured.enabledLocales.filter((locale): locale is string => typeof locale === "string")
+          : [...SUPPORTED_LOCALES];
+        setEnabledLocales(["en", ...values.filter((locale) => locale !== "en" && SUPPORTED_LOCALES.includes(locale as typeof SUPPORTED_LOCALES[number]))]);
+      })
+      .catch((e: any) => setMessage({ text: e.message ?? "Could not load language settings.", ok: false }))
+      .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  const toggleLocale = (locale: string) => {
+    if (locale === "en") return;
+    setEnabledLocales((current) => current.includes(locale)
+      ? current.filter((item) => item !== locale)
+      : [...current, locale]);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const normalized = ["en", ...enabledLocales.filter((locale) => locale !== "en")];
+      await adminApi.saveSettings("languages", { defaultLocale: "en", enabledLocales: normalized }, accessToken);
+      setEnabledLocales(normalized);
+      setMessage({ text: "Language availability saved. All apps will use this list.", ok: true });
+    } catch (e: any) {
+      setMessage({ text: e.message ?? "Could not save language settings.", ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-2xl space-y-5">
+      <div>
+        <h2 className="text-white font-bold text-base">Languages</h2>
+        <p className="text-white/40 text-xs mt-1">
+          Choose which languages appear in Customer Web, Partner Web, Customer Mobile, and Partner Mobile.
+        </p>
+      </div>
+
+      <div className="rounded-2xl p-5 border border-white/[0.07] space-y-5" style={CARD}>
+        {message && (
+          <div
+            className="px-3 py-2 rounded-lg text-xs font-medium border"
+            style={{
+              background: message.ok ? "rgba(22,163,74,0.1)" : "rgba(239,68,68,0.1)",
+              borderColor: message.ok ? "rgba(22,163,74,0.3)" : "rgba(239,68,68,0.3)",
+              color: message.ok ? "#4ade80" : "#f87171",
+            }}
+          >
+            {message.text}
+          </div>
+        )}
+
+        <div className="rounded-xl border border-violet-500/20 p-4" style={{ background: "rgba(91,62,245,0.08)" }}>
+          <div className="flex items-center gap-2">
+            <Globe2 size={17} className="text-violet-300" />
+            <p className="text-white text-sm font-bold">Default language: English</p>
+          </div>
+          <p className="text-white/45 text-xs mt-1">
+            English is always enabled and is used as the default and fallback language.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-white/60 text-xs font-bold uppercase tracking-wide">Available languages</p>
+          {loading ? (
+            <div className="text-white/40 text-sm py-4">Loading language settings…</div>
+          ) : (
+            SUPPORTED_LOCALES.map((locale) => {
+              const checked = enabledLocales.includes(locale);
+              const isEnglish = locale === "en";
+              return (
+                <label
+                  key={locale}
+                  className="flex items-center justify-between gap-4 rounded-xl border px-4 py-3 cursor-pointer transition-colors"
+                  style={{
+                    background: checked ? "rgba(91,62,245,0.08)" : "rgba(255,255,255,0.02)",
+                    borderColor: checked ? "rgba(124,91,248,0.35)" : "rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <span>
+                    <span className="block text-white text-sm font-semibold">{LOCALE_LABELS[locale]}</span>
+                    <span className="block text-white/35 text-[11px] mt-0.5 uppercase">{locale}</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isEnglish}
+                    onChange={() => toggleLocale(locale)}
+                    className="h-4 w-4 accent-violet-500"
+                  />
+                </label>
+              );
+            })
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || loading}
+          className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+        >
+          {saving ? "Saving…" : "Save Language Settings"}
+        </button>
+      </div>
     </div>
   );
 }

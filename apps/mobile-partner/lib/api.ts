@@ -22,6 +22,7 @@ function getApiBase(): string {
   return '';
 }
 const API_BASE = getApiBase();
+export { API_BASE };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

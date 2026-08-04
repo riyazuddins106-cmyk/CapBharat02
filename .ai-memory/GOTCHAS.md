@@ -226,6 +226,11 @@
 **Fix:** Treat `/scanner.html` as the canonical QR page and make legacy QR routes redirect to it with no-cache headers.
 **Warning:** Expo/ngrok tunnel URLs change between sessions; never hardcode them in a secondary QR page.
 
+### Replit multi-port QR scanner mapping
+**Problem:** The QR service's local port and public external port are different, and the public port can be shared with another workflow's local port. Opening the wrong public port shows Partner Web instead of the scanner.
+**Fix:** With the current mapping, use the QR scanner on external `:3001` (local 3000), Partner Web on external `:3000` (local 4000), Customer Web on external `:5000`, and Admin Panel on the default path.
+**Warning:** Do not infer a public URL from a local port; check `.replit` port mappings and verify each route returns the expected HTML before sharing it.
+
 ---
 
 ## Admin Operations
@@ -313,3 +318,9 @@
 **Problem:** Expo Go reported “Something went wrong / failed to download” even though ngrok, Metro, the Expo manifest, and the Android bundle all returned successfully.
 **Fix:** Keep the ngrok transport and `EXPO_PACKAGER_PROXY_URL` on HTTPS, but encode the QR/deep link as `exp://<ngrok-host>`.
 **Warning:** Do not put `exps://` in Expo Go QR codes; validate the manifest and bundle separately before changing tunnel infrastructure.
+
+### Localization — language availability is Admin-managed
+**Problem:** Five separate clients can drift if each hardcodes its own language list or infers a different default from browser/device settings.
+**Fix:** Keep locale definitions in the shared catalog, store enabled locales in the Admin-managed `languages` platform setting, expose a public read-only language configuration endpoint, and force English as default/fallback.
+**Files:** `packages/shared/src/i18n.ts`, `server/src/controllers/platformSettings.controller.ts`, `apps/admin-web/src/app/App.tsx`, each client language provider.
+**Warning:** Do not remove English from the enabled list or make browser/device locale override the configured English default. Full dynamic content translation must use shared keys rather than client-specific dictionaries.

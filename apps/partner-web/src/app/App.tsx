@@ -15,6 +15,7 @@ import {
   type DocumentTypeConfig, type PartnerDocumentHistory,
 } from '@/lib/api';
 import { QRScannerModal } from '@/components/QRScannerModal';
+import { useLanguage } from '@/lib/language';
 
 /* ─── Design tokens (exact match to admin panel) ──────────────────── */
 const CARD      = { background: 'rgba(255,255,255,0.04)' } as const;
@@ -2179,6 +2180,16 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ page, navigate, unread, profile, logout }: SidebarContentProps) {
+  const { t } = useLanguage();
+  const labels: Record<Page, string> = {
+    dashboard: t('common.dashboard'),
+    jobs: t('common.jobs'),
+    earnings: t('common.earnings'),
+    payouts: 'Payouts',
+    documents: 'Documents',
+    notifications: t('common.notifications'),
+    profile: t('common.profile'),
+  };
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -2204,7 +2215,7 @@ function SidebarContent({ page, navigate, unread, profile, logout }: SidebarCont
               }`}
               style={active ? { background: 'rgba(91,62,245,0.2)' } : {}}>
               <Icon size={17} className={active ? 'text-violet-300' : ''}/>
-              <span className="flex-1 text-left">{label}</span>
+              <span className="flex-1 text-left">{labels[id] ?? label}</span>
               {id === 'notifications' && unread > 0 && (
                 <span className="text-[10px] font-bold text-white rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0"
                   style={{ background: '#5B3EF5' }}>
@@ -2240,6 +2251,7 @@ function SidebarContent({ page, navigate, unread, profile, logout }: SidebarCont
 }
 
 export default function App() {
+  const { t } = useLanguage();
   const [auth,    setAuth]    = useState<AuthTokens | null>(() => {
     try { const s = localStorage.getItem('partner_auth'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
@@ -2328,7 +2340,17 @@ export default function App() {
           </button>
           {/* Title */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-white font-bold text-xl leading-none">{currentNav.label}</h1>
+            <h1 className="text-white font-bold text-xl leading-none">
+              {({
+                dashboard: t('common.dashboard'),
+                jobs: t('common.jobs'),
+                earnings: t('common.earnings'),
+                payouts: 'Payouts',
+                documents: 'Documents',
+                notifications: t('common.notifications'),
+                profile: t('common.profile'),
+              } as Record<Page, string>)[page] ?? currentNav.label}
+            </h1>
             <p className="text-white/40 text-sm mt-0.5">ServeNow Partner Portal</p>
           </div>
           {/* Refresh */}
@@ -2361,7 +2383,15 @@ export default function App() {
                 <span className="absolute top-2 right-1/2 translate-x-3 w-3 h-3 rounded-full text-white text-[8px] flex items-center justify-center font-bold"
                   style={{ background: '#5B3EF5' }}>{unread > 9 ? '9' : unread}</span>
               )}
-              <span>{label}</span>
+              <span>{({
+                dashboard: t('common.dashboard'),
+                jobs: t('common.jobs'),
+                earnings: t('common.earnings'),
+                payouts: 'Payouts',
+                documents: 'Documents',
+                notifications: t('common.notifications'),
+                profile: t('common.profile'),
+              } as Record<Page, string>)[id] ?? label}</span>
             </button>
           ))}
         </nav>

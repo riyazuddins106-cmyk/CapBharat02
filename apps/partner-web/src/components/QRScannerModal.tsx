@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { X, Camera, AlertTriangle } from 'lucide-react';
+import { useLanguage } from '@/lib/language';
 
 interface Props {
   onScanned: (token: string) => void;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function QRScannerModal({ onScanned, onClose }: Props) {
+  const { tx } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
@@ -32,8 +34,8 @@ export function QRScannerModal({ onScanned, onClose }: Props) {
       .catch((e) => {
         if (!active) return;
         setErr(e?.name === 'NotAllowedError'
-          ? 'Camera permission denied. Please allow camera access and try again.'
-          : 'Could not access camera. Make sure no other app is using it.');
+          ? tx('Camera permission denied. Please allow camera access and try again.')
+          : tx('Could not access camera. Make sure no other app is using it.'));
       });
 
     function tick() {
@@ -81,7 +83,7 @@ export function QRScannerModal({ onScanned, onClose }: Props) {
         <div className="flex items-center justify-between px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <div className="flex items-center gap-2">
             <Camera size={16} className="text-white/70" />
-            <span className="text-white text-sm font-semibold">Scan Customer QR Code</span>
+            <span className="text-white text-sm font-semibold">{tx('Scan Customer QR Code')}</span>
           </div>
           <button onClick={onClose} className="text-white/60 hover:text-white">
             <X size={18} />
@@ -123,7 +125,7 @@ export function QRScannerModal({ onScanned, onClose }: Props) {
         </div>
 
         <p className="text-white/50 text-xs text-center px-4 py-3">
-          Ask the customer to open their booking and show you the QR code
+          {tx('Ask the customer to open their booking and show you the QR code')}
         </p>
       </div>
     </div>

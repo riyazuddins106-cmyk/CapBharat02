@@ -20,6 +20,7 @@ import {
   type ApiSupportTicket, type ApiPolicy,
 } from "../lib/api";
 import { generateTimeSlots, formatSlotTime, getServiceWindowLabel, formatDuration } from "@servenow/shared";
+import { useLanguage } from "../lib/language";
 
 /* ─────────────────────────── Category icon map ─────────────────── */
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -198,6 +199,11 @@ function PhoneFrame({ children }: { children: React.ReactNode; statusDark?: bool
   );
 }
 
+function usePhraseTranslator() {
+  const { tx } = useLanguage();
+  return tx;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    LOGIN / REGISTER SCREEN
 ═══════════════════════════════════════════════════════════════ */
@@ -237,6 +243,7 @@ interface LoginScreenProps {
 }
 
 function LoginScreen({ onLogin }: LoginScreenProps) {
+  const tx = usePhraseTranslator();
   const [screen, setScreen] = useState<AuthScreen>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -316,73 +323,73 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
         </div>
 
         {screen === "login" && <>
-          <h2 className="text-xl font-bold mb-1">Welcome back </h2>
-          <p className="text-gray-400 text-xs mb-5">Sign in to your ServeNow account</p>
+          <h2 className="text-xl font-bold mb-1">{tx("Welcome back")}</h2>
+          <p className="text-gray-400 text-xs mb-5">{tx("Sign in to your account")}</p>
           <div className="flex flex-col gap-3">
-            <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
-            <AuthInput placeholder="Password" value={password} onChange={setPassword} type="password" />
+          <AuthInput placeholder={tx("Email address")} value={email} onChange={setEmail} type="email" />
+          <AuthInput placeholder={tx("Password")} value={password} onChange={setPassword} type="password" />
           </div>
-          <button onClick={() => { setScreen("forgot"); setError(""); }} className="text-xs font-semibold mt-2 text-right w-full" style={{ color: "#5B3EF5" }}>Forgot password?</button>
+          <button onClick={() => { setScreen("forgot"); setError(""); }} className="text-xs font-semibold mt-2 text-right w-full" style={{ color: "#5B3EF5" }}>{tx("Forgot password?")}</button>
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><AuthBtn label="Sign In" onClick={handleLogin} loading={loading} /></div>
+          <div className="mt-5"><AuthBtn label={tx("Sign In")} onClick={handleLogin} loading={loading} /></div>
           <button onClick={() => { setScreen("register"); setError(""); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
-            Don't have an account? <span style={{ color: "#5B3EF5" }}>Sign up</span>
+            {tx("Don't have an account?")} <span style={{ color: "#5B3EF5" }}>{tx("Sign up")}</span>
           </button>
         </>}
 
         {screen === "register" && <>
-          <h2 className="text-xl font-bold mb-1">Create account</h2>
-          <p className="text-gray-400 text-xs mb-5">Join ServeNow today</p>
+          <h2 className="text-xl font-bold mb-1">{tx("Create account")}</h2>
+          <p className="text-gray-400 text-xs mb-5">{tx("Join ServeNow today")}</p>
           <div className="flex flex-col gap-3">
-            <AuthInput placeholder="Full name" value={fullName} onChange={setFullName} />
-            <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
-            <AuthInput placeholder="Phone (optional)" value={phone} onChange={setPhone} type="tel" />
-            <AuthInput placeholder="Password (min 8 chars, uppercase + number)" value={password} onChange={setPassword} type="password" />
+            <AuthInput placeholder={tx("Full name")} value={fullName} onChange={setFullName} />
+            <AuthInput placeholder={tx("Email address")} value={email} onChange={setEmail} type="email" />
+            <AuthInput placeholder={tx("Phone (optional)")} value={phone} onChange={setPhone} type="tel" />
+            <AuthInput placeholder={tx("Password (min 8 chars, uppercase + number)")} value={password} onChange={setPassword} type="password" />
           </div>
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><AuthBtn label="Create Account" onClick={handleRegister} loading={loading} /></div>
+          <div className="mt-5"><AuthBtn label={tx("Create Account")} onClick={handleRegister} loading={loading} /></div>
           <button onClick={() => { setScreen("login"); setError(""); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
-            Already have an account? <span style={{ color: "#5B3EF5" }}>Sign in</span>
+            {tx("Already have an account?")} <span style={{ color: "#5B3EF5" }}>{tx("Sign in")}</span>
           </button>
         </>}
 
         {screen === "verify-otp" && <>
-          <h2 className="text-xl font-bold mb-1">Verify your email</h2>
-          <p className="text-gray-400 text-xs mb-5">Enter the 6-digit code sent to <span className="font-bold text-gray-600">{email}</span></p>
+          <h2 className="text-xl font-bold mb-1">{tx("Verify your email")}</h2>
+          <p className="text-gray-400 text-xs mb-5">{tx("Enter the 6-digit code sent to")} <span className="font-bold text-gray-600">{email}</span></p>
           {success && <p className="text-green-600 text-xs mb-3">{success}</p>}
-          <AuthInput placeholder="Enter 6-digit OTP" value={otp} onChange={setOtp} />
+          <AuthInput placeholder={tx("Enter 6-digit OTP")} value={otp} onChange={setOtp} />
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><AuthBtn label="Verify OTP" onClick={handleVerifyOtp} loading={loading} /></div>
+          <div className="mt-5"><AuthBtn label={tx("Verify OTP")} onClick={handleVerifyOtp} loading={loading} /></div>
           <button onClick={async () => {
             setError("");
             await authApi.resendOtp(email, otpPurpose);
-            setSuccess("Code resent!");
+            setSuccess(tx("Code resent!"));
           }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
-            Didn't receive it? <span style={{ color: "#5B3EF5" }}>Resend code</span>
+            {tx("Didn't receive it?")} <span style={{ color: "#5B3EF5" }}>{tx("Resend code")}</span>
           </button>
         </>}
 
         {screen === "forgot" && <>
-          <h2 className="text-xl font-bold mb-1">Forgot password?</h2>
-          <p className="text-gray-400 text-xs mb-5">Enter your email to receive a reset code</p>
-          <AuthInput placeholder="Email address" value={email} onChange={setEmail} type="email" />
+          <h2 className="text-xl font-bold mb-1">{tx("Forgot password?")}</h2>
+          <p className="text-gray-400 text-xs mb-5">{tx("Enter your email to receive a reset code")}</p>
+          <AuthInput placeholder={tx("Email address")} value={email} onChange={setEmail} type="email" />
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><AuthBtn label="Send Reset Code" onClick={handleForgot} loading={loading} /></div>
+          <div className="mt-5"><AuthBtn label={tx("Send Reset Code")} onClick={handleForgot} loading={loading} /></div>
           <button onClick={() => { setScreen("login"); setError(""); }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
-            Back to <span style={{ color: "#5B3EF5" }}>Sign in</span>
+            {tx("Back to")} <span style={{ color: "#5B3EF5" }}>{tx("Sign in")}</span>
           </button>
         </>}
 
         {screen === "reset" && <>
-          <h2 className="text-xl font-bold mb-1">Reset password</h2>
-          <p className="text-gray-400 text-xs mb-5">Enter the OTP and your new password</p>
+          <h2 className="text-xl font-bold mb-1">{tx("Reset password")}</h2>
+          <p className="text-gray-400 text-xs mb-5">{tx("Enter the OTP and your new password")}</p>
           <div className="flex flex-col gap-3">
-            <AuthInput placeholder="6-digit OTP" value={otp} onChange={setOtp} />
-            <AuthInput placeholder="New password" value={newPassword} onChange={setNewPassword} type="password" />
+            <AuthInput placeholder={tx("6-digit OTP")} value={otp} onChange={setOtp} />
+            <AuthInput placeholder={tx("New password")} value={newPassword} onChange={setNewPassword} type="password" />
           </div>
           {success && <p className="text-green-600 text-xs mt-2">{success}</p>}
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
-          <div className="mt-5"><AuthBtn label="Reset Password" onClick={handleReset} loading={loading} /></div>
+          <div className="mt-5"><AuthBtn label={tx("Reset Password")} onClick={handleReset} loading={loading} /></div>
         </>}
       </div>
     </PhoneFrame>
@@ -3218,6 +3225,13 @@ interface AppSidebarProps {
   onLogout: () => void;
 }
 function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLoggedIn, user, onLogout }: AppSidebarProps) {
+  const { t } = useLanguage();
+  const tabLabels: Record<string, string> = {
+    home: t("common.home"),
+    services: t("common.services"),
+    bookings: t("common.bookings"),
+    profile: t("common.profile"),
+  };
   return (
     <aside className="hidden md:flex flex-col flex-shrink-0"
       style={{ width: 220, background: "linear-gradient(180deg,#5b3ef5 0%,#4424b4 100%)" }}>
@@ -3247,7 +3261,7 @@ function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLogge
                 color:      active ? "#ffffff"                 : "rgba(255,255,255,0.65)",
               }}>
               <Icon size={18} />
-              {tab.label}
+              {tabLabels[tab.id] ?? tab.label}
             </button>
           );
         })}
@@ -3319,6 +3333,13 @@ function AppShell({
   cartOpen, cart, onCartClose, onCartChange, onCartPaymentComplete,
   locationPickerOpen, addresses, onLocationSelect, onLocationPickerClose,
 }: AppShellProps) {
+  const { t } = useLanguage();
+  const tabLabels: Record<string, string> = {
+    home: t("common.home"),
+    services: t("common.services"),
+    bookings: t("common.bookings"),
+    profile: t("common.profile"),
+  };
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#f7f8fa" }}>
       {/* Desktop sidebar */}
@@ -3385,7 +3406,7 @@ function AppShell({
               className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors"
               style={{ color: active ? "#5B3EF5" : "#9CA3AF" }}>
               <Icon size={20} />
-              <span className="text-[10px] font-semibold">{tab.label}</span>
+               <span className="text-[10px] font-semibold">{tabLabels[tab.id] ?? tab.label}</span>
               {active && <div className="w-1 h-1 rounded-full mt-0.5" style={{ background: "#5B3EF5" }} />}
             </button>
           );

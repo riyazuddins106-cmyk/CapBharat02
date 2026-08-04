@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { categoriesApi } from '@/lib/api';
 
 type Mode = 'login' | 'forgot' | 'reset' | 'register' | 'verify';
@@ -16,6 +17,7 @@ interface Category { id: string; name: string; isActive: boolean; }
 
 export default function AuthScreen() {
   const colors = useColors();
+  const { tx } = useLanguage();
   const insets = useSafeAreaInsets();
   const { login, forgotPassword, resetPassword, resendOtp, registerPartner, verifySignupOtp } = useAuth();
 
@@ -64,13 +66,13 @@ export default function AuthScreen() {
 
   const doLogin = async () => {
     clearMessages();
-    if (!email || !password) return setError('Please fill in all fields');
+    if (!email || !password) return setError(tx('Please fill in all fields'));
     setLoading(true);
     try {
       await login(email.trim(), password);
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (e: any) {
-      setError(e?.message ?? 'Login failed. Please try again.');
+      setError(e?.message ?? tx('Login failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -78,15 +80,15 @@ export default function AuthScreen() {
 
   const doForgot = async () => {
     clearMessages();
-    if (!email) return setError('Enter your email address');
+    if (!email) return setError(tx('Enter your email address'));
     setLoading(true);
     try {
       await forgotPassword(email.trim());
       setPendingEmail(email.trim());
-      setSuccessMsg('Reset code sent — check your email.');
+      setSuccessMsg(tx('Reset code sent — check your email.'));
       setMode('reset');
     } catch (e: any) {
-      setError(e?.message ?? 'Could not send reset email.');
+      setError(e?.message ?? tx('Could not send reset email.'));
     } finally {
       setLoading(false);
     }
@@ -94,14 +96,14 @@ export default function AuthScreen() {
 
   const doReset = async () => {
     clearMessages();
-    if (otp.length !== 6 || !newPassword) return setError('Fill in all fields');
+    if (otp.length !== 6 || !newPassword) return setError(tx('Fill in all fields'));
     setLoading(true);
     try {
       await resetPassword(pendingEmail, otp, newPassword);
       await login(pendingEmail, newPassword);
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (e: any) {
-      setError(e?.message ?? 'Reset failed. Please try again.');
+      setError(e?.message ?? tx('Reset failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -110,7 +112,7 @@ export default function AuthScreen() {
   const doRegister = async () => {
     clearMessages();
     if (!regName || !regEmail || !regPassword || !regCategoryId || !regTitle || !regCity) {
-      return setError('Please fill in all required fields');
+      return setError(tx('Please fill in all required fields'));
     }
     setLoading(true);
     try {
@@ -126,10 +128,10 @@ export default function AuthScreen() {
         pincode: regPincode.trim() || undefined,
       });
       setPendingEmail(result.email);
-      setSuccessMsg('Account created! Enter the 6-digit code sent to your email.');
+      setSuccessMsg(tx('Account created! Enter the 6-digit code sent to your email.'));
       setMode('verify');
     } catch (e: any) {
-      setError(e?.message ?? 'Registration failed. Please try again.');
+      setError(e?.message ?? tx('Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -137,23 +139,23 @@ export default function AuthScreen() {
 
   const doVerify = async () => {
     clearMessages();
-    if (verifyOtp.length !== 6) return setError('Enter the 6-digit code');
+    if (verifyOtp.length !== 6) return setError(tx('Enter the 6-digit code'));
     setLoading(true);
     try {
       await verifySignupOtp(pendingEmail, verifyOtp);
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     } catch (e: any) {
-      setError(e?.message ?? 'Verification failed. Please try again.');
+      setError(e?.message ?? tx('Verification failed. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
   const subtitles: Record<Mode, string> = {
-    login: 'Sign in to manage your jobs',
-    forgot: 'Reset your password',
-    reset: 'Create a new password',
-    register: 'Create your partner account',
+    login: tx('Sign in to manage your jobs'),
+    forgot: tx('Reset your password'),
+    reset: tx('Create a new password'),
+    register: tx('Create your partner account'),
     verify: 'Verify your email',
   };
 
@@ -226,11 +228,11 @@ export default function AuthScreen() {
                 style={[styles.btn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: loading ? 0.7 : 1 }]}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnText}>{loading ? 'Signing in…' : 'Sign In'}</Text>
+            <Text style={styles.btnText}>{loading ? tx('Signing in…') : tx('Sign In')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { clearMessages(); setMode('register'); }} style={styles.switchLink}>
-                <Text style={[styles.switchText, { color: colors.mutedForeground }]}>
-                  New partner? <Text style={{ color: colors.primary, fontWeight: '700' }}>Create an account</Text>
+                  <Text style={[styles.switchText, { color: colors.mutedForeground }]}>
+                    {tx('New partner?')} <Text style={{ color: colors.primary, fontWeight: '700' }}>{tx('Create an account')}</Text>
                 </Text>
               </TouchableOpacity>
             </>
@@ -253,10 +255,10 @@ export default function AuthScreen() {
                 style={[styles.btn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: loading ? 0.7 : 1 }]}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnText}>{loading ? 'Sending…' : 'Send Reset Code'}</Text>
+                <Text style={styles.btnText}>{loading ? tx('Sending…') : tx('Send Reset Code')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { clearMessages(); setMode('login'); }} style={styles.forgotLink}>
-                <Text style={[styles.forgotText, { color: colors.primary }]}>← Back to sign in</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>{`← ${tx('Sign in')}`}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -264,8 +266,8 @@ export default function AuthScreen() {
           {/* ── RESET ── */}
           {mode === 'reset' && (
             <>
-              <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-                Enter the 6-digit code sent to {pendingEmail}
+                <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                 {tx('Enter the 6-digit code sent to')} {pendingEmail}
               </Text>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>OTP Code</Text>
@@ -295,21 +297,21 @@ export default function AuthScreen() {
                 style={[styles.btn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: loading ? 0.7 : 1 }]}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnText}>{loading ? 'Resetting…' : 'Reset Password'}</Text>
+                <Text style={styles.btnText}>{loading ? tx('Resetting…') : tx('Reset Password')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={async () => {
                   clearMessages();
                   try {
                     await resendOtp(pendingEmail, 'password_reset');
-                    setSuccessMsg('Code resent — check your email.');
+                     setSuccessMsg(tx('Code resent — check your email.'));
                   } catch (e: any) {
-                    setError(e?.message ?? 'Could not resend code.');
+                     setError(e?.message ?? tx('Could not resend code.'));
                   }
                 }}
                 style={styles.forgotLink}
               >
-                <Text style={[styles.forgotText, { color: colors.primary }]}>Resend code</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>{tx('Resend code')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -318,7 +320,7 @@ export default function AuthScreen() {
           {mode === 'register' && (
             <>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Full Name *</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Full Name *')}</Text>
                 <TextInput
                   value={regName} onChangeText={setRegName}
                   autoCapitalize="words" placeholder="Your full name"
@@ -327,7 +329,7 @@ export default function AuthScreen() {
                 />
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Email *</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Email')}</Text>
                 <TextInput
                   value={regEmail} onChangeText={setRegEmail}
                   keyboardType="email-address" autoCapitalize="none" autoCorrect={false}
@@ -336,7 +338,7 @@ export default function AuthScreen() {
                 />
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Phone (optional)</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Phone (optional)')}</Text>
                 <TextInput
                   value={regPhone} onChangeText={setRegPhone}
                   keyboardType="phone-pad" placeholder="+91 98765 43210"
@@ -345,7 +347,7 @@ export default function AuthScreen() {
                 />
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Password *</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Password')}</Text>
                 <View style={styles.passRow}>
                   <TextInput
                     value={regPassword} onChangeText={setRegPassword}
@@ -359,7 +361,7 @@ export default function AuthScreen() {
                 </View>
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Service Category *</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Service Category *')}</Text>
                 {catsLoading ? (
                   <ActivityIndicator size="small" color={colors.primary} style={{ alignSelf: 'flex-start', marginTop: 4 }} />
                 ) : (
@@ -387,7 +389,7 @@ export default function AuthScreen() {
                 )}
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Professional Title *</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Professional Title *')}</Text>
                 <TextInput
                   value={regTitle} onChangeText={setRegTitle}
                   placeholder="e.g. Expert Plumber, Senior Electrician"
@@ -397,11 +399,11 @@ export default function AuthScreen() {
               </View>
 
               {/* ── Service Location ── */}
-              <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 2, marginTop: 4, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1 }]}>
-                Service Location
+                <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 2, marginTop: 4, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1 }]}>
+                 {tx('Service Location')}
               </Text>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>City *</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('City *')}</Text>
                 <TextInput
                   value={regCity} onChangeText={setRegCity}
                   autoCapitalize="words" placeholder="e.g. Mumbai, Delhi, Bangalore"
@@ -410,7 +412,7 @@ export default function AuthScreen() {
                 />
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Area / Locality</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Area / Locality')}</Text>
                 <TextInput
                   value={regArea} onChangeText={setRegArea}
                   autoCapitalize="words" placeholder="e.g. Andheri West, Koramangala"
@@ -419,7 +421,7 @@ export default function AuthScreen() {
                 />
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Pincode</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Pincode')}</Text>
                 <TextInput
                   value={regPincode} onChangeText={t => setRegPincode(t.replace(/\D/g, '').slice(0, 6))}
                   keyboardType="number-pad" maxLength={6} placeholder="6-digit pincode"
@@ -433,11 +435,11 @@ export default function AuthScreen() {
                 style={[styles.btn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: loading ? 0.7 : 1 }]}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnText}>{loading ? 'Creating account…' : 'Create Account'}</Text>
+                <Text style={styles.btnText}>{loading ? tx('Creating account…') : tx('Create Account')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { clearMessages(); setMode('login'); }} style={styles.switchLink}>
                 <Text style={[styles.switchText, { color: colors.mutedForeground }]}>
-                  Already have an account? <Text style={{ color: colors.primary, fontWeight: '700' }}>Sign in</Text>
+                  {tx('Already have an account?')} <Text style={{ color: colors.primary, fontWeight: '700' }}>{tx('Sign in')}</Text>
                 </Text>
               </TouchableOpacity>
             </>
@@ -446,11 +448,11 @@ export default function AuthScreen() {
           {/* ── VERIFY OTP (post-register) ── */}
           {mode === 'verify' && (
             <>
-              <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-                Enter the 6-digit code sent to {pendingEmail}
+                <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                 {tx('Enter the 6-digit code sent to')} {pendingEmail}
               </Text>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>Verification Code</Text>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Verification Code')}</Text>
                 <TextInput
                   value={verifyOtp} onChangeText={setVerifyOtp}
                   keyboardType="number-pad" maxLength={6} placeholder="123456"
@@ -463,29 +465,29 @@ export default function AuthScreen() {
                 style={[styles.btn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: loading ? 0.7 : 1 }]}
                 activeOpacity={0.85}
               >
-                <Text style={styles.btnText}>{loading ? 'Verifying…' : 'Verify & Sign In'}</Text>
+                <Text style={styles.btnText}>{loading ? tx('Verifying…') : tx('Verify & Sign In')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={async () => {
                   clearMessages();
                   try {
                     await resendOtp(pendingEmail, 'signup');
-                    setSuccessMsg('Code resent — check your email.');
+                     setSuccessMsg(tx('Code resent — check your email.'));
                   } catch (e: any) {
-                    setError(e?.message ?? 'Could not resend code.');
+                     setError(e?.message ?? tx('Could not resend code.'));
                   }
                 }}
                 style={styles.forgotLink}
               >
-                <Text style={[styles.forgotText, { color: colors.primary }]}>Resend code</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>{tx('Resend code')}</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
 
         {(mode === 'login' || mode === 'register') && (
-          <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-            By continuing, you agree to ServeNow's Terms of Service.
+           <Text style={[styles.footer, { color: colors.mutedForeground }]}>
+             {tx("By continuing, you agree to ServeNow's Terms of Service.")}
           </Text>
         )}
       </ScrollView>

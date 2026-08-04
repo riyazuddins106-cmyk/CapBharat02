@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { useRouter, useSegments } from 'expo-router';
+import { LanguageProvider } from '@/context/LanguageContext';
+import { LanguagePicker } from '@/components/LanguagePicker';
 
 // SplashScreen is native-only — calling it on web shows a white overlay
 // that never gets removed, leaving a permanently blank page.
@@ -120,13 +122,16 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <AuthGate />
-              <StatusBar style="dark" />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
-              </Stack>
-            </AuthProvider>
+            <LanguageProvider>
+              <AuthProvider>
+                <AuthGate />
+                <StatusBar style="dark" />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
+                </Stack>
+                <LanguagePicker />
+              </AuthProvider>
+            </LanguageProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

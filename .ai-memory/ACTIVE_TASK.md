@@ -7,8 +7,21 @@
 ---
 
 ## ▶ Current Task
-**Task:** Send approved partner payouts through RazorpayX UPI
-**Status:** COMPLETE
+**Task:** Add Admin-managed multi-language support
+**Status:** COMPLETE for the shared language configuration foundation; full catalog/content translation remains a follow-up phase.
+
+### Multi-language foundation — 2026-08-04
+- [x] Added shared English, Hindi, Marathi, Arabic, and Urdu locale catalog
+- [x] Made English the mandatory default and fallback
+- [x] Added Admin-controlled enabled-language settings
+- [x] Added public language configuration endpoint for all clients
+- [x] Added language selectors to Customer Web, Partner Web, Admin Panel, Customer Mobile, and Partner Mobile
+- [x] Added browser/device-safe persistence and Arabic/Urdu RTL direction handling
+- [x] Translated the initial customer/partner/admin navigation and shell labels
+- [x] Verified Customer Web, Partner Web, and Admin Web production builds
+- [x] Verified server TypeScript and public language endpoint
+- [x] Verified Admin and Partner Web workflows render without browser errors
+- [ ] Translate all remaining catalog, booking, checkout, notification, email, and policy content
 
 ### Latest Git synchronization — 2026-08-04
 - [x] Integrated Admin Panel and backend account-management changes on top of current GitHub `main`
@@ -32,6 +45,9 @@
 - [x] Rebuilt Admin Web, restarted the workflow, and passed the final scoped diff check
 - [x] Matched the latest reference's purple icon badge, purple gradient button, charcoal form surfaces, and purple focus states
 - [x] Rebuilt Admin Web, restarted the workflow, and confirmed the final Admin Panel workflow is serving cleanly
+- [x] Revalidated live Expo manifests and Android bundles, regenerated both QR PNGs, decoded both payloads, and confirmed the public QR scanner route
+- [x] Verified public web routes: Customer Web `:5000/customer/`, Partner Web `:3000/partner/`, Admin Panel `/admin-panel/`, QR scanner `:3001/`
+- [x] Left fresh QR PNGs/scanner HTML and uploaded/reference assets uncommitted as runtime/user artifacts
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients

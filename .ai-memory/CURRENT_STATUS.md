@@ -74,6 +74,15 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Document upload
 - [x] Notifications
 
+### Admin-managed multi-language foundation (2026-08-04)
+- [x] Shared locale catalog supports English (`en`), Hindi (`hi`), Marathi (`mr`), Arabic (`ar`), and Urdu (`ur`).
+- [x] English is always enabled, is the default locale, and is the fallback for missing translations or unavailable settings.
+- [x] Admin Panel Languages screen controls which locales appear in all customer and partner clients.
+- [x] Public `/api/platform-settings/languages` endpoint returns the Admin-selected list before authentication.
+- [x] Customer Web, Partner Web, Admin Panel, Customer Mobile, and Partner Mobile have persisted language selectors.
+- [x] Arabic and Urdu set RTL direction; web direction updates immediately and native direction is configured through `I18nManager`.
+- [x] Initial shell/navigation labels are translated; dynamic catalog, service, checkout, notification, email, policy, and full form copy still need migration to translation keys.
+
 ### Service-level order completion (2026-08-04)
 - [x] Added full partner service-job detail route and screen, including pending request accept/reject, customer contact/address, timing, notes, payout, payment status, check-in, and completion.
 - [x] Added per-service Razorpay order creation/signature verification and Stripe Checkout session/success handling.
@@ -180,7 +189,7 @@ The service-level order implementation is complete for customer web/mobile, part
 ### Partner App icons (2026-08-04)
 - [x] Fixed blank dashboard/tab Ionicons caused by the Partner App rendering after a 300ms font timeout, before the Ionicons font had loaded.
 - [x] Native timeout is now 3 seconds; web timeout is 1 second, preserving tunnel resilience without sacrificing icon loading.
-- [x] Restarted Expo Partner App; Metro is running and the current partner QR remains `exps://arose-unframed-eclipse.ngrok-free.dev`.
+- [x] Restarted Expo Partner App; Metro is running and the current partner QR is `exp://arose-unframed-eclipse.ngrok-free.dev`.
 
 ### Customer and Partner App icons (2026-08-04)
 - [x] Customer App now uses the same explicit `expo-font` loader pattern for Google fonts, Ionicons, and MaterialCommunityIcons.
@@ -207,6 +216,7 @@ The service-level order implementation is complete for customer web/mobile, part
 ---
 
 ## 🔄 Last Session Summary (2026-08-04)
+- Admin-managed localization foundation is complete: English is mandatory/default/fallback, and Admin controls the enabled launch languages across all five clients. The public endpoint returned `en`, `hi`, `mr`, `ar`, and `ur`; Admin and Partner Web previews rendered cleanly after fixing the selector runtime error.
 - GitHub `main` is synchronized with the Repl at commit `e5c927233`.
 - The pushed history preserves GitHub's newer marketplace/mobile commits and adds the Admin Panel/backend work plus the remaining Customer Web, Customer Mobile, and Expo routing refinements.
 - Partner Web and Partner Mobile had no remaining source differences and were already present on GitHub.
@@ -220,6 +230,8 @@ The service-level order implementation is complete for customer web/mobile, part
 - The Create Admin Account form now uses explicit solid colors: navy card `#1b2638`, graphite controls `#24252a`, defined gray borders, sky-blue focus accents, and a neutral gray action button. These values are local to Admin Management; the global Admin Panel theme remains unchanged. Admin Web build and workflow restart passed.
 - The latest Create Admin Account references were sampled directly: card `#1B2638`, controls `#24252A`, borders `#3B3D44`, and button `#3A3C42`. These are now dedicated Admin Management-only style constants; the global purple Admin Panel theme remains unchanged. Admin Web build and workflow restart passed.
 - The newest Create Admin Account reference supersedes the neutral button/icon treatment: the form now uses charcoal card `#181A20`, controls `#24262B`, borders `#3B3D42`, a purple icon badge `#232041`/`#8B5CF6`, purple focus states, and a `#6446F6` to `#7252F7` button gradient. The change remains scoped to Admin Management; Admin Web build and workflow restart passed.
+- The live Expo manifests and Android bundles both returned HTTP 200. Fresh QR PNGs decode to `exp://prison-deacon-science.ngrok-free.dev` (Customer) and `exp://arose-unframed-eclipse.ngrok-free.dev` (Partner); the public scanner is verified at the QR service external port `:3001`.
+- Verified public development routes are Customer Web `:5000/customer/`, Partner Web `:3000/partner/`, Admin Panel `/admin-panel/`, and QR scanner `:3001/`. QR PNGs, scanner HTML, screenshots, and uploaded reference assets remain uncommitted runtime/user artifacts.
 
 
 ### Task: Add Admin service detail views and booking operations controls
