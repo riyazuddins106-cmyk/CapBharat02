@@ -9,12 +9,16 @@ export const partnerService = {
   async getProfile(userId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found. Contact support to set up your professional account.');
-    return pro;
+    const { payoutContactId: _contactId, payoutFundAccountId: _fundAccountId, ...safeProfile } = pro;
+    return safeProfile;
   },
 
-  async updateProfile(userId: string, data: { title?: string; bio?: string; basePrice?: number; priceUnit?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) {
+  async updateProfile(userId: string, data: { title?: string; bio?: string; basePrice?: number; priceUnit?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null; payoutUpiId?: string | null }) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
+    if (data.payoutUpiId && !/^[a-zA-Z0-9._-]{2,}@[a-zA-Z0-9.-]{2,}$/.test(data.payoutUpiId.trim())) {
+      throw AppError.badRequest('Enter a valid UPI ID, for example name@upi.');
+    }
 
     // Validate categoryId — must be active
     if (data.categoryId !== undefined) {
@@ -41,6 +45,8 @@ export const partnerService = {
         throw AppError.badRequest('Sub-category does not belong to the selected category');
     }
 
+    const payoutUpiChanged = data.payoutUpiId !== undefined
+      && (data.payoutUpiId?.trim() || null) !== pro.payoutUpiId;
     const updated = await professionalRepository.update(pro.id, {
       ...(data.title         !== undefined && { title: data.title }),
       ...(data.bio           !== undefined && { bio: data.bio }),
@@ -49,8 +55,12 @@ export const partnerService = {
       ...(data.tags          !== undefined && { tags: data.tags }),
       ...(data.categoryId    !== undefined && { categoryId: data.categoryId }),
       ...(data.subCategoryId !== undefined && { subCategoryId: data.subCategoryId }),
+      ...(data.payoutUpiId !== undefined && { payoutUpiId: data.payoutUpiId?.trim() || null }),
+      ...(payoutUpiChanged && { payoutContactId: null, payoutFundAccountId: null }),
     });
-    return updated;
+    if (!updated) throw AppError.notFound('Partner profile not found.');
+    const { payoutContactId: _contactId, payoutFundAccountId: _fundAccountId, ...safeProfile } = updated;
+    return safeProfile;
   },
 
   async updateAccount(userId: string, data: { fullName?: string; phone?: string }) {
@@ -378,12 +388,15 @@ export const partnerService = {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw AppError.badRequest('Payout amount must be a positive number.');
     }
+    if (amount < 100) {
+      throw AppError.badRequest('Minimum payout amount is ₹100.');
+    }
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
     const earnings = await partnerRepository.getEarnings(pro.id);
     const payoutTotals = await partnerRepository.getPayoutTotals(pro.id);
-    const available = earnings.total - payoutTotals.pending - payoutTotals.paid;
+    const available = Math.max(0, earnings.total - payoutTotals.pending - payoutTotals.paid);
     if (amount > available) {
       throw AppError.badRequest(`Requested amount exceeds available balance (₹${available}).`);
     }

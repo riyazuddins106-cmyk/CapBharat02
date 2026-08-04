@@ -18,6 +18,7 @@ router.get('/',            ordersController.list);
 router.get('/:id',         ordersController.getById);
 
 // Per-service item operations
+router.get('/:id/items/:itemId/qr',                    ordersController.getItemQr);
 router.patch('/:id/items/:itemId/cancel',            ordersController.cancelItem);
 router.patch('/:id/items/:itemId/continue-searching', ordersController.continueSearching);
 

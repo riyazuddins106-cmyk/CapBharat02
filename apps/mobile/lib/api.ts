@@ -183,6 +183,9 @@ export interface OrderItem {
   customerPrice: number;
   partnerPayout: number;
   quantity: number;
+  cancellationReason?: string | null;
+  cancellationFee?: number;
+  cancelledAt?: string | null;
   payment: {
     id: string;
     status: string;
@@ -371,8 +374,15 @@ export const cartApi = {
 
 export const ordersApi = {
   list: (token: string) => request<Order[]>('/api/orders', { token }),
-  cancelItem: (orderId: string, itemId: string, token: string) =>
-    request<Order>(`/api/orders/${orderId}/items/${itemId}/cancel`, { method: 'PATCH', token }),
+  cancelItem: (orderId: string, itemId: string, reason: string | undefined, token: string) =>
+    request<Order>(`/api/orders/${orderId}/items/${itemId}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason: reason?.trim() || undefined }),
+      token,
+    }),
+  getItemQr: (orderId: string, itemId: string, token: string) =>
+    request<{ qrToken: string; expiresIn: number; orderId: string; orderItemId: string }>(
+      `/api/orders/${orderId}/items/${itemId}/qr`, { token }),
   continueSearching: (orderId: string, itemId: string, token: string) =>
     request<{ message: string }>(`/api/orders/${orderId}/items/${itemId}/continue-searching`, { method: 'PATCH', token }),
   payItem: (orderId: string, itemId: string, method: 'cash' | 'upi_manual', notes: string | undefined, token: string) =>

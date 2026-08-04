@@ -60,6 +60,19 @@ export default function EarningsScreen() {
           <SummaryCard icon="calendar-outline" label="This Month" value={`₹${earnings?.thisMonth ?? 0}`} colors={colors} highlight />
           <SummaryCard icon="trophy-outline" label="All Time" value={`₹${earnings?.total ?? 0}`} colors={colors} />
         </View>
+        <View style={[styles.balanceCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={[styles.balanceLabel, { color: colors.mutedForeground }]}>Available to withdraw</Text>
+              <Text style={[styles.balanceValue, { color: colors.foreground }]}>₹{earnings?.available ?? 0}</Text>
+            </View>
+            <Ionicons name="wallet-outline" size={28} color={colors.primary} />
+          </View>
+          <View style={styles.balanceMeta}>
+            <Text style={[styles.balanceMetaText, { color: colors.mutedForeground }]}>Pending: ₹{earnings?.pendingPayout ?? 0}</Text>
+            <Text style={[styles.balanceMetaText, { color: colors.mutedForeground }]}>Paid out: ₹{earnings?.paidOut ?? 0}</Text>
+          </View>
+        </View>
 
         {/* Weekly bar chart */}
         <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
@@ -128,8 +141,14 @@ export default function EarningsScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            onPress={() => setShowPayoutForm(true)}
-            style={[styles.withdrawBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
+            onPress={() => {
+              if ((earnings?.available ?? 0) < 100) {
+                Alert.alert('Not enough balance', 'You need at least ₹100 of confirmed earnings available to withdraw.');
+                return;
+              }
+              setShowPayoutForm(true);
+            }}
+            style={[styles.withdrawBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: (earnings?.available ?? 0) >= 100 ? 1 : 0.55 }]}
             activeOpacity={0.85}
           >
             <Ionicons name="wallet-outline" size={18} color="#fff" />
@@ -141,7 +160,7 @@ export default function EarningsScreen() {
         <View style={[styles.note, { backgroundColor: colors.secondary, borderRadius: colors.radius }]}>
           <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
           <Text style={[styles.noteText, { color: colors.secondaryForeground }]}>
-            Earnings are counted once a booking is marked as completed.
+            Earnings are available after the service is completed and the customer payment is confirmed. Minimum withdrawal: ₹100.
           </Text>
         </View>
       </ScrollView>
@@ -170,6 +189,12 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, padding: 12, alignItems: 'center', gap: 5, borderWidth: 1 },
   summaryValue: { fontSize: 16, fontWeight: '800' },
   summaryLabel: { fontSize: 10, textAlign: 'center' },
+  balanceCard: { padding: 16, borderWidth: 1, gap: 12 },
+  balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  balanceLabel: { fontSize: 12 },
+  balanceValue: { fontSize: 26, fontWeight: '800', marginTop: 3 },
+  balanceMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  balanceMetaText: { fontSize: 11 },
   chartCard: { padding: 16, borderWidth: 1, gap: 14 },
   chartTitle: { fontSize: 15, fontWeight: '700' },
   chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 160 },

@@ -171,6 +171,42 @@ export const dispatchService = {
     if (!remaining?.count) await db.update(bookings).set({ dispatchStatus: 'waiting_operation', updatedAt: new Date() }).where(eq(bookings.id, bookingId));
   },
 
+  /** Pause partner search for an unassigned legacy booking. */
+  async stopSearching(bookingId: string) {
+    const [booking] = await db.select().from(bookings)
+      .where(and(eq(bookings.id, bookingId), isNull(bookings.deletedAt)))
+      .limit(1);
+    if (!booking) throw AppError.notFound('Booking not found.');
+    if (booking.status === 'cancelled' || booking.status === 'completed') {
+      throw AppError.badRequest('This booking is already finished.');
+    }
+    if (booking.professionalId || booking.dispatchStatus === 'assigned') {
+      throw AppError.badRequest('This booking already has an assigned partner.');
+    }
+    if (!['searching_partner', 'waiting_operation'].includes(booking.dispatchStatus)) {
+      throw AppError.badRequest('This booking is not currently searching for a partner.');
+    }
+
+    await db.update(bookingPartnerRequests)
+      .set({ status: 'expired', respondedAt: new Date() })
+      .where(and(
+        eq(bookingPartnerRequests.bookingId, bookingId),
+        eq(bookingPartnerRequests.status, 'pending'),
+      ));
+
+    const [updated] = await db.update(bookings)
+      .set({ dispatchStatus: 'waiting_operation', updatedAt: new Date() })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+
+    await db.insert(bookingAssignmentLogs).values({
+      bookingId,
+      action: 'SEARCH_STOPPED',
+    });
+
+    return updated;
+  },
+
   async listForOperations(status?: string) {
     const rows = await db.select({ booking: bookings, customer: users })
       .from(bookings).innerJoin(users, eq(bookings.customerId, users.id))

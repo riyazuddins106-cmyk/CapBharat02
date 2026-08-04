@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { partnerApi } from '@/lib/api';
@@ -20,6 +21,11 @@ export default function ServiceJobDetailScreen() {
   const { accessToken } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const processingRef = useRef(false);
   const { data: job, isLoading, refetch } = useQuery({
     queryKey: ['/api/partner/order-item-jobs/detail', id, accessToken],
     queryFn: () => partnerApi.getOrderItemJob(id!, accessToken!),
@@ -27,10 +33,16 @@ export default function ServiceJobDetailScreen() {
   });
 
   const action = useMutation({
-    mutationFn: async (kind: 'accept' | 'reject' | 'checkin' | 'complete') => {
+    mutationFn: async ({ kind, qrToken }: {
+      kind: 'accept' | 'reject' | 'checkin' | 'complete';
+      qrToken?: string;
+    }) => {
       if (kind === 'accept') return partnerApi.acceptOrderItemJob(job!.requestId!, accessToken!);
       if (kind === 'reject') return partnerApi.rejectOrderItemJob(job!.requestId!, accessToken!);
-      if (kind === 'checkin') return partnerApi.checkInOrderItem(id!, accessToken!);
+      if (kind === 'checkin') {
+        if (!qrToken) throw new Error('Scan the customer QR code before checking in.');
+        return partnerApi.checkInOrderItem(id!, qrToken, accessToken!);
+      }
       return partnerApi.completeOrderItem(id!, accessToken!);
     },
     onSuccess: async () => {
@@ -40,8 +52,74 @@ export default function ServiceJobDetailScreen() {
     onError: (error: any) => Alert.alert('Unable to update service', error.message),
   });
 
+  const resetScanner = () => {
+    setScanned(false);
+    setCameraReady(false);
+    processingRef.current = false;
+  };
+
+  const openScanner = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert('Camera Permission', 'Camera access is required to scan the customer QR code.');
+        return;
+      }
+    }
+    resetScanner();
+    setShowScanner(true);
+    setTimeout(() => setCameraReady(true), 700);
+  };
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (!cameraReady || scanned || processingRef.current) return;
+    processingRef.current = true;
+    setScanned(true);
+    setShowScanner(false);
+    setTimeout(() => {
+      Alert.alert('Check In', 'Use this customer QR code to confirm your arrival?', [
+        { text: 'Cancel', style: 'cancel', onPress: resetScanner },
+        {
+          text: 'Check In',
+          onPress: () => {
+            action.mutate({
+              kind: 'checkin',
+              // The mutation is keyed by kind; pass the token through this
+              // one-shot ref so no direct check-in button can bypass scanning.
+              qrToken: data.trim(),
+            });
+          },
+        },
+      ]);
+    }, 250);
+  };
+
   if (isLoading || !job) {
     return <View style={[styles.center, { backgroundColor: colors.background }]}><Text style={{ color: colors.mutedForeground }}>Loading service job…</Text></View>;
+  }
+
+  if (showScanner) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <CameraView
+          style={{ flex: 1 }}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={(!scanned && cameraReady) ? handleBarcodeScanned : undefined}
+        >
+          <View style={styles.scanOverlay}>
+            <View style={[styles.scanHeader, { paddingTop: insets.top + 10 }]}>
+              <TouchableOpacity onPress={() => { setShowScanner(false); resetScanner(); }} style={styles.scanClose}>
+                <Ionicons name="close" size={26} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.scanTitle}>Scan Customer QR</Text>
+            </View>
+            <View style={styles.scanFrame}><View style={[styles.scanTarget, { borderColor: colors.primary }]} /></View>
+            <Text style={styles.scanHint}>Ask the customer to open this service order and show their QR code.</Text>
+          </View>
+        </CameraView>
+      </View>
+    );
   }
 
   const canCheckIn = job.status === 'partner_accepted';
@@ -87,11 +165,11 @@ export default function ServiceJobDetailScreen() {
         </InfoCard>
         {job.orderNotes && <InfoCard title="Customer notes" colors={colors}><Text style={{ color: colors.foreground }}>{job.orderNotes}</Text></InfoCard>}
         {canRespond && <View style={styles.responseRow}>
-          <TouchableOpacity onPress={() => action.mutate('reject')} style={[styles.secondaryButton, { borderColor: '#FCA5A5' }]}><Text style={{ color: '#DC2626', fontWeight: '800' }}>Reject Request</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => action.mutate('accept')} style={[styles.primaryButton, { flex: 1, backgroundColor: colors.primary }]}><Text style={styles.buttonText}>Accept Request</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => action.mutate({ kind: 'reject' })} style={[styles.secondaryButton, { borderColor: '#FCA5A5' }]}><Text style={{ color: '#DC2626', fontWeight: '800' }}>Reject Request</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => action.mutate({ kind: 'accept' })} style={[styles.primaryButton, { flex: 1, backgroundColor: colors.primary }]}><Text style={styles.buttonText}>Accept Request</Text></TouchableOpacity>
         </View>}
-        {canCheckIn && <TouchableOpacity onPress={() => action.mutate('checkin')} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={styles.buttonText}>Mark Arrived & Request Payment</Text></TouchableOpacity>}
-        {canComplete && <TouchableOpacity onPress={() => action.mutate('complete')} style={[styles.primaryButton, { backgroundColor: '#16A34A' }]}><Text style={styles.buttonText}>Complete Service</Text></TouchableOpacity>}
+        {canCheckIn && <TouchableOpacity onPress={openScanner} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Ionicons name="qr-code-outline" size={18} color="#fff" /><Text style={styles.buttonText}>Scan QR to Check In</Text></TouchableOpacity>}
+        {canComplete && <TouchableOpacity onPress={() => action.mutate({ kind: 'complete' })} style={[styles.primaryButton, { backgroundColor: '#16A34A' }]}><Text style={styles.buttonText}>Complete Service</Text></TouchableOpacity>}
       </ScrollView>
     </View>
   );
@@ -117,8 +195,15 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '800' },
   row: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   mapLink: { fontWeight: '700', marginLeft: 27 },
-  primaryButton: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 4 },
+  primaryButton: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 4 },
   secondaryButton: { paddingVertical: 14, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, alignItems: 'center', marginTop: 4 },
   responseRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontWeight: '800' },
+  scanOverlay: { flex: 1, justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.15)' },
+  scanHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: 'rgba(0,0,0,0.65)' },
+  scanClose: { padding: 4 },
+  scanTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  scanFrame: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scanTarget: { width: 270, height: 270, borderWidth: 3, borderRadius: 18 },
+  scanHint: { color: '#fff', textAlign: 'center', padding: 24, lineHeight: 20, backgroundColor: 'rgba(0,0,0,0.65)' },
 });

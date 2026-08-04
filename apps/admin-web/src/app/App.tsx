@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { createPortal } from "react-dom";
 import {
-  Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock,
+  Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock, TrendingUp,
   BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
@@ -18,7 +18,9 @@ import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
-  DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow,
+  DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow, AdminOrderDetail,
+  AdminBookingDetail,
+  PayoutPartnerRow, PayoutPartnerDetail,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1063,7 +1065,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
           ) : activeSection === "payouts" ? (
-            <PayoutsAdminView accessToken={accessToken} />
+            <PayoutsControlCenter accessToken={accessToken} />
           ) : (
             isAdmin ? <SettingsView user={user} /> : <AccessDenied />
           )}
@@ -1300,6 +1302,19 @@ function OrderHierarchyView({
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openDetail = async (orderId: string) => {
+    setDetailLoading(true);
+    try {
+      setDetail(await adminApi.getOrder(orderId, accessToken));
+    } catch (err: any) {
+      adminShowError(err?.message ?? "Could not load order details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const runAction = async (action: "dispatch" | "refund", orderId: string, itemId: string) => {
     const key = `${action}:${itemId}`;
@@ -1349,6 +1364,12 @@ function OrderHierarchyView({
                     <p className="text-white font-bold text-sm">{fmt(order.totalAmount)}</p>
                     <p className="text-emerald-400/80 text-[11px]">Margin {fmt(margin)}</p>
                   </div>
+                  <button
+                    onClick={(event) => { event.stopPropagation(); void openDetail(order.id); }}
+                    className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-300 hover:bg-violet-500/20 whitespace-nowrap"
+                  >
+                    Service details
+                  </button>
                   {isOpen ? <ChevronUp size={17} className="text-white/40" /> : <ChevronDown size={17} className="text-white/40" />}
                 </button>
                 {isOpen && (
@@ -1414,6 +1435,176 @@ function OrderHierarchyView({
           })}
         </div>
       )}
+      {(detailLoading || detail) && (
+        <OrderDetailModal
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => { setDetail(null); setDetailLoading(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+      <p className="text-white/35 text-[10px] uppercase tracking-wide">{label}</p>
+      <p className="text-white/80 text-xs mt-1 break-words">{value || "—"}</p>
+    </div>
+  );
+}
+
+function OrderDetailModal({
+  detail, loading, onClose,
+}: {
+  detail: AdminOrderDetail | null;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl border border-white/10 shadow-2xl p-5" style={MODAL_BG} onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-white/40 text-xs uppercase tracking-wide">Service order detail</p>
+            <h3 className="text-white font-bold text-lg mt-1 break-all">
+              {loading ? "Loading…" : detail ? `Order ${detail.id}` : "Order details"}
+            </h3>
+            {detail && <p className="text-white/40 text-xs mt-1">{detail.customerName} · {detail.customerEmail}</p>}
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white text-xl">✕</button>
+        </div>
+        {loading ? (
+          <div className="py-16 text-center text-white/40">Loading complete order details…</div>
+        ) : detail ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <DetailField label="Order ID" value={detail.id} />
+              <DetailField label="Status" value={<Badge label={detail.status.replaceAll("_", " ")} color={detail.status === "cancelled" ? "#EF4444" : "#7C5BF8"} />} />
+              <DetailField label="Total" value={fmt(detail.totalAmount)} />
+              <DetailField label="Scheduled" value={new Date(detail.scheduledAt).toLocaleString("en-IN")} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <DetailField label="Customer" value={`${detail.customerName} · ${detail.customerEmail}`} />
+              <DetailField label="Phone" value={detail.customerPhone} />
+              <DetailField label="Address" value={detail.address ? Object.values(detail.address).filter(Boolean).join(", ") : null} />
+            </div>
+            <div>
+              <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-2">Services and payment details</p>
+              <div className="space-y-2">
+                {detail.items.map(item => (
+                  <div key={item.id} className="rounded-xl border border-white/[0.07] p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-white font-semibold text-sm">{item.serviceName ?? "Service"}</p>
+                        <p className="text-white/35 text-[11px] mt-1 break-all">Service item ID: {item.id}</p>
+                        <p className="text-white/45 text-xs mt-1">{new Date(item.scheduledAt).toLocaleString("en-IN")} · {item.durationMinutes} min</p>
+                      </div>
+                      <Badge label={item.status.replaceAll("_", " ")} color={item.status === "cancelled" ? "#EF4444" : item.status === "service_completed" ? "#16A34A" : "#F59E0B"} />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                      <DetailField label="Customer price" value={fmt(item.customerPrice)} />
+                      <DetailField label="Partner payout" value={fmt(item.partnerPayout)} />
+                      <DetailField label="Partner ID" value={item.partnerId} />
+                      <DetailField label="Payment" value={item.payment?.status ?? "unpaid"} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function BookingDetailModal({
+  detail, loading, onClose,
+}: {
+  detail: AdminBookingDetail | null;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl border border-white/10 shadow-2xl p-5" style={MODAL_BG} onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-white/40 text-xs uppercase tracking-wide">Booking detail</p>
+            <h3 className="text-white font-bold text-lg mt-1 break-all">
+              {loading ? "Loading…" : detail ? `Booking ${detail.id}` : "Booking details"}
+            </h3>
+            {detail && <p className="text-white/40 text-xs mt-1">{detail.customerName} · {detail.customerEmail}</p>}
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white text-xl">✕</button>
+        </div>
+        {loading ? (
+          <div className="py-16 text-center text-white/40">Loading complete booking details…</div>
+        ) : detail ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <DetailField label="Booking ID" value={detail.id} />
+              <DetailField label="Status" value={<Badge label={detail.status.replaceAll("_", " ")} color={STATUS_COLOR[detail.status] ?? "#7C5BF8"} />} />
+              <DetailField label="Amount" value={fmt(detail.price)} />
+              <DetailField label="Scheduled" value={new Date(detail.scheduledAt).toLocaleString("en-IN")} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <DetailField label="Service" value={detail.serviceName} />
+              <DetailField label="Customer" value={`${detail.customerName ?? "—"} · ${detail.customerEmail ?? "—"}`} />
+              <DetailField label="Phone" value={detail.customerPhone} />
+              <DetailField label="Partner" value={detail.proName} />
+              <DetailField label="Dispatch" value={detail.dispatchStatus.replaceAll("_", " ")} />
+              <DetailField label="Address" value={detail.address ? Object.values(detail.address).filter(Boolean).join(", ") : null} />
+            </div>
+            <div>
+              <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-2">Services</p>
+              <div className="space-y-2">
+                {detail.items.length === 0 ? <p className="text-white/30 text-sm">No service item breakdown.</p> : detail.items.map(item => (
+                  <div key={item.id} className="rounded-xl border border-white/[0.07] p-3">
+                    <p className="text-white font-semibold text-sm">{item.serviceName ?? detail.serviceName}</p>
+                    <p className="text-white/35 text-[11px] mt-1 break-all">Service item ID: {item.id}</p>
+                    <p className="text-white/45 text-xs mt-1">{item.quantity} × {fmt(item.unitCustomerPrice)} · {item.duration} min · line total {fmt(item.lineTotal)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-2">Dispatch requests</p>
+                <div className="space-y-1.5">
+                  {detail.dispatchRequests.length === 0 ? <p className="text-white/30 text-sm">No partner requests.</p> : detail.dispatchRequests.map(request => (
+                    <div key={request.id} className="rounded-lg bg-white/[0.03] px-3 py-2 text-xs">
+                      <span className="text-white">{request.partner.name}</span>
+                      <span className="text-white/40"> · {request.status} · {new Date(request.sentAt).toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-2">Assignment history</p>
+                <div className="space-y-1.5">
+                  {detail.assignmentHistory.length === 0 ? <p className="text-white/30 text-sm">No assignment history.</p> : detail.assignmentHistory.map(log => (
+                    <div key={log.id} className="rounded-lg bg-white/[0.03] px-3 py-2 text-xs">
+                      <span className="text-white">{log.action.replaceAll("_", " ")}</span>
+                      <span className="text-white/40"> · {log.partnerName ?? "No partner"} · {new Date(log.createdAt).toLocaleString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-2">Payments</p>
+              {detail.payments.length === 0 ? <p className="text-white/30 text-sm">No payment records.</p> : detail.payments.map(payment => (
+                <div key={String(payment.id)} className="rounded-lg bg-white/[0.03] px-3 py-2 text-xs text-white/65">
+                  {String(payment.status ?? "unknown")} · {String(payment.method ?? "method unavailable")} · {fmt(Number(payment.amount ?? 0))}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1429,9 +1620,12 @@ function DispatchView({
 }) {
   const DV_COLS = ["Customer", "Service", "Scheduled", "Dispatch Status", "Partner"] as const;
   const [modalBooking, setModalBooking] = useState<DispatchRequestRow | null>(null);
+  const [detail, setDetail] = useState<AdminBookingDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [partners, setPartners] = useState<EligiblePartner[] | null>(null);
   const [loadingPartners, setLoadingPartners] = useState(false);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [actionKey, setActionKey] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [dvPageSize, setDvPageSize]   = useState(50);
   const [dvPage,      setDvPage]      = useState(1);
@@ -1460,6 +1654,40 @@ function DispatchView({
     setAssigning(null);
   };
 
+  const openDetails = async (bookingId: string) => {
+    setDetailLoading(true);
+    try {
+      setDetail(await adminApi.getBooking(bookingId, accessToken));
+    } catch (e: any) {
+      setToast(e?.message ?? "Could not load booking details.");
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const runBookingAction = async (action: "stop" | "cancel", booking: DispatchRequestRow) => {
+    const label = action === "stop" ? "stop partner searching" : "cancel this booking";
+    if (!window.confirm(`Are you sure you want to ${label}?`)) return;
+    const key = `${action}:${booking.id}`;
+    setActionKey(key);
+    try {
+      if (action === "stop") {
+        await adminApi.stopSearching(booking.id, accessToken);
+      } else {
+        await adminApi.cancelBooking(booking.id, accessToken);
+      }
+      setToast(action === "stop" ? "Partner searching stopped." : "Booking cancelled.");
+      onAssigned();
+      setTimeout(() => setToast(null), 3000);
+    } catch (e: any) {
+      setToast(e?.message ?? `Could not ${action} booking.`);
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setActionKey(null);
+    }
+  };
+
   const assign = async (partnerId: string) => {
     if (!modalBooking) return;
     setAssigning(partnerId);
@@ -1479,7 +1707,10 @@ function DispatchView({
   };
 
   const dispatchStatusColor = (s: string) =>
-    s === "assigned" ? "#16A34A" : s === "waiting_operation" ? "#ef4444" : "#F59E0B";
+    s === "assigned" ? "#16A34A"
+      : s === "waiting_operation" ? "#ef4444"
+      : s === "cancelled" ? "#EF4444"
+      : "#F59E0B";
 
   const q = search.toLowerCase();
   const filtered = requests.filter((r) => {
@@ -1512,6 +1743,7 @@ function DispatchView({
     { value: "searching_partner", label: "Searching" },
     { value: "waiting_operation", label: "Waiting" },
     { value: "assigned",          label: "Assigned" },
+    { value: "cancelled",         label: "Cancelled" },
   ];
 
   return (
@@ -1623,13 +1855,39 @@ function DispatchView({
                         : <span className="text-white/25 italic">—</span>}
                     </td>
                   )}
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => openModal(request)}
-                      className="rounded-lg bg-violet-500/15 px-3 py-2 text-xs font-bold text-violet-300 hover:bg-violet-500/25 transition-colors whitespace-nowrap"
-                    >
-                      {request.dispatchStatus === "assigned" ? "Reassign Partner" : "Eligible Partners"}
-                    </button>
+                   <td className="px-4 py-3">
+                     <div className="flex flex-wrap items-center gap-1.5">
+                       <button
+                         onClick={() => void openDetails(request.id)}
+                         className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2 text-[11px] font-bold text-white/70 hover:bg-white/[0.08] whitespace-nowrap"
+                       >
+                         Service details
+                       </button>
+                       <button
+                         onClick={() => openModal(request)}
+                         className="rounded-lg bg-violet-500/15 px-2.5 py-2 text-[11px] font-bold text-violet-300 hover:bg-violet-500/25 transition-colors whitespace-nowrap"
+                       >
+                         {request.dispatchStatus === "assigned" ? "Reassign Partner" : "Eligible Partners"}
+                       </button>
+                       {["searching_partner", "waiting_operation"].includes(request.dispatchStatus) && (
+                         <button
+                           onClick={() => void runBookingAction("stop", request)}
+                           disabled={actionKey === `stop:${request.id}`}
+                           className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-2.5 py-2 text-[11px] font-bold text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 whitespace-nowrap"
+                         >
+                           {actionKey === `stop:${request.id}` ? "Stopping…" : "Stop searching"}
+                         </button>
+                       )}
+                       {!["cancelled", "completed"].includes(request.status) && (
+                         <button
+                           onClick={() => void runBookingAction("cancel", request)}
+                           disabled={actionKey === `cancel:${request.id}`}
+                           className="rounded-lg border border-red-400/25 bg-red-400/10 px-2.5 py-2 text-[11px] font-bold text-red-300 hover:bg-red-400/20 disabled:opacity-50 whitespace-nowrap"
+                         >
+                           {actionKey === `cancel:${request.id}` ? "Cancelling…" : "Cancel booking"}
+                         </button>
+                       )}
+                     </div>
                   </td>
                 </tr>
               ))}
@@ -1651,6 +1909,13 @@ function DispatchView({
           assigning={assigning}
           onAssign={assign}
           onClose={closeModal}
+        />
+      )}
+      {(detailLoading || detail) && (
+        <BookingDetailModal
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => { setDetail(null); setDetailLoading(false); }}
         />
       )}
 
@@ -1960,8 +2225,21 @@ function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; o
   const [dateFrom,    setDateFrom]    = useState("");
   const [dateTo,      setDateTo]      = useState("");
   const [selStatuses, setSelStatuses] = useState<string[]>([]);
+  const [detail, setDetail] = useState<AdminBookingDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const resetPage = () => setPage(1);
+
+  const openDetails = async (bookingId: string) => {
+    setDetailLoading(true);
+    try {
+      setDetail(await adminApi.getBooking(bookingId, accessToken));
+    } catch (e: any) {
+      adminShowError(e?.message ?? "Could not load booking details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   /* Debounce search input 400 ms so we don't fire on every keystroke */
   useEffect(() => {
@@ -2143,6 +2421,7 @@ function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; o
                 <SortTh label="Status"       field="status"       sort={bhSort} onSort={toggleBhSort} />
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Payment</th>
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Notes</th>
+                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -2181,10 +2460,18 @@ function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; o
                     <td className="px-4 py-3 text-white/40 text-xs max-w-[200px]">
                       <p className="truncate" title={b.notes ?? ""}>{b.notes ?? <span className="italic text-white/20">—</span>}</p>
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => void openDetails(b.id)}
+                        className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-2.5 py-2 text-[11px] font-bold text-violet-300 hover:bg-violet-500/20 whitespace-nowrap"
+                      >
+                        Service details
+                      </button>
+                    </td>
                   </tr>
                 ))
               }
-              {!fetching && bhSorted.length === 0 && <EmptyRow cols={10} text="No bookings match the selected filters" />}
+              {!fetching && bhSorted.length === 0 && <EmptyRow cols={11} text="No bookings match the selected filters" />}
             </tbody>
           </table>
         </div>
@@ -2227,6 +2514,13 @@ function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; o
             </div>
           </div>
         </div>
+      )}
+      {(detailLoading || detail) && (
+        <BookingDetailModal
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => { setDetail(null); setDetailLoading(false); }}
+        />
       )}
     </div>
   );
@@ -4836,7 +5130,7 @@ interface PaymentCfg {
   testMode: { enabled: boolean };
   cod:      { enabled: boolean };
   upi:      { enabled: boolean; vpa: string };
-  razorpay: { enabled: boolean; keyId: string; keySecret: string; webhookSecret: string };
+  razorpay: { enabled: boolean; keyId: string; keySecret: string; webhookSecret: string; xAccountNumber: string };
   stripe:   { enabled: boolean; publishableKey: string; secretKey: string };
 }
 
@@ -4844,7 +5138,7 @@ const DEFAULT_PAYMENT_CFG: PaymentCfg = {
   testMode: { enabled: false },
   cod:      { enabled: true },
   upi:      { enabled: false, vpa: "" },
-  razorpay: { enabled: false, keyId: "", keySecret: "", webhookSecret: "" },
+  razorpay: { enabled: false, keyId: "", keySecret: "", webhookSecret: "", xAccountNumber: "" },
   stripe:   { enabled: false, publishableKey: "", secretKey: "" },
 };
 
@@ -4857,7 +5151,18 @@ function PaymentConfigView({ accessToken }: { accessToken: string }) {
   useEffect(() => {
     setLoading(true);
     adminApi.getSettings("payment_config", accessToken)
-      .then(res => setCfg(prev => ({ ...prev, ...(res.value as Partial<PaymentCfg>) })))
+      .then(res => {
+        const value = res.value as Partial<PaymentCfg>;
+        setCfg(prev => ({
+          ...prev,
+          ...value,
+          testMode: { ...prev.testMode, ...(value.testMode ?? {}) },
+          cod: { ...prev.cod, ...(value.cod ?? {}) },
+          upi: { ...prev.upi, ...(value.upi ?? {}) },
+          razorpay: { ...prev.razorpay, ...(value.razorpay ?? {}) },
+          stripe: { ...prev.stripe, ...(value.stripe ?? {}) },
+        }));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [accessToken]);
@@ -4947,6 +5252,16 @@ function PaymentConfigView({ accessToken }: { accessToken: string }) {
               onChange={v => setMethod("razorpay", { webhookSecret: v })}
               placeholder="Webhook signing secret from Razorpay dashboard"
             />
+          </Field>
+          <Field label="RazorpayX Payout Account Number">
+            <TextInput
+              value={cfg.razorpay.xAccountNumber}
+              onChange={v => setMethod("razorpay", { xAccountNumber: v })}
+              placeholder="Your RazorpayX account number"
+            />
+            <p className="text-white/30 text-[10px] mt-1">
+              Required for partner UPI payouts. Find it in RazorpayX → Payouts → Settings.
+            </p>
           </Field>
         </div>
       ),
@@ -5673,6 +5988,442 @@ function OtpSettingsView({ accessToken }: { accessToken: string }) {
    PARTNER PAYOUTS (Admin)
 ═══════════════════════════════════════════════════════════════════ */
 
+function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
+  type ScheduleConfig = {
+    enabled: boolean;
+    frequency: "weekly" | "monthly";
+    dayOfWeek: number;
+    dayOfMonth: number;
+    runHourUtc: number;
+    maxPayoutsPerRun: number;
+    maxAmountPerRun: number;
+  };
+  type PayoutRun = {
+    id: string;
+    trigger: string;
+    scheduleKey: string | null;
+    status: string;
+    requestedCount: number;
+    successCount: number;
+    failureCount: number;
+    requestedAmount: number;
+    paidAmount: number;
+    failureReason: string | null;
+    startedAt: string;
+    completedAt: string | null;
+  };
+  const DEFAULT_SCHEDULE: ScheduleConfig = {
+    enabled: false,
+    frequency: "weekly",
+    dayOfWeek: 5,
+    dayOfMonth: 1,
+    runHourUtc: 3,
+    maxPayoutsPerRun: 100,
+    maxAmountPerRun: 100000,
+  };
+  const [partners, setPartners] = useState<PayoutPartnerRow[]>([]);
+  const [summary, setSummary] = useState({ totalEarnings: 0, monthEarnings: 0, pendingPayout: 0, paidOut: 0, available: 0 });
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState<PayoutPartnerDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleConfig>(DEFAULT_SCHEDULE);
+  const [runs, setRuns] = useState<PayoutRun[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [runningNow, setRunningNow] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminApi.getPayoutPartners({ page, pageSize, search, status }, accessToken);
+      setPartners(data.partners ?? []);
+      setTotal(data.total ?? 0);
+      setSummary(data.summary ?? { totalEarnings: 0, monthEarnings: 0, pendingPayout: 0, paidOut: 0, available: 0 });
+    } catch (e: any) {
+      setPartners([]);
+      setMsg({ text: e.message ?? "Could not load partner payout data.", ok: false });
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken, page, pageSize, search, status]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+  useEffect(() => { void load(); }, [load]);
+
+  const loadAutomation = useCallback(async () => {
+    setScheduleLoading(true);
+    try {
+      const [settings, history] = await Promise.all([
+        adminApi.getSettings("payout_config", accessToken),
+        adminApi.getPayoutRuns(accessToken),
+      ]);
+      setSchedule({ ...DEFAULT_SCHEDULE, ...(settings.value as Partial<ScheduleConfig>) });
+      setRuns(history ?? []);
+    } catch (e: any) {
+      setMsg({ text: e.message ?? "Could not load payout automation settings.", ok: false });
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { void loadAutomation(); }, [loadAutomation]);
+
+  async function saveSchedule() {
+    setSavingSchedule(true);
+    try {
+      await adminApi.saveSettings("payout_config", schedule, accessToken);
+      setMsg({ text: schedule.enabled ? "Automatic payouts enabled." : "Automatic payouts disabled.", ok: true });
+      await loadAutomation();
+    } catch (e: any) {
+      setMsg({ text: e.message ?? "Could not save payout schedule.", ok: false });
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
+  async function runNow() {
+    setRunningNow(true);
+    try {
+      const result = await adminApi.runPayoutsNow(accessToken);
+      setMsg({
+        text: result.skipped
+          ? `Run not started: ${result.reason ?? "not eligible"}.`
+          : `Run finished: ${result.successCount ?? 0} sent, ${result.failureCount ?? 0} failed.`,
+        ok: !result.skipped,
+      });
+      await Promise.all([load(), loadAutomation()]);
+    } catch (e: any) {
+      setMsg({ text: e.message ?? "Could not start payout run.", ok: false });
+    } finally {
+      setRunningNow(false);
+    }
+  }
+
+  async function openDetail(id: string) {
+    setDetailLoading(true);
+    try {
+      setDetail(await adminApi.getPayoutPartnerDetail(id, accessToken));
+    } catch (e: any) {
+      setMsg({ text: e.message ?? "Could not load partner details.", ok: false });
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function resolve(id: string, nextStatus: "paid" | "rejected") {
+    setResolving(id);
+    try {
+      await adminApi.resolvePayout(id, nextStatus, accessToken);
+      setMsg({
+        text: nextStatus === "paid" ? "Payout sent through RazorpayX." : "Payout request rejected.",
+        ok: nextStatus === "paid",
+      });
+      if (detail) await openDetail(detail.partner.id);
+      await load();
+    } catch (e: any) {
+      setMsg({ text: e.message ?? "Action failed.", ok: false });
+    } finally {
+      setResolving(null);
+    }
+  }
+
+  const statCards = [
+    { label: "Partners", value: total.toLocaleString("en-IN"), icon: Users, color: "#A78BFA" },
+    { label: "This month earnings", value: fmt(summary.monthEarnings), icon: TrendingUp, color: "#38BDF8" },
+    { label: "Amount to pay", value: fmt(summary.available), icon: Wallet, color: "#F59E0B" },
+    { label: "Pending requests", value: fmt(summary.pendingPayout), icon: Clock, color: "#FB7185" },
+    { label: "Already paid", value: fmt(summary.paidOut), icon: CheckCircle, color: "#34D399" },
+  ];
+  const fmtDate = (value?: string | null) => value
+    ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-white font-bold text-base">Partner Payout Control Centre</h2>
+          <p className="text-white/40 text-xs mt-1">Review earnings and send approved partner payouts through RazorpayX.</p>
+        </div>
+        <button onClick={() => void load()} className="text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw size={16}/>
+        </button>
+      </div>
+
+      {msg && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm border ${msg.ok ? "border-emerald-500/30 text-emerald-400" : "border-red-500/30 text-red-400"}`}
+          style={{ background: msg.ok ? "rgba(22,163,74,0.1)" : "rgba(239,68,68,0.1)" }}>
+          {msg.ok ? <CheckCircle size={14}/> : <AlertCircle size={14}/>}
+          {msg.text}
+          <button onClick={() => setMsg(null)} className="ml-auto opacity-50 hover:opacity-100"><X size={13}/></button>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-violet-400/20 p-4 space-y-4" style={{ ...CARD, background: "rgba(124,58,237,0.08)" }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-white font-semibold text-sm">Automatic scheduled payouts</h3>
+            <p className="text-white/45 text-xs mt-1 max-w-2xl">
+              Only requests explicitly marked <span className="text-violet-300">Approved for schedule</span> are sent automatically.
+              Normal pending requests remain under Admin review.
+            </p>
+          </div>
+          <button
+            onClick={() => setSchedule(current => ({ ...current, enabled: !current.enabled }))}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${schedule.enabled ? "border-emerald-400/40 text-emerald-300" : "border-white/15 text-white/50"}`}
+          >
+            {schedule.enabled ? "Enabled" : "Disabled"}
+          </button>
+        </div>
+        {scheduleLoading ? (
+          <div className="text-white/40 text-xs">Loading schedule settings…</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <label className="text-white/45 text-xs">Frequency
+                <select value={schedule.frequency} onChange={e => setSchedule(s => ({ ...s, frequency: e.target.value as ScheduleConfig["frequency"] }))}
+                  className="mt-1 w-full px-2.5 py-2 rounded-lg text-xs text-white border border-white/10 outline-none" style={INPUT_STYLE}>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
+              {schedule.frequency === "weekly" ? (
+                <label className="text-white/45 text-xs">Day
+                  <select value={schedule.dayOfWeek} onChange={e => setSchedule(s => ({ ...s, dayOfWeek: Number(e.target.value) }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-lg text-xs text-white border border-white/10 outline-none" style={INPUT_STYLE}>
+                    <option value={0}>Sunday</option><option value={1}>Monday</option><option value={2}>Tuesday</option>
+                    <option value={3}>Wednesday</option><option value={4}>Thursday</option><option value={5}>Friday</option><option value={6}>Saturday</option>
+                  </select>
+                </label>
+              ) : (
+                <label className="text-white/45 text-xs">Day of month
+                  <input type="number" min={1} max={28} value={schedule.dayOfMonth} onChange={e => setSchedule(s => ({ ...s, dayOfMonth: Number(e.target.value) }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-lg text-xs text-white border border-white/10 outline-none" style={INPUT_STYLE}/>
+                </label>
+              )}
+              <label className="text-white/45 text-xs">Run hour (UTC)
+                <input type="number" min={0} max={23} value={schedule.runHourUtc} onChange={e => setSchedule(s => ({ ...s, runHourUtc: Number(e.target.value) }))}
+                  className="mt-1 w-full px-2.5 py-2 rounded-lg text-xs text-white border border-white/10 outline-none" style={INPUT_STYLE}/>
+              </label>
+              <label className="text-white/45 text-xs">Max payouts per run
+                <input type="number" min={1} max={500} value={schedule.maxPayoutsPerRun} onChange={e => setSchedule(s => ({ ...s, maxPayoutsPerRun: Number(e.target.value) }))}
+                  className="mt-1 w-full px-2.5 py-2 rounded-lg text-xs text-white border border-white/10 outline-none" style={INPUT_STYLE}/>
+              </label>
+              <label className="text-white/45 text-xs">Max amount per run (₹)
+                <input type="number" min={100} value={schedule.maxAmountPerRun} onChange={e => setSchedule(s => ({ ...s, maxAmountPerRun: Number(e.target.value) }))}
+                  className="mt-1 w-full px-2.5 py-2 rounded-lg text-xs text-white border border-white/10 outline-none" style={INPUT_STYLE}/>
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => void saveSchedule()} disabled={savingSchedule}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-40">
+                {savingSchedule ? "Saving…" : "Save schedule"}
+              </button>
+              <button onClick={() => void runNow()} disabled={runningNow || !schedule.enabled}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-amber-300 border border-amber-400/30 hover:bg-amber-500/10 disabled:opacity-40">
+                {runningNow ? <Loader2 size={12} className="animate-spin"/> : <Send size={12}/>} Run approved payouts now
+              </button>
+              <span className="text-white/30 text-[10px]">The scheduled time uses UTC. Limits are capped server-side.</span>
+            </div>
+          </>
+        )}
+        {runs.length > 0 && (
+          <div className="border-t border-white/[0.08] pt-3">
+            <p className="text-white/45 text-xs mb-2">Recent payout runs</p>
+            <div className="space-y-1.5">
+              {runs.slice(0, 5).map(run => (
+                <div key={run.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/50">
+                  <span className={`font-semibold ${run.status === "completed" ? "text-emerald-300" : run.status === "failed" ? "text-red-300" : "text-amber-300"}`}>{run.status}</span>
+                  <span>{run.trigger}</span>
+                  <span>{new Date(run.startedAt).toLocaleString("en-IN")}</span>
+                  <span>{run.successCount} sent</span>
+                  <span>{run.failureCount} failed</span>
+                  <span>{fmt(run.paidAmount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {statCards.map(card => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="rounded-2xl border border-white/[0.07] p-4" style={CARD}>
+              <div className="flex items-center justify-between">
+                <span className="text-white/45 text-xs">{card.label}</span>
+                <Icon size={15} style={{ color: card.color }}/>
+              </div>
+              <p className="text-white font-bold text-lg mt-2">{card.value}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[230px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"/>
+          <input
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            placeholder="Search partner, email or UPI ID…"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm text-white placeholder-white/30 border border-white/10 outline-none focus:border-violet-500/50"
+            style={INPUT_STYLE}
+          />
+        </div>
+        <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
+          className="px-3 py-2 rounded-lg text-xs text-white/70 border border-white/10 outline-none" style={INPUT_STYLE}>
+          <option value="all">All partners</option>
+          <option value="payable">Amount to pay</option>
+          <option value="pending">Pending requests</option>
+          <option value="missing_upi">Missing UPI ID</option>
+        </select>
+        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+          className="px-3 py-2 rounded-lg text-xs text-white/70 border border-white/10 outline-none" style={INPUT_STYLE}>
+          <option value={25}>25 per page</option>
+          <option value={50}>50 per page</option>
+          <option value={100}>100 per page</option>
+        </select>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden border border-white/[0.07]" style={CARD}>
+        {loading ? (
+          <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-violet-400"/></div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.07]">
+                    {["Partner", "This month", "Total earned", "Amount to pay", "Pending", "Already paid", "UPI", ""].map(label => (
+                      <th key={label} className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {partners.map(partner => (
+                    <tr key={partner.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
+                      <td className="px-4 py-3">
+                        <button onClick={() => void openDetail(partner.id)} className="text-left hover:text-violet-300 transition-colors">
+                          <p className="text-white font-medium">{partner.name}</p>
+                          <p className="text-white/35 text-xs">{partner.email ?? partner.phone ?? "—"}</p>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sky-300 font-semibold">{fmt(partner.monthEarnings)}</td>
+                      <td className="px-4 py-3 text-white/70">
+                        {fmt(partner.totalEarnings)}
+                        <span className="block text-white/30 text-xs">{partner.completedJobs} jobs</span>
+                      </td>
+                      <td className="px-4 py-3 text-amber-300 font-semibold">{fmt(partner.available)}</td>
+                      <td className="px-4 py-3 text-rose-300">
+                        {fmt(partner.pendingPayout)}
+                        {partner.pendingRequests > 0 && <span className="block text-white/30 text-xs">{partner.pendingRequests} request{partner.pendingRequests > 1 ? "s" : ""}</span>}
+                      </td>
+                      <td className="px-4 py-3 text-emerald-300">{fmt(partner.paidOut)}</td>
+                      <td className="px-4 py-3 text-white/55 text-xs">{partner.payoutUpiId ?? <span className="text-red-400">Not saved</span>}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => void openDetail(partner.id)} className="text-violet-300 hover:text-violet-200 text-xs font-semibold whitespace-nowrap">View details</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!partners.length && <EmptyRow cols={8} text="No partners match the selected filters" />}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} total={total} pageSize={pageSize} onChange={setPage}/>
+          </>
+        )}
+      </div>
+
+      {(detailLoading || detail) && (
+        <div className="fixed inset-0 z-50 flex justify-end" style={{ background: "rgba(0,0,0,0.65)" }} onClick={() => !detailLoading && setDetail(null)}>
+          <div className="w-full max-w-2xl h-full overflow-y-auto border-l border-white/10 p-6" style={{ background: "#151b2d" }} onClick={e => e.stopPropagation()}>
+            {detailLoading ? (
+              <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-violet-400"/></div>
+            ) : detail && (
+              <div className="space-y-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-white/40 text-xs">Partner payout details</p>
+                    <h3 className="text-white font-bold text-xl mt-1">{detail.partner.name}</h3>
+                    <p className="text-white/45 text-sm">{detail.partner.email ?? detail.partner.phone ?? "—"}</p>
+                  </div>
+                  <button onClick={() => setDetail(null)} className="text-white/45 hover:text-white"><X size={18}/></button>
+                </div>
+                <div className="rounded-xl border border-white/10 p-4">
+                  <p className="text-white/40 text-xs">UPI payout destination</p>
+                  <p className="text-white font-semibold mt-1">{detail.partner.payoutUpiId ?? <span className="text-red-400">Partner has not saved a UPI ID</span>}</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    ["This month", detail.summary.monthEarnings, "text-sky-300"],
+                    ["Total earned", detail.summary.totalEarnings, "text-white"],
+                    ["Amount to pay", detail.summary.available, "text-amber-300"],
+                    ["Pending", detail.summary.pendingPayout, "text-rose-300"],
+                    ["Already paid", detail.summary.paidOut, "text-emerald-300"],
+                    ["Completed jobs", detail.summary.completedJobs, "text-white"],
+                  ].map(([label, value, color]) => (
+                    <div key={String(label)} className="rounded-xl border border-white/[0.07] p-3">
+                      <p className="text-white/40 text-xs">{label}</p>
+                      <p className={`font-bold mt-1 ${color}`}>{label === "Completed jobs" ? Number(value).toLocaleString("en-IN") : fmt(Number(value))}</p>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold text-sm mb-3">Payout history</h4>
+                  <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+                    {detail.payoutRequests.length ? detail.payoutRequests.map(request => (
+                      <div key={request.id} className="p-3 border-b border-white/[0.05] last:border-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <div><p className="text-white font-semibold">{fmt(request.amount)}</p><p className="text-white/35 text-xs">{fmtDate(request.requestedAt)}{request.note ? ` · ${request.note}` : ""}</p></div>
+                          <span className={`text-xs font-bold ${request.status === "paid" ? "text-emerald-300" : request.status === "approved" ? "text-violet-300" : request.status === "pending" ? "text-amber-300" : request.status === "processing" ? "text-sky-300" : "text-red-300"}`}>{request.status}</span>
+                        </div>
+                        {request.providerPayoutId && <p className="text-emerald-400/80 text-xs mt-1">RazorpayX reference: {request.providerPayoutId}</p>}
+                        {request.failureReason && <p className="text-red-400/80 text-xs mt-1">{request.failureReason}</p>}
+                        {(request.status === "pending" || request.status === "approved") && (
+                          <div className="flex gap-2 mt-3">
+                            {request.status === "pending" && <button onClick={() => void resolve(request.id, "approved")} disabled={resolving === request.id}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-violet-300 border border-violet-500/30 hover:bg-violet-500/10 disabled:opacity-40">
+                              <Clock size={11}/> Approve for schedule
+                            </button>}
+                            <button onClick={() => void resolve(request.id, "paid")} disabled={resolving === request.id || !detail.partner.payoutUpiId}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 disabled:opacity-40">
+                              {resolving === request.id ? <Loader2 size={11} className="animate-spin"/> : <Send size={11}/>} Send via RazorpayX
+                            </button>
+                            <button onClick={() => void resolve(request.id, "rejected")} disabled={resolving === request.id}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-300 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40">
+                              <XCircle size={11}/> Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )) : <p className="text-white/35 text-sm p-4">No payout requests yet.</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PayoutsAdminView({ accessToken }: { accessToken: string }) {
   const [pvPageSize, setPvPageSize] = useState(50);
   const [pvPage,     setPvPage]     = useState(1);
@@ -5783,6 +6534,7 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
                     <SortTh label="Partner"   field="partner_name" sort={pvSort} onSort={togglePvSort} />
                     <SortTh label="Amount"    field="amount"       sort={pvSort} onSort={togglePvSort} />
                     <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold">Note</th>
+                    <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold">Destination / Transfer</th>
                     <SortTh label="Requested" field="createdAt"    sort={pvSort} onSort={togglePvSort} />
                     <SortTh label="Status"    field="status"       sort={pvSort} onSort={togglePvSort} />
                     <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold">Actions</th>
@@ -5794,6 +6546,11 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
                       <td className="px-4 py-3 text-white font-medium">{p.partner_name ?? p.partnerId?.slice(0, 8)}</td>
                       <td className="px-4 py-3 text-emerald-400 font-semibold">{fmt(p.amount)}</td>
                       <td className="px-4 py-3 text-white/50 max-w-[160px] truncate">{p.note ?? '—'}</td>
+                      <td className="px-4 py-3 text-white/50 text-xs">
+                        {p.payoutUpiId ?? <span className="text-red-400">No UPI ID</span>}
+                        {p.providerPayoutId && <div className="text-emerald-400/80 mt-1">Ref: {p.providerPayoutId}</div>}
+                        {p.failureReason && <div className="text-red-400/80 mt-1 max-w-[180px] truncate" title={p.failureReason}>{p.failureReason}</div>}
+                      </td>
                       <td className="px-4 py-3 text-white/40 text-xs">{new Date(p.createdAt ?? p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-bold"
@@ -5821,7 +6578,7 @@ function PayoutsAdminView({ accessToken }: { accessToken: string }) {
                       </td>
                     </tr>
                   ))}
-                  {pvPaged.length === 0 && <EmptyRow cols={6} text="No payouts match the filters" />}
+                  {pvPaged.length === 0 && <EmptyRow cols={7} text="No payouts match the filters" />}
                 </tbody>
               </table>
             </div>

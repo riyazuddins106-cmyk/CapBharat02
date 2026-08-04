@@ -110,6 +110,7 @@ export interface PartnerProfile {
   tags: string[];
   isActive: boolean;
   categoryId: string;
+  payoutUpiId: string | null;
   availabilityStatus?: 'available' | 'offline' | 'busy';
   currentBookingStatus?: string;
 }
@@ -148,14 +149,19 @@ export interface Earnings {
   total: number;
   thisMonth: number;
   today: number;
+  pendingPayout: number;
+  paidOut: number;
+  available: number;
   weekly: { date: string; amount: number }[];
 }
 
 export interface OrderItemJob {
-  requestId?: string;
+  requestId?: string | null;
   orderItemId: string;
   orderId: string;
   serviceId: string;
+  serviceName?: string;
+  customerName?: string;
   status?: string;
   scheduledAt: string;
   durationMinutes: number;
@@ -293,7 +299,7 @@ export const partnerApi = {
       token,
     }),
 
-  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge'>>, token: string) =>
+  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge' | 'payoutUpiId'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
 
   updateAccount: (data: { fullName?: string; phone?: string }, token: string) =>
@@ -320,8 +326,12 @@ export const partnerApi = {
   rejectOrderItemJob: (requestId: string, token: string) =>
     request<{ message: string }>(`/api/partner/order-item-jobs/${requestId}/reject`, { method: 'PATCH', token }),
 
-  checkInOrderItem: (itemId: string, token: string) =>
-    request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/checkin`, { method: 'PATCH', token }),
+  checkInOrderItem: (itemId: string, qrToken: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/checkin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ qrToken }),
+      token,
+    }),
 
   completeOrderItem: (itemId: string, token: string) =>
     request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/complete`, { method: 'PATCH', token }),

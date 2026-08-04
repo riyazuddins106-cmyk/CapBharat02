@@ -92,6 +92,18 @@ async function getCustomerOrderItem(itemId: string, customerId: string) {
   return row;
 }
 
+function assertOrderItemPaymentAllowed(status: string) {
+  if (!['partner_arrived', 'payment_pending'].includes(status)) {
+    throw AppError.badRequest('Payment is available after the partner checks in.');
+  }
+}
+
+function assertBookingPaymentAllowed(status: string) {
+  if (!['in_progress', 'completed'].includes(status)) {
+    throw AppError.badRequest('Payment is available after the partner checks in.');
+  }
+}
+
 async function markOrderItemPaid(
   itemId: string,
   orderId: string,
@@ -131,6 +143,7 @@ export const createRazorpayOrderForItem = asyncHandler(async (req: Request, res:
   const { orderId, itemId } = req.params;
   const { item, order, serviceName } = await getCustomerOrderItem(itemId, userId);
   if (item.orderId !== orderId) throw AppError.notFound('Service order item not found.');
+  assertOrderItemPaymentAllowed(item.status);
 
   const [existing] = await db.select().from(orderItemPayments)
     .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
@@ -235,6 +248,7 @@ export const createStripeSessionForItem = asyncHandler(async (req: Request, res:
   const { orderId, itemId } = req.params;
   const { item, order, serviceName } = await getCustomerOrderItem(itemId, userId);
   if (item.orderId !== orderId) throw AppError.notFound('Service order item not found.');
+  assertOrderItemPaymentAllowed(item.status);
 
   const [existing] = await db.select().from(orderItemPayments)
     .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
@@ -378,6 +392,7 @@ export const createRazorpayOrder = asyncHandler(async (req: Request, res: Respon
   if (!booking) throw AppError.notFound('Booking not found.');
   if (booking.status === 'cancelled')
     throw AppError.badRequest('Payment cannot be made for a cancelled booking.');
+  assertBookingPaymentAllowed(booking.status);
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
@@ -694,6 +709,7 @@ export const createStripeSession = asyncHandler(async (req: Request, res: Respon
   if (!booking) throw AppError.notFound('Booking not found.');
   if (booking.status === 'cancelled')
     throw AppError.badRequest('Payment cannot be made for a cancelled booking.');
+  assertBookingPaymentAllowed(booking.status);
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
@@ -867,6 +883,7 @@ export const submitPayment = asyncHandler(async (req: Request, res: Response) =>
   if (!booking) throw AppError.notFound('Booking not found.');
   if (booking.status === 'cancelled')
     throw AppError.badRequest('Payment cannot be made for a cancelled booking.');
+  assertBookingPaymentAllowed(booking.status);
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');
@@ -925,6 +942,7 @@ export const testPay = asyncHandler(async (req: Request, res: Response) => {
   const [booking] = await db.select().from(bookings)
     .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, userId))).limit(1);
   if (!booking) throw AppError.notFound('Booking not found.');
+  assertBookingPaymentAllowed(booking.status);
 
   const [existing] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
   if (existing?.status === 'paid') throw AppError.badRequest('This booking has already been paid.');

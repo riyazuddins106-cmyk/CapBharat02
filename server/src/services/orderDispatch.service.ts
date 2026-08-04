@@ -7,6 +7,8 @@ import {
 import { notificationDbService } from './notificationDb.service.js';
 import { notificationService } from './notification.service.js';
 import { logger } from '../utils/logger.js';
+import { AppError } from '../utils/AppError.js';
+import { verifyOrderItemQrToken } from '../utils/bookingQr.js';
 
 const MAX_RADIUS_KM = 30;
 
@@ -239,7 +241,16 @@ export const orderDispatchService = {
   },
 
   /** Partner checks in (arrives at location) — triggers payment request */
-  async checkInItem(orderItemId: string, partnerId: string) {
+  async checkInItem(orderItemId: string, partnerId: string, qrToken: string) {
+    try {
+      const claims = verifyOrderItemQrToken(qrToken);
+      if (claims.orderItemId !== orderItemId) {
+        throw new Error('QR token does not belong to this service.');
+      }
+    } catch (error) {
+      throw AppError.badRequest(error instanceof Error ? error.message : 'Invalid or expired customer QR code.');
+    }
+
     const [item] = await db.update(orderItems).set({
       status: 'payment_pending',
       updatedAt: new Date(),

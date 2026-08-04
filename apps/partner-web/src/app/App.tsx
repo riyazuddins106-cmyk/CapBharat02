@@ -10,6 +10,7 @@ import {
 import {
   authApi, partnerApi, notificationsApi, categoriesApi, payoutsApi, documentsApi, setRefreshHandler,
   type Job, type JobStatus, type Earnings, type PartnerProfile, type Category,
+  type OrderItemJob,
   type AppNotification, type AuthTokens, type Payout, type PartnerDocument,
   type DocumentTypeConfig, type PartnerDocumentHistory,
 } from '@/lib/api';
@@ -148,6 +149,79 @@ function PageHeader({ title, subtitle, onRefresh }: {
           className="text-white/30 hover:text-white/70 transition-colors p-1 mt-0.5">
           <RefreshCw size={16}/>
         </button>
+      )}
+    </div>
+  );
+}
+
+function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
+  item: OrderItemJob;
+  pending?: boolean;
+  busy?: boolean;
+  onAccept?: () => void;
+  onReject?: () => void;
+  onCheckIn?: () => void;
+  onComplete?: () => void;
+}) {
+  const canCheckIn = !pending && item.status === 'partner_accepted';
+  const canComplete = !pending && ['payment_completed', 'service_started'].includes(item.status ?? '');
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] p-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: pending ? 'rgba(245,158,11,0.15)' : 'rgba(91,62,245,0.15)' }}>
+          <Wrench size={16} style={{ color: pending ? '#F59E0B' : '#A78BFA' }}/>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-white text-sm font-bold truncate">{item.serviceName ?? 'Service booking'}</p>
+          <p className="text-white/45 text-xs mt-0.5 truncate">
+            {item.customerName ?? 'Customer'} · Order {item.orderId.slice(0, 8)}
+          </p>
+        </div>
+        <span className="px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap"
+          style={{
+            background: pending ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+            color: pending ? '#FBBF24' : '#60A5FA',
+          }}>
+          {pending ? 'New request' : 'In progress'}
+        </span>
+      </div>
+      <div className="flex items-center gap-4 mt-3 text-xs text-white/45">
+        <span className="flex items-center gap-1"><Calendar size={12}/>{fmtDate(item.scheduledAt)}</span>
+        <span className="flex items-center gap-1"><Clock size={12}/>{item.durationMinutes} min</span>
+        <span className="ml-auto text-white font-bold">{fmt(item.partnerPayout)}</span>
+      </div>
+      {pending && onAccept && onReject && (
+        <div className="flex gap-2 mt-3">
+          <button onClick={onReject} disabled={busy}
+            className="flex-1 py-2 rounded-lg text-xs font-bold border border-red-400/30 text-red-400 disabled:opacity-50">
+            {busy ? 'Updating…' : 'Reject'}
+          </button>
+          <button onClick={onAccept} disabled={busy}
+            className="flex-1 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+            style={{ background: ACCENT }}>
+            {busy ? 'Updating…' : 'Accept'}
+          </button>
+        </div>
+      )}
+      {!pending && (onCheckIn || onComplete) && (
+        <div className="flex gap-2 mt-3">
+          {canCheckIn && onCheckIn && (
+            <button onClick={onCheckIn} disabled={busy}
+              className="flex-1 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+              style={{ background: ACCENT }}>
+              <span className="inline-flex items-center gap-1.5"><QrCode size={13}/> Scan customer QR</span>
+            </button>
+          )}
+          {canComplete && onComplete && (
+            <button onClick={onComplete} disabled={busy}
+              className="flex-1 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+              style={{ background: '#16A34A' }}>
+              <span className="inline-flex items-center gap-1.5"><Check size={13}/> Mark completed</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -550,22 +624,60 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
 function Dashboard({ token, profile }: { token: string; profile: PartnerProfile | null }) {
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [jobs,     setJobs]     = useState<Job[]>([]);
+  const [serviceJobs, setServiceJobs] = useState<{ pendingRequests: OrderItemJob[]; activeJobs: OrderItemJob[]; completedJobs: OrderItemJob[] }>({ pendingRequests: [], activeJobs: [], completedJobs: [] });
   const [loading,  setLoading]  = useState(true);
+  const [actionKey, setActionKey] = useState<string | null>(null);
+  const [serviceCheckinItem, setServiceCheckinItem] = useState<OrderItemJob | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [e, j] = await Promise.all([
+      const [e, j, sj] = await Promise.all([
         partnerApi.getEarnings(token),
         partnerApi.listJobs(token),
+        partnerApi.listOrderItemJobs(token),
       ]);
-      setEarnings(e); setJobs(j);
+      setEarnings(e); setJobs(j); setServiceJobs(sj);
     } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
 
   const upcoming = jobs.filter(j => j.status === 'upcoming' || j.status === 'in_progress').slice(0, 8);
+
+  async function updateRequest(action: 'accept' | 'reject', item: OrderItemJob) {
+    if (!item.requestId) return;
+    setActionKey(`${action}:${item.requestId}`);
+    try {
+      if (action === 'accept') await partnerApi.acceptOrderItemJob(item.requestId, token);
+      else await partnerApi.rejectOrderItemJob(item.requestId, token);
+      await load();
+    } catch (error: any) {
+      alert(error?.message ?? 'Could not update this request.');
+    } finally { setActionKey(null); }
+  }
+
+  async function handleServiceCheckin(qrToken: string) {
+    if (!serviceCheckinItem) return;
+    setActionKey(`checkin:${serviceCheckinItem.orderItemId}`);
+    try {
+      await partnerApi.checkInOrderItem(serviceCheckinItem.orderItemId, qrToken, token);
+      setServiceCheckinItem(null);
+      await load();
+    } catch (error: any) {
+      alert(error?.message ?? 'Check-in failed. Make sure this is the customer QR for this service.');
+    } finally { setActionKey(null); }
+  }
+
+  async function completeService(item: OrderItemJob) {
+    setActionKey(`complete:${item.orderItemId}`);
+    try {
+      await partnerApi.completeOrderItem(item.orderItemId, token);
+      await load();
+    } catch (error: any) {
+      alert(error?.message ?? 'Could not complete this service.');
+    } finally { setActionKey(null); }
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -583,6 +695,30 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
 
   return (
     <div>
+      {serviceJobs.pendingRequests.length > 0 && (
+        <div className="rounded-2xl border border-amber-400/20 p-5 mb-6" style={{ background: 'rgba(245,158,11,0.05)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-bold text-sm">New requests</h3>
+            <span className="w-6 h-6 rounded-full text-white text-[11px] font-bold flex items-center justify-center"
+              style={{ background: '#F59E0B' }}>{serviceJobs.pendingRequests.length}</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {serviceJobs.pendingRequests.slice(0, 4).map(item => (
+              <ServiceRequestCard
+                key={item.requestId ?? item.orderItemId}
+                item={item}
+                pending
+                busy={actionKey?.endsWith(`:${item.requestId}`)}
+                onAccept={() => updateRequest('accept', item)}
+                onReject={() => updateRequest('reject', item)}
+              />
+            ))}
+          </div>
+          {serviceJobs.pendingRequests.length > 4 && (
+            <p className="text-xs text-amber-300/70 mt-3">Open My Jobs to view all {serviceJobs.pendingRequests.length} requests.</p>
+          )}
+        </div>
+      )}
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {stats.map(s => (
@@ -599,7 +735,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
         ))}
       </div>
 
-      {/* Profile + Upcoming */}
+      {/* Profile + Active work */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Profile snapshot */}
         {profile && (
@@ -643,14 +779,26 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
           </div>
         )}
 
-        {/* Upcoming jobs */}
+        {/* Active jobs */}
         <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
           <div className="px-5 py-4 border-b border-white/[0.07]">
-            <h3 className="text-white font-bold text-sm">Upcoming Jobs</h3>
+            <h3 className="text-white font-bold text-sm">Active Jobs</h3>
           </div>
-          {upcoming.length === 0
-            ? <p className="px-5 py-8 text-white/30 text-sm text-center">No upcoming jobs</p>
-            : upcoming.map(j => (
+          {serviceJobs.activeJobs.length === 0 && upcoming.length === 0
+            ? <p className="px-5 py-8 text-white/30 text-sm text-center">No active jobs</p>
+            : (
+              <>
+              {serviceJobs.activeJobs.slice(0, 4).map(item => (
+                <div key={item.orderItemId} className="px-5 py-3 border-b border-white/[0.04]">
+                  <ServiceRequestCard
+                    item={item}
+                    busy={actionKey?.endsWith(`:${item.orderItemId}`)}
+                    onCheckIn={() => setServiceCheckinItem(item)}
+                    onComplete={() => completeService(item)}
+                  />
+                </div>
+              ))}
+              {upcoming.map(j => (
                 <div key={j.id} className="px-5 py-3 flex items-center gap-3 border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold truncate">{j.serviceName}</p>
@@ -659,10 +807,18 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
                   <p className="text-white/60 text-xs flex-shrink-0">{fmt(j.price)}</p>
                   <StatusBadge status={j.status}/>
                 </div>
-              ))
+              ))}
+              </>
+            )
           }
         </div>
       </div>
+      {serviceCheckinItem && (
+        <QRScannerModal
+          onScanned={handleServiceCheckin}
+          onClose={() => setServiceCheckinItem(null)}
+        />
+      )}
     </div>
   );
 }
@@ -670,6 +826,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
 /* ─── Jobs ────────────────────────────────────────────────────────── */
 function Jobs({ token }: { token: string }) {
   const [jobs,        setJobs]        = useState<Job[]>([]);
+  const [serviceJobs, setServiceJobs] = useState<{ pendingRequests: OrderItemJob[]; activeJobs: OrderItemJob[]; completedJobs: OrderItemJob[] }>({ pendingRequests: [], activeJobs: [], completedJobs: [] });
   const [loading,     setLoading]     = useState(true);
   const [selected,    setSelected]    = useState<Job | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -679,17 +836,28 @@ function Jobs({ token }: { token: string }) {
   const [checkingIn,  setCheckingIn]  = useState(false);
   const [showQR,      setShowQR]      = useState(false);
   const [filter,      setFilter]      = useState<JobStatus | 'all'>('all');
+  const [serviceActionKey, setServiceActionKey] = useState<string | null>(null);
+  const [serviceCheckinItem, setServiceCheckinItem] = useState<OrderItemJob | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setJobs(await partnerApi.listJobs(token)); } finally { setLoading(false); }
+    try {
+      const [legacy, service] = await Promise.all([
+        partnerApi.listJobs(token),
+        partnerApi.listOrderItemJobs(token),
+      ]);
+      setJobs(legacy);
+      setServiceJobs(service);
+    } finally { setLoading(false); }
   }, [token]);
   useEffect(() => { load(); }, [load]);
 
   // Auto-refresh every 30 s so new dispatched jobs appear without manual reload
   useEffect(() => {
     const t = setInterval(() => {
-      partnerApi.listJobs(token).then(setJobs).catch(() => {});
+      Promise.all([partnerApi.listJobs(token), partnerApi.listOrderItemJobs(token)])
+        .then(([legacy, service]) => { setJobs(legacy); setServiceJobs(service); })
+        .catch(() => {});
     }, 30_000);
     return () => clearInterval(t);
   }, [token]);
@@ -716,6 +884,40 @@ function Jobs({ token }: { token: string }) {
       const j = await partnerApi.rejectJob(id, token);
       setJobs(prev => prev.map(x => x.id === id ? j : x)); setSelected(j);
     } finally { setRejecting(false); }
+  }
+
+  async function updateServiceRequest(action: 'accept' | 'reject', item: OrderItemJob) {
+    if (!item.requestId) return;
+    setServiceActionKey(`${action}:${item.requestId}`);
+    try {
+      if (action === 'accept') await partnerApi.acceptOrderItemJob(item.requestId, token);
+      else await partnerApi.rejectOrderItemJob(item.requestId, token);
+      await load();
+    } catch (error: any) {
+      alert(error?.message ?? 'Could not update this request.');
+    } finally { setServiceActionKey(null); }
+  }
+
+  async function handleServiceCheckin(qrToken: string) {
+    if (!serviceCheckinItem) return;
+    setServiceActionKey(`checkin:${serviceCheckinItem.orderItemId}`);
+    try {
+      await partnerApi.checkInOrderItem(serviceCheckinItem.orderItemId, qrToken, token);
+      setServiceCheckinItem(null);
+      await load();
+    } catch (error: any) {
+      alert(error?.message ?? 'Check-in failed. Make sure this is the customer QR for this service.');
+    } finally { setServiceActionKey(null); }
+  }
+
+  async function completeService(item: OrderItemJob) {
+    setServiceActionKey(`complete:${item.orderItemId}`);
+    try {
+      await partnerApi.completeOrderItem(item.orderItemId, token);
+      await load();
+    } catch (error: any) {
+      alert(error?.message ?? 'Could not complete this service.');
+    } finally { setServiceActionKey(null); }
   }
 
   // Open job modal — fetch full detail (includes services breakdown) in the background
@@ -767,6 +969,59 @@ function Jobs({ token }: { token: string }) {
           </button>
         ))}
       </div>
+
+      {filter === 'all' || filter === 'pending' ? (
+        <section className="mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-white font-bold text-sm">New service requests</h2>
+            {serviceJobs.pendingRequests.length > 0 && (
+              <span className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: '#F59E0B' }}>
+                {serviceJobs.pendingRequests.length}
+              </span>
+            )}
+          </div>
+          {serviceJobs.pendingRequests.length === 0
+            ? <p className="text-white/25 text-xs">No new service requests.</p>
+            : <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {serviceJobs.pendingRequests.map(item => (
+                  <ServiceRequestCard
+                    key={item.requestId ?? item.orderItemId}
+                    item={item}
+                    pending
+                    busy={serviceActionKey?.endsWith(`:${item.requestId}`)}
+                    onAccept={() => updateServiceRequest('accept', item)}
+                    onReject={() => updateServiceRequest('reject', item)}
+                  />
+                ))}
+              </div>
+          }
+        </section>
+      ) : null}
+
+      {filter === 'all' || filter === 'upcoming' || filter === 'in_progress' ? (
+        <section className="mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-white font-bold text-sm">In progress services</h2>
+            {serviceJobs.activeJobs.length > 0 && (
+              <span className="text-white/30 text-xs">{serviceJobs.activeJobs.length}</span>
+            )}
+          </div>
+          {serviceJobs.activeJobs.length === 0
+            ? <p className="text-white/25 text-xs">No active service jobs.</p>
+            : <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {serviceJobs.activeJobs.map(item => (
+                  <ServiceRequestCard
+                    key={item.orderItemId}
+                    item={item}
+                    busy={serviceActionKey?.endsWith(`:${item.orderItemId}`)}
+                    onCheckIn={() => setServiceCheckinItem(item)}
+                    onComplete={() => completeService(item)}
+                  />
+                ))}
+              </div>
+          }
+        </section>
+      ) : null}
 
       {loading
         ? <div className="flex items-center justify-center h-48"><Loader2 size={24} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
@@ -821,6 +1076,13 @@ function Jobs({ token }: { token: string }) {
             </div>
           )
       }
+
+      {serviceCheckinItem && (
+        <QRScannerModal
+          onScanned={handleServiceCheckin}
+          onClose={() => setServiceCheckinItem(null)}
+        />
+      )}
 
       {/* Job detail modal */}
       {selected && (
@@ -1033,6 +1295,7 @@ function Profile({ token, profile, setProfile }: {
   const [price,        setPrice]       = useState(String(profile?.basePrice ?? ''));
   const [priceUnit,    setPriceUnit]   = useState(profile?.priceUnit ?? 'visit');
   const [tags,         setTags]        = useState((profile?.tags ?? []).join(', '));
+  const [payoutUpiId,  setPayoutUpiId] = useState(profile?.payoutUpiId ?? '');
   const [editCatId,    setEditCatId]   = useState(profile?.categoryId ?? '');
   const [editSubCatId, setEditSubCatId]= useState(profile?.subCategoryId ?? '');
   const [curPwd,       setCurPwd]      = useState('');
@@ -1058,6 +1321,7 @@ function Profile({ token, profile, setProfile }: {
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         categoryId: editCatId || undefined,
         subCategoryId: editSubCatId || null,
+        payoutUpiId: payoutUpiId.trim() || null,
       }, token);
       setProfile(updated); setMsgOk(true); setMsg('Profile updated'); setEditProf(false);
     } catch (e: any) { setMsgOk(false); setMsg(e.message); }
@@ -1272,6 +1536,10 @@ function Profile({ token, profile, setProfile }: {
             <Field label="Skills / Tags (comma-separated)">
               <TextInput value={tags} onChange={setTags} placeholder="plumbing, repair, installation"/>
             </Field>
+            <Field label="Payout UPI ID">
+              <TextInput value={payoutUpiId} onChange={setPayoutUpiId} placeholder="yourname@upi"/>
+              <p className="text-white/30 text-[10px] mt-1">Admin uses this UPI ID for RazorpayX partner payouts.</p>
+            </Field>
             <div className="flex gap-3 mt-6">
               <button onClick={saveProfile} disabled={saving}
                 className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
@@ -1426,6 +1694,7 @@ function Notifications({ token }: { token: string }) {
 /* ─── Payouts ─────────────────────────────────────────────────────── */
 function Payouts({ token }: { token: string }) {
   const [payouts,  setPayouts]  = useState<Payout[]>([]);
+  const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [loading,  setLoading]  = useState(true);
   const [amount,   setAmount]   = useState('');
   const [note,     setNote]     = useState('');
@@ -1435,13 +1704,20 @@ function Payouts({ token }: { token: string }) {
 
   const PAYOUT_STATUS: Record<string, { color: string; label: string }> = {
     pending:  { color: '#F59E0B', label: 'Pending'  },
-    approved: { color: '#16A34A', label: 'Approved' },
+    paid:     { color: '#16A34A', label: 'Paid'     },
     rejected: { color: '#EF4444', label: 'Rejected' },
   };
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setPayouts(await payoutsApi.list(token)); } finally { setLoading(false); }
+    try {
+      const [payoutRows, earningsSummary] = await Promise.all([
+        payoutsApi.list(token),
+        partnerApi.getEarnings(token),
+      ]);
+      setPayouts(payoutRows);
+      setEarnings(earningsSummary);
+    } finally { setLoading(false); }
   }, [token]);
   useEffect(() => { load(); }, [load]);
 
@@ -1460,6 +1736,20 @@ function Payouts({ token }: { token: string }) {
 
   return (
     <div>
+      {earnings && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          {[
+            { label: 'Available to withdraw', value: fmt(earnings.available), color: '#16A34A' },
+            { label: 'Pending payouts', value: fmt(earnings.pendingPayout), color: '#F59E0B' },
+            { label: 'Paid out', value: fmt(earnings.paidOut), color: '#5B3EF5' },
+          ].map(s => (
+            <div key={s.label} className="rounded-2xl p-4 border border-white/[0.07]" style={CARD}>
+              <p className="text-white/40 text-xs">{s.label}</p>
+              <p className="text-white font-bold text-2xl mt-2" style={{ color: s.color }}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
       {msg && (
         <div className={`mb-5 px-4 py-3 rounded-xl text-sm border ${
           msgOk ? 'text-green-400 border-green-400/20' : 'text-red-400 border-red-400/20'
@@ -1473,7 +1763,7 @@ function Payouts({ token }: { token: string }) {
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden mb-5" style={CARD}>
         <div className="px-5 py-4 border-b border-white/[0.07]">
           <h3 className="text-white font-bold text-sm">Request a Payout</h3>
-          <p className="text-white/40 text-xs mt-0.5">Withdraw your earned balance</p>
+          <p className="text-white/40 text-xs mt-0.5">Withdraw confirmed earnings after service completion and payment</p>
         </div>
         <div className="px-5 py-5 space-y-4">
           <Field label="Amount (₹)">
@@ -1482,7 +1772,8 @@ function Payouts({ token }: { token: string }) {
           <Field label="Note (optional)">
             <TextInput value={note} onChange={setNote} placeholder="e.g. Weekly withdrawal"/>
           </Field>
-          <PrimaryBtn onClick={requestPayout} loading={submitting} disabled={!amount}>
+          <p className="text-white/40 text-xs">Available: {fmt(earnings?.available ?? 0)} · Minimum withdrawal: ₹100</p>
+          <PrimaryBtn onClick={requestPayout} loading={submitting} disabled={!amount || Number(amount) < 100 || Number(amount) > (earnings?.available ?? 0)}>
             <FileText size={14}/> Request Payout
           </PrimaryBtn>
         </div>

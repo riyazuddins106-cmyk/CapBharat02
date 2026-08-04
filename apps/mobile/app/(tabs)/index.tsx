@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { categoriesApi, offersApi, addressesApi, notificationsApi, reelsApi, servicesApi, cartApi, type Offer, type Reel } from '@/lib/api';
 import { storage } from '@/lib/storage';
 import { WebView } from 'react-native-webview';
+import { NativeIcon } from '@/components/NativeIcon';
 
 const CAT_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Cleaning: 'broom',
@@ -301,7 +302,7 @@ export default function HomeScreen() {
             onPress={() => { Haptics.selectionAsync(); router.push('/notifications'); }}
             activeOpacity={0.7}
           >
-            <Ionicons name="notifications-outline" size={20} color={colors.foreground} />
+            <NativeIcon name="notifications-outline" size={20} color={colors.foreground} />
             {unreadNotifCount > 0 && (
               <View style={[styles.notifBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
                 <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
@@ -317,11 +318,11 @@ export default function HomeScreen() {
         onPress={() => setLocationModal(true)}
         activeOpacity={0.8}
       >
-        <Ionicons name="location" size={14} color={colors.primary} />
+        <NativeIcon name="location" size={14} color={colors.primary} />
         <Text style={[styles.locationText, { color: colors.foreground }]} numberOfLines={1}>
           {detectingGps ? 'Detecting…' : locationLabel}
         </Text>
-        <Ionicons name="chevron-down" size={14} color={colors.mutedForeground} />
+        <NativeIcon name="chevron-down" size={14} color={colors.mutedForeground} />
       </TouchableOpacity>
 
       {/* Offers carousel */}
@@ -388,11 +389,8 @@ export default function HomeScreen() {
                   router.push({ pathname: '/subcategories/[categoryId]', params: { categoryId: cat.id, categoryName: cat.name } });
                 }}
               >
-                <View style={[styles.catIcon, { backgroundColor: cat.imageUrl ? 'transparent' : cat.color, overflow: 'hidden' }]}>
-                  {cat.imageUrl
-                    ? <Image source={{ uri: cat.imageUrl }} style={styles.catImage} resizeMode="cover" />
-                    : <MaterialCommunityIcons name={CAT_ICONS[cat.name] ?? 'tools'} size={22} color={cat.iconColor} />
-                  }
+                <View style={[styles.catIcon, { backgroundColor: cat.color }]}>
+                  <NativeIcon name={CAT_ICONS[cat.name] ?? 'grid'} size={24} color={cat.iconColor} />
                 </View>
                 <Text style={[styles.catLabel, { color: colors.foreground }]} numberOfLines={1}>{cat.name}</Text>
               </TouchableOpacity>

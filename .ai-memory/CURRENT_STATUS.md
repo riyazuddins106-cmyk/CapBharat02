@@ -89,6 +89,109 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Partner acceptance remains controlled by partner availability, service skill, location, and dispatch eligibility; booking hours do not force an unavailable partner to accept.
 - [x] Server, customer web, admin web, both mobile web exports, runtime health, and slot-generation checks passed.
 
+### Expo Go “failed to download” investigation (2026-08-04)
+- [x] Confirmed the Customer and Partner ngrok manifests were reachable with HTTP 200, so the QR/tunnel was not the root cause.
+- [x] Root cause was Metro’s Babel graph: both Expo apps declared Babel transform plugins at 8.x while Expo SDK 54/Reanimated/Worklets use Babel 7. The generic Expo Go error was a Metro HTTP 500.
+- [x] Pinned the three mobile transform plugins to Babel 7.29.7 and added a pnpm package extension supplying Babel 7 generator, traverse, and types modules omitted by react-native-worklets 0.5.1.
+- [x] Restarted both Expo workflows; Customer and Partner Android and iOS bundles return HTTP 200 and Metro reports successful bundling.
+- [x] Verified web entry points: customer `/`, partner `/partner/`, admin `/admin-panel/` on the current Replit development domain.
+
+### Customer/partner order flow fixes (2026-08-04)
+- [x] Customer category icons now include the MaterialCommunityIcons font; the stale `professional/[id]` route registration was removed.
+- [x] Customer service-order cards now expose full order IDs, service details, status tracking, cancellation reason/fee, and a short-lived check-in QR.
+- [x] Service-order QR tokens are signed for the specific order item and required by the backend before partner check-in.
+- [x] Partner service-order requests and detail screens now open a camera QR scanner instead of allowing direct “Mark Arrived”.
+- [x] Cancellation reasons are optional, including empty notes; the backend records 25% fee after partner acceptance and 50% after partner check-in.
+- [x] Migration, API health, Customer/Partner Metro ports, and changed server/partner TypeScript checks passed. The customer TypeScript command still reports unrelated pre-existing checkout/shared-package errors.
+
+### Payment timing fix (2026-08-04)
+- [x] Removed the Customer legacy Pay Now action from confirmed/upcoming bookings.
+- [x] Legacy payment is available after partner check-in (`in_progress`) and remains available for unpaid completed bookings.
+- [x] Service-order payment is available only after partner check-in (`payment_pending` / `partner_arrived`).
+- [x] Backend payment endpoints now reject payment attempts before those states instead of relying only on UI visibility.
+
+### Partner request visibility (2026-08-04)
+- [x] Partner Dashboard now fetches service-level requests and shows a “New requests” queue with count, service/customer, schedule, payout, and Accept/Reject actions.
+- [x] Dashboard also shows accepted service jobs alongside legacy active jobs.
+- [x] Partner Jobs Active now labels separate “New service requests” and “In progress services” sections and no longer shows a false empty state when only service jobs exist.
+- [x] Partner backend includes service/customer labels and retains jobs through `partner_accepted`, `payment_pending`, `payment_completed`, and `service_started`.
+- [x] Server and Partner mobile TypeScript checks pass; Partner Expo web bundle completed successfully.
+
+### Web parity (2026-08-04)
+- [x] Partner Web Dashboard and Jobs now load `/api/partner/order-item-jobs` alongside legacy jobs.
+- [x] Partner Web supports service-request Accept/Reject, QR check-in, completion, 30-second refresh, and separate New Requests/In Progress sections.
+- [x] Customer Web service-order cards now show customer check-in QR, cancellation-fee guidance, and optional cancellation reasons.
+- [x] Customer Web legacy Pay Now is hidden until `in_progress` (or unpaid `completed` compatibility state), matching mobile and backend guards.
+- [x] `pnpm --filter @servenow/customer-web build` and `pnpm --filter @servenow/partner-web build` pass.
+
+### QR refresh (2026-08-04)
+- [x] QR Codes workflow serves current Customer and Partner tunnel QR codes at `/scanner.html`.
+- [x] `/show-qr.html` now redirects to `/scanner.html`, preventing stale embedded Expo URLs from being shown.
+- [x] QR PNGs were regenerated and visually verified.
+
+### Admin service details and operations controls (2026-08-04)
+- [x] Added `GET /api/admin/bookings/:id` with the complete legacy booking record, customer/contact, address, service items, partner requests, assignment history, and payments.
+- [x] Added `GET /api/admin/orders/:orderId` with the complete master order ID, customer/contact, address, service items, payment status, and earnings breakdown.
+- [x] Booking History and Operations Centre now expose a Service Details action with a full-screen detail view.
+- [x] Service Orders now expose full service-order details instead of only the shortened table ID.
+- [x] Operations Centre now supports Stop Searching and Cancel Booking with confirmation, refresh, and backend state restrictions.
+- [x] Stop Searching expires pending partner requests and records a `SEARCH_STOPPED` assignment event; admin cancellation expires requests, releases assigned partners, and sets dispatch status to cancelled.
+- [x] Admin Web build, server TypeScript check, API health, authenticated detail endpoints, and dispatch listing smoke tests passed.
+
+### Partner payout balance correction (2026-08-04)
+- [x] Partner earnings now include completed service-order items using their stored `partnerPayout` multiplied by quantity.
+- [x] Service-order earnings require both `service_completed` status and a paid order-item payment.
+- [x] Legacy earnings require a completed booking and a paid customer payment; booking-item partner payout is used when available, with the legacy booking price as fallback.
+- [x] Partner Web and Partner Mobile now show available, pending, and paid-out balances.
+- [x] Payout requests enforce a ₹100 minimum and cannot exceed the available confirmed balance.
+- [x] Server, Partner Web, Partner Mobile TypeScript checks and Partner Web build passed.
+- [x] Live seeded-partner smoke test returned the new balance fields successfully.
+
+### RazorpayX UPI partner payouts (2026-08-04)
+- [x] Reused the existing Admin → Payment Config Razorpay Key ID and Secret instead of adding a second payment integration.
+- [x] Added partner payout UPI ID capture in Partner Web and Partner Mobile.
+- [x] Added RazorpayX Payout Account Number configuration in Admin Payment Config.
+- [x] Admin approval now creates/reuses a RazorpayX contact and UPI fund account, then creates the payout with an idempotency key.
+- [x] Payout requests are marked `paid` only after RazorpayX returns a provider payout ID.
+- [x] Provider payout ID, provider status, destination UPI ID, and failure reason are visible to Admin.
+- [x] Failed or unconfigured RazorpayX payouts remain pending and record the failure reason.
+- [x] Added idempotent schema migration for payout destination and provider-tracking fields.
+- [x] Server, Admin Web, Partner Web, and Partner Mobile checks passed; workflows restarted; live partner profile/earnings/payout APIs passed.
+- [ ] RazorpayX Payouts must be enabled and the RazorpayX account number entered before real money can be sent.
+
+### Partner payout control centre (2026-08-04)
+- [x] Replaced the Admin payout navigation target with a server-aggregated partner worklist suitable for 10,000+ partners.
+- [x] Added KPI cards for partner count, current-month earnings, amount available to pay, pending payout requests, and already-paid amount.
+- [x] Added server-side search by partner/email/UPI, payable/pending/missing-UPI filters, and 25/50/100-row pagination.
+- [x] Added lazy-loaded partner detail drawer with earnings, completed jobs, UPI destination, payout history, provider references, and Send/Reject actions.
+- [x] Live smoke test returned 93 partners, ₹1,860 current-month earnings, ₹5,941 available, ₹200 pending, and ₹700 paid for seeded data.
+- [x] Server TypeScript check, Admin production build, API smoke test, workflow restart, and git diff check passed.
+
+### Automatic scheduled partner payouts (2026-08-04)
+- [x] Added a disabled-by-default weekly/monthly scheduler inside the API process.
+- [x] Automatic runs process only payout requests explicitly marked `approved`; ordinary pending requests remain under Admin review.
+- [x] Added per-run maximum payout count and rupee amount caps, PostgreSQL advisory locking, and database payout-run history.
+- [x] Added `processing` state with 15-minute recovery to `approved` after an interrupted server/process run.
+- [x] Added Admin controls for enable/disable, weekly or monthly schedule, UTC run hour, limits, Run approved payouts now, and recent run history.
+- [x] Added Admin Approve for schedule action while preserving immediate Send via RazorpayX.
+- [x] Server/Admin checks passed; migration completed; workflow restarted; schedule API returned enabled=false by default; guarded manual run returned skipped without sending money.
+- [ ] Before production use: enable RazorpayX Payouts, configure the account number, turn off Test Mode, save the schedule, and approve payout requests.
+
+### Partner App icons (2026-08-04)
+- [x] Fixed blank dashboard/tab Ionicons caused by the Partner App rendering after a 300ms font timeout, before the Ionicons font had loaded.
+- [x] Native timeout is now 3 seconds; web timeout is 1 second, preserving tunnel resilience without sacrificing icon loading.
+- [x] Restarted Expo Partner App; Metro is running and the current partner QR remains `exps://arose-unframed-eclipse.ngrok-free.dev`.
+
+### Customer and Partner App icons (2026-08-04)
+- [x] Customer App now uses the same explicit `expo-font` loader pattern for Google fonts, Ionicons, and MaterialCommunityIcons.
+- [x] Both native apps wait up to 3 seconds for icon fonts before using the fallback render path.
+- [x] Both Expo workflows restarted successfully; Customer Android/iOS bundles completed and Partner Metro is serving.
+- [x] Customer and Partner tunnel roots and the current scanner QR assets returned HTTP 200.
+- [ ] Customer mobile `tsc --noEmit` still reports unrelated pre-existing checkout errors (`@servenow/shared`, cart declaration order, implicit callback types).
+- [x] Added font-independent `NativeIcon` fallbacks after the uploaded Customer screenshot showed blank visible glyphs despite `fontsLoaded: true`.
+- [x] Customer home category tiles now use the native fallback instead of allowing a broken category image URL to mask the icon.
+- [x] Customer web preview visibly renders bottom-tab icons; fresh Customer Android/iOS bundles completed; Partner type check passed.
+
 ---
 
 ## ⚠️ Pending / Needs Attention
@@ -103,7 +206,28 @@ The service-level order implementation is complete for customer web/mobile, part
 
 ---
 
-## 🔄 Last Session Summary (2026-08-02)
+## 🔄 Last Session Summary (2026-08-04)
+
+### Task: Add Admin service detail views and booking operations controls
+- Added full legacy booking and service-order detail APIs for the Admin Panel.
+- Added Service Details actions to Booking History, Operations Centre, and Service Orders.
+- Added Stop Searching and Cancel Booking operations with confirmation and automatic refresh.
+- Verified admin-authenticated booking detail, order detail, and dispatch endpoints against seeded data.
+
+### Task: Make partner payout balances include completed service orders
+- Corrected partner earnings aggregation across legacy bookings and service-order items.
+- Added payment-confirmed gating, available/pending/paid-out balance visibility, and withdrawal limits.
+- Verified the live seeded partner response: earnings and payout endpoints returned successfully with the new balance fields.
+
+### Task: Send approved partner payouts through RazorpayX UPI
+- Connected the existing Admin Razorpay configuration to an outbound RazorpayX UPI payout flow.
+- Added partner UPI destination management, RazorpayX recipient reuse, idempotency, transfer references, and failure tracking.
+- Verified all affected builds/type checks, migrations, workflow restarts, and live partner API responses.
+
+### Task: Diagnose Expo Go download failure
+The QR codes and ngrok manifests were healthy. The actual failure was Metro returning a transform error from an incompatible Babel 8/Babel 7 dependency mix, followed by missing Babel modules in the strict pnpm package layout. The targeted Babel 7 pin and Worklets package extension fixed both mobile apps; Android/iOS bundle checks passed for Customer and Partner.
+
+### Earlier task: Fix checkout → payment flow (6 bugs)
 
 ### Task: Fix checkout → payment flow (6 bugs)
 **Server — `server/src/controllers/payment.controller.ts`:**

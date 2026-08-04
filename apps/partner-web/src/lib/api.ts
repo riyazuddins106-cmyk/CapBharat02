@@ -62,6 +62,7 @@ export interface PartnerProfile {
   badge: string | null; avatarUrl: string | null; tags: string[]; isActive: boolean;
   categoryId: string;
   subCategoryId: string | null;
+  payoutUpiId: string | null;
 }
 export type JobStatus = 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
 export interface JobService {
@@ -79,8 +80,29 @@ export interface Job {
   paymentStatus?: string | null;
   services?: JobService[];
 }
+export interface OrderItemJob {
+  requestId?: string | null;
+  orderItemId: string;
+  orderId: string;
+  serviceId: string;
+  serviceName?: string;
+  customerName?: string;
+  status?: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  partnerPayout: number;
+  customerPrice?: number;
+  orderStatus?: string;
+  createdAt?: string;
+}
+export interface OrderItemJobs {
+  pendingRequests: OrderItemJob[];
+  activeJobs: OrderItemJob[];
+  completedJobs: OrderItemJob[];
+}
 export interface Earnings {
   total: number; thisMonth: number; today: number;
+  pendingPayout: number; paidOut: number; available: number;
   weekly: { date: string; amount: number }[];
 }
 export interface AppNotification {
@@ -190,13 +212,27 @@ export const authApi = {
 // ── Partner ────────────────────────────────────────────────
 export const partnerApi = {
   getProfile: (token: string) => request<PartnerProfile>('/api/partner/profile', { token }),
-  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge' | 'categoryId' | 'subCategoryId'>>, token: string) =>
+  updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge' | 'categoryId' | 'subCategoryId' | 'payoutUpiId'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
   updateAccount: (data: { fullName?: string; phone?: string }, token: string) =>
     request<{ message: string }>('/api/partner/account', { method: 'PATCH', body: JSON.stringify(data), token }),
   changePassword: (currentPassword: string, newPassword: string, token: string) =>
     request<{ message: string }>('/api/profile/me/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }), token }),
   listJobs: (token: string) => request<Job[]>('/api/partner/jobs', { token }),
+  listOrderItemJobs: (token: string) =>
+    request<OrderItemJobs>('/api/partner/order-item-jobs', { token }),
+  acceptOrderItemJob: (requestId: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${requestId}/accept`, { method: 'PATCH', token }),
+  rejectOrderItemJob: (requestId: string, token: string) =>
+    request<{ message: string }>(`/api/partner/order-item-jobs/${requestId}/reject`, { method: 'PATCH', token }),
+  checkInOrderItem: (itemId: string, qrToken: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/checkin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ qrToken }),
+      token,
+    }),
+  completeOrderItem: (itemId: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/complete`, { method: 'PATCH', token }),
   getJob: (id: string, token: string) => request<Job>(`/api/partner/jobs/${id}`, { token }),
   completeJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/complete`, { method: 'PATCH', token }),

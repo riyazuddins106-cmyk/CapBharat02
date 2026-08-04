@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
-import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
+import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -82,12 +83,13 @@ export default function RootLayout() {
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
     ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
   });
 
   // Safety net: useFonts() can hang indefinitely on the public HTTPS tunnel.
   // On web, we bypass the wait entirely — system fonts are acceptable and the
   // blank-white-screen UX is worse than rendering without custom fonts.
-  // On native, give it a 3 s grace period before forcing past the gate.
+  // On native, give icon fonts a 3 s grace period before forcing past the gate.
   const [fontTimedOut, setFontTimedOut] = React.useState(Platform.OS === 'web');
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -125,7 +127,6 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="auth" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                 <Stack.Screen name="subcategories/[categoryId]" options={{ animation: 'slide_from_right' }} />
-                <Stack.Screen name="professional/[id]" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
                 <Stack.Screen name="checkout" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
                 <Stack.Screen name="wishlist" options={{ animation: 'slide_from_right' }} />

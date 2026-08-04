@@ -109,25 +109,47 @@ export const partnerController = {
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
     // Pending requests waiting for accept/reject
-    const pendingRequests = await db.select({ request: orderItemRequests, item: orderItems, order: orders })
+    const pendingRequests = await db.select({
+      request: orderItemRequests,
+      item: orderItems,
+      order: orders,
+      serviceName: services.name,
+      customerName: users.fullName,
+    })
       .from(orderItemRequests)
       .innerJoin(orderItems, eq(orderItemRequests.orderItemId, orderItems.id))
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(services, eq(orderItems.serviceId, services.id))
+      .leftJoin(users, eq(orders.customerId, users.id))
       .where(and(eq(orderItemRequests.partnerId, pro.id), eq(orderItemRequests.status, 'pending')));
 
     // Active assigned items (accepted → in progress)
-    const activeItems = await db.select({ item: orderItems, order: orders })
+    const activeItems = await db.select({
+      item: orderItems,
+      order: orders,
+      serviceName: services.name,
+      customerName: users.fullName,
+    })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(services, eq(orderItems.serviceId, services.id))
+      .leftJoin(users, eq(orders.customerId, users.id))
       .where(and(
         eq(orderItems.partnerId, pro.id),
-        inArray(orderItems.status, ['partner_accepted', 'partner_arrived', 'service_started']),
+         inArray(orderItems.status, ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started']),
       ));
 
     // Completed items (last 30 days)
-    const completedItems = await db.select({ item: orderItems, order: orders })
+    const completedItems = await db.select({
+      item: orderItems,
+      order: orders,
+      serviceName: services.name,
+      customerName: users.fullName,
+    })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(services, eq(orderItems.serviceId, services.id))
+      .leftJoin(users, eq(orders.customerId, users.id))
       .where(and(
         eq(orderItems.partnerId, pro.id),
         eq(orderItems.status, 'service_completed'),
@@ -141,6 +163,8 @@ export const partnerController = {
           orderItemId: r.item.id,
           orderId: r.order.id,
           serviceId: r.item.serviceId,
+           serviceName: r.serviceName ?? 'Service booking',
+           customerName: r.customerName ?? 'Customer',
           scheduledAt: r.item.scheduledAt,
           durationMinutes: r.item.durationMinutes,
           partnerPayout: r.item.partnerPayout,
@@ -152,6 +176,8 @@ export const partnerController = {
           orderItemId: r.item.id,
           orderId: r.order.id,
           serviceId: r.item.serviceId,
+           serviceName: r.serviceName ?? 'Service booking',
+           customerName: r.customerName ?? 'Customer',
           status: r.item.status,
           scheduledAt: r.item.scheduledAt,
           durationMinutes: r.item.durationMinutes,
@@ -162,6 +188,8 @@ export const partnerController = {
           orderItemId: r.item.id,
           orderId: r.order.id,
           serviceId: r.item.serviceId,
+           serviceName: r.serviceName ?? 'Service booking',
+           customerName: r.customerName ?? 'Customer',
           status: r.item.status,
           scheduledAt: r.item.scheduledAt,
           partnerPayout: r.item.partnerPayout,
@@ -258,7 +286,10 @@ export const partnerController = {
       .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
-    const data = await orderDispatchService.checkInItem(req.params.itemId, pro.id);
+    const { qrToken } = req.body as { qrToken?: string };
+    if (!qrToken?.trim()) throw AppError.badRequest('qrToken is required. Scan the customer QR code to check in.');
+
+    const data = await orderDispatchService.checkInItem(req.params.itemId, pro.id, qrToken.trim());
     res.json({ success: true, data });
   }),
 

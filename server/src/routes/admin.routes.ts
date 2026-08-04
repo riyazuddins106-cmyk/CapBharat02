@@ -25,7 +25,9 @@ router.get('/analytics/timeseries', adminController.getAnalyticsTimeseries);
 
 // Bookings management
 router.get('/bookings',                        adminController.listBookings);
+router.get('/bookings/:id',                    adminController.getBooking);
 router.get('/orders',                          adminController.listOrders);
+router.get('/orders/:orderId',                 adminController.getOrder);
 router.patch('/orders/:orderId/items/:itemId/dispatch', adminController.continueOrderItemDispatch);
 router.patch('/orders/:orderId/items/:itemId/refund',   adminController.refundOrderItem);
 router.patch('/bookings/:id',                  adminController.updateBooking);
@@ -87,6 +89,10 @@ router.get('/audit-logs',             adminController.listAuditLogs);
 
 // Payouts
 router.get('/payouts',                adminController.listPayoutRequests);
+router.get('/payouts/partners',       adminController.listPayoutPartners);
+router.get('/payouts/partners/:id',   adminController.getPayoutPartnerDetail);
+router.get('/payout-runs',            adminController.listPayoutRuns);
+router.post('/payout-runs/run',       adminController.runPayoutsNow);
 router.patch('/payouts/:id',          adminController.resolvePayoutRequest);
 
 // Platform Policies (admin CRUD)

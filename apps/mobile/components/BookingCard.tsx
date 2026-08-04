@@ -33,11 +33,10 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
   const colors = useColors();
   const { accessToken } = useAuth();
   const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.upcoming;
-  // Completed but not yet paid → show amber "Awaiting Payment" badge instead of green "Completed"
-  const isAwaitingPayment = booking.status === 'completed' && booking.paymentStatus !== 'paid';
-  const displayCfg = isAwaitingPayment
-    ? { label: 'Awaiting Payment', color: PAYMENT_PENDING_COLOR, bg: PAYMENT_PENDING_BG }
-    : cfg;
+  // Payment is due only after the partner checks in. A confirmed/upcoming
+  // booking must not expose a payment action yet.
+  const isAwaitingPayment = ['in_progress', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid';
+  const displayCfg = cfg;
   const [showQR, setShowQR] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -102,13 +101,17 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
           <Text style={[styles.notes, { color: colors.mutedForeground }]} numberOfLines={2}>"{booking.notes}"</Text>
         )}
 
-        {/* Payment pending banner — completed but not yet paid */}
+        {/* Payment pending banner — partner checked in but payment is not recorded */}
         {isAwaitingPayment && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: PAYMENT_PENDING_BG, borderRadius: 8, padding: 10, marginTop: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
             <Ionicons name="time-outline" size={15} color={PAYMENT_PENDING_COLOR} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: PAYMENT_PENDING_COLOR }}>Payment Pending</Text>
-              <Text style={{ fontSize: 11, color: '#92400E', marginTop: 1 }}>Service complete. Tap "Pay Now" to settle ₹{booking.price}.</Text>
+              <Text style={{ fontSize: 11, color: '#92400E', marginTop: 1 }}>
+                {booking.status === 'completed'
+                  ? `Your service is complete. Pay ₹${booking.price} to settle the booking.`
+                  : `Your partner has checked in. Pay ₹${booking.price} to begin the service.`}
+              </Text>
             </View>
           </View>
         )}
@@ -134,8 +137,8 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
               <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
             </TouchableOpacity>
           )}
-          {/* Inline Pay Now for in-progress/upcoming bookings only */}
-          {['upcoming', 'in_progress'].includes(booking.status) && onPay && (
+          {/* Payment is available only after partner check-in. */}
+          {booking.status === 'in_progress' && booking.paymentStatus !== 'paid' && onPay && (
             <TouchableOpacity
               onPress={() => onPay(booking)}
               style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
@@ -156,18 +159,6 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Prominent Pay Now — full-width for completed + unpaid bookings */}
-        {isAwaitingPayment && onPay && (
-          <TouchableOpacity
-            onPress={() => onPay(booking)}
-            style={[styles.cancelBtn, { borderColor: PAYMENT_PENDING_COLOR, backgroundColor: PAYMENT_PENDING_COLOR, marginTop: 10 }]}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="wallet-outline" size={15} color="#fff" />
-            <Text style={[styles.actionBtnText, { color: '#fff', fontSize: 14 }]}>Pay Now — ₹{booking.price}</Text>
-          </TouchableOpacity>
-        )}
 
         {/* Cancel — full-width prominent button on its own row */}
         {['pending', 'upcoming'].includes(booking.status) && onCancel && (

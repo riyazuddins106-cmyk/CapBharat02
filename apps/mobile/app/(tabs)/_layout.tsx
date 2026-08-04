@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { NativeIcon } from '@/components/NativeIcon';
 
 export default function TabLayout() {
   const colors = useColors();
@@ -28,36 +29,28 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <NativeIcon name="home" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="services"
         options={{
           title: 'Services',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <NativeIcon name="search" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
           title: 'Bookings',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <NativeIcon name="calendar" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <NativeIcon name="person" size={22} color={color} />,
         }}
       />
       </Tabs>

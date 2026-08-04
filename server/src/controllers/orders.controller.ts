@@ -12,6 +12,7 @@ import { orderDispatchService, recomputeOrderStatus } from '../services/orderDis
 import { AppError } from '../utils/AppError.js';
 import { notificationDbService } from '../services/notificationDb.service.js';
 import { logger } from '../utils/logger.js';
+import { signOrderItemQrToken } from '../utils/bookingQr.js';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -200,9 +201,38 @@ export const ordersController = {
     sendSuccess(res, { ...order, items: enriched });
   }),
 
+  /** GET /api/orders/:id/items/:itemId/qr — short-lived customer check-in QR */
+  getItemQr: asyncHandler(async (req: Request, res: Response) => {
+    const { id: orderId, itemId } = req.params;
+    const [order] = await db.select().from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.customerId, req.user!.userId)))
+      .limit(1);
+    if (!order) throw AppError.notFound('Order not found.');
+
+    const [item] = await db.select().from(orderItems)
+      .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)))
+      .limit(1);
+    if (!item) throw AppError.notFound('Service not found in this order.');
+    if (!['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status)) {
+      throw AppError.badRequest('The customer QR code is available after a partner accepts this service.');
+    }
+
+    sendSuccess(res, {
+      qrToken: signOrderItemQrToken(orderId, itemId),
+      expiresIn: 300,
+      orderId,
+      orderItemId: itemId,
+    });
+  }),
+
   /** PATCH /api/orders/:id/items/:itemId/cancel — cancel one service in an order */
   cancelItem: asyncHandler(async (req: Request, res: Response) => {
     const { id: orderId, itemId } = req.params;
+    const rawReason = (req.body as { reason?: unknown; notes?: unknown } | undefined)?.reason
+      ?? (req.body as { notes?: unknown } | undefined)?.notes;
+    const cancellationReason = typeof rawReason === 'string' && rawReason.trim()
+      ? rawReason.trim()
+      : null;
 
     const [order] = await db.select()
       .from(orders)
@@ -214,9 +244,16 @@ export const ordersController = {
       .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)))
       .limit(1);
     if (!item) throw AppError.notFound('Service not found in this order.');
-    if (['service_completed', 'cancelled'].includes(item.status)) {
+    if (['service_completed', 'service_started', 'cancelled'].includes(item.status)) {
       throw AppError.badRequest('This service cannot be cancelled.');
     }
+
+    const cancellationRate = item.status === 'partner_accepted'
+      ? 25
+      : ['partner_arrived', 'payment_pending', 'payment_completed'].includes(item.status)
+        ? 50
+        : 0;
+    const cancellationFee = Math.ceil(item.customerPrice * cancellationRate / 100);
 
     // Cancel pending partner requests for this item
     await db.update(orderItemRequests)
@@ -230,7 +267,13 @@ export const ordersController = {
         .where(eq(professionals.id, item.partnerId));
     }
 
-    await db.update(orderItems).set({ status: 'cancelled', updatedAt: new Date() })
+    await db.update(orderItems).set({
+      status: 'cancelled',
+      cancellationReason,
+      cancellationFee,
+      cancelledAt: new Date(),
+      updatedAt: new Date(),
+    })
       .where(eq(orderItems.id, itemId));
 
     await recomputeOrderStatus(orderId);
@@ -307,6 +350,9 @@ export const ordersController = {
       .limit(1);
     if (!item) throw AppError.notFound('Service item not found.');
     if (item.status === 'cancelled') throw AppError.badRequest('Cannot pay for a cancelled service.');
+    if (!['partner_arrived', 'payment_pending'].includes(item.status)) {
+      throw AppError.badRequest('Payment is available after the partner checks in.');
+    }
 
     const [existing] = await db.select().from(orderItemPayments)
       .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
@@ -367,6 +413,9 @@ export const ordersController = {
       .limit(1);
     if (!item) throw AppError.notFound('Service item not found.');
     if (item.status === 'cancelled') throw AppError.badRequest('Cannot pay for a cancelled service.');
+    if (!['partner_arrived', 'payment_pending'].includes(item.status)) {
+      throw AppError.badRequest('Payment is available after the partner checks in.');
+    }
 
     const [existing] = await db.select().from(orderItemPayments)
       .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);

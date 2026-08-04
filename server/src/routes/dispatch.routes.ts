@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate, requireRole('admin', 'operations_manager'));
 router.get('/', dispatchController.list);
 router.get('/history', dispatchController.history);
+router.patch('/:bookingId/stop-searching', dispatchController.stopSearching);
 router.get('/:bookingId/eligible-partners', dispatchController.eligible);
 router.post('/:bookingId/assign', dispatchController.assign);
 export default router;

@@ -13,7 +13,6 @@ import { useAuth } from '@/context/AuthContext';
 import { subcategoriesApi, servicesApi, cartApi } from '@/lib/api';
 import type { Service, Cart } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
-import { CartAccess } from '@/components/CartAccess';
 
 // ── Icon mapping ─────────────────────────────────────────────
 const SUBCAT_ICONS: Array<[string, keyof typeof MaterialCommunityIcons.glyphMap]> = [
@@ -411,8 +410,6 @@ export default function SubcategoriesScreen() {
         }
       />
 
-      {/* Floating cart bar */}
-      {cartItemCount > 0 && <CartAccess />}
     </View>
   );
 }

@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { partnerApi, notificationsApi, type Job } from '@/lib/api';
+import { partnerApi, notificationsApi, type Job, type OrderItemJob } from '@/lib/api';
+import { NativeIcon } from '@/components/NativeIcon';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6' },
@@ -32,10 +33,10 @@ function JobRow({ job }: { job: Job }) {
       <View style={styles.jobLeft}>
         <Text style={[styles.jobService, { color: colors.foreground }]} numberOfLines={1}>{job.serviceName}</Text>
         <Text style={[styles.jobCustomer, { color: colors.mutedForeground }]}>
-          <Ionicons name="person-outline" size={12} /> {job.customerName ?? 'Customer'}
+          <NativeIcon name="person" size={12} /> {job.customerName ?? 'Customer'}
         </Text>
         <Text style={[styles.jobDate, { color: colors.mutedForeground }]}>
-          <Ionicons name="time-outline" size={12} /> {fmtDate(job.scheduledAt)}
+          <NativeIcon name="time-outline" size={12} /> {fmtDate(job.scheduledAt)}
         </Text>
       </View>
       <View style={styles.jobRight}>
@@ -44,6 +45,76 @@ function JobRow({ job }: { job: Job }) {
         </View>
         <Text style={[styles.jobPrice, { color: colors.primary }]}>₹{job.price}</Text>
       </View>
+    </TouchableOpacity>
+  );
+}
+
+function DashboardServiceCard({ item, onAction }: {
+  item: OrderItemJob;
+  onAction: (action: 'accept' | 'reject', item: OrderItemJob) => void;
+}) {
+  const colors = useColors();
+  const isPending = !item.status || item.status === 'assigned';
+  return (
+    <TouchableOpacity
+      onPress={() => router.push(`/service-job/${item.orderItemId}`)}
+      style={[styles.serviceCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}
+      activeOpacity={0.84}
+    >
+      <View style={styles.serviceCardHeader}>
+        <View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}>
+          <NativeIcon name="layers-outline" size={18} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.serviceName, { color: colors.foreground }]} numberOfLines={1}>
+            {item.serviceName ?? 'Service booking'}
+          </Text>
+          <Text style={[styles.serviceMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {item.customerName ?? 'Customer'} · Order {item.orderId.slice(0, 8)}
+          </Text>
+        </View>
+        <View style={[styles.requestBadge, { backgroundColor: isPending ? '#FEF3C7' : '#DBEAFE' }]}>
+          <Text style={[styles.requestBadgeText, { color: isPending ? '#B45309' : '#2563EB' }]}>
+            {isPending ? 'New request' : 'In progress'}
+          </Text>
+        </View>
+      </View>
+      <View style={[styles.serviceDivider, { backgroundColor: colors.border }]} />
+      <View style={styles.serviceDetails}>
+        <View style={styles.serviceDetail}>
+          <NativeIcon name="time-outline" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.serviceDetailText, { color: colors.mutedForeground }]}>
+            {fmtDate(item.scheduledAt)} · {item.durationMinutes} min
+          </Text>
+        </View>
+        <View style={styles.serviceDetail}>
+          <NativeIcon name="cash-outline" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.serviceDetailText, { color: colors.foreground, fontWeight: '700' }]}>
+            ₹{item.partnerPayout}
+          </Text>
+        </View>
+      </View>
+      {isPending ? (
+        <View style={styles.serviceActions}>
+          <TouchableOpacity
+            onPress={(event) => { event.stopPropagation?.(); onAction('reject', item); }}
+            style={[styles.serviceAction, { backgroundColor: '#FEE2E2' }]}
+          >
+            <Text style={[styles.serviceActionText, { color: '#B91C1C' }]}>Reject</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={(event) => { event.stopPropagation?.(); onAction('accept', item); }}
+            style={[styles.serviceAction, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[styles.serviceActionText, { color: '#fff' }]}>Accept</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={[styles.openJobHint, { backgroundColor: colors.secondary }]}>
+          <NativeIcon name="chevron-forward" size={15} color={colors.primary} />
+          <Text style={[styles.openJobText, { color: colors.primary }]}>Open service details</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -60,6 +131,13 @@ export default function DashboardScreen() {
     queryKey: ['/api/partner/jobs', accessToken],
     queryFn: () => partnerApi.listJobs(accessToken!),
     enabled: !!accessToken,
+  });
+
+  const { data: serviceJobs, isRefetching: isServiceRefetching, refetch: refetchServiceJobs } = useQuery({
+    queryKey: ['/api/partner/order-item-jobs', accessToken],
+    queryFn: () => partnerApi.listOrderItemJobs(accessToken!),
+    enabled: !!accessToken,
+    refetchInterval: 30_000,
   });
 
   const { data: earnings } = useQuery({
@@ -83,6 +161,18 @@ export default function DashboardScreen() {
       queryClient.setQueryData(['/api/partner/profile', accessToken], updated);
     },
     onError: () => Alert.alert('Error', 'Could not update availability. Try again.'),
+  });
+
+  const serviceAction = useMutation<unknown, Error, { action: 'accept' | 'reject'; item: OrderItemJob }>({
+    mutationFn: ({ action, item }: { action: 'accept' | 'reject'; item: OrderItemJob }) => {
+      if (action === 'accept') return partnerApi.acceptOrderItemJob(item.requestId!, accessToken!);
+      return partnerApi.rejectOrderItemJob(item.requestId!, accessToken!);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/order-item-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
+    },
+    onError: (error: any) => Alert.alert('Could not update request', error?.message ?? 'Please try again.'),
   });
 
   const cycleAvailability = () => {
@@ -110,6 +200,8 @@ export default function DashboardScreen() {
   });
 
   const activeJobs = (jobs ?? []).filter((j: Job) => ['upcoming', 'in_progress', 'pending'].includes(j.status));
+  const pendingServiceJobs = serviceJobs?.pendingRequests ?? [];
+  const activeServiceJobs = serviceJobs?.activeJobs ?? [];
 
   if (isError) {
     return (
@@ -152,7 +244,7 @@ export default function DashboardScreen() {
             onPress={() => router.push('/notifications')}
             activeOpacity={0.7}
           >
-            <Ionicons name="notifications-outline" size={20} color="#fff" />
+            <NativeIcon name="notifications-outline" size={20} color="#fff" />
             {unreadNotifCount > 0 && (
               <View style={[styles.notifBadge, { borderColor: colors.primary }]}>
                 <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
@@ -203,37 +295,67 @@ export default function DashboardScreen() {
       <FlatList
         data={activeJobs.slice(0, 5)}
         keyExtractor={(j) => j.id}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isRefetching || isServiceRefetching} onRefresh={() => { refetch(); refetchServiceJobs(); }} tintColor={colors.primary} />}
         ListHeaderComponent={
           <View style={styles.content}>
             {/* Stats */}
             <View style={styles.statsRow}>
-              <StatCard
-                icon="today-outline"
+               <StatCard
+                 icon="today-outline"
                 label="Today's Jobs"
                 value={String(todayJobs.length)}
                 colors={colors}
               />
-              <StatCard
-                icon="wallet-outline"
+               <StatCard
+                 icon="wallet-outline"
                 label="Today's Earnings"
                 value={`₹${earnings?.today ?? 0}`}
                 colors={colors}
               />
-              <StatCard
-                icon="calendar-outline"
+               <StatCard
+                 icon="calendar-outline"
                 label="This Month"
                 value={`₹${earnings?.thisMonth ?? 0}`}
                 colors={colors}
               />
             </View>
 
+            {pendingServiceJobs.length > 0 && (
+              <>
+                <View style={styles.sectionHeadingRow}>
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>New requests</Text>
+                  <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.countBadgeText}>{pendingServiceJobs.length}</Text>
+                  </View>
+                </View>
+                {pendingServiceJobs.slice(0, 3).map((item) => (
+                  <DashboardServiceCard
+                    key={item.requestId ?? item.orderItemId}
+                    item={item}
+                    onAction={(action, selected) => serviceAction.mutate({ action, item: selected })}
+                  />
+                ))}
+                {pendingServiceJobs.length > 3 && (
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/jobs')} style={styles.viewAll}>
+                    <Text style={[styles.viewAllText, { color: colors.primary }]}>View all {pendingServiceJobs.length} requests →</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Active Jobs</Text>
+            {activeServiceJobs.map((item) => (
+              <DashboardServiceCard
+                key={item.orderItemId}
+                item={item}
+                onAction={() => undefined}
+              />
+            ))}
           </View>
         }
         renderItem={({ item }) => <View style={{ paddingHorizontal: 16 }}><JobRow job={item} /></View>}
-        ListEmptyComponent={
-          !isLoading ? (
+         ListEmptyComponent={
+          !isLoading && pendingServiceJobs.length === 0 && activeServiceJobs.length === 0 ? (
             <View style={styles.empty}>
               <Ionicons name="checkmark-circle-outline" size={48} color={colors.mutedForeground} />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No active jobs right now</Text>
@@ -256,7 +378,7 @@ export default function DashboardScreen() {
 function StatCard({ icon, label, value, colors }: any) {
   return (
     <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-      <Ionicons name={icon} size={20} color={colors.primary} />
+           <NativeIcon name={icon} size={20} color={colors.primary} />
       <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
     </View>
@@ -287,6 +409,25 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: '800' },
   statLabel: { fontSize: 10, textAlign: 'center' },
   sectionTitle: { fontSize: 17, fontWeight: '700' },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  countBadge: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  countBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  serviceCard: { padding: 14, marginBottom: 10, borderWidth: 1 },
+  serviceCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  serviceIcon: { width: 38, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  serviceName: { fontSize: 14, fontWeight: '700' },
+  serviceMeta: { fontSize: 12, marginTop: 2 },
+  requestBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
+  requestBadgeText: { fontSize: 10, fontWeight: '700' },
+  serviceDivider: { height: 1, marginVertical: 10 },
+  serviceDetails: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  serviceDetail: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
+  serviceDetailText: { fontSize: 11 },
+  serviceActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  serviceAction: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 9 },
+  serviceActionText: { fontSize: 12, fontWeight: '700' },
+  openJobHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8 },
+  openJobText: { fontSize: 12, fontWeight: '700' },
   jobRow: { padding: 14, marginBottom: 10, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   jobLeft: { flex: 1, gap: 3 },
   jobRight: { alignItems: 'flex-end', gap: 6 },

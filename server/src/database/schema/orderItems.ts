@@ -1,4 +1,4 @@
-import { pgTable, uuid, timestamp, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, timestamp, integer, text, pgEnum } from 'drizzle-orm/pg-core';
 import { orders } from './orders.js';
 import { services } from './services.js';
 import { professionals } from './professionals.js';
@@ -26,6 +26,9 @@ export const orderItems = pgTable('order_items', {
   customerPrice: integer('customer_price').notNull(),
   partnerPayout: integer('partner_payout').notNull(),
   quantity: integer('quantity').notNull().default(1),
+  cancellationReason: text('cancellation_reason'),
+  cancellationFee: integer('cancellation_fee').notNull().default(0),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -217,7 +217,7 @@ export async function runMigrations() {
   await run('index: payments_customer', `CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id)`);
 
   await run('enum: payout_status',
-    `CREATE TYPE payout_status AS ENUM ('pending', 'paid', 'rejected')`);
+    `CREATE TYPE payout_status AS ENUM ('pending', 'approved', 'processing', 'paid', 'rejected')`);
 
   await run('table: payout_requests', `
     CREATE TABLE IF NOT EXISTS payout_requests (
@@ -227,9 +227,45 @@ export async function runMigrations() {
       status payout_status NOT NULL DEFAULT 'pending',
       note VARCHAR(512),
       requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      resolved_at TIMESTAMPTZ
+      resolved_at TIMESTAMPTZ,
+      processing_started_at TIMESTAMPTZ
     )`);
   await run('index: payout_requests_professional', `CREATE INDEX IF NOT EXISTS idx_payout_requests_professional ON payout_requests(professional_id)`);
+  await run('column: professionals.payout_upi_id',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS payout_upi_id VARCHAR(255)`);
+  await run('column: professionals.payout_contact_id',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS payout_contact_id VARCHAR(128)`);
+  await run('column: professionals.payout_fund_account_id',
+    `ALTER TABLE professionals ADD COLUMN IF NOT EXISTS payout_fund_account_id VARCHAR(128)`);
+  await run('column: payout_requests.provider_payout_id',
+    `ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS provider_payout_id VARCHAR(128)`);
+  await run('column: payout_requests.provider_status',
+    `ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS provider_status VARCHAR(64)`);
+  await run('column: payout_requests.failure_reason',
+    `ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS failure_reason TEXT`);
+  await run('enum value: payout_status.processing',
+    `ALTER TYPE payout_status ADD VALUE IF NOT EXISTS 'processing'`);
+  await run('enum value: payout_status.approved',
+    `ALTER TYPE payout_status ADD VALUE IF NOT EXISTS 'approved'`);
+  await run('column: payout_requests.processing_started_at',
+    `ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ`);
+  await run('table: payout_runs', `
+    CREATE TABLE IF NOT EXISTS payout_runs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      trigger VARCHAR(32) NOT NULL,
+      schedule_key VARCHAR(64),
+      status VARCHAR(32) NOT NULL DEFAULT 'running',
+      requested_count INTEGER NOT NULL DEFAULT 0,
+      success_count INTEGER NOT NULL DEFAULT 0,
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      requested_amount INTEGER NOT NULL DEFAULT 0,
+      paid_amount INTEGER NOT NULL DEFAULT 0,
+      failure_reason TEXT,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    )`);
+  await run('index: payout_runs_schedule_key',
+    `CREATE INDEX IF NOT EXISTS idx_payout_runs_schedule_key ON payout_runs(schedule_key)`);
 
   await run('enum: ticket_status',
     `CREATE TYPE ticket_status AS ENUM ('open', 'in_progress', 'closed')`);
@@ -624,6 +660,12 @@ export async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_order_items_partner ON order_items(partner_id)`);
   await run('index: order_items_service',
     `CREATE INDEX IF NOT EXISTS idx_order_items_service ON order_items(service_id)`);
+  await run('column: order_items.cancellation_reason',
+    `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`);
+  await run('column: order_items.cancellation_fee',
+    `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancellation_fee INTEGER NOT NULL DEFAULT 0`);
+  await run('column: order_items.cancelled_at',
+    `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`);
 
   await run('table: order_item_requests', `
     CREATE TABLE IF NOT EXISTS order_item_requests (

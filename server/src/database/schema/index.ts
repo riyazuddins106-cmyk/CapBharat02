@@ -10,6 +10,7 @@ export * from './favorites.js';
 export * from './auditLogs.js';
 export * from './payments.js';
 export * from './payoutRequests.js';
+export * from './payoutRuns.js';
 export * from './notifications.js';
 export * from './supportTickets.js';
 export * from './pointsLedger.js';

@@ -1,31 +1,88 @@
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>ServeNow QR Codes</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;}
-.wrap{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;padding:28px;}
-.card{background:#fff;border-radius:20px;padding:28px 24px 20px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.10);width:310px;}
-.badge.customer{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;background:#ebf5ff;color:#0066cc;}
-.badge.partner{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;background:#fff3eb;color:#cc4400;}
-h2{font-size:20px;font-weight:700;color:#111;margin-bottom:4px;}
-.sub{font-size:12px;color:#999;margin-bottom:18px;}
-img{border-radius:10px;border:1.5px solid #eee;}
-.url{margin-top:14px;font-size:10px;color:#bbb;word-break:break-all;font-family:monospace;}
-.ts{margin-top:6px;font-size:9px;color:#ddd;}
-</style></head>
-<body><div class="wrap">
-<div class="card">
-  <div class="badge customer">📱 Customer App</div>
-  <h2>Customer</h2><p class="sub">Open Expo Go → scan to launch</p>
-  <img src="data:image/png;base64,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" width="262" height="262"/>
-  <div class="url">exps://prison-deacon-science.ngrok-free.dev</div>
-  <div class="ts">Generated 2026-08-03T08:13:19.163Z</div>
-</div>
-<div class="card">
-  <div class="badge partner">🔧 Partner App</div>
-  <h2>Partner</h2><p class="sub">Open Expo Go → scan to launch</p>
-  <img src="data:image/png;base64,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" width="262" height="262"/>
-  <div class="url">exps://arose-unframed-eclipse.ngrok-free.dev</div>
-  <div class="ts">Generated 2026-08-03T08:13:19.163Z</div>
-</div>
-</div></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ServeNow QR Codes</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f0f2f5;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 28px;
+        padding: 28px;
+      }
+      .card {
+        width: 310px;
+        padding: 28px 24px 20px;
+        text-align: center;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, .10);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 14px;
+        padding: 5px 14px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .6px;
+        text-transform: uppercase;
+      }
+      .customer { background: #ebf5ff; color: #0066cc; }
+      .partner { background: #fff3eb; color: #cc4400; }
+      h2 { margin-bottom: 4px; color: #111; font-size: 20px; }
+      .sub { margin-bottom: 18px; color: #999; font-size: 12px; }
+      .qr {
+        display: block;
+        width: 262px;
+        height: 262px;
+        margin: 0 auto;
+        border: 1.5px solid #eee;
+        border-radius: 10px;
+      }
+      .url {
+        margin-top: 14px;
+        color: #888;
+        font-family: monospace;
+        font-size: 10px;
+        word-break: break-all;
+      }
+      .note { margin-top: 8px; color: #aaa; font-size: 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="card">
+        <div class="badge customer">📱 Customer App</div>
+        <h2>Customer</h2>
+        <p class="sub">Open Expo Go and scan this QR code</p>
+        <img class="qr" src="/customer-qr.png" alt="Current Customer Expo QR code" />
+        <div class="url">exps://prison-deacon-science.ngrok-free.dev</div>
+        <div class="note">The image is loaded from the current QR file.</div>
+      </section>
+      <section class="card">
+        <div class="badge partner">🔧 Partner App</div>
+        <h2>Partner</h2>
+        <p class="sub">Open Expo Go and scan this QR code</p>
+        <img class="qr" src="/partner-qr.png" alt="Current Partner Expo QR code" />
+        <div class="url">exps://arose-unframed-eclipse.ngrok-free.dev</div>
+        <div class="note">The image is loaded from the current QR file.</div>
+      </section>
+    </div>
+  </body>
+</html>

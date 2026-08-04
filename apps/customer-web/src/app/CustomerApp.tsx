@@ -2458,6 +2458,8 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [orderAction, setOrderAction] = useState<string | null>(null);
   const [payItemTarget, setPayItemTarget] = useState<{ orderId: string; item: ApiOrder["items"][number] } | null>(null);
+  const [qrTarget, setQrTarget] = useState<{ orderId: string; itemId: string; token: string } | null>(null);
+  const [qrLoading, setQrLoading] = useState<string | null>(null);
 
   const searchingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings  = bookings.filter((b) => ["upcoming", "in_progress"].includes(b.status));
@@ -2472,6 +2474,29 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
     } finally {
       setCancelling(null);
     }
+  }
+
+  async function handleItemQr(orderId: string, itemId: string) {
+    setQrLoading(itemId);
+    try {
+      const data = await ordersApi.getItemQr(orderId, itemId);
+      setQrTarget({ orderId, itemId, token: data.qrToken });
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message ?? e?.message ?? "Could not load the customer QR code.");
+    } finally {
+      setQrLoading(null);
+    }
+  }
+
+  async function handleItemCancel(orderId: string, itemId: string, status: string) {
+    const reason = window.prompt(
+      status === "partner_accepted"
+        ? "Optional cancellation reason (a 25% fee may apply):"
+        : ["partner_arrived", "payment_pending", "payment_completed"].includes(status)
+          ? "Optional cancellation reason (a 50% fee may apply):"
+          : "Optional cancellation reason:",
+    ) ?? undefined;
+    await handleOrderAction("cancel", orderId, itemId, reason);
   }
 
   async function handleReviewSubmit() {
@@ -2569,6 +2594,9 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                     const canContinue = !item.partnerId && item.status !== "cancelled";
                     const needsPayment = ["partner_arrived", "payment_pending"].includes(item.status)
                       && item.payment?.status !== "paid";
+                    const canShowQr = ["partner_accepted", "partner_arrived", "payment_pending", "payment_completed", "service_started"].includes(item.status);
+                    const cancellationFeeRate = item.status === "partner_accepted" ? 25
+                      : ["partner_arrived", "payment_pending", "payment_completed"].includes(item.status) ? 50 : 0;
                     return (
                       <div key={item.id} className="rounded-xl bg-white border border-black/[0.06] p-3">
                         <div className="flex items-start justify-between gap-3">
@@ -2585,6 +2613,11 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                             {item.status.replaceAll("_", " ")}
                           </span>
                         </div>
+                        {cancellationFeeRate > 0 && canCancel && (
+                          <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-3">
+                            Cancelling now may incur a {cancellationFeeRate}% fee (approximately ₹{Math.round(item.customerPrice * cancellationFeeRate / 100)}).
+                          </p>
+                        )}
                         <div className="flex gap-2 mt-3">
                           {canContinue && (
                             <button
@@ -2604,9 +2637,18 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                               {orderAction === `pay:${item.id}` ? "Paying…" : `Pay ₹${item.customerPrice}`}
                             </button>
                           )}
+                          {canShowQr && (
+                            <button
+                              onClick={() => handleItemQr(order.id, item.id)}
+                              disabled={qrLoading === item.id}
+                              className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-violet-200 text-violet-600 disabled:opacity-50"
+                            >
+                              {qrLoading === item.id ? "Loading…" : "Show Check-in QR"}
+                            </button>
+                          )}
                           {canCancel && (
                             <button
-                              onClick={() => handleOrderAction("cancel", order.id, item.id)}
+                              onClick={() => handleItemCancel(order.id, item.id, item.status)}
                               disabled={orderAction === `cancel:${item.id}`}
                               className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-red-200 text-red-500 disabled:opacity-50"
                             >
@@ -2651,7 +2693,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                     {cancelling === b.id ? "Cancelling…" : "Cancel"}
                   </button>
                 )}
-                {["pending", "upcoming", "in_progress", "completed"].includes(b.status) && (
+                {["in_progress", "completed"].includes(b.status) && (
                   <button
                     onClick={() => setPayBooking(b)}
                     className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
@@ -2703,6 +2745,25 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
         onClose={() => setPayItemTarget(null)}
         onPaid={() => { setPayItemTarget(null); onRefresh(); }}
       />
+    )}
+
+    {qrTarget && (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4" onClick={() => setQrTarget(null)}>
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center" onClick={(event) => event.stopPropagation()}>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-left">
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Partner check-in</p>
+              <h3 className="text-lg font-bold text-gray-900">Show this QR code</h3>
+            </div>
+            <button onClick={() => setQrTarget(null)} className="text-gray-400"><X size={18} /></button>
+          </div>
+          <p className="text-xs text-gray-500 mb-4 text-left">Ask the partner to scan this code when they arrive. It expires shortly for your security.</p>
+          <div className="inline-flex rounded-2xl border border-violet-100 bg-violet-50 p-4">
+            <QRCodeSVG value={qrTarget.token} size={220} bgColor="#F5F3FF" fgColor="#312E81" level="M" />
+          </div>
+          <button onClick={() => setQrTarget(null)} className="mt-5 w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white">Done</button>
+        </div>
+      </div>
     )}
 
     {payBooking && (

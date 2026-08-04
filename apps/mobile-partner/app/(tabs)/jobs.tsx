@@ -110,8 +110,8 @@ function ServiceJobCard({ item, type, onAction }: {
           <Ionicons name="layers-outline" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.serviceName, { color: colors.foreground }]}>Service booking</Text>
-          <Text style={[styles.customerName, { color: colors.mutedForeground }]}>Order {item.orderId.slice(0, 8)}</Text>
+          <Text style={[styles.serviceName, { color: colors.foreground }]} numberOfLines={1}>{item.serviceName ?? 'Service booking'}</Text>
+          <Text style={[styles.customerName, { color: colors.mutedForeground }]} numberOfLines={1}>{item.customerName ?? 'Customer'} · Order {item.orderId.slice(0, 8)}</Text>
         </View>
         <View style={[styles.badge, { backgroundColor: pending ? '#FEF3C7' : active ? '#DBEAFE' : '#DCFCE7' }]}>
           <Text style={[styles.badgeText, { color: pending ? '#B45309' : active ? '#2563EB' : '#16A34A' }]}>
@@ -141,9 +141,10 @@ function ServiceJobCard({ item, type, onAction }: {
             </TouchableOpacity>
           </>
         )}
-        {active && item.status === 'partner_accepted' && (
-          <TouchableOpacity onPress={() => onAction('checkin', item)} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.actionText, { color: '#fff' }]}>Mark Arrived</Text>
+         {active && item.status === 'partner_accepted' && (
+           <TouchableOpacity onPress={() => onAction('checkin', item)} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
+             <Ionicons name="qr-code-outline" size={15} color="#fff" />
+             <Text style={[styles.actionText, { color: '#fff' }]}>Scan Customer QR</Text>
           </TouchableOpacity>
         )}
         {active && ['payment_completed', 'service_started'].includes(item.status ?? '') && (
@@ -167,11 +168,14 @@ export default function JobsScreen() {
     enabled: !!accessToken,
     refetchInterval: 30_000,
   });
-  const serviceAction = useMutation({
+  const serviceAction = useMutation<unknown, Error, { action: 'accept' | 'reject' | 'checkin' | 'complete'; item: import('@/lib/api').OrderItemJob }>({
     mutationFn: ({ action, item }: { action: 'accept' | 'reject' | 'checkin' | 'complete'; item: import('@/lib/api').OrderItemJob }) => {
       if (action === 'accept') return partnerApi.acceptOrderItemJob(item.requestId!, accessToken!);
       if (action === 'reject') return partnerApi.rejectOrderItemJob(item.requestId!, accessToken!);
-      if (action === 'checkin') return partnerApi.checkInOrderItem(item.orderItemId, accessToken!);
+       if (action === 'checkin') {
+         router.push(`/service-job/${item.orderItemId}`);
+         return Promise.resolve(item);
+       }
       return partnerApi.completeOrderItem(item.orderItemId, accessToken!);
     },
     onSuccess: () => {
@@ -222,10 +226,17 @@ export default function JobsScreen() {
         renderItem={({ item }) => <JobCard job={item} />}
         ListHeaderComponent={
           <View>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Service-level requests</Text>
+            {activeTab.key === 'active' && !!serviceJobs.data?.pendingRequests.length && (
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+                New service requests ({serviceJobs.data.pendingRequests.length})
+              </Text>
+            )}
             {activeTab.key === 'active' && serviceJobs.data?.pendingRequests.map(item => (
-              <ServiceJobCard key={item.requestId} item={item} type="pending" onAction={(action, selected) => serviceAction.mutate({ action, item: selected })} />
+              <ServiceJobCard key={item.requestId ?? item.orderItemId} item={item} type="pending" onAction={(action, selected) => serviceAction.mutate({ action, item: selected })} />
             ))}
+            {activeTab.key === 'active' && !!serviceJobs.data?.activeJobs.length && (
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 8 }]}>In progress services</Text>
+            )}
             {activeTab.key === 'active' && serviceJobs.data?.activeJobs.map(item => (
               <ServiceJobCard key={item.orderItemId} item={item} type="active" onAction={(action, selected) => serviceAction.mutate({ action, item: selected })} />
             ))}
@@ -235,15 +246,19 @@ export default function JobsScreen() {
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="list-outline" size={48} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No {activeTab.label.toLowerCase()} jobs</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              {tab === 'active'
-              ? 'Make sure you are set to Available in your profile — new job requests will appear here automatically.'
-              : 'Your job history will appear here.'}
-            </Text>
-          </View>
+          (activeTab.key === 'active' && ((serviceJobs.data?.pendingRequests.length ?? 0) > 0 || (serviceJobs.data?.activeJobs.length ?? 0) > 0))
+            ? null
+            : (
+              <View style={styles.empty}>
+                <Ionicons name="list-outline" size={48} color={colors.mutedForeground} />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No {activeTab.label.toLowerCase()} jobs</Text>
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  {tab === 'active'
+                  ? 'Make sure you are set to Available in your profile — new job requests will appear here automatically.'
+                  : 'Your job history will appear here.'}
+                </Text>
+              </View>
+            )
         }
       />
     </View>

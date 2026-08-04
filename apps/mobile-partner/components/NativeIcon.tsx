@@ -1,0 +1,1 @@
+export { NativeIcon } from '../../mobile/components/NativeIcon';

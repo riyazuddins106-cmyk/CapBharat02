@@ -25,6 +25,7 @@
 - [Service categories column drift](service-categories-column-drift.md) — featured/image_url missing after push on pre-existing DB; fix via run-column-migration.ts ALTER TABLE IF NOT EXISTS.
 - [Expo settings.json URL derivation](expo-settings-url-derivation.md) — exp.direct URL = settings.json urlRandomness (lowercased) + port; never capture from piped Metro stdout (TTY format differs).
 - [Expo tunnel FIFO stdin fix](expo-tunnel-fifo-stdin.md) — sleep 999999 in pipe blocks retry; use FIFO with exec 9<> (O_RDWR, non-blocking) to hold stdin open.
+- [QR tunnel freshness](qr-tunnel-freshness.md) — QR display pages must redirect to the canonical no-cache scanner page because Expo/ngrok URLs change between sessions.
 - [Admin catalog ownership](admin-catalog-ownership.md) — customers book centrally managed products; partners are matched by skills and do not create or price products.
 - [Live serviceCount query](servicecount-live-query.md) — category serviceCount was static/stale; fixed to JOIN services table; Laundry got 6 new services.
 - [Expo Metro project root fix](expo-metro-project-root-fix.md) — stray workspace-root app.json makes Metro use wrong project root; delete it.
@@ -34,3 +35,8 @@
 - [No-professional booking model](no-professional-booking.md) — platform is dispatch-based; customers never pick a professional; favorites removed; booking validator professionalId is optional.
 - [Master Prompt Status](master-prompt-status.md) — full audit of Urban Company-style marketplace requirements: 14 done, 11 partial, 24 not built; includes recommended build order.
 - [Project Handoff](HANDOFF.md) — READ THIS FIRST in any new session: full project state, secrets, setup commands, what's done/partial/missing, 8-step build order, gotchas index.
+- [Admin service operations](admin-service-operations.md) — detail endpoints and safe distinction between stopping partner search and cancelling a booking.
+- [Partner payout accounting](partner-payout-accounting.md) — partner earnings use completed paid work and stored partner payout, not customer price.
+- [Partner payout control centre](payout-control-center.md) — aggregate earnings and payout requests independently, paginate partners, and lazy-load individual payout history.
+- [Scheduled partner payouts](scheduled-partner-payouts.md) — automatic runs require explicit approval, caps, locking, recovery, and RazorpayX configuration.
+- [Partner App icon font loading](partner-app-icon-font-loading.md) — native Ionicons need a longer font-loading grace period than the web fallback.

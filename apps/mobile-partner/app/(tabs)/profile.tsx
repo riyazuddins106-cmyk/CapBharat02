@@ -61,7 +61,7 @@ export default function ProfileScreen() {
   const [pwModal,   setPwModal]   = useState(false);
 
   // Form state
-  const [proForm,  setProForm]  = useState({ title: '', bio: '', basePrice: '', priceUnit: '/visit', tags: '' });
+  const [proForm,  setProForm]  = useState({ title: '', bio: '', basePrice: '', priceUnit: '/visit', tags: '', payoutUpiId: '' });
   const [acctForm, setAcctForm] = useState({ fullName: '', phone: '' });
   const [pwForm,   setPwForm]   = useState({ currentPw: '', newPw: '', confirmPw: '' });
 
@@ -107,6 +107,7 @@ export default function ProfileScreen() {
         basePrice: String(profile.basePrice ?? ''),
         priceUnit: profile.priceUnit ?? '/visit',
         tags:      (profile.tags ?? []).join(', '),
+      payoutUpiId: profile.payoutUpiId ?? '',
       });
     }
   }, [profile]);
@@ -161,6 +162,7 @@ export default function ProfileScreen() {
       basePrice: Number(proForm.basePrice),
       priceUnit: proForm.priceUnit.trim(),
       tags:      proForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      payoutUpiId: proForm.payoutUpiId.trim() || null,
     }, accessToken!),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -229,6 +231,7 @@ export default function ProfileScreen() {
       basePrice: String(profile?.basePrice ?? ''),
       priceUnit: profile?.priceUnit ?? '/visit',
       tags:      (profile?.tags ?? []).join(', '),
+      payoutUpiId: profile?.payoutUpiId ?? '',
     });
     setProErr(''); setProOk('');
     setProModal(true);
@@ -467,6 +470,21 @@ export default function ProfileScreen() {
                 />
               </FormField>
 
+              <FormField label="Payout UPI ID" colors={colors}>
+                <TextInput
+                  value={proForm.payoutUpiId}
+                  onChangeText={(v) => { setProForm((f) => ({ ...f, payoutUpiId: v })); setProErr(''); }}
+                  placeholder="yourname@upi"
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                />
+                <Text style={[styles.fieldHint, { color: colors.mutedForeground }]}>
+                  This UPI ID receives your approved partner payouts.
+                </Text>
+              </FormField>
+
               {!!proErr && <Text style={styles.errorText}>{proErr}</Text>}
               {!!proOk  && <Text style={styles.successText}>{proOk}</Text>}
 
@@ -637,6 +655,7 @@ const styles = StyleSheet.create({
   bioLabel:      { fontSize: 12, fontWeight: '600' },
   bioText:       { fontSize: 13, lineHeight: 19 },
   tagsWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  fieldHint:     { fontSize: 11, marginTop: 4 },
   tag:           { paddingHorizontal: 10, paddingVertical: 4 },
   tagText:       { fontSize: 12, fontWeight: '600' },
   securityRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },

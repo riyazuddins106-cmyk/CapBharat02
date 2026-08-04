@@ -2,8 +2,9 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
 import {
-  bookings, users, professionals, serviceCategories, reviews, payoutRequests,
-  orders, orderItems, orderItemPayments, services,
+  bookings, users, professionals, serviceCategories, reviews, payoutRequests, payoutRuns,
+  orders, orderItems, orderItemPayments, services, addresses,
+  bookingItems, bookingPartnerRequests, bookingAssignmentLogs,
 } from '../database/schema/index.js';
 import { payments } from '../database/schema/payments.js';
 import { eq, desc, count, sum, ne, isNull, isNotNull, and, or, avg, sql, gte, lte, ilike, inArray } from 'drizzle-orm';
@@ -25,6 +26,8 @@ import { notificationService } from '../services/notification.service.js';
 import { storageService } from '../services/storage.service.js';
 import { hashPassword } from '../utils/password.js';
 import { refundOrderItemPayment } from './payment.controller.js';
+import { createRazorpayUpiPayout } from '../services/razorpayPayout.service.js';
+import { runPayouts } from '../services/payoutScheduler.service.js';
 
 export const adminController = {
   /** Master orders with per-service status, dispatch, earnings and payment state. */
@@ -79,6 +82,66 @@ export const adminController = {
     }
 
     res.json({ success: true, data: [...byOrder.values()] });
+  }),
+
+  /** Full master-order detail for the admin service detail view. */
+  getOrder: asyncHandler(async (req: Request, res: Response) => {
+    const [row] = await db.select({
+      order: orders,
+      customer: users,
+      address: addresses,
+    })
+      .from(orders)
+      .innerJoin(users, eq(users.id, orders.customerId))
+      .leftJoin(addresses, eq(addresses.id, orders.addressId))
+      .where(eq(orders.id, req.params.orderId))
+      .limit(1);
+    if (!row) throw AppError.notFound('Order not found.');
+
+    const itemRows = await db.select({
+      item: orderItems,
+      serviceName: services.name,
+    })
+      .from(orderItems)
+      .leftJoin(services, eq(services.id, orderItems.serviceId))
+      .where(eq(orderItems.orderId, req.params.orderId))
+      .orderBy(orderItems.createdAt);
+
+    const itemPayments = itemRows.length
+      ? await db.select().from(orderItemPayments)
+        .where(inArray(orderItemPayments.orderItemId, itemRows.map(({ item }) => item.id)))
+      : [];
+    const paymentByItem = new Map(itemPayments.map(payment => [payment.orderItemId, payment]));
+
+    res.json({
+      success: true,
+      data: {
+        ...row.order,
+        customerName: row.customer.fullName,
+        customerEmail: row.customer.email,
+        customerPhone: row.customer.phone,
+        address: row.address,
+        items: itemRows.map(({ item, serviceName }) => {
+          const payment = paymentByItem.get(item.id);
+          return {
+            ...item,
+            serviceName,
+            payment: payment ? {
+              id: payment.id,
+              status: payment.status,
+              method: payment.method,
+              amount: payment.amount,
+              notes: payment.notes,
+            } : null,
+            earnings: {
+              customerPrice: item.customerPrice,
+              partnerPayout: item.partnerPayout,
+              platformMargin: item.customerPrice - item.partnerPayout,
+            },
+          };
+        }),
+      },
+    });
   }),
 
   /** Restart dispatch for one service item after a rejection or timeout. */
@@ -269,6 +332,61 @@ export const adminController = {
     });
   }),
 
+  /** Full legacy booking detail for admin operations and history. */
+  getBooking: asyncHandler(async (req: Request, res: Response) => {
+    const [row] = await db.select({
+      booking: bookings,
+      customer: users,
+      address: addresses,
+    })
+      .from(bookings)
+      .leftJoin(users, eq(users.id, bookings.customerId))
+      .leftJoin(addresses, eq(addresses.id, bookings.addressId))
+      .where(and(eq(bookings.id, req.params.id), isNull(bookings.deletedAt)))
+      .limit(1);
+    if (!row) throw AppError.notFound('Booking not found.');
+
+    const [items, requests, history, paymentRows] = await Promise.all([
+      db.select({ item: bookingItems, serviceName: services.name })
+        .from(bookingItems)
+        .leftJoin(services, eq(services.id, bookingItems.serviceId))
+        .where(eq(bookingItems.bookingId, req.params.id)),
+      db.select({ request: bookingPartnerRequests, partner: professionals })
+        .from(bookingPartnerRequests)
+        .innerJoin(professionals, eq(professionals.id, bookingPartnerRequests.partnerId))
+        .where(eq(bookingPartnerRequests.bookingId, req.params.id)),
+      db.select({ log: bookingAssignmentLogs, partnerName: professionals.name })
+        .from(bookingAssignmentLogs)
+        .leftJoin(professionals, eq(professionals.id, bookingAssignmentLogs.partnerId))
+        .where(eq(bookingAssignmentLogs.bookingId, req.params.id))
+        .orderBy(desc(bookingAssignmentLogs.createdAt)),
+      db.select().from(payments).where(eq(payments.bookingId, req.params.id)).orderBy(desc(payments.createdAt)),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        ...row.booking,
+        customerName: row.customer?.fullName ?? null,
+        customerEmail: row.customer?.email ?? null,
+        customerPhone: row.customer?.phone ?? null,
+        address: row.address,
+        items: items.map(({ item, serviceName }) => ({ ...item, serviceName })),
+        dispatchRequests: requests.map(({ request, partner }) => ({
+          ...request,
+          partner: {
+            id: partner.id,
+            name: partner.name,
+            rating: partner.rating,
+            availabilityStatus: partner.availabilityStatus,
+          },
+        })),
+        assignmentHistory: history.map(({ log, partnerName }) => ({ ...log, partnerName: partnerName ?? null })),
+        payments: paymentRows,
+      },
+    });
+  }),
+
   updateBooking: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status, notes, price, scheduledAt } = req.body as {
@@ -318,14 +436,26 @@ export const adminController = {
   cancelBooking: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const [existing] = await db
-      .select({ id: bookings.id, deletedAt: bookings.deletedAt })
+      .select()
       .from(bookings)
       .where(eq(bookings.id, id));
     if (!existing || existing.deletedAt) throw AppError.notFound('Booking not found');
+    if (existing.status === 'completed' || existing.status === 'cancelled') {
+      throw AppError.badRequest('This booking cannot be cancelled in its current state.');
+    }
+
+    await db.update(bookingPartnerRequests)
+      .set({ status: 'expired', respondedAt: new Date() })
+      .where(and(eq(bookingPartnerRequests.bookingId, id), eq(bookingPartnerRequests.status, 'pending')));
+    if (existing.professionalId) {
+      await db.update(professionals)
+        .set({ availabilityStatus: 'available', currentBookingStatus: 'available', updatedAt: new Date() })
+        .where(eq(professionals.id, existing.professionalId));
+    }
 
     const [row] = await db
       .update(bookings)
-      .set({ status: 'cancelled', updatedAt: new Date() })
+      .set({ status: 'cancelled', dispatchStatus: 'cancelled', updatedAt: new Date() })
       .where(eq(bookings.id, id))
       .returning();
     if (!row) throw AppError.notFound('Booking not found');
@@ -977,6 +1107,10 @@ export const adminController = {
         note: payoutRequests.note,
         requestedAt: payoutRequests.requestedAt,
         resolvedAt: payoutRequests.resolvedAt,
+        providerPayoutId: payoutRequests.providerPayoutId,
+        providerStatus: payoutRequests.providerStatus,
+        failureReason: payoutRequests.failureReason,
+        payoutUpiId: professionals.payoutUpiId,
       })
       .from(payoutRequests)
       .leftJoin(professionals, eq(payoutRequests.professionalId, professionals.id))
@@ -989,17 +1123,328 @@ export const adminController = {
     res.json({ success: true, data: { payouts: rows, total: Number(total) } });
   }),
 
+  /** Scalable partner payout worklist. Aggregates earnings in SQL and never
+   * loads all partner history into the browser. */
+  listPayoutPartners: asyncHandler(async (req: Request, res: Response) => {
+    const page = Math.max(1, Number(req.query.page ?? 1));
+    const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize ?? 50)));
+    const offset = (page - 1) * pageSize;
+    const search = String(req.query.search ?? '').trim();
+    const status = String(req.query.status ?? 'all');
+
+    const result = await db.execute(sql`
+      WITH earned AS (
+        SELECT b.professional_id, b.scheduled_at,
+          COALESCE(SUM(bi.unit_partner_payout * bi.quantity), b.price)::numeric AS amount
+        FROM bookings b
+        LEFT JOIN booking_items bi ON bi.booking_id = b.id
+        WHERE b.deleted_at IS NULL
+          AND b.status = 'completed'
+          AND EXISTS (
+            SELECT 1 FROM payments bp
+            WHERE bp.booking_id = b.id AND bp.status = 'paid'
+          )
+        GROUP BY b.id, b.professional_id, b.scheduled_at, b.price
+        UNION ALL
+        SELECT oi.partner_id, oi.scheduled_at,
+          (oi.partner_payout * GREATEST(1, oi.quantity))::numeric AS amount
+        FROM order_items oi
+        WHERE oi.partner_id IS NOT NULL
+          AND oi.status = 'service_completed'
+          AND EXISTS (
+            SELECT 1 FROM order_item_payments op
+            WHERE op.order_item_id = oi.id AND op.status = 'paid'
+          )
+      ),
+      earned_by_partner AS (
+        SELECT
+          professional_id,
+          COUNT(*)::int AS completed_jobs,
+          COALESCE(SUM(amount), 0)::numeric AS total_earnings,
+          COALESCE(SUM(amount) FILTER (
+            WHERE scheduled_at >= date_trunc('month', CURRENT_DATE)
+          ), 0)::numeric AS month_earnings
+        FROM earned
+        GROUP BY professional_id
+      ),
+      payouts_by_partner AS (
+        SELECT
+          professional_id,
+          COALESCE(SUM(amount) FILTER (WHERE status IN ('pending', 'approved', 'processing')), 0)::numeric AS pending_payout,
+          COALESCE(SUM(amount) FILTER (WHERE status = 'paid'), 0)::numeric AS paid_out,
+          COUNT(*) FILTER (WHERE status IN ('pending', 'approved', 'processing'))::int AS pending_requests,
+          MAX(requested_at) FILTER (WHERE status IN ('pending', 'approved', 'processing')) AS latest_request_at
+        FROM payout_requests
+        GROUP BY professional_id
+      ),
+      partner_summary AS (
+        SELECT
+          pr.id AS professional_id,
+          pr.name,
+          pr.payout_upi_id,
+          u.email,
+          u.phone,
+          COALESCE(e.completed_jobs, 0)::int AS completed_jobs,
+          COALESCE(e.total_earnings, 0)::numeric AS total_earnings,
+          COALESCE(e.month_earnings, 0)::numeric AS month_earnings,
+          COALESCE(p.pending_payout, 0)::numeric AS pending_payout,
+          COALESCE(p.paid_out, 0)::numeric AS paid_out,
+          COALESCE(p.pending_requests, 0)::int AS pending_requests,
+          p.latest_request_at
+        FROM professionals pr
+        LEFT JOIN users u ON u.id = pr.user_id
+        LEFT JOIN earned_by_partner e ON e.professional_id = pr.id
+        LEFT JOIN payouts_by_partner p ON p.professional_id = pr.id
+        WHERE pr.deleted_at IS NULL
+      ),
+      filtered AS (
+        SELECT *,
+          GREATEST(0, total_earnings - pending_payout - paid_out)::numeric AS available
+        FROM partner_summary
+        WHERE (
+          ${search} = ''
+          OR name ILIKE ${`%${search}%`}
+          OR email ILIKE ${`%${search}%`}
+          OR payout_upi_id ILIKE ${`%${search}%`}
+        )
+      )
+      SELECT *,
+        COUNT(*) OVER()::int AS total_partners,
+        COALESCE(SUM(total_earnings) OVER(), 0)::numeric AS summary_total_earnings,
+        COALESCE(SUM(month_earnings) OVER(), 0)::numeric AS summary_month_earnings,
+        COALESCE(SUM(pending_payout) OVER(), 0)::numeric AS summary_pending_payout,
+        COALESCE(SUM(paid_out) OVER(), 0)::numeric AS summary_paid_out,
+        COALESCE(SUM(available) OVER(), 0)::numeric AS summary_available
+      FROM filtered
+      WHERE (
+        ${status} = 'all'
+        OR (${status} = 'payable' AND available > 0)
+        OR (${status} = 'pending' AND pending_requests > 0)
+        OR (${status} = 'missing_upi' AND available > 0 AND (payout_upi_id IS NULL OR payout_upi_id = ''))
+      )
+      ORDER BY available DESC, name ASC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `);
+
+    const rows = (result as any[]).map((row: any) => ({
+      id: row.professional_id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      payoutUpiId: row.payout_upi_id,
+      completedJobs: Number(row.completed_jobs ?? 0),
+      totalEarnings: Number(row.total_earnings ?? 0),
+      monthEarnings: Number(row.month_earnings ?? 0),
+      pendingPayout: Number(row.pending_payout ?? 0),
+      paidOut: Number(row.paid_out ?? 0),
+      available: Number(row.available ?? 0),
+      pendingRequests: Number(row.pending_requests ?? 0),
+      latestRequestAt: row.latest_request_at,
+      totalPartners: Number(row.total_partners ?? 0),
+      summary: {
+        totalEarnings: Number(row.summary_total_earnings ?? 0),
+        monthEarnings: Number(row.summary_month_earnings ?? 0),
+        pendingPayout: Number(row.summary_pending_payout ?? 0),
+        paidOut: Number(row.summary_paid_out ?? 0),
+        available: Number(row.summary_available ?? 0),
+      },
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        partners: rows,
+        total: rows[0]?.totalPartners ?? 0,
+        summary: rows[0]?.summary ?? {
+          totalEarnings: 0, monthEarnings: 0, pendingPayout: 0, paidOut: 0, available: 0,
+        },
+        page,
+        pageSize,
+      },
+    });
+  }),
+
+  /** Full payout/earnings view for one partner, loaded only on demand. */
+  getPayoutPartnerDetail: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await db.execute(sql`
+      WITH earned AS (
+        SELECT b.professional_id, b.scheduled_at,
+          COALESCE(SUM(bi.unit_partner_payout * bi.quantity), b.price)::numeric AS amount
+        FROM bookings b
+        LEFT JOIN booking_items bi ON bi.booking_id = b.id
+        WHERE b.deleted_at IS NULL AND b.professional_id = ${id}
+          AND b.status = 'completed'
+          AND EXISTS (SELECT 1 FROM payments bp WHERE bp.booking_id = b.id AND bp.status = 'paid')
+        GROUP BY b.id, b.professional_id, b.scheduled_at, b.price
+        UNION ALL
+        SELECT oi.partner_id, oi.scheduled_at,
+          (oi.partner_payout * GREATEST(1, oi.quantity))::numeric
+        FROM order_items oi
+        WHERE oi.partner_id = ${id}
+          AND oi.status = 'service_completed'
+          AND EXISTS (SELECT 1 FROM order_item_payments op WHERE op.order_item_id = oi.id AND op.status = 'paid')
+      ),
+      earned_by_partner AS (
+        SELECT
+          professional_id,
+          COUNT(*)::int AS completed_jobs,
+          COALESCE(SUM(amount), 0)::numeric AS total_earnings,
+          COALESCE(SUM(amount) FILTER (
+            WHERE scheduled_at >= date_trunc('month', CURRENT_DATE)
+          ), 0)::numeric AS month_earnings
+        FROM earned
+        GROUP BY professional_id
+      ),
+      payouts_by_partner AS (
+        SELECT
+          professional_id,
+        COALESCE(SUM(amount) FILTER (WHERE status IN ('pending', 'approved', 'processing')), 0)::numeric AS pending_payout,
+          COALESCE(SUM(amount) FILTER (WHERE status = 'paid'), 0)::numeric AS paid_out
+        FROM payout_requests
+        WHERE professional_id = ${id}
+        GROUP BY professional_id
+      )
+      SELECT
+        pr.id, pr.name, pr.payout_upi_id, u.email, u.phone,
+        COALESCE(e.completed_jobs, 0)::int AS completed_jobs,
+        COALESCE(e.total_earnings, 0)::numeric AS total_earnings,
+        COALESCE(e.month_earnings, 0)::numeric AS month_earnings,
+        COALESCE(p.pending_payout, 0)::numeric AS pending_payout,
+        COALESCE(p.paid_out, 0)::numeric AS paid_out
+      FROM professionals pr
+      LEFT JOIN users u ON u.id = pr.user_id
+      LEFT JOIN earned_by_partner e ON e.professional_id = pr.id
+      LEFT JOIN payouts_by_partner p ON p.professional_id = pr.id
+      WHERE pr.id = ${id} AND pr.deleted_at IS NULL
+    `);
+    const row = (result as any[])[0];
+    if (!row) throw AppError.notFound('Partner not found.');
+
+    const requests = await db.select({
+      id: payoutRequests.id,
+      professionalId: payoutRequests.professionalId,
+      proName: professionals.name,
+      amount: payoutRequests.amount,
+      status: payoutRequests.status,
+      note: payoutRequests.note,
+      requestedAt: payoutRequests.requestedAt,
+      resolvedAt: payoutRequests.resolvedAt,
+      providerPayoutId: payoutRequests.providerPayoutId,
+      providerStatus: payoutRequests.providerStatus,
+      failureReason: payoutRequests.failureReason,
+    })
+      .from(payoutRequests)
+      .leftJoin(professionals, eq(payoutRequests.professionalId, professionals.id))
+      .where(eq(payoutRequests.professionalId, id))
+      .orderBy(desc(payoutRequests.requestedAt))
+      .limit(100);
+
+    res.json({
+      success: true,
+      data: {
+        partner: {
+          id: row.id, name: row.name, email: row.email, phone: row.phone, payoutUpiId: row.payout_upi_id,
+        },
+        summary: {
+          completedJobs: Number(row.completed_jobs ?? 0),
+          totalEarnings: Number(row.total_earnings ?? 0),
+          monthEarnings: Number(row.month_earnings ?? 0),
+          pendingPayout: Number(row.pending_payout ?? 0),
+          paidOut: Number(row.paid_out ?? 0),
+          available: Math.max(0, Number(row.total_earnings ?? 0) - Number(row.pending_payout ?? 0) - Number(row.paid_out ?? 0)),
+        },
+        payoutRequests: requests,
+      },
+    });
+  }),
+
+  listPayoutRuns: asyncHandler(async (req: Request, res: Response) => {
+    const limit = Math.min(Number(req.query.limit ?? 20), 100);
+    const rows = await db.select().from(payoutRuns)
+      .orderBy(desc(payoutRuns.startedAt))
+      .limit(limit);
+    res.json({ success: true, data: rows });
+  }),
+
+  runPayoutsNow: asyncHandler(async (_req: Request, res: Response) => {
+    const result = await runPayouts('manual');
+    res.json({ success: true, data: result });
+  }),
+
   resolvePayoutRequest: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body as { status?: string };
-    if (status !== 'paid' && status !== 'rejected') {
-      throw AppError.badRequest('status must be "paid" or "rejected"');
+    if (status !== 'paid' && status !== 'rejected' && status !== 'approved') {
+      throw AppError.badRequest('status must be "approved", "paid", or "rejected"');
     }
 
     const [existing] = await db.select().from(payoutRequests).where(eq(payoutRequests.id, id));
     if (!existing) throw AppError.notFound('Payout request not found');
-    if (existing.status !== 'pending') {
+    if (!['pending', 'approved'].includes(existing.status)) {
       throw AppError.badRequest(`Payout request is already ${existing.status}.`);
+    }
+
+    if (status === 'approved') {
+      const [row] = await db.update(payoutRequests)
+        .set({ status: 'approved', providerStatus: 'approved_for_schedule', failureReason: null })
+        .where(and(eq(payoutRequests.id, id), eq(payoutRequests.status, 'pending')))
+        .returning();
+      if (!row) throw AppError.conflict('Payout request changed before it could be approved.');
+      await auditLogService.record(req.user!.userId, 'payout.approved_for_schedule', 'payout_request', id, { amount: existing.amount });
+      return res.json({ success: true, data: row });
+    }
+
+    if (status === 'paid') {
+      const [pro] = await db.select({
+        userId: professionals.userId,
+        payoutUpiId: professionals.payoutUpiId,
+      }).from(professionals).where(eq(professionals.id, existing.professionalId));
+      if (!pro?.payoutUpiId) {
+        throw AppError.badRequest('Partner has not saved a payout UPI ID.');
+      }
+
+      try {
+        const provider = await createRazorpayUpiPayout({
+          payoutRequestId: existing.id,
+          professionalId: existing.professionalId,
+          amountRupees: existing.amount,
+          upiId: pro.payoutUpiId,
+          note: existing.note,
+        });
+        const [row] = await db
+          .update(payoutRequests)
+          .set({
+            status: 'paid',
+            resolvedAt: new Date(),
+            providerPayoutId: provider.id,
+            providerStatus: provider.status,
+            failureReason: null,
+          })
+          .where(eq(payoutRequests.id, id))
+          .returning();
+
+        await auditLogService.record(req.user!.userId, 'payout.paid', 'payout_request', id, {
+          amount: existing.amount,
+          provider: 'razorpayx',
+          providerPayoutId: provider.id,
+        });
+        if (pro.userId) {
+          void notificationService.sendToUser(
+            pro.userId,
+            'Payout sent',
+            `Your payout of ₹${existing.amount} was sent to ${pro.payoutUpiId}.`,
+            { payoutId: id, providerPayoutId: provider.id, type: 'payout_paid' },
+          );
+        }
+        return res.json({ success: true, data: row });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'RazorpayX payout failed.';
+        await db.update(payoutRequests)
+          .set({ providerStatus: 'failed', failureReason: message })
+          .where(eq(payoutRequests.id, id));
+        throw error;
+      }
     }
 
     const [row] = await db
@@ -1014,10 +1459,8 @@ export const adminController = {
     if (pro?.userId) {
       void notificationService.sendToUser(
         pro.userId,
-        status === 'paid' ? 'Payout sent' : 'Payout request rejected',
-        status === 'paid'
-          ? `Your payout of ₹${existing.amount} has been processed.`
-          : `Your payout request of ₹${existing.amount} was rejected.`,
+        'Payout request rejected',
+        `Your payout request of ₹${existing.amount} was rejected.`,
         { payoutId: id, type: `payout_${status}` },
       );
     }

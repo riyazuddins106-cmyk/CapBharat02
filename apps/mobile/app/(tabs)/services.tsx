@@ -9,6 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { categoriesApi, subcategoriesApi, servicesApi, cartApi, type Cart } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
+import { NativeIcon } from '@/components/NativeIcon';
 
 const serviceTypeIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   all: 'grid-outline',
@@ -137,7 +138,7 @@ export default function ServicesScreen() {
               style={styles.serviceTypeTile}
             >
               <View style={[styles.serviceTypeIcon, { backgroundColor: colors.primary }]}>
-                <Ionicons name="grid-outline" size={25} color="#fff" />
+                <NativeIcon name="grid-outline" size={28} color="#fff" />
               </View>
               <Text numberOfLines={2} style={[styles.serviceTypeLabel, { color: selectedSubCat === null ? colors.primary : colors.foreground, fontWeight: selectedSubCat === null ? '700' : '500' }]}>
                 All
@@ -155,7 +156,7 @@ export default function ServicesScreen() {
                   {item.imageUrl ? (
                     <Image source={{ uri: item.imageUrl }} style={styles.serviceTypeImage} />
                   ) : (
-                    <Ionicons name={getServiceTypeIcon(item.name)} size={25} color="#fff" />
+                    <NativeIcon name={getServiceTypeIcon(item.name)} size={28} color="#fff" />
                   )}
                 </View>
                 <Text numberOfLines={2} style={[styles.serviceTypeLabel, { color: selectedSubCat === item.id ? colors.primary : colors.foreground, fontWeight: selectedSubCat === item.id ? '700' : '500' }]}>

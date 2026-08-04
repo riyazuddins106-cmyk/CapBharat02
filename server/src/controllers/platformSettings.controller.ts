@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import nodemailer from 'nodemailer';
 
 /* ── Allowed setting keys ─────────────────────────────────────────── */
-const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config', 'booking_config']);
+const ALLOWED_KEYS = new Set(['payment_config', 'email_config', 'sms_config', 'contact_config', 'otp_config', 'booking_config', 'payout_config']);
 
 /* ── GET /admin/settings/:key ─────────────────────────────────────── */
 export const getSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -105,7 +105,7 @@ function getDefaults(key: string): object {
       testMode: { enabled: false },
       cod:      { enabled: true  },
       upi:      { enabled: false, vpa: '' },
-      razorpay: { enabled: false, keyId: '', keySecret: '', webhookSecret: '' },
+      razorpay: { enabled: false, keyId: '', keySecret: '', webhookSecret: '', xAccountNumber: '' },
       stripe:   { enabled: false, publishableKey: '', secretKey: '' },
     };
   }
@@ -155,6 +155,17 @@ function getDefaults(key: string): object {
       openingHour:         9,
       closingHour:         20,
       slotIntervalMinutes: 30,
+    };
+  }
+  if (key === 'payout_config') {
+    return {
+      enabled: false,
+      frequency: 'weekly',
+      dayOfWeek: 5,
+      dayOfMonth: 1,
+      runHourUtc: 3,
+      maxPayoutsPerRun: 100,
+      maxAmountPerRun: 100000,
     };
   }
   return {};

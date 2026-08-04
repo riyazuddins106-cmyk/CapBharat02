@@ -148,6 +148,9 @@ export interface ApiOrderItem {
   customerPrice: number;
   partnerPayout: number;
   quantity: number;
+  cancellationReason?: string | null;
+  cancellationFee?: number | null;
+  cancelledAt?: string | null;
   payment: {
     id: string;
     status: "created" | "paid" | "failed" | "refunded";
@@ -329,9 +332,16 @@ export const ordersApi = {
     return data.data as ApiOrder[];
   },
 
-  async cancelItem(orderId: string, itemId: string) {
-    const { data } = await client.patch(`/orders/${orderId}/items/${itemId}/cancel`);
+  async cancelItem(orderId: string, itemId: string, reason?: string) {
+    const { data } = await client.patch(`/orders/${orderId}/items/${itemId}/cancel`, {
+      reason: reason?.trim() || undefined,
+    });
     return data.data as ApiOrder;
+  },
+
+  async getItemQr(orderId: string, itemId: string) {
+    const { data } = await client.get(`/orders/${orderId}/items/${itemId}/qr`);
+    return data.data as { qrToken: string; expiresIn: number; orderId: string; orderItemId: string };
   },
 
   async continueSearching(orderId: string, itemId: string) {

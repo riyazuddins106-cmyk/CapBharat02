@@ -462,21 +462,59 @@ function OrderItemPaymentSheet({ order, item, token, onClose, onPaid }: {
 function OrderServiceCard({ order, item, onAction, busy }: {
   order: Order;
   item: OrderItem;
-  onAction: (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string) => void;
+  onAction: (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string, reason?: string) => void;
   busy: string | null;
 }) {
   const colors = useColors();
+  const { accessToken } = useAuth();
   const canCancel = !['cancelled', 'service_started', 'service_completed'].includes(item.status);
   const canContinue = !item.partnerId && item.status !== 'cancelled';
   const needsPayment = ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid';
   const actionKey = (action: string) => `${action}:${item.id}`;
+  const [showDetails, setShowDetails] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [reason, setReason] = useState('');
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const canShowQr = ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status);
+  const penaltyRate = item.status === 'partner_accepted' ? 25
+    : ['partner_arrived', 'payment_pending', 'payment_completed'].includes(item.status) ? 50 : 0;
+  const estimatedFee = Math.ceil(item.customerPrice * penaltyRate / 100);
+  const statusSteps = [
+    { key: 'searching_partner', label: 'Finding a partner' },
+    { key: 'partner_accepted', label: 'Partner accepted' },
+    { key: 'partner_arrived', label: 'Partner checked in' },
+    { key: 'payment_completed', label: 'Payment confirmed' },
+    { key: 'service_started', label: 'Service in progress' },
+    { key: 'service_completed', label: 'Service completed' },
+  ];
+  const currentStep = item.status === 'cancelled'
+    ? -1
+    : Math.max(0, statusSteps.findIndex((step) => step.key === item.status));
+
+  const openQr = async () => {
+    if (!accessToken) return;
+    setShowDetails(true);
+    if (qrToken) return;
+    setQrLoading(true);
+    try {
+      const data = await ordersApi.getItemQr(order.id, item.id, accessToken);
+      setQrToken(data.qrToken);
+    } catch (error: any) {
+      Alert.alert('QR unavailable', error?.message ?? 'The customer QR code could not be loaded.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   return (
+    <>
     <View style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
       <View style={styles.orderHeader}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.orderLabel, { color: colors.primary }]}>SERVICE ORDER</Text>
           <Text style={[styles.orderMeta, { color: colors.mutedForeground }]}>{formatOrderTime(order.scheduledAt)} · ₹{order.totalAmount}</Text>
+          <Text style={[styles.orderMeta, { color: colors.mutedForeground }]} numberOfLines={1}>Order ID: {order.id}</Text>
         </View>
         <Text style={[styles.orderStatus, { color: colors.primary }]}>{order.status.replaceAll('_', ' ')}</Text>
       </View>
@@ -492,6 +530,10 @@ function OrderServiceCard({ order, item, onAction, busy }: {
         </View>
         <Text style={[styles.orderItemStatus, { color: colors.foreground }]}>{item.status.replaceAll('_', ' ')}</Text>
       </View>
+       <TouchableOpacity onPress={() => setShowDetails(true)} style={styles.detailsLink}>
+         <Ionicons name="information-circle-outline" size={15} color={colors.primary} />
+         <Text style={[styles.detailsLinkText, { color: colors.primary }]}>View service details & tracking</Text>
+       </TouchableOpacity>
       {(canContinue || needsPayment || canCancel) && (
         <View style={styles.orderActions}>
           {canContinue && (
@@ -518,7 +560,7 @@ function OrderServiceCard({ order, item, onAction, busy }: {
           )}
           {canCancel && (
             <TouchableOpacity
-              onPress={() => onAction('cancel', order.id, item.id)}
+               onPress={() => setShowCancel(true)}
               disabled={busy === actionKey('cancel')}
               style={[styles.orderActionBtn, { borderColor: '#FCA5A5' }]}
             >
@@ -530,6 +572,84 @@ function OrderServiceCard({ order, item, onAction, busy }: {
         </View>
       )}
     </View>
+     <Modal visible={showDetails} transparent animationType="slide" onRequestClose={() => setShowDetails(false)}>
+       <View style={styles.modalBackdrop}>
+         <View style={[styles.orderDetailSheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
+           <View style={styles.reviewHeader}>
+             <View style={{ flex: 1 }}>
+               <Text style={[styles.reviewTitle, { color: colors.foreground }]}>{item.serviceName ?? 'Service'}</Text>
+               <Text style={[styles.orderMeta, { color: colors.mutedForeground }]}>Order ID: {order.id}</Text>
+             </View>
+             <TouchableOpacity onPress={() => setShowDetails(false)}>
+               <Ionicons name="close" size={23} color={colors.mutedForeground} />
+             </TouchableOpacity>
+           </View>
+           <View style={[styles.detailSummary, { backgroundColor: colors.muted }]}>
+             <Text style={[styles.detailSummaryTitle, { color: colors.foreground }]}>Service details</Text>
+             <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>Scheduled: {formatOrderTime(item.startTime)}</Text>
+             <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>Duration: {item.durationMinutes} minutes · Quantity: {item.quantity}</Text>
+             <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>Partner: {item.partnerName ?? 'Searching for a partner'}</Text>
+             <Text style={[styles.orderDetail, { color: colors.foreground, fontWeight: '700' }]}>Amount: ₹{item.customerPrice}</Text>
+           </View>
+           <Text style={[styles.timelineTitle, { color: colors.foreground }]}>Booking tracking</Text>
+           <View style={styles.timeline}>
+             {statusSteps.map((step, index) => {
+               const done = currentStep >= index;
+               const active = item.status === step.key;
+               return (
+                 <View key={step.key} style={styles.timelineRow}>
+                   <View style={[styles.timelineDot, { backgroundColor: done ? colors.primary : colors.border }]}>
+                     {done && <Ionicons name={active ? 'radio-button-on' : 'checkmark'} size={11} color="#fff" />}
+                   </View>
+                   <Text style={[styles.timelineLabel, { color: done ? colors.foreground : colors.mutedForeground, fontWeight: active ? '700' : '500' }]}>{step.label}</Text>
+                 </View>
+               );
+             })}
+           </View>
+           {item.status === 'cancelled' && (
+             <View style={[styles.cancelledBox, { backgroundColor: '#FEF2F2' }]}>
+               <Text style={{ color: '#B91C1C', fontWeight: '700' }}>Service cancelled</Text>
+               {item.cancellationReason && <Text style={{ color: '#991B1B', fontSize: 12 }}>Reason: {item.cancellationReason}</Text>}
+               {!!item.cancellationFee && <Text style={{ color: '#991B1B', fontSize: 12 }}>Cancellation fee: ₹{item.cancellationFee}</Text>}
+             </View>
+           )}
+           {canShowQr && (
+             <View style={[styles.customerQrBox, { borderColor: colors.border }]}>
+               <Text style={[styles.timelineTitle, { color: colors.foreground }]}>Customer check-in QR</Text>
+               {qrLoading ? <ActivityIndicator color={colors.primary} style={{ height: 150 }} />
+                 : qrToken ? <QRCode value={qrToken} size={150} color={colors.foreground} backgroundColor={colors.card} />
+                 : <TouchableOpacity onPress={openQr} style={[styles.qrLoadButton, { backgroundColor: colors.primary }]}><Ionicons name="qr-code-outline" size={17} color="#fff" /><Text style={styles.qrLoadText}>Show QR code</Text></TouchableOpacity>}
+               <Text style={[styles.orderDetail, { color: colors.mutedForeground, textAlign: 'center' }]}>Show this code to your partner when they arrive.</Text>
+             </View>
+           )}
+         </View>
+       </View>
+     </Modal>
+     <Modal visible={showCancel} transparent animationType="fade" onRequestClose={() => setShowCancel(false)}>
+       <View style={styles.modalBackdrop}>
+         <View style={[styles.cancelSheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
+           <Text style={[styles.reviewTitle, { color: colors.foreground }]}>Cancel this service?</Text>
+           <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>
+             {penaltyRate > 0
+               ? `A ${penaltyRate}% cancellation fee of approximately ₹${estimatedFee} may apply because the partner has ${item.status === 'partner_accepted' ? 'accepted this service' : 'checked in'}.`
+               : 'There is no cancellation fee before a partner accepts this service.'}
+           </Text>
+           <TextInput
+             value={reason}
+             onChangeText={setReason}
+             placeholder="Cancellation reason (optional)"
+             placeholderTextColor={colors.mutedForeground}
+             style={[styles.cancelInput, { backgroundColor: colors.muted, color: colors.foreground }]}
+             multiline
+           />
+           <View style={styles.cancelActions}>
+             <TouchableOpacity onPress={() => setShowCancel(false)} style={[styles.orderActionBtn, { borderColor: colors.border }]}><Text style={[styles.orderActionText, { color: colors.foreground }]}>Keep service</Text></TouchableOpacity>
+             <TouchableOpacity onPress={() => { setShowCancel(false); onAction('cancel', order.id, item.id, reason); setReason(''); }} style={[styles.orderActionBtn, { backgroundColor: '#DC2626', borderColor: '#DC2626' }]}><Text style={[styles.orderActionText, { color: '#fff' }]}>Cancel service</Text></TouchableOpacity>
+           </View>
+         </View>
+       </View>
+     </Modal>
+    </>
   );
 }
 
@@ -579,8 +699,8 @@ export default function BookingsScreen() {
     if (target) {
       setPayModal(target);
       if (target.status === 'pending') setTab('searching');
-      else if (['upcoming', 'in_progress'].includes(target.status)) setTab('upcoming');
-      else if (target.status === 'completed' && target.paymentStatus !== 'paid') setTab('awaitingPayment');
+      else if (target.status === 'upcoming' || (target.status === 'in_progress' && target.paymentStatus === 'paid')) setTab('upcoming');
+      else if (['in_progress', 'completed'].includes(target.status) && target.paymentStatus !== 'paid') setTab('awaitingPayment');
     } else {
       // Booking not in list yet — refetch once after a short delay.
       const timer = setTimeout(() => refetch(), 1500);
@@ -614,11 +734,11 @@ export default function BookingsScreen() {
     setRefreshing(false);
   };
 
-  const handleOrderAction = async (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string) => {
+  const handleOrderAction = async (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string, reason?: string) => {
     const key = `${action}:${itemId}`;
     setOrderActionBusy(key);
     try {
-      if (action === 'cancel') await ordersApi.cancelItem(orderId, itemId, accessToken!);
+       if (action === 'cancel') await ordersApi.cancelItem(orderId, itemId, reason, accessToken!);
       if (action === 'continue') await ordersApi.continueSearching(orderId, itemId, accessToken!);
       if (action === 'pay') {
         const order = orders.find((candidate) => candidate.id === orderId);
@@ -638,8 +758,8 @@ export default function BookingsScreen() {
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const allBookings = bookings ?? [];
   const searchingBookings       = allBookings.filter((b) => b.status === 'pending');
-  const upcomingBookings        = allBookings.filter((b) => ['upcoming', 'in_progress'].includes(b.status));
-  const awaitingPaymentBookings = allBookings.filter((b) => b.status === 'completed' && b.paymentStatus !== 'paid');
+  const upcomingBookings        = allBookings.filter((b) => b.status === 'upcoming' || (b.status === 'in_progress' && b.paymentStatus === 'paid'));
+  const awaitingPaymentBookings = allBookings.filter((b) => ['in_progress', 'completed'].includes(b.status) && b.paymentStatus !== 'paid');
   const pastBookings            = allBookings.filter((b) =>
     b.status === 'cancelled' || (b.status === 'completed' && b.paymentStatus === 'paid'),
   );
@@ -744,7 +864,7 @@ export default function BookingsScreen() {
                   <Ionicons name="wallet-outline" size={20} color="#D97706" />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.searchingTitle, { color: '#D97706' }]}>Service Payment Due</Text>
-                    <Text style={[styles.searchingText, { color: '#92400E' }]}>Pay each service after its partner arrives.</Text>
+                    <Text style={[styles.searchingText, { color: '#92400E' }]}>Payment is due after your partner checks in or completes the service.</Text>
                   </View>
                 </View>
               </View>
@@ -891,6 +1011,23 @@ const styles = StyleSheet.create({
   orderItem: { flexDirection: 'row', alignItems: 'flex-start', padding: 10, borderRadius: 10 },
   orderServiceName: { fontSize: 14, fontWeight: '700' },
   orderDetail: { fontSize: 11, marginTop: 4 },
+  detailsLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
+  detailsLinkText: { fontSize: 12, fontWeight: '700' },
+  orderDetailSheet: { width: '100%', maxWidth: 390, padding: 20, gap: 14, maxHeight: '90%' },
+  detailSummary: { padding: 13, borderRadius: 12, gap: 5 },
+  detailSummaryTitle: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  timelineTitle: { fontSize: 13, fontWeight: '800', marginTop: 2 },
+  timeline: { gap: 9 },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  timelineDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  timelineLabel: { fontSize: 13 },
+  customerQrBox: { alignItems: 'center', gap: 9, borderWidth: 1, borderRadius: 12, padding: 14 },
+  qrLoadButton: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 9 },
+  qrLoadText: { color: '#fff', fontWeight: '700' },
+  cancelledBox: { padding: 11, borderRadius: 10, gap: 4 },
+  cancelSheet: { width: '100%', maxWidth: 390, padding: 20, gap: 13 },
+  cancelInput: { minHeight: 74, padding: 12, borderRadius: 10, textAlignVertical: 'top', fontSize: 13 },
+  cancelActions: { flexDirection: 'row', gap: 8 },
   orderItemStatus: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize', maxWidth: 90, textAlign: 'right' },
   orderActions: { flexDirection: 'row', gap: 7, marginTop: 10 },
   orderActionBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 34, paddingHorizontal: 6, borderRadius: 8, borderWidth: 1 },

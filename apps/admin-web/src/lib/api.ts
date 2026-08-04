@@ -96,6 +96,42 @@ export interface BookingRow {
   paymentId?: string | null;
 }
 
+export interface AdminBookingDetail extends BookingRow {
+  customerPhone?: string | null;
+  address?: Record<string, unknown> | null;
+  items: Array<{
+    id: string;
+    serviceId: string;
+    serviceName: string | null;
+    quantity: number;
+    unitCustomerPrice: number;
+    unitPartnerPayout: number;
+    lineTotal: number;
+    duration: number;
+  }>;
+  dispatchRequests: Array<{
+    id: string;
+    status: string;
+    sentAt: string;
+    respondedAt: string | null;
+    partner: {
+      id: string;
+      name: string;
+      rating: number;
+      availabilityStatus: string;
+    };
+  }>;
+  assignmentHistory: Array<{
+    id: string;
+    action: string;
+    partnerId: string | null;
+    partnerName: string | null;
+    assignedByUserId: string | null;
+    createdAt: string;
+  }>;
+  payments: Array<Record<string, unknown>>;
+}
+
 export interface AdminOrderItemRow {
   id: string;
   serviceName: string | null;
@@ -117,6 +153,11 @@ export interface AdminOrderRow {
   customerName: string;
   customerEmail: string;
   items: AdminOrderItemRow[];
+}
+
+export interface AdminOrderDetail extends AdminOrderRow {
+  customerPhone?: string | null;
+  address?: Record<string, unknown> | null;
 }
 
 export interface ProfessionalRow {
@@ -250,10 +291,36 @@ export interface PayoutRow {
   professionalId: string;
   proName: string | null;
   amount: number;
-  status: 'pending' | 'paid' | 'rejected';
+  status: 'pending' | 'approved' | 'processing' | 'paid' | 'rejected';
   note: string | null;
   requestedAt: string;
   resolvedAt: string | null;
+  providerPayoutId?: string | null;
+  providerStatus?: string | null;
+  failureReason?: string | null;
+  payoutUpiId?: string | null;
+}
+
+export interface PayoutPartnerRow {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  payoutUpiId: string | null;
+  completedJobs: number;
+  totalEarnings: number;
+  monthEarnings: number;
+  pendingPayout: number;
+  paidOut: number;
+  available: number;
+  pendingRequests: number;
+  latestRequestAt: string | null;
+}
+
+export interface PayoutPartnerDetail {
+  partner: Pick<PayoutPartnerRow, 'id' | 'name' | 'email' | 'phone' | 'payoutUpiId'>;
+  summary: Pick<PayoutPartnerRow, 'completedJobs' | 'totalEarnings' | 'monthEarnings' | 'pendingPayout' | 'paidOut' | 'available'>;
+  payoutRequests: PayoutRow[];
 }
 
 export interface NotificationRow {
@@ -527,6 +594,8 @@ export const adminApi = {
       cancelledCount: number;
       pendingCount: number;
     }>(`/admin/bookings${params ? `?${params}` : ''}`, { token }),
+  getBooking: (id: string, token: string) =>
+    request<AdminBookingDetail>(`/admin/bookings/${id}`, { token }),
   updateBooking: (id: string, data: { status?: string; notes?: string; price?: number; scheduledAt?: string }, token: string) =>
     request<BookingRow>(`/admin/bookings/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   cancelBooking: (id: string, token: string) =>
@@ -653,8 +722,35 @@ export const adminApi = {
   // Payouts
   getPayouts: (token: string) =>
     request<{ payouts: PayoutRow[]; total: number }>('/admin/payouts?limit=100', { token }),
-  resolvePayout: (id: string, status: 'paid' | 'rejected', token: string) =>
+  getPayoutPartners: (params: { page?: number; pageSize?: number; search?: string; status?: string }, token: string) => {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params.search) query.set('search', params.search);
+    if (params.status && params.status !== 'all') query.set('status', params.status);
+    return request<{
+      partners: PayoutPartnerRow[];
+      total: number;
+      summary: { totalEarnings: number; monthEarnings: number; pendingPayout: number; paidOut: number; available: number };
+      page: number;
+      pageSize: number;
+    }>(`/admin/payouts/partners?${query.toString()}`, { token });
+  },
+  getPayoutPartnerDetail: (id: string, token: string) =>
+    request<PayoutPartnerDetail>(`/admin/payouts/partners/${id}`, { token }),
+  resolvePayout: (id: string, status: 'approved' | 'paid' | 'rejected', token: string) =>
     request<PayoutRow>(`/admin/payouts/${id}`, { method: 'PATCH', token, body: JSON.stringify({ status }) }),
+  getPayoutRuns: (token: string) =>
+    request<Array<{
+      id: string; trigger: string; scheduleKey: string | null; status: string;
+      requestedCount: number; successCount: number; failureCount: number;
+      requestedAmount: number; paidAmount: number; failureReason: string | null;
+      startedAt: string; completedAt: string | null;
+    }>>('/admin/payout-runs?limit=20', { token }),
+  runPayoutsNow: (token: string) =>
+    request<{ skipped?: boolean; reason?: string; runId?: string; successCount?: number; failureCount?: number; paidAmount?: number }>(
+      '/admin/payout-runs/run', { method: 'POST', token },
+    ),
 
   // Support Tickets
   getSupportTickets: (token: string) =>
@@ -718,20 +814,24 @@ export const adminApi = {
 
   getDispatch: (token: string, status?: string) =>
     request<DispatchRequestRow[]>(`/operations/dispatch${status ? `?status=${encodeURIComponent(status)}` : ''}`, { token }),
+  stopSearching: (bookingId: string, token: string) =>
+    request<BookingRow>(`/operations/dispatch/${bookingId}/stop-searching`, { method: 'PATCH', token }),
   getEligiblePartners: (bookingId: string, token: string) =>
     request<EligiblePartner[]>(`/operations/dispatch/${bookingId}/eligible-partners`, { token }),
   assignPartner: (bookingId: string, partnerId: string, token: string) =>
     request<BookingRow>(`/operations/dispatch/${bookingId}/assign`, { method: 'POST', token, body: JSON.stringify({ partnerId }) }),
   getOrders: (token: string) => request<AdminOrderRow[]>('/admin/orders', { token }),
+  getOrder: (orderId: string, token: string) =>
+    request<AdminOrderDetail>(`/admin/orders/${orderId}`, { token }),
   continueOrderItemDispatch: (orderId: string, itemId: string, token: string) =>
     request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/dispatch`, { method: 'PATCH', token }),
   refundOrderItem: (orderId: string, itemId: string, token: string) =>
     request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/refund`, { method: 'PATCH', token }),
 
   // Platform Settings
-  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config', token: string) =>
+  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config', token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { token }),
-  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config', value: unknown, token: string) =>
+  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config', value: unknown, token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { method: 'PUT', token, body: JSON.stringify(value) }),
   sendTestEmail: (to: string, token: string) =>
     request<{ message: string }>('/admin/settings/email/test', { method: 'POST', token, body: JSON.stringify({ to }) }),

@@ -97,11 +97,12 @@ export default function RootLayout() {
   });
 
   // Safety net: useFonts() can stall indefinitely over tunnel connections.
-  // Force render with fallback fonts after a short timeout.
+  // Keep a native grace period long enough for the Ionicons font to load;
+  // rendering after a few hundred milliseconds produces blank icon glyphs.
   const [fontTimedOut, setFontTimedOut] = React.useState(false);
   useEffect(() => {
     if (fontsLoaded || fontError) return;
-    const timer = setTimeout(() => setFontTimedOut(true), 300);
+    const timer = setTimeout(() => setFontTimedOut(true), Platform.OS === 'web' ? 1000 : 3000);
     return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
