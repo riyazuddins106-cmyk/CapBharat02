@@ -19,6 +19,7 @@ router.use(authenticate, requireRole('admin'));
 
 // Dashboard stats
 router.get('/stats', adminController.getStats);
+router.patch('/me', adminController.updateOwnAdminProfile);
 
 // Analytics timeseries
 router.get('/analytics/timeseries', adminController.getAnalyticsTimeseries);
@@ -47,6 +48,9 @@ router.delete('/professionals/:id',             adminController.deleteProfession
 router.post('/professionals/:id/avatar',        upload.single('avatar'), adminController.uploadProfessionalAvatar);
 
 // Users / Customers
+router.get('/admins',                  adminController.listAdmins);
+router.post('/admins',                 adminController.createAdmin);
+router.patch('/admins/:id',             adminController.updateAdmin);
 router.get('/users',                  adminController.listUsers);
 router.patch('/users/:id',            adminController.updateUser);
 router.delete('/users/:id',           adminController.deleteUser);

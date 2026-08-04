@@ -30,6 +30,57 @@ import { createRazorpayUpiPayout } from '../services/razorpayPayout.service.js';
 import { runPayouts } from '../services/payoutScheduler.service.js';
 
 export const adminController = {
+  updateOwnAdminProfile: asyncHandler(async (req: Request, res: Response) => {
+    const { fullName, email, phone } = req.body as {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+    };
+
+    if (fullName !== undefined && fullName.trim().length < 2) {
+      throw AppError.badRequest('Full name must be at least 2 characters.');
+    }
+    if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      throw AppError.badRequest('A valid email is required.');
+    }
+
+    const normalizedEmail = email?.trim().toLowerCase();
+    if (normalizedEmail) {
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, normalizedEmail))
+        .limit(1);
+      if (existing && existing.id !== req.user!.userId) {
+        throw AppError.conflict('A user with this email already exists.');
+      }
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...(fullName !== undefined ? { fullName: fullName.trim() } : {}),
+        ...(normalizedEmail ? { email: normalizedEmail, emailVerifiedAt: new Date() } : {}),
+        ...(phone !== undefined ? { phone: phone.trim() || null } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, req.user!.userId))
+      .returning({
+        id: users.id,
+        email: users.email,
+        phone: users.phone,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+        role: users.role,
+      });
+
+    if (!updated) throw AppError.notFound('Admin account not found.');
+    await auditLogService.record(req.user!.userId, 'admin.profile.update', 'user', req.user!.userId, {
+      changedFields: Object.keys(req.body ?? {}),
+    });
+    res.json({ success: true, data: updated });
+  }),
+
   /** Master orders with per-service status, dispatch, earnings and payment state. */
   listOrders: asyncHandler(async (req: Request, res: Response) => {
     const limit = Math.min(Number(req.query.limit ?? 100), 500);
@@ -793,6 +844,173 @@ export const adminController = {
     res.json({ success: true, data: { users: rows, total: Number(total) } });
   }),
 
+  listAdmins: asyncHandler(async (_req: Request, res: Response) => {
+    const rows = await db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        isActive: users.isActive,
+        avatarUrl: users.avatarUrl,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(and(inArray(users.role, ['admin', 'operations_manager']), isNull(users.deletedAt)))
+      .orderBy(desc(users.createdAt));
+
+    res.json({ success: true, data: { admins: rows, total: rows.length } });
+  }),
+
+  createAdmin: asyncHandler(async (req: Request, res: Response) => {
+    const { fullName, email, password, phone, role } = req.body as {
+      fullName?: string;
+      email?: string;
+      password?: string;
+      phone?: string;
+      role?: string;
+    };
+
+    if (!fullName?.trim()) throw AppError.badRequest('Full name is required.');
+    if (!email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      throw AppError.badRequest('A valid email is required.');
+    }
+    if (!password || password.length < 8) {
+      throw AppError.badRequest('Password must be at least 8 characters.');
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      throw AppError.badRequest('Password must contain an uppercase letter, lowercase letter, and number.');
+    }
+    if (role !== 'admin' && role !== 'operations_manager') {
+      throw AppError.badRequest('Role must be admin or operations_manager.');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, normalizedEmail))
+      .limit(1);
+    if (existing) throw AppError.conflict('A user with this email already exists.');
+
+    const passwordHash = await hashPassword(password);
+    const [created] = await db
+      .insert(users)
+      .values({
+        fullName: fullName.trim(),
+        email: normalizedEmail,
+        phone: phone?.trim() || null,
+        passwordHash,
+        role: role as 'admin' | 'operations_manager',
+        emailVerifiedAt: new Date(),
+        isActive: true,
+      })
+      .returning({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        isActive: users.isActive,
+        avatarUrl: users.avatarUrl,
+        createdAt: users.createdAt,
+      });
+
+    await auditLogService.record(req.user!.userId, 'admin.create', 'user', created.id, {
+      email: created.email,
+      role: created.role,
+    });
+    res.status(201).json({ success: true, data: created });
+  }),
+
+  updateAdmin: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { fullName, email, phone, role, isActive, password } = req.body as {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      role?: string;
+      isActive?: boolean;
+      password?: string;
+    };
+
+    if (id === req.user!.userId) {
+      throw AppError.badRequest('Use Settings to update your own account.');
+    }
+    if (fullName !== undefined && fullName.trim().length < 2) {
+      throw AppError.badRequest('Full name must be at least 2 characters.');
+    }
+    if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      throw AppError.badRequest('A valid email is required.');
+    }
+    if (role !== undefined && role !== 'admin' && role !== 'operations_manager') {
+      throw AppError.badRequest('Role must be admin or operations_manager.');
+    }
+    if (isActive === false && id === req.user!.userId) {
+      throw AppError.badRequest('You cannot disable your own account.');
+    }
+    if (password !== undefined) {
+      if (password.length < 8) throw AppError.badRequest('Password must be at least 8 characters.');
+      if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+        throw AppError.badRequest('Password must contain an uppercase letter, lowercase letter, and number.');
+      }
+    }
+
+    const [target] = await db
+      .select({ id: users.id, role: users.role, deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    if (!target || target.deletedAt || !['admin', 'operations_manager'].includes(target.role)) {
+      throw AppError.notFound('Admin account not found.');
+    }
+
+    const normalizedEmail = email?.trim().toLowerCase();
+    if (normalizedEmail) {
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, normalizedEmail))
+        .limit(1);
+      if (existing && existing.id !== id) {
+        throw AppError.conflict('A user with this email already exists.');
+      }
+    }
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (fullName !== undefined) patch.fullName = fullName.trim();
+    if (normalizedEmail) {
+      patch.email = normalizedEmail;
+      patch.emailVerifiedAt = new Date();
+    }
+    if (phone !== undefined) patch.phone = phone.trim() || null;
+    if (role !== undefined) patch.role = role;
+    if (isActive !== undefined) patch.isActive = isActive;
+    if (password !== undefined) patch.passwordHash = await hashPassword(password);
+
+    const [updated] = await db
+      .update(users)
+      .set(patch)
+      .where(eq(users.id, id))
+      .returning({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        isActive: users.isActive,
+        avatarUrl: users.avatarUrl,
+        createdAt: users.createdAt,
+      });
+
+    await auditLogService.record(req.user!.userId, 'admin.update', 'user', id, {
+      changedFields: Object.keys(req.body ?? {}).filter(field => field !== 'password'),
+      passwordReset: password !== undefined,
+    });
+    res.json({ success: true, data: updated });
+  }),
+
   updateUser: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { fullName, email, phone, role } = req.body as {
@@ -1127,10 +1345,29 @@ export const adminController = {
    * loads all partner history into the browser. */
   listPayoutPartners: asyncHandler(async (req: Request, res: Response) => {
     const page = Math.max(1, Number(req.query.page ?? 1));
-    const pageSize = Math.min(100, Math.max(10, Number(req.query.pageSize ?? 50)));
+    const requestedPageSize = Number(req.query.pageSize ?? 50);
+    const pageSize = requestedPageSize === -1
+      ? 1000
+      : Math.min(250, Math.max(10, requestedPageSize));
     const offset = (page - 1) * pageSize;
     const search = String(req.query.search ?? '').trim();
-    const status = String(req.query.status ?? 'all');
+    const requestedPartnerFilters = String(req.query.status ?? '')
+      .split(',')
+      .filter(Boolean);
+    const allowedPartnerFilters = ['payable', 'pending', 'missing_upi'] as const;
+    const partnerFilters = requestedPartnerFilters.filter(
+      (value): value is typeof allowedPartnerFilters[number] =>
+        (allowedPartnerFilters as readonly string[]).includes(value),
+    );
+    const partnerFilter = partnerFilters.length
+      ? sql`AND (${sql.join(partnerFilters.map(value =>
+          value === 'payable'
+            ? sql`available > 0`
+            : value === 'pending'
+              ? sql`pending_requests > 0`
+              : sql`available > 0 AND (payout_upi_id IS NULL OR payout_upi_id = '')`,
+        ), sql` OR `)})`
+      : sql``;
 
     const result = await db.execute(sql`
       WITH earned AS (
@@ -1216,12 +1453,8 @@ export const adminController = {
         COALESCE(SUM(paid_out) OVER(), 0)::numeric AS summary_paid_out,
         COALESCE(SUM(available) OVER(), 0)::numeric AS summary_available
       FROM filtered
-      WHERE (
-        ${status} = 'all'
-        OR (${status} = 'payable' AND available > 0)
-        OR (${status} = 'pending' AND pending_requests > 0)
-        OR (${status} = 'missing_upi' AND available > 0 AND (payout_upi_id IS NULL OR payout_upi_id = ''))
-      )
+      WHERE TRUE
+      ${partnerFilter}
       ORDER BY available DESC, name ASC
       LIMIT ${pageSize} OFFSET ${offset}
     `);

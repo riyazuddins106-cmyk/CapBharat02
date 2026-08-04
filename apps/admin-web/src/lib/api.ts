@@ -35,6 +35,30 @@ export interface AdminUser {
   avatarUrl?: string | null;
 }
 
+export interface AdminAccount extends AdminUser {
+  isActive: boolean;
+  createdAt: string;
+}
+
+/**
+ * The admin panel can be opened through the public preview route, while the
+ * API is exposed by the server on public port 8000. Keep the relative
+ * `/api` path for the local Vite server (where its proxy is configured), but
+ * use the server port when the browser is on the Replit public host. Without
+ * this distinction, `/api` can be answered by another active preview
+ * workflow with an HTML app shell instead of JSON.
+ */
+function getApiBase(): string {
+  if (typeof window === 'undefined') return '';
+  const { hostname, protocol, port } = window.location;
+  const isLocalAdminDev = port === '5001' || port === '3002';
+  const isReplitPreview = hostname.endsWith('.replit.dev') || hostname.endsWith('.repl.co');
+  return !isLocalAdminDev && isReplitPreview ? `${protocol}//${hostname}:8000` : '';
+}
+
+const API_BASE = getApiBase();
+const apiPath = (path: string) => `${API_BASE}/api${path}`;
+
 export interface PlatformPolicyRow {
   id: string;
   slug: string;
@@ -510,7 +534,7 @@ async function silentRefresh(): Promise<string> {
   refreshPromise = (async () => {
     const storedRefresh = adminAuth.getRefreshToken();
     if (!storedRefresh) throw new Error('No refresh token');
-    const data = await fetch('/api/auth/refresh', {
+    const data = await fetch(apiPath('/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: storedRefresh }),
@@ -524,7 +548,7 @@ async function silentRefresh(): Promise<string> {
 }
 
 async function doFetch(path: string, init: RequestInit, token?: string): Promise<Response> {
-  return fetch(`/api${path}`, {
+  return fetch(apiPath(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -551,6 +575,9 @@ async function request<T>(path: string, options: RequestInit & { token?: string 
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+  if (!json || json.success !== true || !('data' in json)) {
+    throw new Error('Admin API is unavailable. Please refresh and try again.');
+  }
   return json.data as T;
 }
 
@@ -560,6 +587,9 @@ export const authApi = {
     const data = await request<{ accessToken: string; refreshToken: string; user: AdminUser }>(
       '/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }
     );
+    if (!data?.user || !data.accessToken || !data.refreshToken) {
+      throw new Error('Admin login response was incomplete. Please try again.');
+    }
     if (!['admin', 'operations_manager'].includes(data.user.role)) throw new Error('This account does not have admin access.');
     return data;
   },
@@ -629,6 +659,14 @@ export const adminApi = {
   },
 
   // Users
+  updateAdminProfile: (data: { fullName?: string; email?: string; phone?: string }, token: string) =>
+    request<AdminUser>('/admin/me', { method: 'PATCH', token, body: JSON.stringify(data) }),
+  getAdmins: (token: string) =>
+    request<{ admins: AdminAccount[]; total: number }>('/admin/admins', { token }),
+  createAdmin: (data: { fullName: string; email: string; password: string; phone?: string; role: 'admin' | 'operations_manager' }, token: string) =>
+    request<AdminAccount>('/admin/admins', { method: 'POST', token, body: JSON.stringify(data) }),
+  updateAdmin: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: 'admin' | 'operations_manager'; isActive?: boolean; password?: string }, token: string) =>
+    request<AdminAccount>(`/admin/admins/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   getUsers: (token: string, page = 1, limit = 25) =>
     request<{ users: CustomerUser[]; total: number }>(`/admin/users?offset=${(page - 1) * limit}&limit=${limit}`, { token }),
   updateUser: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: string }, token: string) =>
@@ -722,12 +760,12 @@ export const adminApi = {
   // Payouts
   getPayouts: (token: string) =>
     request<{ payouts: PayoutRow[]; total: number }>('/admin/payouts?limit=100', { token }),
-  getPayoutPartners: (params: { page?: number; pageSize?: number; search?: string; status?: string }, token: string) => {
+  getPayoutPartners: (params: { page?: number; pageSize?: number; search?: string; partnerFilters?: string[] }, token: string) => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
     if (params.search) query.set('search', params.search);
-    if (params.status && params.status !== 'all') query.set('status', params.status);
+    if (params.partnerFilters?.length) query.set('status', params.partnerFilters.join(','));
     return request<{
       partners: PayoutPartnerRow[];
       total: number;

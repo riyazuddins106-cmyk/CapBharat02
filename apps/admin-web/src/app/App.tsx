@@ -16,6 +16,7 @@ import * as XLSX from "xlsx";
 import { DocumentVerificationView } from "./DocumentVerification";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
+  AdminAccount,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
   DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow, AdminOrderDetail,
@@ -147,6 +148,72 @@ function SelectInput({ value, onChange, children, disabled }: {
     >
       {children}
     </select>
+  );
+}
+
+function ThemedSelect({
+  value, onChange, options, disabled = false, minWidth = 160,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
+  minWidth?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find(option => option.value === value);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative" style={{ minWidth }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(current => !current)}
+        className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm text-white outline-none border border-white/10 hover:border-white/20 focus:border-violet-500/60 transition-colors disabled:opacity-40"
+        style={INPUT_STYLE}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selected?.label ?? value}</span>
+        <ChevronDown size={14} className={`flex-shrink-0 text-white/35 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 right-0 z-[70] mt-1 overflow-hidden rounded-xl border border-white/10 py-1 shadow-2xl"
+          style={{ background: "#1b1b22" }}
+          role="listbox"
+        >
+          {options.map(option => {
+            const active = option.value === value;
+            return (
+              <button
+                type="button"
+                key={option.value}
+                role="option"
+                aria-selected={active}
+                onClick={() => { onChange(option.value); setOpen(false); }}
+                className="w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.07]"
+                style={{
+                  color: active ? "#ffffff" : "rgba(255,255,255,0.72)",
+                  background: active ? "rgba(255,255,255,0.08)" : undefined,
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -546,7 +613,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
    ADMIN PANEL SHELL
 ═══════════════════════════════════════════════════════════════════ */
 
-// adminOnly: true  → visible to role === 'admin' only; hidden from operations_manager
+// adminOnly: true  → visible to role === 'admin' only; hidden from Operations users
 const ADMIN_SIDEBAR = [
   { id: "dashboard",      icon: Home,        label: "Dashboard"                     },
   { id: "bookings",       icon: BookOpen,    label: "Bookings"                      },
@@ -572,6 +639,7 @@ const ADMIN_SIDEBAR = [
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config",     adminOnly: true },
   { id: "otp-settings",       icon: KeyRound,    label: "OTP Settings",       adminOnly: true },
   { id: "booking-settings",   icon: Clock,       label: "Booking Settings",   adminOnly: true },
+  { id: "admin-management",   icon: UserPlus,    label: "Admin Management",   adminOnly: true },
   { id: "settings",           icon: Settings,    label: "Settings",           adminOnly: true },
 ];
 
@@ -594,7 +662,7 @@ function adminShowError(msg: string) {
 
 const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch","orders",
   "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
-  "payment-config","email-config","sms-config","otp-settings","documents","payouts"] as const;
+  "payment-config","email-config","sms-config","otp-settings","documents","payouts","admin-management"] as const;
 
 // Sections that only role === 'admin' may access
 const ADMIN_ONLY_SECTIONS = new Set(
@@ -606,7 +674,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [activeSection, setActiveSection] = useState(() => {
     const hash = window.location.hash.replace(/^#/, "");
     const valid = VALID_SECTIONS.includes(hash as typeof VALID_SECTIONS[number]);
-    // Prevent operations_manager from landing on an admin-only section via hash
+    // Prevent Operations users from landing on an admin-only section via hash
     if (valid && ADMIN_ONLY_SECTIONS.has(hash) && user.role !== "admin") return "dashboard";
     return valid ? hash : "dashboard";
   });
@@ -617,6 +685,13 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
     setLocalUser(updated);
     adminAuth.patchUser(updated);
   };
+
+  useEffect(() => {
+    if (localUser.role !== "admin" && ADMIN_ONLY_SECTIONS.has(activeSection)) {
+      setActiveSection("dashboard");
+      window.history.replaceState(null, "", "#dashboard");
+    }
+  }, [activeSection, localUser.role]);
 
   const [stats,        setStats]        = useState<DashboardStats | null>(null);
   const [bookingList,  setBookingList]  = useState<BookingRow[]>([]);
@@ -1050,6 +1125,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             isAdmin ? <AuditLogsView logs={auditLogs} /> : <AccessDenied />
           ) : activeSection === "privacy" ? (
             isAdmin ? <PrivacySecurityView user={localUser} accessToken={accessToken} onUserUpdate={handleUserUpdate} /> : <AccessDenied />
+          ) : activeSection === "admin-management" ? (
+            isAdmin ? <AdminManagementView accessToken={accessToken} currentUserId={localUser.id} /> : <AccessDenied />
           ) : activeSection === "support" ? (
             <HelpSupportView accessToken={accessToken} />
           ) : activeSection === "payment-config" ? (
@@ -1067,7 +1144,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "payouts" ? (
             <PayoutsControlCenter accessToken={accessToken} />
           ) : (
-            isAdmin ? <SettingsView user={user} /> : <AccessDenied />
+            isAdmin ? <SettingsView user={localUser} accessToken={accessToken} onUserUpdate={handleUserUpdate} /> : <AccessDenied />
           )}
         </div>
       </div>
@@ -4560,12 +4637,13 @@ function OffersView({
 
 /* ── Multi-select dropdown (reusable) ───────────────────────────── */
 function MultiSelect({
-  label, options, selected, onChange,
+  label, options, selected, onChange, allLabel,
 }: {
   label: string;
-  options: string[];
+  options: Array<string | { value: string; label: string }>;
   selected: string[];   // empty = All
   onChange: (v: string[]) => void;
+  allLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -4583,9 +4661,14 @@ function MultiSelect({
     else onChange([...selected, val]);
   };
 
+  const optionLabel = (value: string) => {
+    const option = options.find(item => typeof item === "string" ? item === value : item.value === value);
+    return typeof option === "string" ? option : option?.label ?? value;
+  };
+  const emptyLabel = allLabel ?? (label === "Status" ? "All Status" : `All ${label}s`);
   const displayLabel =
-    selected.length === 0 ? `All ${label}s` :
-    selected.length === 1 ? selected[0] :
+    selected.length === 0 ? emptyLabel :
+    selected.length === 1 ? optionLabel(selected[0]) :
     `${selected.length} ${label}s selected`;
 
   return (
@@ -4604,31 +4687,36 @@ function MultiSelect({
       {open && (
         <div
           className="absolute z-50 mt-1 rounded-xl border border-white/[0.1] py-1 overflow-y-auto"
-          style={{ background: "#1a1a2e", maxHeight: 240, minWidth: 200, top: "100%", left: 0 }}
+           style={{ background: "#1a1b31", maxHeight: 240, minWidth: 200, top: "100%", left: 0, boxShadow: "0 16px 40px rgba(0,0,0,0.35)" }}
         >
           {/* All option */}
           <button
             onClick={() => { onChange([]); setOpen(false); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors ${selected.length === 0 ? "text-violet-400" : "text-white/60"}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-[#292a42] ${selected.length === 0 ? "text-violet-300" : "text-white/70"}`}
+            style={{ background: selected.length === 0 ? "#292a42" : undefined }}
           >
             <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${selected.length === 0 ? "border-violet-400 bg-violet-400/20" : "border-white/20"}`}>
               {selected.length === 0 && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>}
             </span>
-            All {label}s
+             {emptyLabel}
           </button>
           <div className="border-t border-white/[0.06] my-1" />
-          {options.map(opt => (
+          {options.map(option => {
+            const opt = typeof option === "string" ? { value: option, label: option } : option;
+            return (
             <button
-              key={opt}
-              onClick={() => toggle(opt)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.06] transition-colors text-white/80"
+              key={opt.value}
+              onClick={() => toggle(opt.value)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-white/80 hover:bg-[#292a42]"
+              style={{ background: selected.includes(opt.value) ? "#292a42" : undefined, color: selected.includes(opt.value) ? "#c4b5fd" : undefined }}
             >
-              <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? "border-violet-400 bg-violet-400/20" : "border-white/20"}`}>
-                {selected.includes(opt) && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>}
+              <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt.value) ? "border-violet-400 bg-violet-400/20" : "border-white/20"}`}>
+                {selected.includes(opt.value) && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>}
               </span>
-              <span className="truncate">{opt}</span>
+              <span className="truncate">{opt.label}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -6028,7 +6116,7 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
   const [pageSize, setPageSize] = useState(50);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [partnerFilters, setPartnerFilters] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<PayoutPartnerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -6043,7 +6131,7 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminApi.getPayoutPartners({ page, pageSize, search, status }, accessToken);
+      const data = await adminApi.getPayoutPartners({ page, pageSize, search, partnerFilters }, accessToken);
       setPartners(data.partners ?? []);
       setTotal(data.total ?? 0);
       setSummary(data.summary ?? { totalEarnings: 0, monthEarnings: 0, pendingPayout: 0, paidOut: 0, available: 0 });
@@ -6053,7 +6141,7 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, page, pageSize, search, status]);
+  }, [accessToken, page, pageSize, search, partnerFilters]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -6151,9 +6239,24 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
   const fmtDate = (value?: string | null) => value
     ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
     : "—";
+  const exportPartnerPayouts = () => exportToExcel(
+    partners.map(partner => ({
+      Partner: partner.name,
+      Email: partner.email ?? "—",
+      Phone: partner.phone ?? "—",
+      "This month (₹)": partner.monthEarnings,
+      "Total earned (₹)": partner.totalEarnings,
+      "Amount to pay (₹)": partner.available,
+      "Pending payout (₹)": partner.pendingPayout,
+      "Pending requests": partner.pendingRequests,
+      "Already paid (₹)": partner.paidOut,
+      UPI: partner.payoutUpiId ?? "Not saved",
+    })),
+    `Partner_Payouts_${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-white font-bold text-base">Partner Payout Control Centre</h2>
@@ -6286,19 +6389,26 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
             style={INPUT_STYLE}
           />
         </div>
-        <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-          className="px-3 py-2 rounded-lg text-xs text-white/70 border border-white/10 outline-none" style={INPUT_STYLE}>
-          <option value="all">All partners</option>
-          <option value="payable">Amount to pay</option>
-          <option value="pending">Pending requests</option>
-          <option value="missing_upi">Missing UPI ID</option>
-        </select>
-        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-          className="px-3 py-2 rounded-lg text-xs text-white/70 border border-white/10 outline-none" style={INPUT_STYLE}>
-          <option value={25}>25 per page</option>
-          <option value={50}>50 per page</option>
-          <option value={100}>100 per page</option>
-        </select>
+        <MultiSelect
+          label="Partner"
+          allLabel="All partners"
+          options={[
+            { value: "payable", label: "Amount to pay" },
+            { value: "pending", label: "Pending requests" },
+            { value: "missing_upi", label: "Missing UPI ID" },
+          ]}
+          selected={partnerFilters}
+          onChange={value => { setPartnerFilters(value); setPage(1); }}
+        />
+        <button
+          onClick={exportPartnerPayouts}
+          disabled={loading || partners.length === 0}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.1] text-white/60 hover:text-white hover:border-white/20 text-xs font-semibold transition-colors whitespace-nowrap disabled:opacity-40"
+          style={{ background: "rgba(255,255,255,0.04)" }}
+          title="Download partner payouts as Excel"
+        >
+          <Download size={13} /> Excel
+        </button>
       </div>
 
       <div className="rounded-2xl overflow-hidden border border-white/[0.07]" style={CARD}>
@@ -6306,6 +6416,11 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
           <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-violet-400"/></div>
         ) : (
           <>
+            <RowsBar
+              total={total}
+              pageSize={pageSize}
+              onPageSizeChange={n => { setPageSize(n); setPage(1); }}
+            />
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -6827,20 +6942,479 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
   );
 }
 
-function SettingsView({ user }: { user: AdminUser }) {
+function SettingsView({
+  user, accessToken, onUserUpdate,
+}: {
+  user: AdminUser;
+  accessToken: string;
+  onUserUpdate: (user: AdminUser) => void;
+}) {
+  const [fullName, setFullName] = useState(user.fullName ?? "");
+  const [email, setEmail] = useState(user.email ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    setFullName(user.fullName ?? "");
+    setEmail(user.email ?? "");
+    setPhone(user.phone ?? "");
+  }, [user.id, user.fullName, user.phone]);
+
+  const save = async () => {
+    if (fullName.trim().length < 2) {
+      setMessage({ text: "Full name must be at least 2 characters.", type: "error" });
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      const updated = await adminApi.updateAdminProfile(
+        { fullName: fullName.trim(), email: email.trim(), phone: phone.trim() || undefined },
+        accessToken,
+      );
+      adminAuth.patchUser(updated);
+      onUserUpdate(updated);
+      setMessage({ text: "Account details updated successfully.", type: "success" });
+    } catch (e: any) {
+      setMessage({ text: e.message ?? "Could not update account details.", type: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-lg space-y-4">
       <div className="rounded-2xl p-5 border border-white/[0.07]" style={CARD}>
-        <h3 className="text-white font-bold text-sm mb-4">Account Info</h3>
-        <div className="space-y-4">
-          <div><p className="text-white/40 text-xs mb-0.5">Full Name</p><p className="text-white text-sm">{user.fullName}</p></div>
-          <div><p className="text-white/40 text-xs mb-0.5">Email</p><p className="text-white text-sm">{user.email}</p></div>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h3 className="text-white font-bold text-sm">Account Info</h3>
+          <Pencil size={14} className="text-violet-400" />
+        </div>
+        <p className="text-white/35 text-xs mb-5">Update the details shown for your admin account.</p>
+        {message && (
+          <div
+            className="mb-4 px-3 py-2 rounded-lg text-xs font-medium border"
+            style={{
+              background: message.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)",
+              borderColor: message.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)",
+              color: message.type === "error" ? "#f87171" : "#4ade80",
+            }}
+          >
+            {message.text}
+          </div>
+        )}
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-white/40 text-xs mb-1 block">Full Name</span>
+            <input
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+              style={INPUT_STYLE}
+            />
+          </label>
+          <label className="block">
+            <span className="text-white/40 text-xs mb-1 block">Phone</span>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+              style={INPUT_STYLE}
+            />
+          </label>
+          <label className="block">
+            <span className="text-white/40 text-xs mb-1 block">Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
+              style={INPUT_STYLE}
+            />
+            <p className="text-white/25 text-[10px] mt-1">Use an email address you control. It becomes the login email immediately.</p>
+          </label>
           <div>
-            <p className="text-white/40 text-xs mb-0.5">Role</p>
+            <p className="text-white/40 text-xs mb-1">Role</p>
             <Badge label={user.role?.toUpperCase()} color="#5B3EF5" />
           </div>
+          <button
+            onClick={() => void save()}
+            disabled={saving}
+            className="flex items-center gap-2 mt-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {saving ? "Saving…" : "Save changes"}
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AdminManagementView({
+  accessToken, currentUserId,
+}: {
+  accessToken: string;
+  currentUserId: string;
+}) {
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<AdminAccount | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    role: "admin" as "admin" | "operations_manager",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminApi.getAdmins(accessToken);
+      setAdmins(data.admins ?? []);
+    } catch (e: any) {
+      setMessage({ text: e.message ?? "Could not load admin accounts.", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const create = async () => {
+    if (!form.fullName.trim() || !form.email.trim() || !form.password) {
+      setMessage({ text: "Name, email, and password are required.", type: "error" });
+      return;
+    }
+    setCreating(true);
+    setMessage(null);
+    try {
+      const created = await adminApi.createAdmin({
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim() || undefined,
+        password: form.password,
+        role: form.role,
+      }, accessToken);
+      setAdmins(prev => [created, ...prev]);
+      setForm({ fullName: "", email: "", phone: "", password: "", role: "admin" });
+      setMessage({
+        text: `${created.fullName} was created as ${created.role === "operations_manager" ? "Operations" : "Admin"}.`,
+        type: "success",
+      });
+    } catch (e: any) {
+      setMessage({ text: e.message ?? "Could not create admin account.", type: "error" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editForm.fullName.trim() || !editForm.email.trim()) {
+      setMessage({ text: "Name and email are required.", type: "error" });
+      return;
+    }
+    setEditSaving(true);
+    setMessage(null);
+    try {
+      const updated = await adminApi.updateAdmin(editing.id, {
+        fullName: editForm.fullName.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim(),
+        role: editForm.role,
+        isActive: editForm.isActive,
+        ...(editForm.password ? { password: editForm.password } : {}),
+      }, accessToken);
+      setAdmins(prev => prev.map(admin => admin.id === updated.id ? updated : admin));
+      setEditing(null);
+      setMessage({ text: `${updated.fullName}'s account was updated successfully.`, type: "success" });
+    } catch (e: any) {
+      setMessage({ text: e.message ?? "Could not update admin account.", type: "error" });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    role: "admin" as "admin" | "operations_manager",
+    isActive: true,
+    password: "",
+  });
+
+  const openEdit = (admin: AdminAccount) => {
+    setMessage(null);
+    setEditing(admin);
+    setEditForm({
+      fullName: admin.fullName,
+      email: admin.email,
+      phone: admin.phone ?? "",
+      role: admin.role,
+      isActive: admin.isActive,
+      password: "",
+    });
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-3xl space-y-5">
+      <div>
+        <h2 className="text-white font-bold text-base">Admin Management</h2>
+        <p className="text-white/40 text-xs mt-1">Create and manage accounts that can access the ServeNow Admin Panel.</p>
+      </div>
+
+      <div className="rounded-2xl p-5 border border-violet-400/20 space-y-4" style={{ ...CARD, background: "rgba(124,58,237,0.07)" }}>
+        <div className="flex items-center gap-2">
+          <UserPlus size={17} className="text-violet-300" />
+          <h3 className="text-white font-semibold text-sm">Create Admin Account</h3>
+        </div>
+        {message && (
+          <div
+            className="px-3 py-2 rounded-lg text-xs font-medium border"
+            style={{
+              background: message.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(22,163,74,0.1)",
+              borderColor: message.type === "error" ? "rgba(239,68,68,0.3)" : "rgba(22,163,74,0.3)",
+              color: message.type === "error" ? "#f87171" : "#4ade80",
+            }}
+          >
+            {message.text}
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-white/45 text-xs mb-1 block">Full Name</span>
+            <input
+              value={form.fullName}
+              onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
+              placeholder="e.g. Operations Admin"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              style={INPUT_STYLE}
+            />
+          </label>
+          <label className="block">
+            <span className="text-white/45 text-xs mb-1 block">Email</span>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+              placeholder="admin@example.com"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              style={INPUT_STYLE}
+            />
+          </label>
+          <label className="block">
+            <span className="text-white/45 text-xs mb-1 block">Phone (optional)</span>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+              placeholder="+91 98765 43210"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              style={INPUT_STYLE}
+            />
+          </label>
+          <label className="block">
+            <span className="text-white/45 text-xs mb-1 block">Role</span>
+            <ThemedSelect
+              value={form.role}
+              onChange={value => setForm(f => ({ ...f, role: value as "admin" | "operations_manager" }))}
+              options={[
+                { value: "admin", label: "Admin" },
+                { value: "operations_manager", label: "Operations" },
+              ]}
+              minWidth={0}
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="text-white/45 text-xs mb-1 block">Temporary Password</span>
+            <input
+              type="password"
+              value={form.password}
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+              placeholder="At least 8 characters, with uppercase, lowercase, and number"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              style={INPUT_STYLE}
+            />
+          </label>
+        </div>
+        <button
+          onClick={() => void create()}
+          disabled={creating}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+        >
+          {creating && <Loader2 size={14} className="animate-spin" />}
+          {creating ? "Creating…" : "Create account"}
+        </button>
+        <p className="text-white/30 text-[10px]">The new account is verified and active immediately. Share the login details securely.</p>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
+        <div className="px-5 py-4 border-b border-white/[0.07] flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-semibold text-sm">Admin Accounts</h3>
+            <p className="text-white/35 text-xs mt-1">{admins.length} account{admins.length === 1 ? "" : "s"}</p>
+          </div>
+          <button onClick={() => void load()} className="text-white/40 hover:text-white/80" title="Refresh admin accounts">
+            <RefreshCw size={15} />
+          </button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 size={22} className="animate-spin text-violet-400" /></div>
+        ) : admins.length === 0 ? (
+          <p className="px-5 py-8 text-center text-white/35 text-sm">No admin accounts found.</p>
+        ) : (
+          <div className="divide-y divide-white/[0.05]">
+            {admins.map(admin => (
+              <div key={admin.id} className="px-5 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
+                  {admin.fullName.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-white text-sm font-medium truncate">
+                    {admin.fullName} {admin.id === currentUserId && <span className="text-white/30 text-xs">(you)</span>}
+                  </p>
+                  <p className="text-white/40 text-xs truncate">{admin.email}{admin.phone ? ` · ${admin.phone}` : ""}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge label={admin.role === "operations_manager" ? "Operations" : "Admin"} color="#7C5BF8" />
+                  <span className={`text-[10px] font-semibold ${admin.isActive ? "text-emerald-400" : "text-red-400"}`}>
+                    {admin.isActive ? "Active" : "Disabled"}
+                  </span>
+                  {admin.id !== currentUserId && (
+                    <button
+                      onClick={() => openEdit(admin)}
+                      className="ml-1 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                      title={`Edit ${admin.fullName}`}
+                      aria-label={`Edit ${admin.fullName}`}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)" }}
+          onMouseDown={e => { if (e.target === e.currentTarget && !editSaving) setEditing(null); }}
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 p-5 shadow-2xl" style={CARD}>
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h3 className="text-white font-bold text-base">Edit Admin Account</h3>
+                <p className="text-white/35 text-xs mt-1">Update access and account details for {editing.fullName}.</p>
+              </div>
+              <button
+                onClick={() => setEditing(null)}
+                disabled={editSaving}
+                className="text-white/40 hover:text-white disabled:opacity-50"
+                aria-label="Close edit dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-white/45 text-xs mb-1 block">Full Name</span>
+                <input
+                  value={editForm.fullName}
+                  onChange={e => setEditForm(f => ({ ...f, fullName: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+                  style={INPUT_STYLE}
+                />
+              </label>
+              <label className="block">
+                <span className="text-white/45 text-xs mb-1 block">Email</span>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+                  style={INPUT_STYLE}
+                />
+              </label>
+              <label className="block">
+                <span className="text-white/45 text-xs mb-1 block">Phone</span>
+                <input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+                  style={INPUT_STYLE}
+                />
+              </label>
+              <label className="block">
+                <span className="text-white/45 text-xs mb-1 block">Role</span>
+                <ThemedSelect
+                  value={editForm.role}
+                  onChange={value => setEditForm(f => ({ ...f, role: value as "admin" | "operations_manager" }))}
+                  options={[
+                    { value: "admin", label: "Admin" },
+                    { value: "operations_manager", label: "Operations" },
+                  ]}
+                  minWidth={0}
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-white/45 text-xs mb-1 block">New Password (optional)</span>
+                <input
+                  type="password"
+                  value={editForm.password}
+                  onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Leave blank to keep the current password"
+                  className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+                  style={INPUT_STYLE}
+                />
+              </label>
+            </div>
+            <label className="flex items-center gap-3 mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editForm.isActive}
+                onChange={e => setEditForm(f => ({ ...f, isActive: e.target.checked }))}
+                className="accent-violet-500"
+              />
+              <span className="text-white/70 text-sm">
+                Account active
+                <span className="block text-white/30 text-[10px]">Disabled accounts cannot sign in.</span>
+              </span>
+            </label>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setEditing(null)}
+                disabled={editSaving}
+                className="px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white border border-white/10 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void saveEdit()}
+                disabled={editSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+              >
+                {editSaving && <Loader2 size={14} className="animate-spin" />}
+                {editSaving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
