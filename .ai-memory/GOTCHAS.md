@@ -283,3 +283,8 @@
 **Problem:** The Repl's local history and GitHub `main` were unrelated, so pushing the whole local branch would have overwritten newer marketplace/mobile commits.
 **Fix:** Start from the current GitHub `main`, apply the Admin/backend and remaining Customer/Expo changes as targeted patches, build the affected apps, and push normal fast-forward commits.
 **Warning:** Do not force-push the preserved local branch or merge its entire unrelated tree into GitHub `main`; review targeted file differences first.
+
+### Expo QR scheme — use `exp://`, not `exps://`
+**Problem:** Expo Go reported “Something went wrong / failed to download” even though ngrok, Metro, the Expo manifest, and the Android bundle all returned successfully.
+**Fix:** Keep the ngrok transport and `EXPO_PACKAGER_PROXY_URL` on HTTPS, but encode the QR/deep link as `exp://<ngrok-host>`.
+**Warning:** Do not put `exps://` in Expo Go QR codes; validate the manifest and bundle separately before changing tunnel infrastructure.

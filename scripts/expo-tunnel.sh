@@ -419,15 +419,14 @@ NODE
       # URL for both the QR and the manifest bundle URLs. Do not include the
       # internal Metro port here; ngrok terminates HTTPS on its public host.
       export EXPO_PACKAGER_PROXY_URL="https://${NGROK_HOST}"
-      # ngrok terminates HTTP on port 80 with a 307 redirect to HTTPS.
-      # Expo Go does NOT follow that redirect — it just fails with
-      # "failed to download remote update". Using exps:// makes Expo Go
-      # connect directly to HTTPS:443, bypassing the redirect entirely.
-      EXPO_GO_URL="exps://${NGROK_HOST}"
+      # Expo Go's QR/deep-link scheme is exp://. The packager proxy URL above
+      # remains HTTPS, so Metro's manifest and bundle requests still travel
+      # through ngrok over TLS; the QR scheme must remain the Expo Go scheme.
+      EXPO_GO_URL="exp://${NGROK_HOST}"
       echo "$EXPO_GO_URL" > "/tmp/expo-tunnel-${PORT}.url"
       export REACT_NATIVE_PACKAGER_HOSTNAME="$NGROK_HOST"
 
-      # Regenerate QR PNG and patch scanner.html with the exps:// URL
+      # Regenerate QR PNG and patch scanner.html with the exp:// URL
       QR_DIR="$WORKSPACE_ROOT/tmp-qr"
       if [[ "$PORT" -eq 8099 ]]; then
         QR_PNG="$QR_DIR/partner-qr.png"; QR_KEY="partner"

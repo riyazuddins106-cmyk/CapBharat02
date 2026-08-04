@@ -213,6 +213,7 @@ The service-level order implementation is complete for customer web/mobile, part
 - Customer Web, Admin Web, and Partner Web production builds passed; Partner Mobile type checking passed.
 - Customer Mobile type checking still reports pre-existing errors in `app/checkout.tsx` and cannot resolve `@servenow/shared`; these errors are unrelated to the icon fallback changes.
 - The local tree is clean. A lockfile-only metadata difference remains on the preserved local comparison branch and was intentionally not pushed.
+- Expo Go failure investigation found the ngrok QR generator wrote `exps://` links; the live HTTPS manifests and Android bundles were healthy. The generator now writes `exp://` links, and fresh Customer/Partner QR codes were validated.
 
 
 ### Task: Add Admin service detail views and booking operations controls

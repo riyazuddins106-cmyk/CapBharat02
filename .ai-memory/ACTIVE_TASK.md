@@ -20,6 +20,7 @@
 - [x] Customer Mobile type check remains blocked by pre-existing `@servenow/shared` and `checkout.tsx` errors
 - [x] Pushed and verified GitHub `main` at commit `e5c927233`
 - [x] Left lockfile-only metadata churn uncommitted because it was unrelated to the app changes
+- [x] Fixed Expo Go QR deep-link scheme from `exps://` to `exp://` after validating live manifests and bundles
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients
