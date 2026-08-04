@@ -179,7 +179,11 @@ function ThemedSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(current => !current)}
-        className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm text-white outline-none border border-white/10 hover:border-white/20 focus:border-violet-500/60 transition-colors disabled:opacity-40"
+        className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm text-white outline-none border transition-colors disabled:opacity-40 ${
+          neutral
+            ? "border-[#3b3d44] hover:border-sky-400/40 focus:border-sky-400"
+            : "border-white/10 hover:border-white/20 focus:border-violet-500/60"
+        }`}
         style={neutral ? { background: "#24252a" } : INPUT_STYLE}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -7173,7 +7177,10 @@ function AdminManagementView({
         <p className="text-white/40 text-xs mt-1">Create and manage accounts that can access the ServeNow Admin Panel.</p>
       </div>
 
-      <div className="rounded-2xl p-5 border border-sky-400/20 space-y-4" style={{ ...CARD, background: "rgba(30,41,59,0.72)" }}>
+      <div
+        className="rounded-2xl p-5 space-y-4"
+        style={{ ...CARD, background: "#1b2638", border: "1px solid rgba(14,165,233,0.3)" }}
+      >
         <div className="flex items-center gap-2">
           <UserPlus size={17} className="text-sky-300" />
           <h3 className="text-white font-semibold text-sm">Create Admin Account</h3>
@@ -7197,8 +7204,8 @@ function AdminManagementView({
               value={form.fullName}
               onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
               placeholder="e.g. Operations Admin"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a" }}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
             />
           </label>
           <label className="block">
@@ -7208,8 +7215,8 @@ function AdminManagementView({
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="admin@example.com"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a" }}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
             />
           </label>
           <label className="block">
@@ -7219,8 +7226,8 @@ function AdminManagementView({
               value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               placeholder="+91 98765 43210"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a" }}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
             />
           </label>
           <label className="block">
@@ -7243,8 +7250,8 @@ function AdminManagementView({
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               placeholder="At least 8 characters, with uppercase, lowercase, and number"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
-              style={{ ...INPUT_STYLE, background: "#24252a" }}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-[#3b3d44] focus:border-sky-400"
+              style={{ ...INPUT_STYLE, background: "#24252a", borderColor: "#3b3d44" }}
             />
           </label>
         </div>

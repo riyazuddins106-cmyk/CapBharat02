@@ -277,7 +277,7 @@
 ### Admin Panel — scope visual references to the requested component
 **Problem:** A neutral charcoal screenshot intended for the Create Admin Account form was initially applied to the entire Admin Panel.
 **Fix:** Restore the original global purple theme and keep the neutral slate/graphite treatment local to the account-creation card, its fields, role select, and button.
-**Warning:** When a screenshot shows a single form or card, do not change shared theme tokens or global utility colors unless the user explicitly asks for a full-panel redesign.
+**Warning:** When a screenshot shows a single form or card, do not change shared theme tokens or global utility colors unless the user explicitly asks for a full-panel redesign. If shared inline tokens make the local treatment too subtle, use explicit styles inside that component rather than broad overrides.
 
 ### Partner App Ionicons need a native font grace period
 **Problem:** The Partner App dashboard and tab labels rendered, but Ionicons were blank because the root layout forced rendering after a 300ms `useFonts` timeout.

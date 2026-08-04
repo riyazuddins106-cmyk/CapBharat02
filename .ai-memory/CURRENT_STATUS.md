@@ -217,6 +217,7 @@ The service-level order implementation is complete for customer web/mobile, part
 - Partner Mobile Earnings now fetches and displays the same payout history as Partner Web, including amount, optional note, requested date, Pending/Processing/Paid/Rejected status, pull-to-refresh, and immediate insertion after a successful request. Mobile payout API calls returned HTTP 200; Partner Mobile type check and Partner Web production build passed.
 - Admin Management's Create Admin Account card now uses a calmer slate surface with sky-blue borders, icon, focus states, and action button instead of the heavy purple treatment. Admin Web production build passed.
 - The uploaded neutral charcoal reference is scoped only to the Admin Management Create Admin Account form. The wider Admin Panel shell, login page, navigation, shared controls, and other sections retain the original purple theme. Admin Web production build passed, the workflow restarted cleanly, and the restored purple login preview was visually verified.
+- The Create Admin Account form now uses explicit solid colors: navy card `#1b2638`, graphite controls `#24252a`, defined gray borders, sky-blue focus accents, and a neutral gray action button. These values are local to Admin Management; the global Admin Panel theme remains unchanged. Admin Web build and workflow restart passed.
 
 
 ### Task: Add Admin service detail views and booking operations controls

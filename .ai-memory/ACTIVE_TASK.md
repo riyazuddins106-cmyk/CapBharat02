@@ -26,6 +26,8 @@
 - [x] Reverted the Admin Panel-wide charcoal theme after clarifying that the uploaded reference applied only to the Create Admin Account form
 - [x] Kept the neutral slate/graphite styling isolated to the Create Admin Account card, fields, role select, and button
 - [x] Verified the restored purple Admin Panel preview, rebuilt Admin Web, restarted the workflow, and passed git diff checks
+- [x] Strengthened the form-only colors with solid inline navy/graphite values after the first scoped styling remained too subtle
+- [x] Rebuilt Admin Web, restarted the workflow, and confirmed no global theme files changed in the final correction
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients
