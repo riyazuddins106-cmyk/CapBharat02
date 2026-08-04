@@ -5,7 +5,7 @@
 
 ## Overall Completion: ~99%
 
-The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, and admin controls. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 17/17 checks; live gateway transactions still require Razorpay/Stripe provider configuration.
+The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, admin controls, and admin-configurable booking hours. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 17/17 checks; live gateway transactions still require Razorpay/Stripe provider configuration.
 
 ---
 
@@ -82,6 +82,13 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Current-contract smoke test: 17/17 passed across health, auth, multi-service cart, `/orders/checkout`, item listing, cancellation, continue-searching, test payment, and auth protection.
 - [!] Existing legacy `full-flow.e2e.ts` and `dispatch.e2e.ts` scripts still assert retired booking/cart contracts and were not used as release gates.
 
+### Admin-configurable booking hours (2026-08-04)
+- [x] Admin Booking Settings now supports custom windows such as 09:00–18:00 or 09:00–21:00.
+- [x] Added a 24-hour booking switch; when enabled, customer web/mobile can select overnight starts such as 03:00 and 23:30.
+- [x] Backend validation uses the same setting for both current multi-service checkout and legacy single-service checkout.
+- [x] Partner acceptance remains controlled by partner availability, service skill, location, and dispatch eligibility; booking hours do not force an unavailable partner to accept.
+- [x] Server, customer web, admin web, both mobile web exports, runtime health, and slot-generation checks passed.
+
 ---
 
 ## ⚠️ Pending / Needs Attention
@@ -89,6 +96,7 @@ The service-level order implementation is complete for customer web/mobile, part
 | Item | Details |
 |------|---------|
 | **Live gateway verification** | Execute a real Razorpay/Stripe transaction and provider refund after enabling provider credentials in Admin → Payment Config. |
+| **Partner overnight staffing** | 24-hour customer booking permits overnight requests, but partners still need to mark themselves available and be eligible for the requested service/time. |
 | **Email (SMTP)** | Optional — OTP codes log to console if not set. |
 | **EAS projectId** | Not set — push tokens use Expo Go anonymous identity. Needed only for standalone builds. |
 | **Dependencies** | Run `pnpm install --frozen-lockfile` before first start. |

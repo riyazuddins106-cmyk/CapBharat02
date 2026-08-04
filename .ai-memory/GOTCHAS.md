@@ -184,3 +184,8 @@
 **Problem:** The older full-flow scripts call `POST /cart` and `/bookings/checkout`, while the current multi-service contract uses `POST /cart/items` and `/orders/checkout`; those scripts fail before exercising service-order behavior.
 **Fix:** Use `server/src/e2e/order-item-flow.e2e.ts` as the service-order smoke test, and update legacy scripts before treating them as full release gates.
 **Warning:** Do not interpret failures from the retired booking/cart paths as failures in the current order-item implementation.
+
+### Booking hours — 24-hour mode must be explicit
+**Problem:** Representing a full-day schedule as `openingHour: 0` and `closingHour: 0` conflicts with normal-window validation because the old code requires opening time to be earlier than closing time.
+**Fix:** Store an explicit `is24Hours` booking setting. Customer slot generation and both checkout controllers bypass closing-window checks only when that flag is true.
+**Warning:** A 24-hour customer booking window does not make partners automatically available; dispatch still requires an eligible partner with `availabilityStatus = available`.

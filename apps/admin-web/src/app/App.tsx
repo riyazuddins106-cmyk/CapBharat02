@@ -5845,6 +5845,7 @@ type BookingCfg = {
   minAdvanceMinutes: number;
   sameDayBooking: boolean;
   maxAdvanceDays: number;
+  is24Hours: boolean;
   openingHour: number;
   closingHour: number;
   slotIntervalMinutes: number;
@@ -5853,6 +5854,7 @@ const DEFAULT_BOOKING_CFG: BookingCfg = {
   minAdvanceMinutes: 30,
   sameDayBooking: true,
   maxAdvanceDays: 30,
+  is24Hours: false,
   openingHour: 8,
   closingHour: 20,
   slotIntervalMinutes: 30,
@@ -5878,7 +5880,7 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
   };
 
   const save = async () => {
-    if (cfg.openingHour >= cfg.closingHour) {
+    if (!cfg.is24Hours && cfg.openingHour >= cfg.closingHour) {
       showMsg("Opening hour must be before closing hour.", "error"); return;
     }
     setSaving(true);
@@ -5974,9 +5976,17 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
       {/* ── Business Hours ── */}
       <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
         <h3 className="text-white text-sm font-semibold">Business Hours</h3>
-        <p className="text-white/40 text-xs -mt-2">Bookings outside these hours are rejected at checkout.</p>
+        <p className="text-white/40 text-xs -mt-2">Bookings outside these hours are rejected at checkout. Enable 24-hour mode for round-the-clock booking.</p>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center justify-between rounded-xl border border-white/[0.07] px-4 py-3">
+          <div>
+            <p className="text-white text-sm font-medium">24-hour booking</p>
+            <p className="text-white/40 text-xs mt-0.5">Allow customers to select any time, including overnight slots.</p>
+          </div>
+          <ToggleSwitch checked={cfg.is24Hours} onChange={v => setCfg(c => ({ ...c, is24Hours: v }))} />
+        </div>
+
+        {!cfg.is24Hours && <div className="grid grid-cols-2 gap-4">
           <div>
             <Field label="Opening Hour (24h)">
               <div className="flex items-center gap-3">
@@ -6007,10 +6017,10 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
               </div>
             </Field>
           </div>
-        </div>
+        </div>}
         <p className="text-white/30 text-xs">
-          Current window: {cfg.openingHour}:00 – {cfg.closingHour}:00
-          {cfg.openingHour >= cfg.closingHour && <span className="text-red-400 ml-2">⚠ Opening must be before closing</span>}
+          Current window: {cfg.is24Hours ? "24 hours (00:00–24:00)" : `${cfg.openingHour}:00 – ${cfg.closingHour}:00`}
+          {!cfg.is24Hours && cfg.openingHour >= cfg.closingHour && <span className="text-red-400 ml-2">⚠ Opening must be before closing</span>}
         </p>
       </div>
 

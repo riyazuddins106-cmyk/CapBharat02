@@ -41,8 +41,9 @@ export const bookingController = {
     const globalMinAdvance: number  = bookingCfg.minAdvanceMinutes ?? 30;
     const sameDayBooking: boolean   = bookingCfg.sameDayBooking !== false; // default true
     const maxAdvanceDays: number    = bookingCfg.maxAdvanceDays ?? 30;
-    const openingHour: number       = bookingCfg.openingHour ?? 8;
-    const closingHour: number       = bookingCfg.closingHour ?? 20;
+    const is24Hours: boolean        = bookingCfg.is24Hours === true;
+    const openingHour: number       = is24Hours ? 0 : (bookingCfg.openingHour ?? 8);
+    const closingHour: number       = is24Hours ? 24 : (bookingCfg.closingHour ?? 20);
 
     // ── Same-day booking check ────────────────────────────────────────────────
     const nowDate = new Date();
@@ -63,7 +64,7 @@ export const bookingController = {
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
     const whenIST = new Date(when.getTime() + IST_OFFSET_MS);
     const slotHour = whenIST.getUTCHours();
-    if (slotHour < openingHour || slotHour >= closingHour) {
+    if (!is24Hours && (slotHour < openingHour || slotHour >= closingHour)) {
       throw AppError.badRequest(`Bookings are only available between ${openingHour}:00 and ${closingHour}:00.`);
     }
 
@@ -95,7 +96,7 @@ export const bookingController = {
     );
     const endIST = new Date(whenIST.getTime() + maxJobMinutes * 60 * 1000);
     const endHour = endIST.getUTCHours() + endIST.getUTCMinutes() / 60;
-    if (endHour > closingHour) {
+    if (!is24Hours && endHour > closingHour) {
       const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
       const endStr = `${pad(endIST.getUTCHours())}:${pad(endIST.getUTCMinutes())}`;
       throw AppError.badRequest(

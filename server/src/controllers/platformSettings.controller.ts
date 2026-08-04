@@ -151,6 +151,7 @@ function getDefaults(key: string): object {
       minAdvanceMinutes:   30,
       sameDayBooking:      true,
       maxAdvanceDays:      7,
+      is24Hours:           false,
       openingHour:         9,
       closingHour:         20,
       slotIntervalMinutes: 30,

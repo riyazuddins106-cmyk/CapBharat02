@@ -23,6 +23,7 @@
 - [x] Add provider-backed per-service payment and refund endpoints
 - [x] Connect customer web and mobile payment sheets to item-level endpoints
 - [x] Run current-contract service-order validation
+- [x] Add admin-configurable booking hours and 24-hour mode
 
 ### Verification Notes
 - Customer web production build passed.

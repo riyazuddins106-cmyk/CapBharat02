@@ -33,11 +33,13 @@ export function generateTimeSlots(
   closingHour: number,
   intervalMinutes = 30,
   maxDurationMinutes = 60,
+  is24Hours = false,
 ): number[] {
   const slots: number[] = [];
-  const openingMinutes = openingHour * 60;
-  const closingMinutes = closingHour * 60;
-  for (let m = openingMinutes; m + maxDurationMinutes <= closingMinutes; m += intervalMinutes) {
+  const openingMinutes = is24Hours ? 0 : openingHour * 60;
+  const closingMinutes = is24Hours ? 24 * 60 : closingHour * 60;
+  const latestStart = is24Hours ? closingMinutes - intervalMinutes : closingMinutes - maxDurationMinutes;
+  for (let m = openingMinutes; m <= latestStart; m += intervalMinutes) {
     slots.push(m);
   }
   return slots;

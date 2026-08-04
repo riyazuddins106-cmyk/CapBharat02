@@ -20,6 +20,7 @@ type BookingConfig = {
   openingHour: number;
   closingHour: number;
   slotIntervalMinutes: number;
+  is24Hours: boolean;
 };
 const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   minAdvanceMinutes: 30,
@@ -28,6 +29,7 @@ const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   openingHour: 8,
   closingHour: 20,
   slotIntervalMinutes: 30,
+  is24Hours: false,
 };
 
 function buildScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
@@ -108,8 +110,9 @@ export default function CheckoutScreen() {
       bookingConfig.closingHour,
       bookingConfig.slotIntervalMinutes,
       maxDurationMinutes,
+      bookingConfig.is24Hours,
     ),
-    [bookingConfig.openingHour, bookingConfig.closingHour, bookingConfig.slotIntervalMinutes, maxDurationMinutes],
+    [bookingConfig.openingHour, bookingConfig.closingHour, bookingConfig.slotIntervalMinutes, bookingConfig.is24Hours, maxDurationMinutes],
   );
 
   // ── Compute disabled slots for the selected date ───────────────────────────

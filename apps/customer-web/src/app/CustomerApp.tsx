@@ -1649,6 +1649,7 @@ type CheckoutBookingConfig = {
   openingHour: number;
   closingHour: number;
   slotIntervalMinutes: number;
+  is24Hours: boolean;
 };
 const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = {
   minAdvanceMinutes: 30,
@@ -1656,6 +1657,7 @@ const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = {
   openingHour: 8,
   closingHour: 20,
   slotIntervalMinutes: 30,
+  is24Hours: false,
 };
 
 function buildSlotScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
@@ -1729,8 +1731,9 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
       bookingCfg.closingHour,
       bookingCfg.slotIntervalMinutes,
       maxDurationMinutes,
+      bookingCfg.is24Hours,
     ),
-    [bookingCfg.openingHour, bookingCfg.closingHour, bookingCfg.slotIntervalMinutes, maxDurationMinutes],
+    [bookingCfg.openingHour, bookingCfg.closingHour, bookingCfg.slotIntervalMinutes, bookingCfg.is24Hours, maxDurationMinutes],
   );
 
   // Compute disabled slots for the selected date
