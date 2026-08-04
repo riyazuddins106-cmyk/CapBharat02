@@ -214,6 +214,7 @@ The service-level order implementation is complete for customer web/mobile, part
 - Customer Mobile type checking still reports pre-existing errors in `app/checkout.tsx` and cannot resolve `@servenow/shared`; these errors are unrelated to the icon fallback changes.
 - The local tree is clean. A lockfile-only metadata difference remains on the preserved local comparison branch and was intentionally not pushed.
 - Expo Go failure investigation found the ngrok QR generator wrote `exps://` links; the live HTTPS manifests and Android bundles were healthy. The generator now writes `exp://` links, and fresh Customer/Partner QR codes were validated.
+- Partner Mobile Earnings now fetches and displays the same payout history as Partner Web, including amount, optional note, requested date, Pending/Processing/Paid/Rejected status, pull-to-refresh, and immediate insertion after a successful request. Mobile payout API calls returned HTTP 200; Partner Mobile type check and Partner Web production build passed.
 
 
 ### Task: Add Admin service detail views and booking operations controls

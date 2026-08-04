@@ -21,6 +21,7 @@
 - [x] Pushed and verified GitHub `main` at commit `e5c927233`
 - [x] Left lockfile-only metadata churn uncommitted because it was unrelated to the app changes
 - [x] Fixed Expo Go QR deep-link scheme from `exps://` to `exp://` after validating live manifests and bundles
+- [x] Added Partner Mobile payout history parity with Partner Web, including payout notes, statuses, dates, pull-to-refresh, and immediate post-request updates
 
 ### Checklist
 - [x] Add typed master-order and per-service APIs to customer and partner clients

@@ -1,14 +1,38 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { partnerApi } from '@/lib/api';
+import { partnerApi, type Payout } from '@/lib/api';
 
 function fmtDay(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short' });
+}
+
+function fmtPayoutDate(dateStr: string) {
+  return new Date(dateStr).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function payoutStatus(status: string) {
+  switch (status) {
+    case 'paid':
+      return { label: 'Paid', color: '#16a34a', icon: 'checkmark-circle-outline' as const };
+    case 'rejected':
+      return { label: 'Rejected', color: '#ef4444', icon: 'close-circle-outline' as const };
+    case 'approved':
+    case 'processing':
+      return { label: 'Processing', color: '#3b82f6', icon: 'sync-outline' as const };
+    default:
+      return { label: 'Pending', color: '#f59e0b', icon: 'time-outline' as const };
+  }
 }
 
 export default function EarningsScreen() {
@@ -19,6 +43,7 @@ export default function EarningsScreen() {
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
   const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutNote, setPayoutNote] = useState('');
   const [showPayoutForm, setShowPayoutForm] = useState(false);
 
   const { data: earnings, isLoading } = useQuery({
@@ -27,17 +52,33 @@ export default function EarningsScreen() {
     enabled: !!accessToken,
   });
 
+  const {
+    data: payouts = [],
+    isLoading: payoutsLoading,
+    isFetching: payoutsFetching,
+    refetch: refetchPayouts,
+  } = useQuery({
+    queryKey: ['/api/partner/payouts', accessToken],
+    queryFn: () => partnerApi.listPayouts(accessToken!),
+    enabled: !!accessToken,
+  });
+
   const payoutMutation = useMutation({
     mutationFn: () => {
       const amt = parseFloat(payoutAmount);
       if (!amt || amt < 100) throw new Error('Minimum payout is ₹100');
-      return partnerApi.requestPayout(amt, accessToken!);
+      return partnerApi.requestPayout(amt, payoutNote, accessToken!);
     },
-    onSuccess: () => {
+    onSuccess: (payout) => {
       Alert.alert('Payout Requested', 'Your withdrawal request has been submitted. It will be processed within 2–3 business days.');
       setPayoutAmount('');
+      setPayoutNote('');
       setShowPayoutForm(false);
       queryClient.invalidateQueries({ queryKey: ['/api/partner/earnings'] });
+      queryClient.setQueryData<Payout[]>(
+        ['/api/partner/payouts', accessToken],
+        (current = []) => [payout, ...current.filter((item) => item.id !== payout.id)],
+      );
     },
     onError: (e: any) => Alert.alert('Error', e.message ?? 'Could not submit payout request. Try again.'),
   });
@@ -53,7 +94,16 @@ export default function EarningsScreen() {
         <Text style={styles.headerSub}>Your income summary</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 32 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 32 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={payoutsFetching}
+            onRefresh={() => { refetchPayouts(); queryClient.invalidateQueries({ queryKey: ['/api/partner/earnings'] }); }}
+            tintColor={colors.primary}
+          />
+        }
+      >
         {/* Summary cards */}
         <View style={styles.summaryRow}>
           <SummaryCard icon="today-outline" label="Today" value={`₹${earnings?.today ?? 0}`} colors={colors} />
@@ -125,8 +175,16 @@ export default function EarningsScreen() {
                 style={[styles.payoutInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
               />
             </View>
+            <TextInput
+              value={payoutNote}
+              onChangeText={setPayoutNote}
+              placeholder="Note (optional)"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.payoutNoteInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+              maxLength={512}
+            />
             <View style={styles.payoutBtns}>
-              <TouchableOpacity onPress={() => { setShowPayoutForm(false); setPayoutAmount(''); }}
+              <TouchableOpacity onPress={() => { setShowPayoutForm(false); setPayoutAmount(''); setPayoutNote(''); }}
                 style={[styles.payoutCancel, { borderColor: colors.border, borderRadius: colors.radius }]}>
                 <Text style={[styles.payoutCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
               </TouchableOpacity>
@@ -155,6 +213,46 @@ export default function EarningsScreen() {
             <Text style={styles.withdrawBtnText}>Request Withdrawal</Text>
           </TouchableOpacity>
         )}
+
+        {/* Payout history */}
+        <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <View style={styles.historyHeader}>
+            <View>
+              <Text style={[styles.historyTitle, { color: colors.foreground }]}>Payout History</Text>
+              <Text style={[styles.historySub, { color: colors.mutedForeground }]}>Track your withdrawal requests</Text>
+            </View>
+            <Ionicons name="receipt-outline" size={22} color={colors.primary} />
+          </View>
+          {payoutsLoading ? (
+            <View style={styles.historyLoading}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : payouts.length === 0 ? (
+            <View style={styles.historyEmpty}>
+              <Ionicons name="wallet-outline" size={30} color={colors.mutedForeground} />
+              <Text style={[styles.historyEmptyText, { color: colors.mutedForeground }]}>No payout requests yet</Text>
+            </View>
+          ) : (
+            <View>
+              {payouts.map((payout) => {
+                const status = payoutStatus(payout.status);
+                return (
+                  <View key={payout.id} style={[styles.payoutHistoryRow, { borderTopColor: colors.border }]}>
+                    <View style={styles.payoutHistoryMain}>
+                      <Text style={[styles.payoutHistoryAmount, { color: colors.foreground }]}>₹{payout.amount.toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.payoutHistoryDate, { color: colors.mutedForeground }]}>{fmtPayoutDate(payout.requestedAt)}</Text>
+                      {payout.note ? <Text style={[styles.payoutHistoryNote, { color: colors.mutedForeground }]} numberOfLines={1}>{payout.note}</Text> : null}
+                    </View>
+                    <View style={[styles.statusPill, { backgroundColor: `${status.color}18` }]}>
+                      <Ionicons name={status.icon} size={13} color={status.color} />
+                      <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
 
         {/* Info note */}
         <View style={[styles.note, { backgroundColor: colors.secondary, borderRadius: colors.radius }]}>
@@ -215,9 +313,24 @@ const styles = StyleSheet.create({
   payoutRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   payoutCurr: { fontSize: 22, fontWeight: '800' },
   payoutInput: { flex: 1, padding: 12, fontSize: 18, fontWeight: '700' },
+  payoutNoteInput: { padding: 12, fontSize: 14 },
   payoutBtns: { flexDirection: 'row', gap: 10, marginTop: 4 },
   payoutCancel: { flex: 1, paddingVertical: 12, alignItems: 'center', borderWidth: 1 },
   payoutCancelText: { fontSize: 14, fontWeight: '600' },
   payoutSubmit: { flex: 2, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   payoutSubmitText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  historyCard: { borderWidth: 1, overflow: 'hidden' },
+  historyHeader: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  historyTitle: { fontSize: 16, fontWeight: '700' },
+  historySub: { fontSize: 12, marginTop: 3 },
+  historyLoading: { paddingVertical: 28, alignItems: 'center' },
+  historyEmpty: { paddingVertical: 28, alignItems: 'center', gap: 8 },
+  historyEmptyText: { fontSize: 13 },
+  payoutHistoryRow: { borderTopWidth: 1, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  payoutHistoryMain: { flex: 1, gap: 3 },
+  payoutHistoryAmount: { fontSize: 16, fontWeight: '800' },
+  payoutHistoryDate: { fontSize: 11 },
+  payoutHistoryNote: { fontSize: 11 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999 },
+  statusText: { fontSize: 11, fontWeight: '700' },
 });

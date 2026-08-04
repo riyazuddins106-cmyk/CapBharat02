@@ -155,6 +155,15 @@ export interface Earnings {
   weekly: { date: string; amount: number }[];
 }
 
+export interface Payout {
+  id: string;
+  amount: number;
+  status: string;
+  note: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+}
+
 export interface OrderItemJob {
   requestId?: string | null;
   orderItemId: string;
@@ -354,15 +363,15 @@ export const partnerApi = {
   getEarnings: (token: string) =>
     request<Earnings>('/api/partner/earnings', { token }),
 
-  requestPayout: (amount: number, token: string) =>
-    request<{ id: string; amount: number; status: string }>('/api/partner/payouts', {
+  requestPayout: (amount: number, note: string | undefined, token: string) =>
+    request<Payout>('/api/partner/payouts', {
       method: 'POST',
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, note: note || undefined }),
       token,
     }),
 
   listPayouts: (token: string) =>
-    request<{ id: string; amount: number; status: string; createdAt: string }[]>('/api/partner/payouts', { token }),
+    request<Payout[]>('/api/partner/payouts', { token }),
 };
 
 // ── Documents ──────────────────────────────────────────────
