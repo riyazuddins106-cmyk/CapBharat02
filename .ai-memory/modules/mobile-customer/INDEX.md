@@ -1,5 +1,5 @@
 # Module: Customer Mobile App
-**Status:** ✅ Complete
+**Status:** ✅ Complete — service-level orders added
 
 ## Key Files
 | File | Purpose |
@@ -18,7 +18,7 @@
 - Home: categories grid + reels feed
 - Sub-categories drill-down → service listing → service detail
 - Checkout: cart → address → date → time slot → summary → payment
-- My Bookings: list with QR code per booking
+- My Bookings: legacy bookings plus master orders with per-service status, windows, cancel/search, and payment actions
 - Wishlist / Favorites
 - Points & Rewards
 - Notifications

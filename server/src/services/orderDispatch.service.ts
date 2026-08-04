@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import {
-  orderItems, orderItemRequests, orders,
+  orderItems, orderItemRequests, orderItemPayments, orders,
   professionals, partnerServices, users, addresses,
 } from '../database/schema/index.js';
 import { notificationDbService } from './notificationDb.service.js';
@@ -56,7 +56,7 @@ export async function recomputeOrderStatus(orderId: string) {
   const anyCompleted  = nonCancelled.some(i => i.status === 'service_completed');
   const allConfirmed  = nonCancelled.every(i => ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started', 'service_completed'].includes(i.status));
   const anyConfirmed  = nonCancelled.some(i => ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started', 'service_completed'].includes(i.status));
-  const anyInProgress = nonCancelled.some(i => ['partner_arrived', 'service_started'].includes(i.status));
+  const anyInProgress = nonCancelled.some(i => ['partner_arrived', 'payment_pending', 'service_started'].includes(i.status));
 
   let newStatus: typeof orders.$inferSelect['status'];
   if (allCompleted)          newStatus = 'completed';
@@ -241,7 +241,7 @@ export const orderDispatchService = {
   /** Partner checks in (arrives at location) — triggers payment request */
   async checkInItem(orderItemId: string, partnerId: string) {
     const [item] = await db.update(orderItems).set({
-      status: 'partner_arrived',
+      status: 'payment_pending',
       updatedAt: new Date(),
     }).where(and(
       eq(orderItems.id, orderItemId),
@@ -249,6 +249,22 @@ export const orderDispatchService = {
       eq(orderItems.status, 'partner_accepted'),
     )).returning();
     if (!item) throw new Error('Order item not found or not in the correct state for check-in.');
+
+    const [existingPayment] = await db.select({ id: orderItemPayments.id })
+      .from(orderItemPayments)
+      .where(eq(orderItemPayments.orderItemId, item.id))
+      .limit(1);
+    if (!existingPayment) {
+      await db.insert(orderItemPayments).values({
+        orderItemId: item.id,
+        orderId: item.orderId,
+        customerId: (await db.select({ customerId: orders.customerId }).from(orders).where(eq(orders.id, item.orderId)).limit(1))[0]?.customerId ?? '',
+        amount: item.customerPrice,
+        currency: 'INR',
+        status: 'created',
+        notes: 'Payment requested at partner check-in',
+      });
+    }
 
     await recomputeOrderStatus(item.orderId);
 
@@ -277,7 +293,7 @@ export const orderDispatchService = {
     }).where(and(
       eq(orderItems.id, orderItemId),
       eq(orderItems.partnerId, partnerId),
-      inArray(orderItems.status, ['service_started', 'payment_completed', 'partner_arrived']),
+      inArray(orderItems.status, ['service_started', 'payment_completed']),
     )).returning();
     if (!item) throw new Error('Order item not found or not in a completable state.');
 

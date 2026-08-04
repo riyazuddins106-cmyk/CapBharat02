@@ -18,7 +18,7 @@ import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
-  DispatchRequestRow, EligiblePartner, TimeseriesPoint,
+  DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow,
 } from "@/lib/api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -550,6 +550,7 @@ const ADMIN_SIDEBAR = [
   { id: "bookings",       icon: BookOpen,    label: "Bookings"                      },
   { id: "booking-history", icon: HistoryIcon, label: "Booking History"              },
   { id: "dispatch",       icon: Navigation,  label: "Booking Operations Centre"     },
+  { id: "orders",         icon: Package,     label: "Service Orders"                },
   { id: "pros",           icon: Users,       label: "Professionals"                 },
   { id: "users",          icon: UserCheck,   label: "Users"                         },
   { id: "categories",     icon: Grid,        label: "Categories"                    },
@@ -589,7 +590,7 @@ function adminShowError(msg: string) {
   else console.error("[AdminError]", msg);
 }
 
-const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch",
+const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch","orders",
   "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
   "payment-config","email-config","sms-config","otp-settings","documents","payouts"] as const;
 
@@ -632,6 +633,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [reelList,     setReelList]     = useState<ReelRow[]>([]);
   const [serviceList,  setServiceList]  = useState<ServiceRow[]>([]);
   const [dispatchList, setDispatchList] = useState<DispatchRequestRow[]>([]);
+  const [orderList,    setOrderList]    = useState<AdminOrderRow[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -643,7 +645,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, b, p, u, c, r, a, o, rl, sv, d] = await Promise.all([
+      const [s, b, p, u, c, r, a, o, rl, sv, d, ord] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken, 1, proPageSize),
@@ -655,6 +657,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         adminApi.getReels(accessToken),
         adminApi.getServices(accessToken),
         adminApi.getDispatch(accessToken),
+        adminApi.getOrders(accessToken),
       ]);
       setStats(s);
       setBookingList(b.bookings);
@@ -669,6 +672,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setReelList(rl.reels);
       setServiceList(sv.services);
       setDispatchList(d);
+      setOrderList(ord);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
@@ -1028,6 +1032,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
             <DispatchView requests={dispatchList} accessToken={accessToken} onAssigned={load} />
+          ) : activeSection === "orders" ? (
+            <OrderHierarchyView orders={orderList} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "services" ? (
             <ServicesView services={serviceList} categories={categoryList} accessToken={accessToken} onCreate={createService} onEdit={editService} onDelete={deleteService} onRefresh={load} />
           ) : activeSection === "reels" ? (
@@ -1279,6 +1285,135 @@ function EligiblePartnersModal({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function OrderHierarchyView({
+  orders,
+  accessToken,
+  onRefresh,
+}: {
+  orders: AdminOrderRow[];
+  accessToken: string;
+  onRefresh: () => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const runAction = async (action: "dispatch" | "refund", orderId: string, itemId: string) => {
+    const key = `${action}:${itemId}`;
+    setBusy(key);
+    try {
+      if (action === "dispatch") {
+        await adminApi.continueOrderItemDispatch(orderId, itemId, accessToken);
+      } else {
+        await adminApi.refundOrderItem(orderId, itemId, accessToken);
+      }
+      onRefresh();
+    } catch (err: any) {
+      adminShowError(err?.message ?? "Could not update service order.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 overflow-auto h-full">
+      <div>
+        <h2 className="text-white text-xl font-bold">Service Orders</h2>
+        <p className="text-white/40 text-sm mt-1">Master orders with per-service dispatch, earnings, and payment controls.</p>
+      </div>
+      {orders.length === 0 ? (
+        <div className="rounded-2xl border border-white/[0.08] p-10 text-center text-white/35">No service orders yet.</div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {orders.map((order) => {
+            const isOpen = expanded === order.id;
+            const margin = order.items.reduce((sum, item) => sum + item.earnings.platformMargin, 0);
+            return (
+              <div key={order.id} className="rounded-2xl border border-white/[0.08] overflow-hidden" style={CARD}>
+                <button
+                  onClick={() => setExpanded(isOpen ? null : order.id)}
+                  className="w-full text-left p-4 flex items-center gap-4 hover:bg-white/[0.03]"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-white font-bold text-sm">Order {order.id.slice(0, 8)}</span>
+                      <Badge label={order.status.replaceAll("_", " ")} color={order.status === "completed" ? "#16A34A" : order.status === "cancelled" ? "#EF4444" : "#7C5BF8"} />
+                    </div>
+                    <p className="text-white/50 text-xs mt-1">{order.customerName} · {order.customerEmail}</p>
+                    <p className="text-white/35 text-xs mt-1">{new Date(order.scheduledAt).toLocaleString("en-IN")} · {order.items.length} service{order.items.length === 1 ? "" : "s"}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-white font-bold text-sm">{fmt(order.totalAmount)}</p>
+                    <p className="text-emerald-400/80 text-[11px]">Margin {fmt(margin)}</p>
+                  </div>
+                  {isOpen ? <ChevronUp size={17} className="text-white/40" /> : <ChevronDown size={17} className="text-white/40" />}
+                </button>
+                {isOpen && (
+                  <div className="border-t border-white/[0.07] p-3 flex flex-col gap-2">
+                    {order.items.map((item) => {
+                      const canDispatch = !["cancelled", "service_completed"].includes(item.status);
+                      const canRefund = item.payment?.status === "paid";
+                      return (
+                        <div key={item.id} className="rounded-xl border border-white/[0.07] p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-white font-semibold text-sm">{item.serviceName ?? "Service"}</p>
+                              <p className="text-white/45 text-xs mt-1">
+                                {new Date(item.scheduledAt).toLocaleString("en-IN")} · {item.durationMinutes} min
+                              </p>
+                              <p className="text-white/45 text-xs mt-1">
+                                {item.partnerId ? `Partner assigned · ${fmt(item.partnerPayout)} payout` : "No partner assigned"}
+                              </p>
+                            </div>
+                            <Badge label={item.status.replaceAll("_", " ")} color={item.status === "service_completed" ? "#16A34A" : item.status === "cancelled" ? "#EF4444" : "#F59E0B"} />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 mt-3">
+                            <div className="rounded-lg bg-white/[0.04] p-2">
+                              <p className="text-white/35 text-[10px]">Customer</p>
+                              <p className="text-white text-xs font-bold mt-1">{fmt(item.earnings.customerPrice)}</p>
+                            </div>
+                            <div className="rounded-lg bg-white/[0.04] p-2">
+                              <p className="text-white/35 text-[10px]">Partner payout</p>
+                              <p className="text-white text-xs font-bold mt-1">{fmt(item.earnings.partnerPayout)}</p>
+                            </div>
+                            <div className="rounded-lg bg-white/[0.04] p-2">
+                              <p className="text-white/35 text-[10px]">Payment</p>
+                              <p className="text-white text-xs font-bold mt-1 capitalize">{item.payment?.status ?? "unpaid"}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            {canDispatch && (
+                              <ActionBtn
+                                variant="edit"
+                                disabled={busy === `dispatch:${item.id}`}
+                                onClick={() => runAction("dispatch", order.id, item.id)}
+                              >
+                                {busy === `dispatch:${item.id}` ? "Restarting…" : "Restart Dispatch"}
+                              </ActionBtn>
+                            )}
+                            {canRefund && (
+                              <ActionBtn
+                                variant="danger"
+                                disabled={busy === `refund:${item.id}`}
+                                onClick={() => runAction("refund", order.id, item.id)}
+                              >
+                                {busy === `refund:${item.id}` ? "Refunding…" : "Refund Service"}
+                              </ActionBtn>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,9 +3,9 @@
 
 ---
 
-## Overall Completion: ~97%
+## Overall Completion: ~98%
 
-The platform is feature-complete and end-to-end tested. All core flows work. Supabase and JWT secrets are configured, dependencies are installed, migrations are applied idempotently, and the main customer web/API workflow is running in preview.
+The service-level order implementation is complete for customer web/mobile, partner mobile, payment gating, and admin controls. The main customer web/API/admin workflows are running in preview. Full end-to-end validation of every new order-item state remains the next verification phase.
 
 ---
 
@@ -80,9 +80,7 @@ The platform is feature-complete and end-to-end tested. All core flows work. Sup
 
 | Item | Details |
 |------|---------|
-| **DATABASE_URL secret** | Not set in this Replit environment. App won't start without it. Add Supabase Postgres connection string. |
-| **Other Supabase secrets** | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` also needed. |
-| **JWT secrets** | `JWT_SECRET` and `JWT_REFRESH_SECRET` needed. |
+| **Full service-order E2E validation** | Run customer checkout → partner accept/check-in → per-item payment → completion, plus cancellation, re-dispatch, refund, and admin controls. |
 | **Email (SMTP)** | Optional — OTP codes log to console if not set. |
 | **EAS projectId** | Not set — push tokens use Expo Go anonymous identity. Needed only for standalone builds. |
 | **Dependencies** | Run `pnpm install --frozen-lockfile` before first start. |

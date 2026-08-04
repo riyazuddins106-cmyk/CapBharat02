@@ -1,5 +1,5 @@
 # Module: Admin
-**Status:** ✅ Complete
+**Status:** ✅ Complete — service-order controls added
 
 ## Key Files
 | File | Purpose |
@@ -9,6 +9,8 @@
 | `server/src/controllers/admin.controller.ts` | stats, users, bookings, professionals |
 | `server/src/controllers/platformSettings.controller.ts` | settings CRUD |
 | `server/src/routes/admin.routes.ts` | route bindings (all require admin role) |
+
+Service Orders: master order hierarchy, per-item dispatch restart, refunds, payouts, and platform margin.
 
 ## ⚠️ Important: Admin UI is monolithic
 There are NO separate page files. Every view (dashboard, users, bookings, categories, settings, etc.) is a component function inside `App.tsx`. When editing admin UI, search by function name in App.tsx.

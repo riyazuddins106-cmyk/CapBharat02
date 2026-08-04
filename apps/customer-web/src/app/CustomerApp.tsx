@@ -11,10 +11,10 @@ import {
   Sofa, Shirt, Package, WashingMachine, Tag, Waves, Banknote, Smartphone, CreditCard,
 } from "lucide-react";
 import {
-  auth, authApi, categoriesApi, subcategoriesApi, bookingsApi,
+  auth, authApi, categoriesApi, subcategoriesApi, bookingsApi, ordersApi,
   addressesApi, offersApi, profileApi, reelsApi, getPaymentConfig, servicesApi, cartApi,
   notificationsApi, pointsApi, serviceWishlistApi, supportTicketsApi, platformPoliciesApi, reviewsApi,
-  type ApiUser, type ApiCategory, type ApiSubCategory, type ApiBooking,
+  type ApiUser, type ApiCategory, type ApiSubCategory, type ApiBooking, type ApiOrder,
   type ApiAddress, type ApiOffer, type ApiReel, type ApiPayment, type ApiService, type ApiCart,
   type ApiNotification, type ApiPointsSummary, type ApiWishlistedService,
   type ApiSupportTicket, type ApiPolicy,
@@ -1763,7 +1763,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     }
   }, [disabledSlots, timeSlots]);
   const [bookingDone, setBookingDone] = useState(false);
-  const [createdBooking, setCreatedBooking] = useState<ApiBooking | null>(null);
+  const [createdOrder, setCreatedOrder] = useState<ApiOrder | null>(null);
   const [payAfterBook, setPayAfterBook] = useState(false);
 
   useEffect(() => {
@@ -1800,7 +1800,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     try {
       const scheduledAt = buildSlotScheduledAt(selectedDate, selectedSlot);
       const created = await cartApi.checkout({ scheduledAt, addressId: selectedAddressId ?? undefined });
-      setCreatedBooking(created);
+      setCreatedOrder(created);
       onChange({ ...cart, items: [], total: 0 });
       setBookingDone(true);
       setStep(5);
@@ -2176,14 +2176,11 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 </p>
               )}
 
-              {createdBooking && (
-                <button
-                  onClick={() => setPayAfterBook(true)}
-                  className="w-full py-3.5 mb-2 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
-                  style={{ background: "linear-gradient(135deg,#059669,#10b981)" }}
-                >
-                  💳 Pay Now — ₹{createdBooking.price.toLocaleString("en-IN")}
-                </button>
+              {createdOrder && (
+                <div className="w-full rounded-2xl bg-violet-50 border border-violet-100 p-3 mb-2">
+                  <p className="text-xs font-bold text-violet-700">Service-wise payment</p>
+                  <p className="text-[11px] text-violet-600 mt-1">Payment becomes available for each service when its partner arrives.</p>
+                </div>
               )}
               <button
                 onClick={onClose}
@@ -2197,13 +2194,6 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
       </div>
     </div>
 
-    {payAfterBook && createdBooking && (
-      <PaymentModal
-        booking={createdBooking}
-        onClose={() => setPayAfterBook(false)}
-        onPaid={() => { setPayAfterBook(false); onClose(); onPaymentComplete?.(); }}
-      />
-    )}
     </>
   );
 }
@@ -2447,8 +2437,9 @@ function PaymentModal({ booking, onClose, onPaid }: {
   );
 }
 
-function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
+function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
   bookings: ApiBooking[];
+  orders: ApiOrder[];
   onCancel: (id: string) => void;
   onRefresh: () => void;
   onRebook: (categoryId: string) => void;
@@ -2462,6 +2453,7 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewErr, setReviewErr] = useState("");
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  const [orderAction, setOrderAction] = useState<string | null>(null);
 
   const searchingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings  = bookings.filter((b) => ["upcoming", "in_progress"].includes(b.status));
@@ -2487,6 +2479,21 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
       setReviewBooking(null); setReviewComment(""); setReviewRating(5);
     } catch (e: any) { setReviewErr(e.message ?? "Failed to submit review."); }
     finally { setReviewLoading(false); }
+  }
+
+  async function handleOrderAction(action: "cancel" | "continue" | "pay", orderId: string, itemId: string) {
+    const key = `${action}:${itemId}`;
+    setOrderAction(key);
+    try {
+      if (action === "cancel") await ordersApi.cancelItem(orderId, itemId);
+      if (action === "continue") await ordersApi.continueSearching(orderId, itemId);
+      if (action === "pay") await ordersApi.payItem(orderId, itemId, "cash");
+      onRefresh();
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message ?? e?.message ?? "Could not update this service.");
+    } finally {
+      setOrderAction(null);
+    }
   }
 
   return (
@@ -2525,6 +2532,85 @@ function CustBookings({ bookings, onCancel, onRefresh, onRebook }: {
               We're matching the best available service provider to your booking. This usually takes a few minutes — you'll be notified once confirmed.
             </p>
           </div>
+        </div>
+      )}
+
+      {orders.length > 0 && (
+        <div className="px-5 mt-4 flex flex-col gap-3">
+          {orders
+            .filter((order) => tab === "searching"
+              ? order.status === "searching_partners" || order.status === "partially_confirmed"
+              : tab === "upcoming"
+                ? ["fully_confirmed", "in_progress"].includes(order.status)
+                : ["completed", "partially_completed", "cancelled"].includes(order.status))
+            .map((order) => (
+              <div key={order.id} className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Service Order</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatScheduledAt(order.scheduledAt)} · ₹{order.totalAmount}</p>
+                  </div>
+                  <span className="text-[10px] font-bold rounded-full px-2 py-1 bg-white text-violet-700">
+                    {order.status.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {order.items.map((item) => {
+                    const canCancel = !["cancelled", "service_started", "service_completed"].includes(item.status);
+                    const canContinue = !item.partnerId && item.status !== "cancelled";
+                    const needsPayment = ["partner_arrived", "payment_pending"].includes(item.status)
+                      && item.payment?.status !== "paid";
+                    return (
+                      <div key={item.id} className="rounded-xl bg-white border border-black/[0.06] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold">{item.serviceName ?? "Service"}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {item.partnerName ? `Partner: ${item.partnerName}` : "Partner: searching"}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {formatScheduledAt(item.startTime)} – {formatScheduledAt(item.endTime)} · {item.durationMinutes} min
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-bold rounded-full px-2 py-1 bg-gray-100 text-gray-600 whitespace-nowrap">
+                            {item.status.replaceAll("_", " ")}
+                          </span>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          {canContinue && (
+                            <button
+                              onClick={() => handleOrderAction("continue", order.id, item.id)}
+                              disabled={orderAction === `continue:${item.id}`}
+                              className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-violet-200 text-violet-600 disabled:opacity-50"
+                            >
+                              {orderAction === `continue:${item.id}` ? "Searching…" : "Continue Searching"}
+                            </button>
+                          )}
+                          {needsPayment && (
+                            <button
+                              onClick={() => handleOrderAction("pay", order.id, item.id)}
+                              disabled={orderAction === `pay:${item.id}`}
+                              className="flex-1 py-2 rounded-lg text-[11px] font-bold text-white bg-emerald-600 disabled:opacity-50"
+                            >
+                              {orderAction === `pay:${item.id}` ? "Paying…" : `Pay ₹${item.customerPrice}`}
+                            </button>
+                          )}
+                          {canCancel && (
+                            <button
+                              onClick={() => handleOrderAction("cancel", order.id, item.id)}
+                              disabled={orderAction === `cancel:${item.id}`}
+                              className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-red-200 text-red-500 disabled:opacity-50"
+                            >
+                              {orderAction === `cancel:${item.id}` ? "Cancelling…" : "Cancel Service"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
         </div>
       )}
 
@@ -3411,6 +3497,7 @@ export default function CustomerApp() {
   const [servicesInitCatId, setServicesInitCatId] = useState<string | null>(null);
   const [featuredServices, setFeaturedServices] = useState<ApiService[]>([]);
   const [bookings, setBookings]               = useState<ApiBooking[]>([]);
+  const [orders, setOrders]                   = useState<ApiOrder[]>([]);
   const [favoriteIds, setFavoriteIds]         = useState<Set<string>>(new Set()); // kept for wishlist toggle compat
   const [wishlistIds, setWishlistIds]         = useState<Set<string>>(new Set());
   const [offers, setOffers]                   = useState<ApiOffer[]>([]);
@@ -3439,6 +3526,7 @@ export default function CustomerApp() {
   useEffect(() => {
     if (!isLoggedIn) return;
     bookingsApi.list().then(setBookings).catch(console.error);
+    ordersApi.list().then(setOrders).catch(console.error);
     addressesApi.list().then(setAddresses).catch(console.error);
     serviceWishlistApi.getIds().then(({ ids }) => setWishlistIds(new Set(ids))).catch(console.error);
   }, [isLoggedIn]);
@@ -3456,6 +3544,7 @@ export default function CustomerApp() {
     setUser(null);
     setIsLoggedIn(false);
     setBookings([]);
+    setOrders([]);
     setFavoriteIds(new Set());
     setWishlistIds(new Set());
     setAddresses([]);
@@ -3504,6 +3593,7 @@ export default function CustomerApp() {
   const refreshBookings = useCallback(() => {
     if (!isLoggedIn) return;
     bookingsApi.list().then(setBookings).catch(console.error);
+    ordersApi.list().then(setOrders).catch(console.error);
   }, [isLoggedIn]);
 
   const handleSelectLocation = useCallback((loc: string) => {
@@ -3672,6 +3762,7 @@ export default function CustomerApp() {
       {activeTab === "bookings" && (
         <CustBookings
           bookings={bookings}
+          orders={orders}
           onCancel={handleCancelBooking}
           onRefresh={refreshBookings}
           onRebook={handleRebook}

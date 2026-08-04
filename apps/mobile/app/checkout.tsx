@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { cartApi, addressesApi, API_BASE, type Cart, type Address } from '@/lib/api';
+import { cartApi, addressesApi, API_BASE, type Cart, type Address, type Order } from '@/lib/api';
 import { setPendingPayId } from '@/lib/pendingPayment';
 import { generateTimeSlots, formatSlotTime, getServiceWindowLabel, formatDuration } from '@servenow/shared';
 
@@ -81,6 +81,7 @@ export default function CheckoutScreen() {
   const [done, setDone] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [createdBookingPrice, setCreatedBookingPrice] = useState<number | null>(null);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
   // ── Fetch booking config (public, no auth) ────────────────────────────────
   const { data: bookingConfig = DEFAULT_BOOKING_CONFIG } = useQuery<BookingConfig>({
@@ -178,11 +179,12 @@ export default function CheckoutScreen() {
         },
         accessToken!,
       ),
-    onSuccess: (booking: any) => {
+    onSuccess: (order: Order) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart', accessToken] });
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings', accessToken] });
-      setCreatedBookingId(booking?.id ?? null);
-      setCreatedBookingPrice(booking?.price ?? null);
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', accessToken] });
+      setCreatedOrder(order);
+      setCreatedBookingId(order?.id ?? null);
+      setCreatedBookingPrice(order?.totalAmount ?? null);
       setDone(true);
       setStep(5);
     },

@@ -122,6 +122,52 @@ export interface ApiCart {
   total: number;
 }
 
+export type ApiOrderItemStatus =
+  | "searching_partner"
+  | "assigned"
+  | "partner_accepted"
+  | "partner_arrived"
+  | "payment_pending"
+  | "payment_completed"
+  | "service_started"
+  | "service_completed"
+  | "cancelled";
+
+export interface ApiOrderItem {
+  id: string;
+  orderId: string;
+  serviceId: string;
+  serviceName: string | null;
+  partnerId: string | null;
+  partnerName: string | null;
+  status: ApiOrderItemStatus;
+  scheduledAt: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  customerPrice: number;
+  partnerPayout: number;
+  quantity: number;
+  payment: {
+    id: string;
+    status: "created" | "paid" | "failed" | "refunded";
+    method: string | null;
+    amount: number;
+    notes: string | null;
+  } | null;
+}
+
+export interface ApiOrder {
+  id: string;
+  customerId: string;
+  addressId: string | null;
+  scheduledAt: string;
+  status: string;
+  totalAmount: number;
+  notes: string | null;
+  items: ApiOrderItem[];
+}
+
 export interface ApiReview {
   id: string;
   bookingId: string;
@@ -277,6 +323,33 @@ export const bookingsApi = {
   },
 };
 
+export const ordersApi = {
+  async list() {
+    const { data } = await client.get("/orders");
+    return data.data as ApiOrder[];
+  },
+
+  async cancelItem(orderId: string, itemId: string) {
+    const { data } = await client.patch(`/orders/${orderId}/items/${itemId}/cancel`);
+    return data.data as ApiOrder;
+  },
+
+  async continueSearching(orderId: string, itemId: string) {
+    const { data } = await client.patch(`/orders/${orderId}/items/${itemId}/continue-searching`);
+    return data.data as { message: string };
+  },
+
+  async payItem(orderId: string, itemId: string, method: "cash" | "upi_manual", notes?: string) {
+    const { data } = await client.post(`/orders/${orderId}/items/${itemId}/pay`, { method, notes });
+    return data.data;
+  },
+
+  async testPayItem(orderId: string, itemId: string, method = "cash") {
+    const { data } = await client.post(`/orders/${orderId}/items/${itemId}/test-pay`, { method });
+    return data.data;
+  },
+};
+
 export interface ApiPayment {
   id: string;
   bookingId: string;
@@ -343,7 +416,7 @@ export const cartApi = {
   async add(serviceId: string, quantity = 1) { const { data } = await client.post('/cart/items', { serviceId, quantity }); return data.data as ApiCart; },
   async update(itemId: string, quantity: number) { const { data } = await client.patch(`/cart/items/${itemId}`, { quantity }); return data.data as ApiCart; },
   async remove(itemId: string) { const { data } = await client.delete(`/cart/items/${itemId}`); return data.data as ApiCart; },
-  async checkout(payload: { scheduledAt: string; addressId?: string; notes?: string }) { const { data } = await client.post('/bookings/checkout', payload); return data.data as ApiBooking; },
+  async checkout(payload: { scheduledAt: string; addressId?: string; notes?: string }) { const { data } = await client.post('/orders/checkout', payload); return data.data as ApiOrder; },
 };
 
 // ─── Offers API ───────────────────────────────────────────────────────────────

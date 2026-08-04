@@ -96,6 +96,29 @@ export interface BookingRow {
   paymentId?: string | null;
 }
 
+export interface AdminOrderItemRow {
+  id: string;
+  serviceName: string | null;
+  status: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  partnerId: string | null;
+  customerPrice: number;
+  partnerPayout: number;
+  payment: { id: string; status: string; method: string | null; amount: number; notes: string | null } | null;
+  earnings: { customerPrice: number; partnerPayout: number; platformMargin: number };
+}
+
+export interface AdminOrderRow {
+  id: string;
+  status: string;
+  scheduledAt: string;
+  totalAmount: number;
+  customerName: string;
+  customerEmail: string;
+  items: AdminOrderItemRow[];
+}
+
 export interface ProfessionalRow {
   id: string;
   name: string;
@@ -699,6 +722,11 @@ export const adminApi = {
     request<EligiblePartner[]>(`/operations/dispatch/${bookingId}/eligible-partners`, { token }),
   assignPartner: (bookingId: string, partnerId: string, token: string) =>
     request<BookingRow>(`/operations/dispatch/${bookingId}/assign`, { method: 'POST', token, body: JSON.stringify({ partnerId }) }),
+  getOrders: (token: string) => request<AdminOrderRow[]>('/admin/orders', { token }),
+  continueOrderItemDispatch: (orderId: string, itemId: string, token: string) =>
+    request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/dispatch`, { method: 'PATCH', token }),
+  refundOrderItem: (orderId: string, itemId: string, token: string) =>
+    request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/refund`, { method: 'PATCH', token }),
 
   // Platform Settings
   getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config', token: string) =>

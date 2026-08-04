@@ -156,6 +156,52 @@ export interface Booking {
   /** Latest payment status from the payments table (null = no payment record yet) */
   paymentStatus?: 'created' | 'paid' | 'failed' | 'refunded' | null;
 }
+
+export type OrderItemStatus =
+  | 'searching_partner'
+  | 'assigned'
+  | 'partner_accepted'
+  | 'partner_arrived'
+  | 'payment_pending'
+  | 'payment_completed'
+  | 'service_started'
+  | 'service_completed'
+  | 'cancelled';
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  serviceId: string;
+  serviceName: string | null;
+  partnerId: string | null;
+  partnerName: string | null;
+  status: OrderItemStatus;
+  scheduledAt: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  customerPrice: number;
+  partnerPayout: number;
+  quantity: number;
+  payment: {
+    id: string;
+    status: string;
+    method: string | null;
+    amount: number;
+    notes: string | null;
+  } | null;
+}
+
+export interface Order {
+  id: string;
+  customerId: string;
+  addressId: string | null;
+  scheduledAt: string;
+  status: string;
+  totalAmount: number;
+  notes: string | null;
+  items: OrderItem[];
+}
 export interface Review {
   id: string;
   rating: number;
@@ -320,7 +366,19 @@ export const cartApi = {
   remove: (itemId: string, token: string) =>
     request<Cart>(`/api/cart/items/${itemId}`, { method: 'DELETE', token }),
   checkout: (payload: { scheduledAt: string; addressId?: string; notes?: string }, token: string) =>
-    request<Booking>('/api/bookings/checkout', { method: 'POST', body: JSON.stringify(payload), token }),
+    request<Order>('/api/orders/checkout', { method: 'POST', body: JSON.stringify(payload), token }),
+};
+
+export const ordersApi = {
+  list: (token: string) => request<Order[]>('/api/orders', { token }),
+  cancelItem: (orderId: string, itemId: string, token: string) =>
+    request<Order>(`/api/orders/${orderId}/items/${itemId}/cancel`, { method: 'PATCH', token }),
+  continueSearching: (orderId: string, itemId: string, token: string) =>
+    request<{ message: string }>(`/api/orders/${orderId}/items/${itemId}/continue-searching`, { method: 'PATCH', token }),
+  payItem: (orderId: string, itemId: string, method: 'cash' | 'upi_manual', notes: string | undefined, token: string) =>
+    request(`/api/orders/${orderId}/items/${itemId}/pay`, { method: 'POST', body: JSON.stringify({ method, notes }), token }),
+  testPayItem: (orderId: string, itemId: string, method: string, token: string) =>
+    request(`/api/orders/${orderId}/items/${itemId}/test-pay`, { method: 'POST', body: JSON.stringify({ method }), token }),
 };
 
 // ── Offers / Banners ───────────────────────────────────────

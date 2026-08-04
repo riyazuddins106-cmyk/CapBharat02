@@ -1,7 +1,10 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { db } from '../config/database.js';
-import { bookings, users, professionals, serviceCategories, reviews, payoutRequests } from '../database/schema/index.js';
+import {
+  bookings, users, professionals, serviceCategories, reviews, payoutRequests,
+  orders, orderItems, orderItemPayments, services,
+} from '../database/schema/index.js';
 import { payments } from '../database/schema/payments.js';
 import { eq, desc, count, sum, ne, isNull, isNotNull, and, or, avg, sql, gte, lte, ilike, inArray } from 'drizzle-orm';
 
@@ -23,6 +26,94 @@ import { storageService } from '../services/storage.service.js';
 import { hashPassword } from '../utils/password.js';
 
 export const adminController = {
+  /** Master orders with per-service status, dispatch, earnings and payment state. */
+  listOrders: asyncHandler(async (req: Request, res: Response) => {
+    const limit = Math.min(Number(req.query.limit ?? 100), 500);
+    const rows = await db.select({
+      order: orders,
+      item: orderItems,
+      serviceName: services.name,
+      customerName: users.fullName,
+      customerEmail: users.email,
+    })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(services, eq(services.id, orderItems.serviceId))
+      .innerJoin(users, eq(users.id, orders.customerId))
+      .orderBy(desc(orders.createdAt))
+      .limit(limit);
+
+    const paymentRows = rows.length
+      ? await db.select().from(orderItemPayments)
+        .where(inArray(orderItemPayments.orderItemId, rows.map(row => row.item.id)))
+      : [];
+    const paymentByItem = new Map(paymentRows.map(payment => [payment.orderItemId, payment]));
+    const byOrder = new Map<string, any>();
+
+    for (const row of rows) {
+      const existing = byOrder.get(row.order.id) ?? {
+        ...row.order,
+        customerName: row.customerName,
+        customerEmail: row.customerEmail,
+        items: [],
+      };
+      const payment = paymentByItem.get(row.item.id);
+      existing.items.push({
+        ...row.item,
+        serviceName: row.serviceName,
+        payment: payment ? {
+          id: payment.id,
+          status: payment.status,
+          method: payment.method,
+          amount: payment.amount,
+          notes: payment.notes,
+        } : null,
+        earnings: {
+          customerPrice: row.item.customerPrice,
+          partnerPayout: row.item.partnerPayout,
+          platformMargin: row.item.customerPrice - row.item.partnerPayout,
+        },
+      });
+      byOrder.set(row.order.id, existing);
+    }
+
+    res.json({ success: true, data: [...byOrder.values()] });
+  }),
+
+  /** Restart dispatch for one service item after a rejection or timeout. */
+  continueOrderItemDispatch: asyncHandler(async (req: Request, res: Response) => {
+    const [item] = await db.select().from(orderItems)
+      .where(and(eq(orderItems.id, req.params.itemId), eq(orderItems.orderId, req.params.orderId)))
+      .limit(1);
+    if (!item) throw AppError.notFound('Order service not found.');
+    if (item.status === 'cancelled' || item.status === 'service_completed') {
+      throw AppError.badRequest('This service is not dispatchable.');
+    }
+    const [order] = await db.select().from(orders).where(eq(orders.id, item.orderId)).limit(1);
+    if (!order) throw AppError.notFound('Order not found.');
+    await db.update(orderItems).set({ status: 'searching_partner', partnerId: null, updatedAt: new Date() })
+      .where(eq(orderItems.id, item.id));
+    const { orderDispatchService } = await import('../services/orderDispatch.service.js');
+    await orderDispatchService.broadcastForItem({ ...item, status: 'searching_partner', partnerId: null }, order);
+    res.json({ success: true, data: { message: 'Dispatch restarted.' } });
+  }),
+
+  /** Refund a per-service payment and cancel the service item. */
+  refundOrderItem: asyncHandler(async (req: Request, res: Response) => {
+    const [item] = await db.select().from(orderItems)
+      .where(and(eq(orderItems.id, req.params.itemId), eq(orderItems.orderId, req.params.orderId)))
+      .limit(1);
+    if (!item) throw AppError.notFound('Order service not found.');
+    const [payment] = await db.select().from(orderItemPayments)
+      .where(eq(orderItemPayments.orderItemId, item.id)).limit(1);
+    if (!payment) throw AppError.badRequest('No payment exists for this service.');
+    if (payment.status === 'refunded') throw AppError.badRequest('This service is already refunded.');
+    await db.update(orderItemPayments).set({ status: 'refunded', updatedAt: new Date() })
+      .where(eq(orderItemPayments.id, payment.id));
+    await db.update(orderItems).set({ status: 'cancelled', updatedAt: new Date() })
+      .where(eq(orderItems.id, item.id));
+    res.json({ success: true, data: { message: 'Service payment refunded.' } });
+  }),
   /* ───────────────────────── Dashboard ───────────────────────── */
   getStats: asyncHandler(async (_req: Request, res: Response) => {
     const [bookingStats] = await db

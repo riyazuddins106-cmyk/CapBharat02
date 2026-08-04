@@ -44,7 +44,7 @@ async function notifyPartner(bookingId: string, amount: number, serviceName: str
     const { notificationDbService } = await import('../services/notificationDb.service.js');
     void notificationDbService.create({ userId: pro.userId, title, body, type: 'payment', data: { bookingId } });
   } catch (err) {
-    logger.warn('[payments] failed to notify partner for booking %s', bookingId, err);
+    logger.warn(`[payments] failed to notify partner for booking ${bookingId}`, err);
   }
 }
 
@@ -301,7 +301,7 @@ export const razorpayCallback = asyncHandler(async (req: Request, res: Response)
   const [existingByOrder] = await db.select().from(payments)
     .where(eq(payments.razorpayOrderId, razorpay_order_id)).limit(1);
   if (existingByOrder && existingByOrder.bookingId !== booking_id) {
-    logger.warn('[razorpay] booking_id mismatch: form=%s db=%s', booking_id, existingByOrder.bookingId);
+    logger.warn(`[razorpay] booking_id mismatch: form=${booking_id} db=${existingByOrder.bookingId}`);
     throw AppError.badRequest('Payment verification failed. Booking ID mismatch.');
   }
 
@@ -483,7 +483,7 @@ export const stripeSuccess = asyncHandler(async (req: Request, res: Response) =>
   // Using || means: reject if metadata is missing OR if it doesn't match — prevents spoofing
   // via a session created without metadata or for a different booking.
   if (!session.metadata?.bookingId || session.metadata.bookingId !== booking_id) {
-    logger.warn('[stripe] booking_id mismatch or missing metadata: query=%s session=%s', booking_id, session.metadata?.bookingId);
+    logger.warn(`[stripe] booking_id mismatch or missing metadata: query=${booking_id} session=${session.metadata?.bookingId}`);
     return res.redirect(302, 'servenow://payment-cancel');
   }
 
@@ -668,7 +668,7 @@ export const testPay = asyncHandler(async (req: Request, res: Response) => {
 
   void awardPoints(userId, bookingId, booking.price ?? 0);
   void notifyPartner(bookingId, booking.price ?? 0, booking.serviceName ?? 'service');
-  logger.info('[test-pay] Simulated %s payment for booking %s', method, bookingId);
+  logger.info(`[test-pay] Simulated ${method} payment for booking ${bookingId}`);
   sendSuccess(res, paymentRecord, 200);
 });
 

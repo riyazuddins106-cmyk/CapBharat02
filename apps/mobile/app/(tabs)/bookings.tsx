@@ -10,7 +10,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { bookingsApi, reviewsApi, getPaymentConfig, testPay, API_BASE, type Booking, type Payment, type PaymentConfig } from '@/lib/api';
+import { bookingsApi, ordersApi, reviewsApi, getPaymentConfig, testPay, API_BASE, type Booking, type Order, type OrderItem, type Payment, type PaymentConfig } from '@/lib/api';
 import { consumePendingPayId } from '@/lib/pendingPayment';
 import { BookingCard } from '@/components/BookingCard';
 import { queryClient } from '@/lib/queryClient';
@@ -355,6 +355,86 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
   );
 }
 
+function formatOrderTime(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function OrderServiceCard({ order, item, onAction, busy }: {
+  order: Order;
+  item: OrderItem;
+  onAction: (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string) => void;
+  busy: string | null;
+}) {
+  const colors = useColors();
+  const canCancel = !['cancelled', 'service_started', 'service_completed'].includes(item.status);
+  const canContinue = !item.partnerId && item.status !== 'cancelled';
+  const needsPayment = ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid';
+  const actionKey = (action: string) => `${action}:${item.id}`;
+
+  return (
+    <View style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+      <View style={styles.orderHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.orderLabel, { color: colors.primary }]}>SERVICE ORDER</Text>
+          <Text style={[styles.orderMeta, { color: colors.mutedForeground }]}>{formatOrderTime(order.scheduledAt)} · ₹{order.totalAmount}</Text>
+        </View>
+        <Text style={[styles.orderStatus, { color: colors.primary }]}>{order.status.replaceAll('_', ' ')}</Text>
+      </View>
+      <View style={[styles.orderItem, { backgroundColor: colors.muted }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.orderServiceName, { color: colors.foreground }]}>{item.serviceName ?? 'Service'}</Text>
+          <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>
+            {item.partnerName ? `Partner: ${item.partnerName}` : 'Partner: searching'}
+          </Text>
+          <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>
+            {formatOrderTime(item.startTime)} – {formatOrderTime(item.endTime)}
+          </Text>
+        </View>
+        <Text style={[styles.orderItemStatus, { color: colors.foreground }]}>{item.status.replaceAll('_', ' ')}</Text>
+      </View>
+      {(canContinue || needsPayment || canCancel) && (
+        <View style={styles.orderActions}>
+          {canContinue && (
+            <TouchableOpacity
+              onPress={() => onAction('continue', order.id, item.id)}
+              disabled={busy === actionKey('continue')}
+              style={[styles.orderActionBtn, { borderColor: colors.primary }]}
+            >
+              <Text style={[styles.orderActionText, { color: colors.primary }]}>
+                {busy === actionKey('continue') ? 'Searching…' : 'Continue Searching'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {needsPayment && (
+            <TouchableOpacity
+              onPress={() => onAction('pay', order.id, item.id)}
+              disabled={busy === actionKey('pay')}
+              style={[styles.orderActionBtn, { backgroundColor: '#16A34A', borderColor: '#16A34A' }]}
+            >
+              <Text style={[styles.orderActionText, { color: '#fff' }]}>
+                {busy === actionKey('pay') ? 'Paying…' : `Pay ₹${item.customerPrice}`}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {canCancel && (
+            <TouchableOpacity
+              onPress={() => onAction('cancel', order.id, item.id)}
+              disabled={busy === actionKey('cancel')}
+              style={[styles.orderActionBtn, { borderColor: '#FCA5A5' }]}
+            >
+              <Text style={[styles.orderActionText, { color: '#DC2626' }]}>
+                {busy === actionKey('cancel') ? 'Cancelling…' : 'Cancel Service'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -370,10 +450,16 @@ export default function BookingsScreen() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [orderActionBusy, setOrderActionBusy] = useState<string | null>(null);
 
   const { data: bookings, isLoading, refetch } = useQuery({
     queryKey: ['/api/bookings', accessToken],
     queryFn: () => bookingsApi.list(accessToken!),
+    enabled: !!accessToken,
+  });
+  const { data: orders = [], refetch: refetchOrders } = useQuery({
+    queryKey: ['/api/orders', accessToken],
+    queryFn: () => ordersApi.list(accessToken!),
     enabled: !!accessToken,
   });
 
@@ -425,8 +511,24 @@ export default function BookingsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchOrders()]);
     setRefreshing(false);
+  };
+
+  const handleOrderAction = async (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string) => {
+    const key = `${action}:${itemId}`;
+    setOrderActionBusy(key);
+    try {
+      if (action === 'cancel') await ordersApi.cancelItem(orderId, itemId, accessToken!);
+      if (action === 'continue') await ordersApi.continueSearching(orderId, itemId, accessToken!);
+      if (action === 'pay') await ordersApi.payItem(orderId, itemId, 'cash', undefined, accessToken!);
+      await refetchOrders();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Could not update service', e?.message ?? 'Please try again.');
+    } finally {
+      setOrderActionBusy(null);
+    }
   };
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
@@ -504,31 +606,46 @@ export default function BookingsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListHeaderComponent={
-          tab === 'searching' ? (
-            <View style={[styles.searchingBanner, { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' }]}>
-              <View style={styles.searchingRow}>
-                <ActivityIndicator size="small" color="#7C3AED" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.searchingTitle}>Finding your service provider</Text>
-                  <Text style={styles.searchingText}>
-                    We're matching the best available service provider to your booking. This usually takes a few minutes. You'll get a notification once confirmed.
-                  </Text>
+          <View>
+            {orders.flatMap(order => order.items
+              .filter(item => tab === 'searching'
+                ? ['searching_partner', 'assigned'].includes(item.status)
+                : tab === 'upcoming'
+                  ? ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status)
+                  : tab === 'awaitingPayment'
+                    ? ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid'
+                    : ['service_completed', 'cancelled'].includes(item.status))
+              .map(item => (
+                <OrderServiceCard
+                  key={item.id}
+                  order={order}
+                  item={item}
+                  busy={orderActionBusy}
+                  onAction={handleOrderAction}
+                />
+              )))}
+            {tab === 'searching' ? (
+              <View style={[styles.searchingBanner, { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' }]}>
+                <View style={styles.searchingRow}>
+                  <ActivityIndicator size="small" color="#7C3AED" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.searchingTitle}>Finding your service provider</Text>
+                    <Text style={styles.searchingText}>We're matching the best available service provider to your booking. You'll get a notification once confirmed.</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ) : tab === 'awaitingPayment' ? (
-            <View style={[styles.searchingBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
-              <View style={styles.searchingRow}>
-                <Ionicons name="wallet-outline" size={20} color="#D97706" />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.searchingTitle, { color: '#D97706' }]}>Service Complete — Payment Due</Text>
-                  <Text style={[styles.searchingText, { color: '#92400E' }]}>
-                    Your service provider has finished the job. Please tap "Pay Now" on each booking below to complete payment.
-                  </Text>
+            ) : tab === 'awaitingPayment' ? (
+              <View style={[styles.searchingBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                <View style={styles.searchingRow}>
+                  <Ionicons name="wallet-outline" size={20} color="#D97706" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.searchingTitle, { color: '#D97706' }]}>Service Payment Due</Text>
+                    <Text style={[styles.searchingText, { color: '#92400E' }]}>Pay each service after its partner arrives.</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ) : null
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
           isLoading ? (
@@ -646,6 +763,18 @@ export default function BookingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  orderCard: { padding: 12, marginBottom: 12, borderWidth: 1 },
+  orderHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  orderLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  orderMeta: { fontSize: 11, marginTop: 3 },
+  orderStatus: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize', maxWidth: 100, textAlign: 'right' },
+  orderItem: { flexDirection: 'row', alignItems: 'flex-start', padding: 10, borderRadius: 10 },
+  orderServiceName: { fontSize: 14, fontWeight: '700' },
+  orderDetail: { fontSize: 11, marginTop: 4 },
+  orderItemStatus: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize', maxWidth: 90, textAlign: 'right' },
+  orderActions: { flexDirection: 'row', gap: 7, marginTop: 10 },
+  orderActionBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 34, paddingHorizontal: 6, borderRadius: 8, borderWidth: 1 },
+  orderActionText: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
   searchingBanner: { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14 },
   searchingRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   searchingTitle:  { fontSize: 13, fontWeight: '700', color: '#7C3AED', marginBottom: 3 },

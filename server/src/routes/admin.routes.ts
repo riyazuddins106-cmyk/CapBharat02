@@ -25,6 +25,9 @@ router.get('/analytics/timeseries', adminController.getAnalyticsTimeseries);
 
 // Bookings management
 router.get('/bookings',                        adminController.listBookings);
+router.get('/orders',                          adminController.listOrders);
+router.patch('/orders/:orderId/items/:itemId/dispatch', adminController.continueOrderItemDispatch);
+router.patch('/orders/:orderId/items/:itemId/refund',   adminController.refundOrderItem);
 router.patch('/bookings/:id',                  adminController.updateBooking);
 router.patch('/bookings/:id/cancel',           adminController.cancelBooking);
 router.delete('/bookings/:id',                 adminController.deleteBooking);

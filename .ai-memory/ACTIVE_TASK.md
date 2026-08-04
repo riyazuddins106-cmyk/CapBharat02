@@ -7,24 +7,28 @@
 ---
 
 ## ▶ Current Task
-**Task:** Add dynamic 30-minute booking start times and longest-duration service windows
+**Task:** Complete remaining service-level customer, partner, payment, and admin flows
 **Status:** IN PROGRESS
 
 ### Checklist
-- [x] Replace fixed time-slot list with configurable 30-minute start times
-- [x] Update customer mobile checkout to use generated start times
-- [x] Update customer web checkout to use generated start times
-- [x] Validate booking windows using the longest cart-item duration
-- [x] Verify affected TypeScript packages and update project memory
+- [x] Add typed master-order and per-service APIs to customer and partner clients
+- [x] Route customer cart checkout through `/orders/checkout`
+- [x] Add customer web per-service order details and actions
+- [x] Add partner mobile service-level requests and actions
+- [x] Trigger per-service payment pending state at partner check-in
+- [x] Add customer mobile per-service order details and actions
+- [x] Add admin order hierarchy, earnings, refunds, and dispatch controls
+- [x] Run focused verification and update project memory
+- [ ] Run full end-to-end validation for every new service-order state
 
 ### Verification Notes
 - Customer web production build passed.
 - Admin panel production build passed.
 - Main application workflow started successfully; API migrations completed and API is listening.
-- Server build still reports four pre-existing logger signature errors in `server/src/controllers/payment.controller.ts`; no unrelated changes were made.
-- Shared slot utility check was blocked by the filtered package runner not exposing `tsx`; the customer web build exercises the shared utility import successfully.
+- Server build passes after correcting four logger call signatures in `server/src/controllers/payment.controller.ts`.
+- API health and unauthenticated `/api/orders` protection smoke checks pass.
 
-**Status:** COMPLETE
+**Status:** PARTIAL — implementation complete; full end-to-end validation remains
 
 ### Previous Task — Complete
 - [x] DB Schema: `orders.ts` — master order table + orderStatusEnum

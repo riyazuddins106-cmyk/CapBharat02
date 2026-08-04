@@ -1,5 +1,5 @@
 # Module: Partner Mobile App
-**Status:** ✅ Complete
+**Status:** ✅ Complete — service-level order jobs added
 
 ## Key Files
 | File | Purpose |
@@ -12,8 +12,8 @@
 
 ## Screens
 - Auth (login, register, OTP verify)
-- Job list: New / Accepted / Completed tabs
-- Job detail: accept, check-in (QR scan), complete
+- Job list: legacy jobs plus service-level order-item requests and active/completed service actions
+- Job detail: legacy accept/check-in/complete; service-item list supports accept, mark arrived, payment-gated completion
 - Document upload
 - Availability toggle
 - Earnings & payouts

@@ -151,6 +151,26 @@ export interface Earnings {
   weekly: { date: string; amount: number }[];
 }
 
+export interface OrderItemJob {
+  requestId?: string;
+  orderItemId: string;
+  orderId: string;
+  serviceId: string;
+  status?: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  partnerPayout: number;
+  customerPrice?: number;
+  orderStatus?: string;
+  createdAt?: string;
+}
+
+export interface OrderItemJobs {
+  pendingRequests: OrderItemJob[];
+  activeJobs: OrderItemJob[];
+  completedJobs: OrderItemJob[];
+}
+
 // ── Multipart upload (avatar) — no Content-Type header so browser sets boundary ──
 async function uploadFile<T>(
   path: string,
@@ -270,6 +290,21 @@ export const partnerApi = {
 
   listJobs: (token: string) =>
     request<Job[]>('/api/partner/jobs', { token }),
+
+  listOrderItemJobs: (token: string) =>
+    request<OrderItemJobs>('/api/partner/order-item-jobs', { token }),
+
+  acceptOrderItemJob: (requestId: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${requestId}/accept`, { method: 'PATCH', token }),
+
+  rejectOrderItemJob: (requestId: string, token: string) =>
+    request<{ message: string }>(`/api/partner/order-item-jobs/${requestId}/reject`, { method: 'PATCH', token }),
+
+  checkInOrderItem: (itemId: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/checkin`, { method: 'PATCH', token }),
+
+  completeOrderItem: (itemId: string, token: string) =>
+    request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/complete`, { method: 'PATCH', token }),
 
   getJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}`, { token }),
