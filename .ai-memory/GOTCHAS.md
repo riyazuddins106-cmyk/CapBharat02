@@ -269,6 +269,11 @@
 **Fix:** Fetch `/api/partner/payouts` alongside earnings and render the server fields `amount`, `note`, `status`, and `requestedAt`; update the local list immediately after a successful request.
 **Warning:** Do not infer payout history from earnings totals. Pending and paid balances are aggregates, while status and request metadata live in the payout records.
 
+### Admin Management — keep the account form distinct from primary purple navigation
+**Problem:** The Create Admin Account card used a saturated violet surface and button, making the protected management section feel visually heavy against the dark admin shell.
+**Fix:** Use a slate card surface with sky-blue border/icon/focus accents and a blue gradient action button, while leaving the broader Admin Panel theme unchanged.
+**Warning:** Do not recolor the whole Admin Panel for a local section-level contrast issue; keep navigation and global actions consistent.
+
 ### Partner App Ionicons need a native font grace period
 **Problem:** The Partner App dashboard and tab labels rendered, but Ionicons were blank because the root layout forced rendering after a 300ms `useFonts` timeout.
 **Fix:** Keep the native font gate open for 3 seconds and only use a shorter 1-second fallback on web. The Customer App already used a longer native grace period.

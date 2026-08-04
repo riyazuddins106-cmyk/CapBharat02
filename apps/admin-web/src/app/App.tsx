@@ -7172,9 +7172,9 @@ function AdminManagementView({
         <p className="text-white/40 text-xs mt-1">Create and manage accounts that can access the ServeNow Admin Panel.</p>
       </div>
 
-      <div className="rounded-2xl p-5 border border-violet-400/20 space-y-4" style={{ ...CARD, background: "rgba(124,58,237,0.07)" }}>
+      <div className="rounded-2xl p-5 border border-sky-400/20 space-y-4" style={{ ...CARD, background: "rgba(30,41,59,0.72)" }}>
         <div className="flex items-center gap-2">
-          <UserPlus size={17} className="text-violet-300" />
+          <UserPlus size={17} className="text-sky-300" />
           <h3 className="text-white font-semibold text-sm">Create Admin Account</h3>
         </div>
         {message && (
@@ -7196,7 +7196,7 @@ function AdminManagementView({
               value={form.fullName}
               onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
               placeholder="e.g. Operations Admin"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
               style={INPUT_STYLE}
             />
           </label>
@@ -7207,7 +7207,7 @@ function AdminManagementView({
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="admin@example.com"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
               style={INPUT_STYLE}
             />
           </label>
@@ -7218,7 +7218,7 @@ function AdminManagementView({
               value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               placeholder="+91 98765 43210"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
               style={INPUT_STYLE}
             />
           </label>
@@ -7241,7 +7241,7 @@ function AdminManagementView({
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               placeholder="At least 8 characters, with uppercase, lowercase, and number"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500"
+              className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-sky-400"
               style={INPUT_STYLE}
             />
           </label>
@@ -7250,7 +7250,7 @@ function AdminManagementView({
           onClick={() => void create()}
           disabled={creating}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+          style={{ background: "linear-gradient(135deg,#2563eb,#38bdf8)" }}
         >
           {creating && <Loader2 size={14} className="animate-spin" />}
           {creating ? "Creating…" : "Create account"}
