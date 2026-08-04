@@ -278,3 +278,8 @@
 **Problem:** The Customer screenshot showed blank category and bottom-tab icons even though the root log reported `fontsLoaded: true`; bundle completion and font state are not sufficient visual verification.
 **Fix:** Primary navigation and high-visibility category/dashboard surfaces use a font-independent `NativeIcon` fallback built from native shapes and system emoji. Customer category images no longer mask the fallback when an image URL is stale or broken.
 **How to verify:** Capture the rendered Customer screen after data loads, not only Metro logs. Check the four bottom tabs and the Services category row on both native apps after a full Expo Go reload.
+
+### Git integration — unrelated local and remote histories
+**Problem:** The Repl's local history and GitHub `main` were unrelated, so pushing the whole local branch would have overwritten newer marketplace/mobile commits.
+**Fix:** Start from the current GitHub `main`, apply the Admin/backend and remaining Customer/Expo changes as targeted patches, build the affected apps, and push normal fast-forward commits.
+**Warning:** Do not force-push the preserved local branch or merge its entire unrelated tree into GitHub `main`; review targeted file differences first.
