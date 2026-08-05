@@ -56,8 +56,13 @@ export async function recomputeOrderStatus(orderId: string) {
 
   const allCompleted  = nonCancelled.every(i => i.status === 'service_completed');
   const anyCompleted  = nonCancelled.some(i => i.status === 'service_completed');
-  const allConfirmed  = nonCancelled.every(i => ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started', 'service_completed'].includes(i.status));
-  const anyConfirmed  = nonCancelled.some(i => ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started', 'service_completed'].includes(i.status));
+  // The master order is only a summary. Each order item remains the source of
+  // truth for the customer's Search, Active, and Pay Now tabs. Include an
+  // assigned item in the summary so a multi-service order does not look like
+  // it has no progress just because another service is still searching.
+  const confirmedStatuses = ['assigned', 'partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started', 'service_completed'];
+  const allConfirmed  = nonCancelled.every(i => confirmedStatuses.includes(i.status));
+  const anyConfirmed  = nonCancelled.some(i => confirmedStatuses.includes(i.status));
   const anyInProgress = nonCancelled.some(i => ['partner_arrived', 'payment_pending', 'service_started'].includes(i.status));
 
   let newStatus: typeof orders.$inferSelect['status'];
