@@ -491,6 +491,7 @@ export interface DispatchRequestRow {
   proName: string | null;
   price: number;
   scheduledAt: string;
+  createdAt: string;
   customerName: string;
   requests: Array<{ request: { id: string; status: string; sentAt: string; respondedAt: string | null }; partner: { id: string; name: string; rating: number; availabilityStatus: string } }>;
 }
@@ -790,6 +791,12 @@ export const adminApi = {
     request(`/admin/users/${id}/suspend`, { method: 'PATCH', token }),
   activateUser: (id: string, token: string) =>
     request(`/admin/users/${id}/activate`, { method: 'PATCH', token }),
+  resetUserPassword: (id: string, adminPassword: string, newPassword: string, token: string) =>
+    request<{ message: string }>(`/admin/users/${id}/reset-password`, { method: 'POST', token, body: JSON.stringify({ adminPassword, newPassword }) }),
+  resetProfessionalPassword: (id: string, adminPassword: string, newPassword: string, token: string) =>
+    request<{ message: string }>(`/admin/professionals/${id}/reset-password`, { method: 'POST', token, body: JSON.stringify({ adminPassword, newPassword }) }),
+  resetAdminPassword: (id: string, adminPassword: string, newPassword: string, token: string) =>
+    request<{ message: string }>(`/admin/admins/${id}/reset-password`, { method: 'POST', token, body: JSON.stringify({ adminPassword, newPassword }) }),
 
   // Categories
   getCategories: (token: string) =>

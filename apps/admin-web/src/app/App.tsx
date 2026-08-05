@@ -97,6 +97,173 @@ function ConfirmDialog({
   );
 }
 
+/* ─── Reset Password Modal (2-step: verify admin identity → set new password) ── */
+function ResetPasswordModal({
+  targetId, targetName, type, accessToken, onClose, onSuccess,
+}: {
+  targetId: string;
+  targetName: string;
+  type: "user" | "professional" | "admin";
+  accessToken: string;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
+  const [step,            setStep]            = useState<"verify" | "reset">("verify");
+  const [adminPassword,   setAdminPassword]   = useState("");
+  const [newPassword,     setNewPassword]     = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showAdminPw,     setShowAdminPw]     = useState(false);
+  const [showNewPw,       setShowNewPw]       = useState(false);
+  const [saving,          setSaving]          = useState(false);
+  const [error,           setError]           = useState("");
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8)                                { setError("Password must be at least 8 characters"); return; }
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword))
+      { setError("Password must have uppercase, lowercase, and a number"); return; }
+    if (newPassword !== confirmPassword)                       { setError("Passwords do not match"); return; }
+    setSaving(true); setError("");
+    try {
+      const fn = type === "user"
+        ? adminApi.resetUserPassword
+        : type === "professional"
+        ? adminApi.resetProfessionalPassword
+        : adminApi.resetAdminPassword;
+      await fn(targetId, adminPassword, newPassword, accessToken);
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      const msg: string = err.message ?? "Failed to reset password";
+      // If server says the admin password was wrong, go back to step 1
+      if (msg.toLowerCase().includes("incorrect") || msg.toLowerCase().includes("verification")) {
+        setStep("verify"); setAdminPassword("");
+      }
+      setError(msg);
+    } finally { setSaving(false); }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.78)" }}>
+      <div className="w-full max-w-md rounded-2xl border border-white/10 p-6" style={MODAL_BG}>
+        {/* Header */}
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <KeyRound size={16} className="text-violet-400" />
+              <h3 className="text-white font-bold text-base">Reset Password</h3>
+            </div>
+            <p className="text-white/40 text-sm">for <span className="text-white/70 font-medium">{targetName}</span></p>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors"><X size={18} /></button>
+        </div>
+
+        {/* Step pills */}
+        <div className="flex items-center gap-2 mb-5">
+          <div className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 ${
+            step === "verify" ? "bg-violet-500/20 text-violet-300" : "bg-green-500/15 text-green-400"
+          }`}>
+            {step === "verify" ? "1" : <CheckCircle size={10} />}
+            <span>Verify identity</span>
+          </div>
+          <ChevronRight size={12} className="text-white/20" />
+          <div className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+            step === "reset" ? "bg-violet-500/20 text-violet-300" : "bg-white/5 text-white/25"
+          }`}>
+            2 Set new password
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 px-3 py-2.5 rounded-xl text-sm text-red-400 border border-red-400/20" style={{ background: "rgba(239,68,68,0.08)" }}>
+            {error}
+          </div>
+        )}
+
+        {step === "verify" ? (
+          <div className="space-y-4">
+            <div className="rounded-xl p-3 border border-amber-400/20" style={{ background: "rgba(245,158,11,0.07)" }}>
+              <p className="text-amber-300/80 text-xs leading-relaxed">
+                🔒 Enter <strong>your own</strong> admin password to confirm your identity before changing this account's password.
+              </p>
+            </div>
+            <div>
+              <label className="block text-white/50 text-xs mb-1.5">Your admin password</label>
+              <div className="relative">
+                <input
+                  type={showAdminPw ? "text" : "password"}
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && adminPassword) { setStep("reset"); setError(""); } }}
+                  placeholder="Your current password"
+                  autoFocus
+                  className="w-full rounded-xl px-4 py-2.5 pr-10 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+                  style={INPUT_STYLE}
+                />
+                <button type="button" onClick={() => setShowAdminPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+                  {showAdminPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => { if (!adminPassword) { setError("Enter your password"); return; } setStep("reset"); setError(""); }}
+              className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-opacity"
+              style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+            >
+              Continue →
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleReset} className="space-y-4">
+            <div>
+              <label className="block text-white/50 text-xs mb-1.5">New password</label>
+              <div className="relative">
+                <input
+                  type={showNewPw ? "text" : "password"}
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Min. 8 chars · uppercase · lowercase · number"
+                  autoFocus
+                  className="w-full rounded-xl px-4 py-2.5 pr-10 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+                  style={INPUT_STYLE}
+                />
+                <button type="button" onClick={() => setShowNewPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+                  {showNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-white/50 text-xs mb-1.5">Confirm new password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+                className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
+                style={INPUT_STYLE}
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => { setStep("verify"); setError(""); }}
+                className="px-4 py-2.5 rounded-xl font-bold text-sm border border-white/10 text-white/60 hover:bg-white/5">
+                ← Back
+              </button>
+              <button type="submit" disabled={saving}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60 transition-opacity"
+                style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+                {saving ? "Resetting…" : "Reset password"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>,
+    document.body
+  ) as unknown as React.ReactElement;
+}
+
 function Field({
   label, children,
 }: { label: string; children: React.ReactNode }) {
@@ -1740,7 +1907,9 @@ function DispatchView({
   const [dvPage,      setDvPage]      = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const { sort: dvSort, toggleSort: toggleDvSort, applySortFn: sortDv } = useTableSort();
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo,   setDateTo]   = useState("");
+  const { sort: dvSort, toggleSort: toggleDvSort, applySortFn: sortDv } = useTableSort({ field: "createdAt", dir: "desc" });
   const dvColVis = useColumnVisibility(DV_COLS);
 
   const openModal = async (request: DispatchRequestRow) => {
@@ -1828,13 +1997,16 @@ function DispatchView({
       r.serviceName?.toLowerCase().includes(q) ||
       (r.proName ?? "").toLowerCase().includes(q);
     const matchesStatus = statusFilter === "all" || r.dispatchStatus === statusFilter;
-    return matchesSearch && matchesStatus;
+    const rDate = r.createdAt ? new Date(r.createdAt) : null;
+    const matchesFrom = !dateFrom || (rDate && rDate >= new Date(dateFrom));
+    const matchesTo   = !dateTo   || (rDate && rDate <= new Date(dateTo + "T23:59:59"));
+    return matchesSearch && matchesStatus && matchesFrom && matchesTo;
   });
   const dvSorted = sortDv(filtered as Record<string, unknown>[]) as typeof filtered;
   const dvEff    = dvPageSize === -1 ? dvSorted.length : dvPageSize;
   const dvPaged  = dvSorted.slice((dvPage - 1) * dvEff, dvPage * dvEff);
 
-  useEffect(() => { setDvPage(1); }, [search, statusFilter]);
+  useEffect(() => { setDvPage(1); }, [search, statusFilter, dateFrom, dateTo]);
 
   const exportDispatch = () => exportToExcel(
     dvSorted.map(r => ({
@@ -1899,6 +2071,17 @@ function DispatchView({
             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-xs">✕</button>
           )}
         </div>
+        {/* Date range */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-white/30 text-xs whitespace-nowrap">From</span>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="rounded-xl px-3 py-2 text-xs text-white border border-white/[0.08] outline-none focus:border-violet-500/50"
+            style={{ background: "rgba(255,255,255,0.04)", colorScheme: "dark" }} />
+          <span className="text-white/30 text-xs">To</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="rounded-xl px-3 py-2 text-xs text-white border border-white/[0.08] outline-none focus:border-violet-500/50"
+            style={{ background: "rgba(255,255,255,0.04)", colorScheme: "dark" }} />
+        </div>
         <div className="flex gap-1.5 flex-shrink-0">
           {STATUS_OPTIONS.map((opt) => (
             <button
@@ -1915,8 +2098,8 @@ function DispatchView({
             </button>
           ))}
         </div>
-        {(search || statusFilter !== "all") && (
-          <button onClick={() => { setSearch(""); setStatusFilter("all"); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+        {(search || statusFilter !== "all" || dateFrom || dateTo) && (
+          <button onClick={() => { setSearch(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
         )}
         <ColumnVisibilityMenu columns={DV_COLS} labels={{ Customer: "Customer", Service: "Service", Scheduled: "Scheduled", "Dispatch Status": "Dispatch Status", Partner: "Partner" }} hidden={dvColVis.hidden} onToggle={dvColVis.toggle as (col: string) => void} />
         <ExportBtn onClick={exportDispatch} />
@@ -1926,6 +2109,7 @@ function DispatchView({
       <p className="text-white/25 text-xs -mt-1">
         Showing {filtered.length} of {requests.length} bookings
         {search && <span> matching "<span className="text-white/40">{search}</span>"</span>}
+        {(dateFrom || dateTo) && <span className="text-white/30"> · date filtered</span>}
       </p>
 
       {/* Table */}
@@ -3302,6 +3486,13 @@ function UsersView({
   const [busyId,     setBusyId]     = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminCustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [resetTarget, setResetTarget] = useState<CustomerUser | null>(null);
+  // Per-column local filters (applied client-side on the returned page)
+  const [colName,   setColName]   = useState("");
+  const [colEmail,  setColEmail]  = useState("");
+  const [colPhone,  setColPhone]  = useState("");
+  const [colRole,   setColRole]   = useState("");
+  const [colStatus, setColStatus] = useState("");
   const { sort: uvSort, toggleSort: toggleUvSort, applySortFn: sortUv } = useTableSort();
 
   const openEdit = (u: CustomerUser) => {

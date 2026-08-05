@@ -58,8 +58,11 @@ router.get('/users',                  adminController.listUsers);
 router.get('/users/:id/detail',        adminController.getCustomerDetail);
 router.patch('/users/:id',            adminController.updateUser);
 router.delete('/users/:id',           adminOnly, adminController.deleteUser);
-router.patch('/users/:id/suspend',    adminController.suspendUser);
-router.patch('/users/:id/activate',   adminController.activateUser);
+router.patch('/users/:id/suspend',             adminController.suspendUser);
+router.patch('/users/:id/activate',            adminController.activateUser);
+router.post('/users/:id/reset-password',       adminController.resetUserPassword);
+router.post('/professionals/:id/reset-password', adminOnly, adminController.resetProfessionalPassword);
+router.post('/admins/:id/reset-password',      adminOnly, adminController.resetAdminPassword);
 
 // Service categories
 router.get('/categories',                           adminController.listCategories);

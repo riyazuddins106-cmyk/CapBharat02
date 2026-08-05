@@ -31,7 +31,7 @@ As a web search (use web-search skill if available), searching files within the 
 
 ## Integration Lifecycle
 
-There are three types of integrations, and they represent different stages of a lifecycle:
+There are four integration types, and they represent different stages of a lifecycle:
 
 ```text
 connector (not_setup)
@@ -40,6 +40,10 @@ connector (not_setup)
         -- addIntegration        -- code-side wiring (npm packages, scaffolds, project registration)
         -- ProposeIntegration    -- platform-side binding (registers this Repl with connectors so the credential proxy will serve secrets)
         -- now it is a functioning connection (added + authorized, ready to use)
+
+connector_catalog (requires_setup)
+    -- ProposeIntegration         -- creates/configures the connector and authorizes it inline
+    -- connection (added)         -- attached to this Repl and ready to use
 
 blueprint (not_installed)
     -- addIntegration or ProposeIntegration
@@ -63,6 +67,14 @@ blueprint (not_installed)
 - Example ID: `connection:conn_linear_01MG99PAJR6MQ5...`
 
 NOTE: You must not delay calling `ProposeIntegration` even if it waits for the user. You will be blocked and not have access to test the feature you build because you don't have access to real data, real APIs, etc, which is even more inefficient than reaching out to the user as soon as you know you need the integration to get accepted.
+
+### Catalog Connectors
+
+- A connector in the OpenInt catalog that does not yet have a workspace connector configuration
+- Status: `requires_setup`
+- Use `ProposeIntegration` directly with its exact `connector_catalog:<name>` id; it opens the inline setup flow and attaches the resulting connection to this Repl
+- Do not send the user to workspace Settings or call `addIntegration` first
+- Example ID: `connector_catalog:google-calendar`
 
 ### Blueprints
 
@@ -124,7 +136,7 @@ console.log(info.renderedContent);  // Same blob you'd get from addIntegration
 
 ### addIntegration({ integrationId })
 
-Add a blueprint or connection to the current project. **Do not use for connectors** (those with `integrationType: connector` and `status: not_setup`) -- use `ProposeIntegration` for those.
+Add a blueprint or connection to the current project. **Do not use for connectors or catalog connectors** (those with `status: not_setup` or `requires_setup`) -- use `ProposeIntegration` for those.
 
 **Returns:** Dict with:
 
@@ -164,16 +176,18 @@ Propose a connector to the user. This is a **model tool**, not a code execution 
 **Use for:**
 
 - Connectors with `status: not_setup` (drives OAuth + binding)
+- Catalog connectors with `status: requires_setup` (creates/configures the connector, then authorizes and binds it inline)
 - Connections with `status: not_added` after calling `addIntegration` (drives the binding only)
 - Connections with `status: added` if runtime fails with "not connected" (re-binds / refreshes)
 - Blueprints where `addIntegration` returns `requiresConfirmation: True`
 
-Always explain to the user what is about to happen, then call the `ProposeIntegration` tool with `{ proposal: [{ integrationId: "connector:ccfg_google-sheet_E42A9F6CA62546F68A1FECA0E8" }] }`.
+Always explain to the user what is about to happen, then call the `ProposeIntegration` tool with the exact id returned by `searchIntegrations`, such as `{ proposal: [{ integrationId: "connector:ccfg_google-sheet_E42A9F6CA62546F68A1FECA0E8" }] }` or `{ proposal: [{ integrationId: "connector_catalog:google-calendar" }] }`.
 
 **Notes:**
 
 - After the user completes OAuth, the connector becomes a `connection`
-- On the next agent loop, call `addIntegration` with the new `connection:...` ID
+- After the user completes catalog setup, the connection is already attached to this Repl; do not call `addIntegration` again
+- After a `connector (not_setup)` OAuth proposal, call `addIntegration` with the new `connection:...` ID on the next agent loop
 - There is no user-visible message automatically shown when this exits -- explain what you're doing in your chat response before calling it
 
 ---
@@ -198,6 +212,7 @@ When the user wants to connect to Databricks, use the `databricks-m2m` connector
 
 - **Not logging results:** `searchIntegrations` and all other functions return silently unless you `console.log()` the output
 - **Calling addIntegration on a connector:** Will fail or behave unexpectedly. Check `integrationType` first
+- **Sending catalog connectors to Settings:** `requires_setup` results are set up inline with `ProposeIntegration`; pass the exact `connector_catalog:<name>` id
 - **Asking for API keys when a connection exists:** If `searchIntegrations` returns a `connection`, the user is already authenticated at the account level -- use `addIntegration` to wire the project, then `ProposeIntegration` to bind this Repl to the connection. Both steps are always required.
 - **Caching the client:** The boilerplate snippet is explicit about this. Tokens expire. Always call `getUncachable___Client()` fresh
 - **Package install side effects:** `addIntegration` runs package installation (e.g. npm, uv), which can crash a running dev server. Restart the workflow after adding integrations

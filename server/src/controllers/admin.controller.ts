@@ -24,7 +24,7 @@ import { AppError } from '../utils/AppError.js';
 import { auditLogService } from '../services/auditLog.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { storageService } from '../services/storage.service.js';
-import { hashPassword } from '../utils/password.js';
+import { hashPassword, comparePassword } from '../utils/password.js';
 import { refundOrderItemPayment } from './payment.controller.js';
 import { createRazorpayUpiPayout } from '../services/razorpayPayout.service.js';
 import { runPayouts } from '../services/payoutScheduler.service.js';
@@ -1385,6 +1385,114 @@ export const adminController = {
     if (!row) throw AppError.notFound('User not found');
     await auditLogService.record(req.user!.userId, 'user.activate', 'user', req.params.id);
     res.json({ success: true, data: row });
+  }),
+
+  /** Admin resets a customer or partner user's password.
+   *  Requires the requesting admin to supply their own current password for verification.
+   *  Does NOT require the target user's old password. */
+  resetUserPassword: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { adminPassword, newPassword } = req.body as { adminPassword?: string; newPassword?: string };
+
+    if (!adminPassword) throw AppError.badRequest('Your current admin password is required');
+    if (!newPassword || newPassword.length < 8) throw AppError.badRequest('New password must be at least 8 characters');
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword))
+      throw AppError.badRequest('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+
+    // Verify the requesting admin's own password first
+    const [adminRow] = await db.select({ passwordHash: users.passwordHash })
+      .from(users).where(eq(users.id, req.user!.userId)).limit(1);
+    if (!adminRow) throw AppError.unauthorized('Could not verify your identity');
+    const valid = await comparePassword(adminPassword, adminRow.passwordHash!);
+    if (!valid) throw AppError.unauthorized('Incorrect admin password — identity verification failed');
+
+    // Validate target user
+    const [target] = await db.select({ id: users.id, role: users.role, deletedAt: users.deletedAt, fullName: users.fullName })
+      .from(users).where(eq(users.id, id)).limit(1);
+    if (!target || target.deletedAt) throw AppError.notFound('User not found');
+    if (!['customer', 'partner'].includes(target.role))
+      throw AppError.forbidden('Use the admin reset endpoint for admin/operations accounts');
+
+    const passwordHash = await hashPassword(newPassword);
+    await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, id));
+
+    await auditLogService.record(req.user!.userId, 'user.password_reset', 'user', id, {
+      targetName: target.fullName,
+      targetRole: target.role,
+      resetBy: req.user!.userId,
+    });
+    res.json({ success: true, data: { message: 'Password reset successfully' } });
+  }),
+
+  /** Admin resets a professional/partner login password via their linked user account. */
+  resetProfessionalPassword: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params; // professional id
+    const { adminPassword, newPassword } = req.body as { adminPassword?: string; newPassword?: string };
+
+    if (!adminPassword) throw AppError.badRequest('Your current admin password is required');
+    if (!newPassword || newPassword.length < 8) throw AppError.badRequest('New password must be at least 8 characters');
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword))
+      throw AppError.badRequest('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+
+    // Verify admin's own password
+    const [adminRow] = await db.select({ passwordHash: users.passwordHash })
+      .from(users).where(eq(users.id, req.user!.userId)).limit(1);
+    if (!adminRow) throw AppError.unauthorized('Could not verify your identity');
+    const valid = await comparePassword(adminPassword, adminRow.passwordHash!);
+    if (!valid) throw AppError.unauthorized('Incorrect admin password — identity verification failed');
+
+    // Get professional and their linked user
+    const [pro] = await db.select({ id: professionals.id, userId: professionals.userId, deletedAt: professionals.deletedAt, name: professionals.name })
+      .from(professionals).where(eq(professionals.id, id)).limit(1);
+    if (!pro || pro.deletedAt) throw AppError.notFound('Professional not found');
+    if (!pro.userId) throw AppError.badRequest('This professional has no linked login account');
+
+    const passwordHash = await hashPassword(newPassword);
+    await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, pro.userId));
+
+    await auditLogService.record(req.user!.userId, 'professional.password_reset', 'professional', id, {
+      targetName: pro.name,
+      linkedUserId: pro.userId,
+      resetBy: req.user!.userId,
+    });
+    res.json({ success: true, data: { message: 'Password reset successfully' } });
+  }),
+
+  /** Admin resets another admin/operations-manager's password. Cannot reset your own. */
+  resetAdminPassword: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { adminPassword, newPassword } = req.body as { adminPassword?: string; newPassword?: string };
+
+    if (id === req.user!.userId)
+      throw AppError.badRequest('Use Privacy & Security to change your own password');
+    if (!adminPassword) throw AppError.badRequest('Your current admin password is required');
+    if (!newPassword || newPassword.length < 8) throw AppError.badRequest('New password must be at least 8 characters');
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword))
+      throw AppError.badRequest('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+
+    // Verify admin's own password
+    const [adminRow] = await db.select({ passwordHash: users.passwordHash })
+      .from(users).where(eq(users.id, req.user!.userId)).limit(1);
+    if (!adminRow) throw AppError.unauthorized('Could not verify your identity');
+    const valid = await comparePassword(adminPassword, adminRow.passwordHash!);
+    if (!valid) throw AppError.unauthorized('Incorrect admin password — identity verification failed');
+
+    // Validate target admin
+    const [target] = await db.select({ id: users.id, role: users.role, deletedAt: users.deletedAt, fullName: users.fullName })
+      .from(users).where(eq(users.id, id)).limit(1);
+    if (!target || target.deletedAt) throw AppError.notFound('Admin account not found');
+    if (!['admin', 'operations_manager'].includes(target.role))
+      throw AppError.forbidden('Target is not an admin or operations account');
+
+    const passwordHash = await hashPassword(newPassword);
+    await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, id));
+
+    await auditLogService.record(req.user!.userId, 'admin.password_reset', 'user', id, {
+      targetName: target.fullName,
+      targetRole: target.role,
+      resetBy: req.user!.userId,
+    });
+    res.json({ success: true, data: { message: 'Password reset successfully' } });
   }),
 
   /* ──────────────────── Service Categories ───────────────────── */

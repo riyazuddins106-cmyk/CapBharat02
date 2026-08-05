@@ -92,10 +92,11 @@ export const orderDispatchService = {
         eq(partnerServices.serviceId, orderItem.serviceId),
         eq(services.id, orderItem.serviceId),
         eq(services.categoryId, professionals.categoryId),
-        or(
-          isNull(professionals.subCategoryId),
-          eq(services.subCategoryId, professionals.subCategoryId),
-        ),
+        // subcategory is NOT used as a hard dispatch filter — partner_services already
+        // guarantees the partner is qualified for this specific service, so a mismatch
+        // between the partner's profile sub-category and the service sub-category must
+        // not block dispatch (e.g. partner specialises in "AC Repair" but is assigned
+        // to "AC Service & Repair" → they should still receive the job).
         eq(professionals.isActive, true),
         eq(professionals.availabilityStatus, 'available'),
         isNull(professionals.deletedAt),
