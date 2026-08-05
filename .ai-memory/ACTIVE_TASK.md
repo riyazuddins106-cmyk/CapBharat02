@@ -7,21 +7,77 @@
 ---
 
 ## ▶ Current Task
-**Task:** Add Admin-managed multi-language support
-**Status:** COMPLETE for the shared language configuration foundation; full catalog/content translation remains a follow-up phase.
+**Task:** Remove multilingual support and return ServeNow to English-only
+**Status:** COMPLETE. All language selectors, locale providers, translation catalogs, RTL behavior, and Admin language settings were removed from the web, mobile, and server surfaces.
 
-### Multi-language foundation — 2026-08-04
-- [x] Added shared English, Hindi, Marathi, Arabic, and Urdu locale catalog
-- [x] Made English the mandatory default and fallback
-- [x] Added Admin-controlled enabled-language settings
-- [x] Added public language configuration endpoint for all clients
-- [x] Added language selectors to Customer Web, Partner Web, Admin Panel, Customer Mobile, and Partner Mobile
-- [x] Added browser/device-safe persistence and Arabic/Urdu RTL direction handling
-- [x] Translated the initial customer/partner/admin navigation and shell labels
-- [x] Verified Customer Web, Partner Web, and Admin Web production builds
-- [x] Verified server TypeScript and public language endpoint
-- [x] Verified Admin and Partner Web workflows render without browser errors
-- [ ] Translate all remaining catalog, booking, checkout, notification, email, and policy content
+### Admin Partner Payout fix — 2026-08-04
+- [x] Fixed the Partner Payout Control Centre action handler to support `approved`, `paid`, and `rejected`
+- [x] Added clear success messaging for scheduled approval versus immediate RazorpayX payment
+- [x] Removed remaining stale Admin Web translation-helper calls that caused the login screen to crash after the English-only rollback
+- [x] Rebuilt and restarted Admin Web; fresh preview renders the login screen without application errors
+- [x] Reverted an unrelated temporary `.replit` module change
+
+### Partner account/professional visibility fix — 2026-08-05
+- [x] Confirmed `partner@servenow.in` logs in successfully as a partner
+- [x] Confirmed the login is linked to the active `Rajan Verma` professional profile used by payouts
+- [x] Added server-side professional search by name, title, partner name, or login email
+- [x] Added linked partner email/status to Admin Professionals rows
+- [x] Left the separate unlinked duplicate Rajan Verma profile untouched
+- [x] Rebuilt Admin Web and Server; live search returned Rajan Verma with `partner@servenow.in`
+- [x] Changed Admin Professionals default view to linked partner profiles only
+- [x] Added a separate Unlinked Profiles view for legacy/catalog records
+- [x] Added multi-select Category and Sub-category filters to both views
+- [x] Fixed Professionals search focus loss while typing by avoiding global loading remounts and debouncing the search request
+- [x] Verified category and non-null sub-category server filters against live data
+
+### Partner dispatch category/payment timing fix — 2026-08-05
+- [x] Removed premature Pay Now from the Customer Mobile booking confirmation screen
+- [x] Enforced partner category and exact sub-category eligibility during service-order dispatch
+- [x] Added matching eligibility guards to Partner Mobile request listing, detail, and accept paths
+- [x] Reconciled partner@servenow.in / Rajan Verma to AC Service → AC Service & Repair
+- [x] Removed 17 unrelated service links and expired 2 stale unrelated requests
+- [x] Verified Rajan's live queue contains AC Service only
+- [x] Rebuilt Server and restarted API, Customer Expo, and Partner Expo workflows
+
+### Full web/mobile end-to-end verification — 2026-08-05
+- [x] Customer Web, Admin Web, Partner Web, and Server production builds passed
+- [x] Partner Mobile type-check passed; Customer Mobile Expo Android/iOS bundles passed
+- [x] Current order-item smoke test passed 16/16 after using a valid in-window tomorrow 10:00 fixture
+- [x] Customer, Partner, and Admin authenticated read surfaces returned HTTP 200
+- [x] Customer/Partner/Admin role protection returned HTTP 403 for unauthorized surfaces
+- [x] Full order lifecycle passed: checkout → dispatch → accept → QR → check-in → payment → completion
+- [x] Confirmed payment is blocked before partner check-in
+- [x] Verified Customer Web, Admin Web, Partner Web, Customer Expo, and Partner Expo are serving
+- [x] Fixed Customer Mobile TypeScript errors in checkout and shared-package path resolution
+- [x] Customer Mobile strict TypeScript check passes with no errors
+- [x] Fresh Customer Expo Android and iOS Metro bundles both completed successfully after the fix
+- [x] Repeated the Customer Mobile type-check and fresh Expo Android/iOS bundle verification; all passed again
+- [ ] Live Razorpay/Stripe transaction and refund remain unverified until provider credentials are configured
+
+### Emergency partner payout pause — 2026-08-05
+- [x] Added persisted `payoutsPaused` control to the existing payout configuration
+- [x] Added Admin Partner Payouts emergency control with pause/unpause messaging
+- [x] Disabled manual RazorpayX send and payout-run controls in Admin while paused
+- [x] Added server-side guard before every RazorpayX partner transfer
+- [x] Added server-side guard for scheduled and manual payout runs
+- [x] Verified live payout-run endpoint skips with the pause reason
+- [x] Verified direct transfer creation is blocked before provider access
+- [x] Restored the original payout configuration after testing
+
+### GitHub branch comparison — 2026-08-05
+- [x] Confirmed `origin/main` already contains the full history of `origin/agent/30-minute-booking-slots`; that branch tip is the merge base of `main`.
+- [x] Confirmed `origin/servenow-updates` has unrelated history and is not a superset of either existing GitHub branch.
+- [ ] Do not make `servenow-updates` the default branch until its workspace content is reconciled with the existing GitHub `main`.
+
+### English-only rollback — 2026-08-04
+- [x] Removed Customer Web, Partner Web, and Admin Panel language selectors/providers
+- [x] Removed Customer Mobile and Partner Mobile language pickers/providers and RTL handling
+- [x] Removed the shared locale/translation catalog and related exports
+- [x] Removed the Admin Languages section and language setting API contract
+- [x] Removed the public `/api/platform-settings/languages` endpoint
+- [x] Preserved English UI and dynamic admin-created category/service names exactly as entered
+- [x] Rebuilt Customer Web, Admin Web, Partner Web, and Server successfully
+- [x] Restarted affected workflows and verified the settled Customer Web preview renders normal English labels without browser errors
 
 ### Latest Git synchronization — 2026-08-04
 - [x] Integrated Admin Panel and backend account-management changes on top of current GitHub `main`

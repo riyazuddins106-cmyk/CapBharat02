@@ -10,7 +10,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { cartApi, addressesApi, API_BASE, type Cart, type Address, type Order } from '@/lib/api';
-import { setPendingPayId } from '@/lib/pendingPayment';
 import { generateTimeSlots, formatSlotTime, getServiceWindowLabel, formatDuration } from '@servenow/shared';
 
 type BookingConfig = {
@@ -81,9 +80,6 @@ export default function CheckoutScreen() {
   const [selectedDate, setSelectedDate] = useState('Today');
   const [selectedSlot, setSelectedSlot] = useState<number>(9 * 60); // total minutes since midnight
   const [done, setDone] = useState(false);
-  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
-  const [createdBookingPrice, setCreatedBookingPrice] = useState<number | null>(null);
-  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
   // ── Fetch booking config (public, no auth) ────────────────────────────────
   const { data: bookingConfig = DEFAULT_BOOKING_CONFIG } = useQuery<BookingConfig>({
@@ -94,6 +90,12 @@ export default function CheckoutScreen() {
       return json.data ?? DEFAULT_BOOKING_CONFIG;
     },
     staleTime: 5 * 60 * 1000, // cache 5 min — changes are infrequent
+  });
+
+  const { data: cart, isLoading: cartLoading } = useQuery<Cart>({
+    queryKey: ['/api/cart', accessToken],
+    queryFn: () => cartApi.get(accessToken!),
+    enabled: !!accessToken,
   });
 
   // ── Max service duration (longest single service — services run in parallel) ──
@@ -122,7 +124,7 @@ export default function CheckoutScreen() {
     const isToday = selectedDate === 'Today';
 
     if (isToday && !bookingConfig.sameDayBooking) {
-      timeSlots.forEach(m => disabled.add(m));
+      timeSlots.forEach((m: number) => disabled.add(m));
       return disabled;
     }
 
@@ -134,7 +136,7 @@ export default function CheckoutScreen() {
       ? (now.getHours() * 60 + now.getMinutes() + effectiveMinAdvance)
       : 0;
 
-    timeSlots.forEach(startM => {
+    timeSlots.forEach((startM: number) => {
       if (isToday && startM < earliestMinutes) disabled.add(startM);
     });
     return disabled;
@@ -143,16 +145,10 @@ export default function CheckoutScreen() {
   // Auto-select first available slot when date or config changes
   useEffect(() => {
     if (disabledSlots.has(selectedSlot) || !timeSlots.includes(selectedSlot)) {
-      const first = timeSlots.find(m => !disabledSlots.has(m));
+      const first = timeSlots.find((m: number) => !disabledSlots.has(m));
       if (first !== undefined) setSelectedSlot(first);
     }
   }, [disabledSlots, timeSlots]);
-
-  const { data: cart, isLoading: cartLoading } = useQuery({
-    queryKey: ['/api/cart', accessToken],
-    queryFn: () => cartApi.get(accessToken!),
-    enabled: !!accessToken,
-  });
 
   const { data: addresses = [], isLoading: addrsLoading } = useQuery({
     queryKey: ['/api/addresses', accessToken],
@@ -185,9 +181,6 @@ export default function CheckoutScreen() {
     onSuccess: (order: Order) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart', accessToken] });
       queryClient.invalidateQueries({ queryKey: ['/api/orders', accessToken] });
-      setCreatedOrder(order);
-      setCreatedBookingId(order?.id ?? null);
-      setCreatedBookingPrice(order?.totalAmount ?? null);
       setDone(true);
       setStep(5);
     },
@@ -411,7 +404,7 @@ export default function CheckoutScreen() {
               </View>
             </View>
             <View style={styles.slotGrid}>
-              {timeSlots.map((startM) => {
+              {timeSlots.map((startM: number) => {
                 const selected = selectedSlot === startM;
                 const disabled = disabledSlots.has(startM);
                 const label = formatSlotTime(startM);
@@ -518,26 +511,11 @@ export default function CheckoutScreen() {
               )}
               <Text style={[styles.infoLabel, { color: '#D97706', marginTop: 8 }]}>Status: Pending</Text>
             </View>
-            {createdBookingPrice != null && (
-              <TouchableOpacity
-                onPress={() => {
-                  // Store payId before navigating — router.replace from a Stack
-                  // modal to a nested tab route does not reliably pass params via
-                  // useLocalSearchParams in Expo Router SDK 54. The bookings screen
-                  // reads from this module-level store instead.
-                  setPendingPayId(createdBookingId ?? null);
-                  router.dismiss(); // properly closes the modal, returns to tabs
-                }}
-                style={[styles.primaryBtn, { backgroundColor: '#059669', marginTop: 8 }]}
-              >
-                <Text style={styles.primaryBtnText}>💳 Pay Now — ₹{createdBookingPrice}</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               onPress={() => router.replace('/(tabs)/bookings')}
               style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
             >
-              <Text style={styles.primaryBtnText}>Pay Later · View Bookings</Text>
+              <Text style={styles.primaryBtnText}>View My Bookings</Text>
             </TouchableOpacity>
           </View>
         )}

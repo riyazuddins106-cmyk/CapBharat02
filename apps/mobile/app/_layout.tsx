@@ -12,8 +12,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { CartAccess } from '@/components/CartAccess';
-import { LanguageProvider } from '@/context/LanguageContext';
-import { LanguagePicker } from '@/components/LanguagePicker';
 
 // SplashScreen is native-only — calling it on web shows a white overlay
 // that never gets removed, leaving a permanently blank page.
@@ -123,7 +121,6 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <LanguageProvider>
               <AuthProvider>
                 <StatusBar style="dark" />
                 <Stack screenOptions={{ headerShown: false }}>
@@ -139,9 +136,7 @@ export default function RootLayout() {
                 <Stack.Screen name="help-support" options={{ animation: 'slide_from_right' }} />
                 </Stack>
                 <CartAccess />
-                <LanguagePicker />
               </AuthProvider>
-            </LanguageProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

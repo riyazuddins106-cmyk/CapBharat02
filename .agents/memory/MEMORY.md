@@ -40,4 +40,4 @@
 - [Partner payout control centre](payout-control-center.md) — aggregate earnings and payout requests independently, paginate partners, and lazy-load individual payout history.
 - [Scheduled partner payouts](scheduled-partner-payouts.md) — automatic runs require explicit approval, caps, locking, recovery, and RazorpayX configuration.
 - [Partner App icon font loading](partner-app-icon-font-loading.md) — native Ionicons need a longer font-loading grace period than the web fallback.
-- [Admin-managed localization](admin-managed-localization.md) — Admin controls enabled locales across all clients; English is mandatory, default, and fallback.
+- [English-only product language](english-only-product-language.md) — ServeNow intentionally has no translation catalog, language settings, selectors, or RTL behavior; content displays exactly as stored.

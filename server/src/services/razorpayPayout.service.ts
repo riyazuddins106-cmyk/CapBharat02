@@ -26,6 +26,31 @@ async function getConfig(): Promise<PaymentConfig> {
   return row ? JSON.parse(row.value) as PaymentConfig : {};
 }
 
+type PayoutControlConfig = {
+  payoutsPaused?: boolean;
+};
+
+async function getPayoutControlConfig(): Promise<PayoutControlConfig> {
+  const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'payout_config'));
+  if (!row) return {};
+  try {
+    return JSON.parse(row.value) as PayoutControlConfig;
+  } catch {
+    return {};
+  }
+}
+
+export async function arePartnerPayoutsPaused(): Promise<boolean> {
+  const config = await getPayoutControlConfig();
+  return config.payoutsPaused === true;
+}
+
+export async function assertPartnerPayoutsNotPaused(): Promise<void> {
+  if (await arePartnerPayoutsPaused()) {
+    throw AppError.badRequest('Partner payouts are temporarily paused by an administrator.');
+  }
+}
+
 function providerError(response: Response, body: RazorpayApiResponse) {
   return body.error?.description
     || body.error?.reason
@@ -58,6 +83,7 @@ export async function createRazorpayUpiPayout(input: {
   upiId: string;
   note?: string | null;
 }) {
+  await assertPartnerPayoutsNotPaused();
   const cfg = await getConfig();
   const razorpay = cfg.razorpay;
   if (cfg.testMode?.enabled) {

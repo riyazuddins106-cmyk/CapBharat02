@@ -15,7 +15,6 @@ import {
   type DocumentTypeConfig, type PartnerDocumentHistory,
 } from '@/lib/api';
 import { QRScannerModal } from '@/components/QRScannerModal';
-import { useLanguage } from '@/lib/language';
 
 /* ─── Design tokens (exact match to admin panel) ──────────────────── */
 const CARD      = { background: 'rgba(255,255,255,0.04)' } as const;
@@ -164,6 +163,7 @@ function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
   onCheckIn?: () => void;
   onComplete?: () => void;
 }) {
+  const tx = (source: string) => source;
   const canCheckIn = !pending && item.status === 'partner_accepted';
   const canComplete = !pending && ['payment_completed', 'service_started'].includes(item.status ?? '');
 
@@ -175,9 +175,9 @@ function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
           <Wrench size={16} style={{ color: pending ? '#F59E0B' : '#A78BFA' }}/>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white text-sm font-bold truncate">{item.serviceName ?? 'Service booking'}</p>
+          <p className="text-white text-sm font-bold truncate">{item.serviceName ?? tx('Service booking')}</p>
           <p className="text-white/45 text-xs mt-0.5 truncate">
-            {item.customerName ?? 'Customer'} · Order {item.orderId.slice(0, 8)}
+            {item.customerName ?? tx('Customer')} · Order {item.orderId.slice(0, 8)}
           </p>
         </div>
         <span className="px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap"
@@ -185,7 +185,7 @@ function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
             background: pending ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
             color: pending ? '#FBBF24' : '#60A5FA',
           }}>
-          {pending ? 'New request' : 'In progress'}
+          {pending ? tx('New request') : tx('In progress')}
         </span>
       </div>
       <div className="flex items-center gap-4 mt-3 text-xs text-white/45">
@@ -197,12 +197,12 @@ function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
         <div className="flex gap-2 mt-3">
           <button onClick={onReject} disabled={busy}
             className="flex-1 py-2 rounded-lg text-xs font-bold border border-red-400/30 text-red-400 disabled:opacity-50">
-            {busy ? 'Updating…' : 'Reject'}
+            {busy ? tx('Updating…') : tx('Reject')}
           </button>
           <button onClick={onAccept} disabled={busy}
             className="flex-1 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
             style={{ background: ACCENT }}>
-            {busy ? 'Updating…' : 'Accept'}
+            {busy ? tx('Updating…') : tx('Accept')}
           </button>
         </div>
       )}
@@ -212,14 +212,14 @@ function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
             <button onClick={onCheckIn} disabled={busy}
               className="flex-1 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
               style={{ background: ACCENT }}>
-              <span className="inline-flex items-center gap-1.5"><QrCode size={13}/> Scan customer QR</span>
+              <span className="inline-flex items-center gap-1.5"><QrCode size={13}/> {tx('Scan customer QR')}</span>
             </button>
           )}
           {canComplete && onComplete && (
             <button onClick={onComplete} disabled={busy}
               className="flex-1 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
               style={{ background: '#16A34A' }}>
-              <span className="inline-flex items-center gap-1.5"><Check size={13}/> Mark completed</span>
+              <span className="inline-flex items-center gap-1.5"><Check size={13}/> {tx('Mark completed')}</span>
             </button>
           )}
         </div>
@@ -272,6 +272,7 @@ function SubmitBtn({ label, loadingLabel, loading }: { label: string; loadingLab
 }
 
 function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
+  const tx = (source: string) => source;
   const [mode, setMode] = useState<AuthMode>('login');
   const [step, setStep] = useState(1); // register steps: 1=basic info, 2=professional details
   const [docsToken, setDocsToken] = useState<AuthTokens | null>(null);
@@ -590,8 +591,8 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
       <div className="w-full max-w-sm">
         <Logo/>
         <AuthCard>
-          <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
-          <p className="text-white/40 text-sm mb-6">Sign in to your partner portal</p>
+            <h2 className="text-white font-bold text-lg mb-1">{tx('Welcome back')}</h2>
+            <p className="text-white/40 text-sm mb-6">{tx('Sign in to your partner portal')}</p>
           <ErrBanner err={err}/>
           <form onSubmit={handleLogin} className="space-y-4">
             <Field label="Email">
@@ -604,15 +605,15 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
           </form>
           <div className="flex items-center justify-between mt-5">
             <div className="flex items-center gap-1.5">
-              <span className="text-white/30 text-xs">New partner?</span>
+              <span className="text-white/30 text-xs">{tx('New partner?')}</span>
               <button onClick={() => { setMode('register'); setStep(1); setErr(''); }}
                 className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors">
-                Register here
+                {tx('Register here')}
               </button>
             </div>
             <button onClick={() => { setForgotEmail(loginEmail); setMode('forgot'); setErr(''); }}
               className="text-white/40 text-xs hover:text-violet-300 transition-colors">
-              Forgot password?
+              {tx('Forgot password?')}
             </button>
           </div>
         </AuthCard>
@@ -623,6 +624,7 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
 
 /* ─── Dashboard ───────────────────────────────────────────────────── */
 function Dashboard({ token, profile }: { token: string; profile: PartnerProfile | null }) {
+  const tx = (source: string) => source;
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [jobs,     setJobs]     = useState<Job[]>([]);
   const [serviceJobs, setServiceJobs] = useState<{ pendingRequests: OrderItemJob[]; activeJobs: OrderItemJob[]; completedJobs: OrderItemJob[] }>({ pendingRequests: [], activeJobs: [], completedJobs: [] });
@@ -654,7 +656,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
       else await partnerApi.rejectOrderItemJob(item.requestId, token);
       await load();
     } catch (error: any) {
-      alert(error?.message ?? 'Could not update this request.');
+      alert(error?.message ?? tx('Could not update this request.'));
     } finally { setActionKey(null); }
   }
 
@@ -666,7 +668,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
       setServiceCheckinItem(null);
       await load();
     } catch (error: any) {
-      alert(error?.message ?? 'Check-in failed. Make sure this is the customer QR for this service.');
+      alert(error?.message ?? tx('Check-in failed. Make sure this is the customer QR for this service.'));
     } finally { setActionKey(null); }
   }
 
@@ -676,7 +678,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
       await partnerApi.completeOrderItem(item.orderItemId, token);
       await load();
     } catch (error: any) {
-      alert(error?.message ?? 'Could not complete this service.');
+      alert(error?.message ?? tx('Could not complete this service.'));
     } finally { setActionKey(null); }
   }
 
@@ -688,10 +690,10 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
 
   const stats = [
 
-    { label: 'Total Earnings', value: fmt(earnings?.total ?? 0),     color: '#16A34A', icon: DollarSign },
-    { label: 'This Month',     value: fmt(earnings?.thisMonth ?? 0), color: '#5B3EF5', icon: TrendingUp },
-    { label: 'Today',          value: fmt(earnings?.today ?? 0),     color: '#F59E0B', icon: Zap        },
-    { label: 'Rating',         value: profile ? profile.rating.toFixed(1) : '—', color: '#F59E0B', icon: Star },
+    { label: tx('Total Earnings'), value: fmt(earnings?.total ?? 0),     color: '#16A34A', icon: DollarSign },
+    { label: tx('This Month'),     value: fmt(earnings?.thisMonth ?? 0), color: '#5B3EF5', icon: TrendingUp },
+    { label: tx('Today'),          value: fmt(earnings?.today ?? 0),     color: '#F59E0B', icon: Zap        },
+    { label: tx('Rating'),         value: profile ? profile.rating.toFixed(1) : '—', color: '#F59E0B', icon: Star },
   ];
 
   return (
@@ -699,7 +701,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
       {serviceJobs.pendingRequests.length > 0 && (
         <div className="rounded-2xl border border-amber-400/20 p-5 mb-6" style={{ background: 'rgba(245,158,11,0.05)' }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-bold text-sm">New requests</h3>
+            <h3 className="text-white font-bold text-sm">{tx('New requests')}</h3>
             <span className="w-6 h-6 rounded-full text-white text-[11px] font-bold flex items-center justify-center"
               style={{ background: '#F59E0B' }}>{serviceJobs.pendingRequests.length}</span>
           </div>
@@ -742,7 +744,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
         {profile && (
           <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
             <div className="px-5 py-4 border-b border-white/[0.07]">
-              <h3 className="text-white font-bold text-sm">My Profile</h3>
+            <h3 className="text-white font-bold text-sm">{tx('My Profile')}</h3>
             </div>
             <div className="px-5 py-4">
               <div className="flex items-center gap-3 mb-4">
@@ -756,14 +758,14 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
                 </div>
                 <span className="ml-auto px-2.5 py-1 rounded-lg text-[10px] font-bold"
                   style={{ background: profile.isActive ? '#16A34A20' : '#EF444420', color: profile.isActive ? '#16A34A' : '#EF4444' }}>
-                  {profile.isActive ? 'Active' : 'Inactive'}
+                  {profile.isActive ? tx('Active') : tx('Inactive')}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 {[
-                  { label: 'Rating',  value: profile.rating.toFixed(1) },
-                  { label: 'Reviews', value: String(profile.reviewCount) },
-                  { label: 'Rate',    value: `${fmt(profile.basePrice)}/${profile.priceUnit}` },
+                  { label: tx('Rating'),  value: profile.rating.toFixed(1) },
+                  { label: tx('Reviews'), value: String(profile.reviewCount) },
+                  { label: tx('Rate'),    value: `${fmt(profile.basePrice)}/${profile.priceUnit}` },
                 ].map(s => (
                   <div key={s.label} className="rounded-xl py-3 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.02)' }}>
                     <p className="text-white font-bold text-sm">{s.value}</p>
@@ -783,10 +785,10 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
         {/* Active jobs */}
         <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
           <div className="px-5 py-4 border-b border-white/[0.07]">
-            <h3 className="text-white font-bold text-sm">Active Jobs</h3>
+            <h3 className="text-white font-bold text-sm">{tx('Active Jobs')}</h3>
           </div>
           {serviceJobs.activeJobs.length === 0 && upcoming.length === 0
-            ? <p className="px-5 py-8 text-white/30 text-sm text-center">No active jobs</p>
+            ? <p className="px-5 py-8 text-white/30 text-sm text-center">{tx('No active jobs')}</p>
             : (
               <>
               {serviceJobs.activeJobs.slice(0, 4).map(item => (
@@ -803,7 +805,7 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
                 <div key={j.id} className="px-5 py-3 flex items-center gap-3 border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold truncate">{j.serviceName}</p>
-                    <p className="text-white/40 text-xs truncate">{j.customerName ?? 'Customer'}</p>
+                    <p className="text-white/40 text-xs truncate">{j.customerName ?? tx('Customer')}</p>
                   </div>
                   <p className="text-white/60 text-xs flex-shrink-0">{fmt(j.price)}</p>
                   <StatusBadge status={j.status}/>
@@ -2180,15 +2182,14 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ page, navigate, unread, profile, logout }: SidebarContentProps) {
-  const { t } = useLanguage();
   const labels: Record<Page, string> = {
-    dashboard: t('common.dashboard'),
-    jobs: t('common.jobs'),
-    earnings: t('common.earnings'),
+    dashboard: 'Dashboard',
+    jobs: 'My Jobs',
+    earnings: 'Earnings',
     payouts: 'Payouts',
     documents: 'Documents',
-    notifications: t('common.notifications'),
-    profile: t('common.profile'),
+    notifications: 'Notifications',
+    profile: 'Profile',
   };
   return (
     <div className="flex flex-col h-full">
@@ -2251,7 +2252,7 @@ function SidebarContent({ page, navigate, unread, profile, logout }: SidebarCont
 }
 
 export default function App() {
-  const { t } = useLanguage();
+  const t = (source: string) => source;
   const [auth,    setAuth]    = useState<AuthTokens | null>(() => {
     try { const s = localStorage.getItem('partner_auth'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
@@ -2342,13 +2343,13 @@ export default function App() {
           <div className="flex-1 min-w-0">
             <h1 className="text-white font-bold text-xl leading-none">
               {({
-                dashboard: t('common.dashboard'),
-                jobs: t('common.jobs'),
-                earnings: t('common.earnings'),
+                dashboard: 'Dashboard',
+                jobs: 'My Jobs',
+                earnings: 'Earnings',
                 payouts: 'Payouts',
                 documents: 'Documents',
-                notifications: t('common.notifications'),
-                profile: t('common.profile'),
+                notifications: 'Notifications',
+                profile: 'Profile',
               } as Record<Page, string>)[page] ?? currentNav.label}
             </h1>
             <p className="text-white/40 text-sm mt-0.5">ServeNow Partner Portal</p>
@@ -2384,13 +2385,13 @@ export default function App() {
                   style={{ background: '#5B3EF5' }}>{unread > 9 ? '9' : unread}</span>
               )}
               <span>{({
-                dashboard: t('common.dashboard'),
-                jobs: t('common.jobs'),
-                earnings: t('common.earnings'),
+                dashboard: 'Dashboard',
+                jobs: 'My Jobs',
+                earnings: 'Earnings',
                 payouts: 'Payouts',
                 documents: 'Documents',
-                notifications: t('common.notifications'),
-                profile: t('common.profile'),
+                notifications: 'Notifications',
+                profile: 'Profile',
               } as Record<Page, string>)[id] ?? label}</span>
             </button>
           ))}

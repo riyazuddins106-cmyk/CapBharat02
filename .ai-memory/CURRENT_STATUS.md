@@ -74,14 +74,13 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Document upload
 - [x] Notifications
 
-### Admin-managed multi-language foundation (2026-08-04)
-- [x] Shared locale catalog supports English (`en`), Hindi (`hi`), Marathi (`mr`), Arabic (`ar`), and Urdu (`ur`).
-- [x] English is always enabled, is the default locale, and is the fallback for missing translations or unavailable settings.
-- [x] Admin Panel Languages screen controls which locales appear in all customer and partner clients.
-- [x] Public `/api/platform-settings/languages` endpoint returns the Admin-selected list before authentication.
-- [x] Customer Web, Partner Web, Admin Panel, Customer Mobile, and Partner Mobile have persisted language selectors.
-- [x] Arabic and Urdu set RTL direction; web direction updates immediately and native direction is configured through `I18nManager`.
-- [x] Initial shell/navigation labels are translated; dynamic catalog, service, checkout, notification, email, policy, and full form copy still need migration to translation keys.
+### English-only product state (2026-08-04)
+- [x] Removed the multilingual locale catalog, translation helpers, language selectors, locale persistence, and RTL behavior from all clients.
+- [x] Removed the Admin Languages screen, language platform-setting key, and public language configuration endpoint.
+- [x] Customer Web, Partner Web, Admin Panel, Customer Mobile, and Partner Mobile now use English-only UI.
+- [x] Dynamic category, subcategory, service, offer, and policy content is displayed exactly as stored; no automatic translation is performed.
+- [x] Customer Web, Admin Web, Partner Web, and Server production builds pass; `git diff --check` passes.
+- [x] Settled Customer Web preview renders Home, Services, Bookings, and Profile labels normally with no browser errors.
 
 ### Service-level order completion (2026-08-04)
 - [x] Added full partner service-job detail route and screen, including pending request accept/reject, customer contact/address, timing, notes, payout, payment status, check-in, and completion.
@@ -118,6 +117,39 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Legacy payment is available after partner check-in (`in_progress`) and remains available for unpaid completed bookings.
 - [x] Service-order payment is available only after partner check-in (`payment_pending` / `partner_arrived`).
 - [x] Backend payment endpoints now reject payment attempts before those states instead of relying only on UI visibility.
+
+### Partner dispatch eligibility correction (2026-08-05)
+- [x] Partner service dispatch now requires the service category to match the professional profile category.
+- [x] When a professional has a sub-category, the service sub-category must match exactly.
+- [x] Partner request list, detail, and accept endpoints apply the same eligibility rule.
+- [x] Reconciled the seeded Rajan Verma account to `AC Repair → AC Service & Repair`, matching the `AC Service` catalog item.
+- [x] Removed broad legacy service links and expired stale out-of-category requests; live queue now shows AC Service only.
+- [x] Customer Mobile checkout confirmation no longer offers Pay Now while the booking is still pending partner matching; payment remains available after partner arrival/check-in.
+
+### Full web/mobile verification (2026-08-05)
+- [x] Customer Web, Admin Web, Partner Web, and Server production builds passed.
+- [x] Partner Mobile TypeScript passed; Customer and Partner Expo Android/iOS bundles completed successfully.
+- [x] Current order-item smoke test passed 16/16: registration, OTP, login, catalog, multi-service cart, checkout, order listing, item cancellation, continue-searching, and auth protection.
+- [x] Full live lifecycle passed with a disposable AC Service order: customer checkout → partner request → accept → customer QR → pre-check-in payment rejection → QR check-in → cash payment → service completion → completed order.
+- [x] Customer, Partner, and Admin authenticated menu-backed API surfaces returned HTTP 200; unauthorized role access returned HTTP 403.
+- [x] Partner Web is healthy on its configured local port 4000; the older handoff port list was stale.
+- [x] Updated the current smoke fixture to schedule tomorrow at 10:00 so it remains inside configured booking hours.
+- [x] Customer Mobile strict `tsc --noEmit` now passes. The checkout cart query is declared before dependent memo calculations, slot callbacks are explicitly typed, and the mobile tsconfig resolves `@servenow/shared`.
+- [x] Fresh Customer Expo verification after the fix completed both Android and iOS Metro bundles successfully with no build errors.
+- [x] Repeated the verification from the current workspace state: Customer Mobile TypeScript, Android bundle, and iOS bundle all passed again.
+- [!] Real Razorpay/Stripe payment and refund provider flows remain unverified because live gateway credentials are not configured.
+
+### Emergency partner payout pause (2026-08-05)
+- [x] Admin Partner Payouts now has a persisted emergency pause/unpause control.
+- [x] When paused, manual RazorpayX sends and the Admin “Run approved payouts now” action are disabled in the UI.
+- [x] The server blocks RazorpayX transfer creation before provider access and skips both scheduled and manual payout runs.
+- [x] Existing payout requests remain unchanged while paused; customer payments are not affected by this control.
+- [x] Live controlled verification passed for the payout-run skip and direct transfer guard; the original setting was restored afterward.
+
+### GitHub branch state (2026-08-05)
+- `origin/main` is the current GitHub default branch and already contains `origin/agent/30-minute-booking-slots`.
+- `origin/servenow-updates` is a separate 16-commit workspace snapshot with no common history with either existing GitHub branch.
+- The latest branch must not be treated as the complete combined project until a content-level reconciliation is performed.
 
 ### Partner request visibility (2026-08-04)
 - [x] Partner Dashboard now fetches service-level requests and shows a “New requests” queue with count, service/customer, schedule, payout, and Accept/Reject actions.
@@ -216,7 +248,29 @@ The service-level order implementation is complete for customer web/mobile, part
 ---
 
 ## 🔄 Last Session Summary (2026-08-04)
-- Admin-managed localization foundation is complete: English is mandatory/default/fallback, and Admin controls the enabled launch languages across all five clients. The public endpoint returned `en`, `hi`, `mr`, `ar`, and `ur`; Admin and Partner Web previews rendered cleanly after fixing the selector runtime error.
+- Reverted the multilingual feature at the user’s request and returned the full ServeNow product to English-only behavior.
+- Deleted the shared translation catalog and all web/mobile language provider and picker modules.
+- Removed language controls from all clients, Arabic/Urdu RTL handling, Admin language configuration, and the public language settings endpoint.
+- Replaced remaining structured translation-key shell labels with their actual English labels, then rebuilt and restarted the affected workflows.
+- Final Customer Web screenshot showed normal English labels including Home, Services, Bookings, and Profile; browser logs contained no application errors.
+- Customer Web, Admin Web, Partner Web, and Server production builds passed; `git diff --check` passed.
+- Main workflow migrations completed successfully and the API served the Customer Web category, reel, offer, and featured-service requests with HTTP 200.
+- No deployment or GitHub push was performed for this rollback.
+
+### Admin Partner Payout fix (2026-08-04)
+- Fixed the payout Control Centre handler so the UI can correctly approve a request for scheduled payout, send it through RazorpayX, or reject it.
+- Fixed stale Admin Web `tx(...)` calls left behind by the English-only rollback; these were causing a blank Admin login screen after restart.
+- Admin Web production build passed, `git diff --check` passed, and the refreshed Admin preview renders the login screen normally.
+- The browser only reports a non-blocking password autocomplete recommendation. Real money transfer still requires valid RazorpayX configuration, a partner UPI ID, and Test/Sandbox Mode disabled.
+
+### Partner account/professional visibility fix (2026-08-05)
+- `partner@servenow.in` is a valid partner login linked to the active `Rajan Verma` professional profile.
+- The database also contains a separate older, unlinked professional row with the same display name; it was not deleted.
+- Admin Professionals now supports server-side search by partner login email/name/title and displays the linked login email or “No partner login linked.”
+- Live verification returned `Rajan Verma` with `partner@servenow.in`; Admin Web and Server builds passed.
+- Admin Professionals now defaults to “Linked Partners”; unlinked records are available under “Unlinked Profiles.”
+- Professionals supports multi-select Category and Sub-category filters in both views.
+- Search now remains focused while typing and applies after a short debounce instead of remounting the page after every character.
 - GitHub `main` is synchronized with the Repl at commit `e5c927233`.
 - The pushed history preserves GitHub's newer marketplace/mobile commits and adds the Admin Panel/backend work plus the remaining Customer Web, Customer Mobile, and Expo routing refinements.
 - Partner Web and Partner Mobile had no remaining source differences and were already present on GitHub.

@@ -20,7 +20,8 @@
   },
   "pnpm": {
     "overrides": {
-      "vite": "6.3.5"
+      "vite": "6.3.5",
+      "tar": "7.5.22"
     }
   },
   "dependencies": {

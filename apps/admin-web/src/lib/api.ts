@@ -186,6 +186,8 @@ export interface AdminOrderDetail extends AdminOrderRow {
 
 export interface ProfessionalRow {
   id: string;
+  userId?: string | null;
+  userEmail?: string | null;
   name: string;
   title: string;
   bio?: string | null;
@@ -642,8 +644,25 @@ export const adminApi = {
     basePrice: number; priceUnit?: string; badge?: string; tags?: string[];
   }, token: string) =>
     request<ProfessionalRow>('/admin/professionals', { method: 'POST', token, body: JSON.stringify(data) }),
-  getProfessionals: (token: string, page = 1, limit = 25) =>
-    request<{ professionals: ProfessionalRow[]; total: number }>(`/admin/professionals?offset=${(page - 1) * limit}&limit=${limit}`, { token }),
+  getProfessionals: (
+    token: string,
+    page = 1,
+    limit = 25,
+    search = '',
+    linkStatus: 'linked' | 'unlinked' = 'linked',
+    categoryIds: string[] = [],
+    subCategoryIds: string[] = [],
+  ) => {
+    const query = new URLSearchParams({
+      offset: String((page - 1) * limit),
+      limit: String(limit),
+      linkStatus,
+    });
+    if (search.trim()) query.set('search', search.trim());
+    if (categoryIds.length) query.set('categoryIds', categoryIds.join(','));
+    if (subCategoryIds.length) query.set('subCategoryIds', subCategoryIds.join(','));
+    return request<{ professionals: ProfessionalRow[]; total: number }>(`/admin/professionals?${query.toString()}`, { token });
+  },
   updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }, token: string) =>
     request<ProfessionalRow>(`/admin/professionals/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   suspendProfessional: (id: string, token: string) =>
@@ -867,9 +886,9 @@ export const adminApi = {
     request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/refund`, { method: 'PATCH', token }),
 
   // Platform Settings
-  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config' | 'languages', token: string) =>
+  getSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config', token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { token }),
-  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config' | 'languages', value: unknown, token: string) =>
+  saveSettings: (key: 'payment_config' | 'email_config' | 'sms_config' | 'contact_config' | 'otp_config' | 'booking_config' | 'payout_config', value: unknown, token: string) =>
     request<{ key: string; value: unknown }>(`/admin/settings/${key}`, { method: 'PUT', token, body: JSON.stringify(value) }),
   sendTestEmail: (to: string, token: string) =>
     request<{ message: string }>('/admin/settings/email/test', { method: 'POST', token, body: JSON.stringify({ to }) }),

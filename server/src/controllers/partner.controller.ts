@@ -5,7 +5,7 @@ import { storageService } from '../services/storage.service.js';
 import { AppError } from '../utils/AppError.js';
 import { orderDispatchService } from '../services/orderDispatch.service.js';
 import { db } from '../config/database.js';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
   orderItemRequests, orderItems, orderItemPayments, orders, professionals,
   services, users, addresses,
@@ -102,7 +102,11 @@ export const partnerController = {
 
   /** GET /api/partner/order-item-jobs — list open requests + assigned items for this partner */
   listOrderItemJobs: asyncHandler(async (req: Request, res: Response) => {
-    const [pro] = await db.select({ id: professionals.id })
+    const [pro] = await db.select({
+      id: professionals.id,
+      categoryId: professionals.categoryId,
+      subCategoryId: professionals.subCategoryId,
+    })
       .from(professionals)
       .where(eq(professionals.userId, req.user!.userId))
       .limit(1);
@@ -121,7 +125,14 @@ export const partnerController = {
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .leftJoin(services, eq(orderItems.serviceId, services.id))
       .leftJoin(users, eq(orders.customerId, users.id))
-      .where(and(eq(orderItemRequests.partnerId, pro.id), eq(orderItemRequests.status, 'pending')));
+      .where(and(
+        eq(orderItemRequests.partnerId, pro.id),
+        eq(orderItemRequests.status, 'pending'),
+        eq(services.categoryId, pro.categoryId),
+        pro.subCategoryId
+          ? eq(services.subCategoryId, pro.subCategoryId)
+          : undefined,
+      ));
 
     // Active assigned items (accepted → in progress)
     const activeItems = await db.select({
@@ -200,7 +211,11 @@ export const partnerController = {
 
   /** GET /api/partner/order-item-jobs/:itemId — full service-level job detail */
   getOrderItemJob: asyncHandler(async (req: Request, res: Response) => {
-    const [pro] = await db.select({ id: professionals.id })
+    const [pro] = await db.select({
+      id: professionals.id,
+      categoryId: professionals.categoryId,
+      subCategoryId: professionals.subCategoryId,
+    })
       .from(professionals)
       .where(eq(professionals.userId, req.user!.userId))
       .limit(1);
@@ -229,6 +244,10 @@ export const partnerController = {
       .where(and(
         eq(orderItems.id, req.params.itemId),
         or(eq(orderItems.partnerId, pro.id), eq(orderItemRequests.partnerId, pro.id)),
+        eq(services.categoryId, pro.categoryId),
+        pro.subCategoryId
+          ? eq(services.subCategoryId, pro.subCategoryId)
+          : undefined,
       ))
       .limit(1);
 
@@ -252,7 +271,11 @@ export const partnerController = {
 
   /** PATCH /api/partner/order-item-jobs/:requestId/accept */
   acceptOrderItemJob: asyncHandler(async (req: Request, res: Response) => {
-    const [pro] = await db.select({ id: professionals.id })
+    const [pro] = await db.select({
+      id: professionals.id,
+      categoryId: professionals.categoryId,
+      subCategoryId: professionals.subCategoryId,
+    })
       .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
@@ -260,6 +283,19 @@ export const partnerController = {
       .where(and(eq(orderItemRequests.id, req.params.requestId), eq(orderItemRequests.partnerId, pro.id)))
       .limit(1);
     if (!request) throw AppError.notFound('Job request not found.');
+
+    const [eligible] = await db.select({ id: orderItems.id })
+      .from(orderItems)
+      .innerJoin(services, eq(orderItems.serviceId, services.id))
+      .where(and(
+        eq(orderItems.id, request.orderItemId),
+        eq(services.categoryId, pro.categoryId),
+        pro.subCategoryId
+          ? eq(services.subCategoryId, pro.subCategoryId)
+          : undefined,
+      ))
+      .limit(1);
+    if (!eligible) throw AppError.badRequest('This service is outside your assigned category.');
 
     const data = await orderDispatchService.acceptItem(request.orderItemId, pro.id);
     res.json({ success: true, data });

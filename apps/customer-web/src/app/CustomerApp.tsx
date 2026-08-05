@@ -20,7 +20,6 @@ import {
   type ApiSupportTicket, type ApiPolicy,
 } from "../lib/api";
 import { generateTimeSlots, formatSlotTime, getServiceWindowLabel, formatDuration } from "@servenow/shared";
-import { useLanguage } from "../lib/language";
 
 /* ─────────────────────────── Category icon map ─────────────────── */
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
@@ -154,7 +153,7 @@ function buildScheduledAt(dateLabel: string, timeLabel: string): string {
   return base.toISOString();
 }
 
-function formatScheduledAt(iso: string): string {
+function formatScheduledAt(iso: string, locale = "en-IN", tx?: (source: string) => string): string {
   const d = new Date(iso);
   const today = new Date();
   const yesterday = new Date(today);
@@ -165,15 +164,17 @@ function formatScheduledAt(iso: string): string {
   const sameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-  const timeStr = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-  if (sameDay(d, today)) return `Today, ${timeStr}`;
-  if (sameDay(d, yesterday)) return `Yesterday, ${timeStr}`;
-  if (sameDay(d, tomorrow)) return `Tomorrow, ${timeStr}`;
-  return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}, ${timeStr}`;
+  const timeStr = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  const translate = tx ?? ((source: string) => source);
+  if (sameDay(d, today)) return `${translate("Today")}, ${timeStr}`;
+  if (sameDay(d, yesterday)) return `${translate("Yesterday")}, ${timeStr}`;
+  if (sameDay(d, tomorrow)) return `${translate("Tomorrow")}, ${timeStr}`;
+  return `${d.toLocaleDateString(locale, { day: "numeric", month: "short" })}, ${timeStr}`;
 }
 
-function statusLabel(status: ApiBooking["status"]): string {
-  return { pending: "Pending", upcoming: "Upcoming", in_progress: "In Progress", completed: "Completed", cancelled: "Cancelled" }[status];
+function statusLabel(status: ApiBooking["status"], tx?: (source: string) => string): string {
+  const translate = tx ?? ((source: string) => source);
+  return translate({ pending: "Pending", upcoming: "Upcoming", in_progress: "In Progress", completed: "Completed", cancelled: "Cancelled" }[status]);
 }
 
 function statusColors(status: ApiBooking["status"]): { bg: string; color: string } {
@@ -200,8 +201,7 @@ function PhoneFrame({ children }: { children: React.ReactNode; statusDark?: bool
 }
 
 function usePhraseTranslator() {
-  const { tx } = useLanguage();
-  return tx;
+  return (source: string) => source;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -400,6 +400,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
    WISHLIST SCREEN  (saved services)
 ═══════════════════════════════════════════════════════════════ */
 function WishlistScreen({ onBack }: { onBack: () => void }) {
+  const tx = usePhraseTranslator();
   const [items, setItems] = useState<ApiWishlistedService[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -418,16 +419,16 @@ function WishlistScreen({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
           <ChevronLeft size={18} color="#5B3EF5" />
         </button>
-        <h2 className="text-lg font-bold">My Wishlist</h2>
-        {items.length > 0 && <span className="text-xs font-semibold text-violet-500 ml-1">{items.length} saved</span>}
+        <h2 className="text-lg font-bold">{tx("My Wishlist")}</h2>
+        {items.length > 0 && <span className="text-xs font-semibold text-violet-500 ml-1">{items.length} {tx("saved")}</span>}
       </div>
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">{tx("Loading…")}</div>
       ) : items.length === 0 ? (
         <div className="text-center py-16">
           <Heart size={40} color="#E5E7EB" className="mx-auto mb-3" />
-          <p className="text-sm font-bold text-gray-700">No saved services yet</p>
-          <p className="text-xs text-gray-400 mt-1">Tap the ♡ on any service to save it here</p>
+          <p className="text-sm font-bold text-gray-700">{tx("No saved services yet")}</p>
+          <p className="text-xs text-gray-400 mt-1">{tx("Tap the ♡ on any service to save it here")}</p>
         </div>
       ) : (
         <div className="px-5 mt-4 flex flex-col gap-3">
@@ -466,6 +467,7 @@ function WishlistScreen({ onBack }: { onBack: () => void }) {
    NOTIFICATIONS SCREEN
 ═══════════════════════════════════════════════════════════════ */
 function NotificationsScreen({ onBack }: { onBack: () => void }) {
+  const tx = usePhraseTranslator();
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -497,19 +499,19 @@ function NotificationsScreen({ onBack }: { onBack: () => void }) {
           <button onClick={onBack} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
             <ChevronLeft size={18} color="#5B3EF5" />
           </button>
-          <h2 className="text-lg font-bold">Notifications {unread > 0 && <span className="text-sm font-bold text-violet-500">({unread} new)</span>}</h2>
+          <h2 className="text-lg font-bold">{tx("Notifications")} {unread > 0 && <span className="text-sm font-bold text-violet-500">({unread} {tx("new")})</span>}</h2>
         </div>
         {unread > 0 && (
-          <button onClick={handleMarkAll} className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>Mark all read</button>
+          <button onClick={handleMarkAll} className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>{tx("Mark all read")}</button>
         )}
       </div>
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">{tx("Loading…")}</div>
       ) : notifications.length === 0 ? (
         <div className="text-center py-16">
           <Bell size={40} color="#E5E7EB" className="mx-auto mb-3" />
-          <p className="text-sm font-bold text-gray-700">No notifications yet</p>
-          <p className="text-xs text-gray-400 mt-1">We'll notify you about bookings and offers</p>
+          <p className="text-sm font-bold text-gray-700">{tx("No notifications yet")}</p>
+          <p className="text-xs text-gray-400 mt-1">{tx("We'll notify you about bookings and offers")}</p>
         </div>
       ) : (
         <div className="px-5 mt-4 flex flex-col gap-2">
@@ -544,6 +546,7 @@ function NotificationsScreen({ onBack }: { onBack: () => void }) {
    POINTS & REWARDS SCREEN
 ═══════════════════════════════════════════════════════════════ */
 function PointsScreen({ onBack }: { onBack: () => void }) {
+  const tx = usePhraseTranslator();
   const [summary, setSummary] = useState<ApiPointsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState(false);
@@ -552,13 +555,13 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    pointsApi.getSummary().then(setSummary).catch(() => setError("Could not load points")).finally(() => setLoading(false));
-  }, []);
+    pointsApi.getSummary().then(setSummary).catch(() => setError(tx("Could not load points"))).finally(() => setLoading(false));
+  }, [tx]);
 
   async function handleRedeem() {
     const pts = parseInt(redeemInput, 10);
-    if (!pts || pts < 100) { setRedeemMsg("Minimum redemption is 100 points"); return; }
-    if (summary && pts > summary.balance) { setRedeemMsg("Not enough points"); return; }
+    if (!pts || pts < 100) { setRedeemMsg(tx("Minimum redemption is 100 points")); return; }
+    if (summary && pts > summary.balance) { setRedeemMsg(tx("Not enough points")); return; }
     setRedeeming(true);
     setRedeemMsg(null);
     try {
@@ -567,7 +570,7 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
       setRedeemMsg(`✓ Redeemed ${pts} points = ₹${pts} wallet credit!`);
       setRedeemInput("");
     } catch {
-      setRedeemMsg("Redemption failed. Try again.");
+      setRedeemMsg(tx("Redemption failed. Try again."));
     } finally {
       setRedeeming(false);
     }
@@ -579,10 +582,10 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FD" }}>
           <ChevronLeft size={18} color="#5B3EF5" />
         </button>
-        <h2 className="text-lg font-bold">Points & Rewards</h2>
+        <h2 className="text-lg font-bold">{tx("Points & Rewards")}</h2>
       </div>
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">{tx("Loading…")}</div>
       ) : error ? (
         <div className="text-center py-16">
           <p className="text-sm text-red-500">{error}</p>
@@ -593,17 +596,17 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
           <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
             <div className="flex items-center gap-2 mb-1">
               <Coins size={18} color="rgba(255,255,255,0.8)" />
-              <span className="text-xs font-semibold text-white/70 uppercase tracking-wide">Available Balance</span>
+              <span className="text-xs font-semibold text-white/70 uppercase tracking-wide">{tx("Available Balance")}</span>
             </div>
             <p className="text-4xl font-black">{summary.balance} <span className="text-xl font-bold text-white/70">pts</span></p>
-            <p className="text-sm text-white/70 mt-1">Worth ₹{summary.redeemableValue} · 1 pt = ₹1</p>
+            <p className="text-sm text-white/70 mt-1">{tx("Worth")} ₹{summary.redeemableValue} · {tx("1 pt = ₹1")}</p>
             <div className="flex gap-4 mt-4 pt-4 border-t border-white/20">
               <div>
-                <p className="text-xs text-white/60">Total Earned</p>
+                <p className="text-xs text-white/60">{tx("Total Earned")}</p>
                 <p className="text-base font-bold">{summary.totalEarned} pts</p>
               </div>
               <div>
-                <p className="text-xs text-white/60">Total Redeemed</p>
+                <p className="text-xs text-white/60">{tx("Total Redeemed")}</p>
                 <p className="text-base font-bold">{summary.totalRedeemed} pts</p>
               </div>
             </div>
@@ -613,15 +616,15 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
           <div className="bg-amber-50 rounded-2xl p-4 flex items-start gap-3 border border-amber-100">
             <Award size={20} color="#D97706" className="flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-bold text-amber-800">How to earn points</p>
-              <p className="text-xs text-amber-600 mt-1">Earn 1 point for every ₹10 spent on bookings. Minimum 100 points needed to redeem.</p>
+              <p className="text-sm font-bold text-amber-800">{tx("How to earn points")}</p>
+              <p className="text-xs text-amber-600 mt-1">{tx("Earn 1 point for every ₹10 spent on bookings. Minimum 100 points needed to redeem.")}</p>
             </div>
           </div>
 
           {/* Redeem */}
           {summary.balance >= 100 && (
             <div className="bg-white rounded-2xl border border-black/[0.08] shadow-sm p-4">
-              <p className="text-sm font-bold mb-3">Redeem Points</p>
+              <p className="text-sm font-bold mb-3">{tx("Redeem Points")}</p>
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -629,7 +632,7 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
                   max={summary.balance}
                   value={redeemInput}
                   onChange={(e) => setRedeemInput(e.target.value)}
-                  placeholder={`Min 100, max ${summary.balance}`}
+                  placeholder={`${tx("Min 100, max")} ${summary.balance}`}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-violet-400"
                 />
                 <button
@@ -638,7 +641,7 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
                   className="px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}
                 >
-                  {redeeming ? "…" : "Redeem"}
+                  {redeeming ? tx("Loading…") : tx("Redeem")}
                 </button>
               </div>
               {redeemMsg && (
@@ -650,7 +653,7 @@ function PointsScreen({ onBack }: { onBack: () => void }) {
           {/* Transaction history */}
           {summary.transactions.length > 0 && (
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">History</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{tx("History")}</p>
               <div className="flex flex-col gap-2">
                 {summary.transactions.map((t) => (
                   <div key={t.id} className="bg-white rounded-2xl border border-black/[0.08] shadow-sm px-4 py-3 flex items-center justify-between">
@@ -699,12 +702,13 @@ function LocationPickerModal({
   onSelect: (loc: string) => void;
   onClose: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [text, setText] = useState(current === "Set your location" ? "" : current);
   const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState("");
 
   function detectLocation() {
-    if (!navigator.geolocation) { setError("Geolocation not supported."); return; }
+    if (!navigator.geolocation) { setError(tx("Geolocation not supported.")); return; }
     setDetecting(true); setError("");
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -720,10 +724,10 @@ function LocationPickerModal({
           const loc = [city, state].filter(Boolean).join(", ") || `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
           setText(loc);
         } catch {
-          setError("Could not fetch location name.");
+          setError(tx("Could not fetch location name."));
         } finally { setDetecting(false); }
       },
-      () => { setError("Location access denied."); setDetecting(false); }
+      () => { setError(tx("Location access denied.")); setDetecting(false); }
     );
   }
 
@@ -739,7 +743,7 @@ function LocationPickerModal({
       <div className="bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: "75%" }}>
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
         <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06]">
-          <h3 className="text-base font-bold">Set your location</h3>
+          <h3 className="text-base font-bold">{tx("Set your location")}</h3>
           <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
         </div>
 
@@ -754,20 +758,20 @@ function LocationPickerModal({
               <Navigation size={16} color="white" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-bold" style={{ color: "#5B3EF5" }}>{detecting ? "Detecting…" : "Use my current location"}</p>
-              <p className="text-xs text-gray-400">Automatically detect via GPS</p>
+              <p className="text-sm font-bold" style={{ color: "#5B3EF5" }}>{detecting ? tx("Detecting…") : tx("Use my current location")}</p>
+              <p className="text-xs text-gray-400">{tx("Automatically detect via GPS")}</p>
             </div>
           </button>
 
           {/* Manual input */}
           <div>
-            <p className="text-xs font-bold text-gray-500 mb-2">Or enter manually</p>
+            <p className="text-xs font-bold text-gray-500 mb-2">{tx("Or enter manually")}</p>
             <div className="flex gap-2">
               <div className="flex-1 bg-gray-100 rounded-xl flex items-center gap-2 px-3 py-3">
                 <Search size={15} color="#9CA3AF" />
                 <input
                   className="flex-1 bg-transparent text-sm outline-none"
-                  placeholder="City, State (e.g. Mumbai, Maharashtra)"
+                  placeholder={tx("City, State (e.g. Mumbai, Maharashtra)")}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSave()}
@@ -781,7 +785,7 @@ function LocationPickerModal({
           {/* Saved addresses as quick picks */}
           {addresses.length > 0 && (
             <div>
-              <p className="text-xs font-bold text-gray-500 mb-2">Your saved addresses</p>
+              <p className="text-xs font-bold text-gray-500 mb-2">{tx("Your saved addresses")}</p>
               <div className="flex flex-col gap-2">
                 {addresses.map((a) => {
                   const lbl = (a.label ?? "Other") as AddrLabel;
@@ -808,7 +812,7 @@ function LocationPickerModal({
             disabled={!text.trim()}
             className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-40 mt-1"
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-            Confirm Location
+            {tx("Confirm Location")}
           </button>
         </div>
       </div>
@@ -829,14 +833,15 @@ function AddressFormModal({
   onClose: () => void;
   saving: boolean;
 }) {
+  const tx = usePhraseTranslator();
   const [form, setForm] = useState<typeof BLANK_FORM>({ ...BLANK_FORM, ...initial });
   const [error, setError] = useState("");
 
   function handleSubmit() {
-    if (!form.line1.trim()) { setError("Street address is required."); return; }
-    if (!form.city.trim()) { setError("City is required."); return; }
-    if (!form.state.trim()) { setError("State is required."); return; }
-    if (!form.postalCode.trim()) { setError("Pincode is required."); return; }
+    if (!form.line1.trim()) { setError(tx("Street address is required.")); return; }
+    if (!form.city.trim()) { setError(tx("City is required.")); return; }
+    if (!form.state.trim()) { setError(tx("State is required.")); return; }
+    if (!form.postalCode.trim()) { setError(tx("Pincode is required.")); return; }
     setError("");
     onSave(form);
   }
@@ -850,13 +855,13 @@ function AddressFormModal({
       <div className="bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: "85%" }}>
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
         <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06]">
-          <h3 className="text-base font-bold">{initial?.line1 ? "Edit Address" : "Add New Address"}</h3>
+          <h3 className="text-base font-bold">{initial?.line1 ? tx("Edit Address") : tx("Add New Address")}</h3>
           <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
         </div>
         <div className="px-5 pt-4 pb-6 overflow-y-auto flex flex-col gap-4" style={{ scrollbarWidth: "none" }}>
           {/* Label picker */}
           <div>
-            <p className="text-xs font-bold text-gray-500 mb-2">Address Type</p>
+            <p className="text-xs font-bold text-gray-500 mb-2">{tx("Address Type")}</p>
             <div className="flex gap-2">
               {ADDR_LABELS.map((lbl) => {
                 const lc = LABEL_COLORS[lbl];
@@ -901,7 +906,7 @@ function AddressFormModal({
               style={{ borderColor: form.isDefault ? "#5B3EF5" : "rgba(0,0,0,0.2)", background: form.isDefault ? "#5B3EF5" : "#fff" }}>
               {form.isDefault && <Check size={12} color="white" />}
             </div>
-            <span className="text-sm font-semibold text-gray-700">Set as default address</span>
+            <span className="text-sm font-semibold text-gray-700">{tx("Set as default address")}</span>
           </button>
 
           {error && <p className="text-red-500 text-xs -mt-2">{error}</p>}
@@ -911,7 +916,7 @@ function AddressFormModal({
             disabled={saving}
             className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 mt-1"
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-            {saving ? "Saving…" : "Save Address"}
+            {saving ? tx("Saving…") : tx("Save Address")}
           </button>
         </div>
       </div>
@@ -1074,19 +1079,20 @@ function ProfileEditModal({ user, onSave, onClose }: {
   onSave: (u: ApiUser) => void;
   onClose: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSave() {
-    if (!fullName.trim()) { setError("Name is required."); return; }
+    if (!fullName.trim()) { setError(tx("Name is required.")); return; }
     setSaving(true);
     try {
       const updated = await profileApi.update({ fullName: fullName.trim(), phone: phone.trim() || undefined });
       onSave(updated);
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? "Update failed.");
+      setError(e?.response?.data?.error?.message ?? tx("Update failed."));
     } finally { setSaving(false); }
   }
 
@@ -1096,25 +1102,25 @@ function ProfileEditModal({ user, onSave, onClose }: {
       <div className="bg-white rounded-t-3xl">
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
         <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-black/[0.06]">
-          <h3 className="text-base font-bold">Edit Profile</h3>
+          <h3 className="text-base font-bold">{tx("Edit Profile")}</h3>
           <button onClick={onClose}><X size={20} color="#9CA3AF" /></button>
         </div>
         <div className="px-5 pt-4 pb-6 flex flex-col gap-4">
           <div>
-            <p className="text-xs font-bold text-gray-500 mb-1.5">Full Name</p>
-            <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your full name" />
+            <p className="text-xs font-bold text-gray-500 mb-1.5">{tx("Full Name")}</p>
+            <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={tx("Your full name")} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-500 mb-1.5">Phone</p>
+            <p className="text-xs font-bold text-gray-500 mb-1.5">{tx("Phone")}</p>
             <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" type="tel" />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-500 mb-1.5">Email</p>
+            <p className="text-xs font-bold text-gray-500 mb-1.5">{tx("Email")}</p>
             <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-400">{user.email}</div>
           </div>
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <button onClick={handleSave} disabled={saving} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-            {saving ? "Saving…" : "Save Changes"}
+            {saving ? tx("Saving…") : tx("Save Changes")}
           </button>
         </div>
       </div>
@@ -1143,6 +1149,7 @@ function CustHome({
   addToCart: (serviceId: string, serviceName?: string) => void;
   onServicePress: (id: string) => void;
 }) {
+  const tx = usePhraseTranslator();
   const [offerIdx, setOfferIdx] = useState(0);
   const [activeReel, setActiveReel] = useState<ApiReel | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1160,7 +1167,7 @@ function CustHome({
 
   // Greet based on hour
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning " : hour < 17 ? "Good afternoon " : "Good evening ";
+  const greeting = hour < 12 ? tx("Good morning ") : hour < 17 ? tx("Good afternoon ") : tx("Good evening ");
 
   return (
     <div className="flex flex-col">
@@ -1168,7 +1175,7 @@ function CustHome({
       <div className="pt-6 pb-2 flex items-center justify-between">
         <div>
           <p className="text-gray-400 text-sm mb-0.5">{greeting}</p>
-          <h1 className="text-gray-900 text-2xl font-bold">{user?.fullName ?? "Guest"}</h1>
+          <h1 className="text-gray-900 text-2xl font-bold">{user?.fullName ?? tx("Guest")}</h1>
         </div>
       </div>
 
@@ -1194,20 +1201,20 @@ function CustHome({
                 <div className="flex items-center justify-between h-full px-5 py-5">
                   <div className="flex flex-col gap-1.5">
                     {offer.tag && (
-                      <p className="text-white/80 text-[10px] font-bold tracking-widest uppercase">{offer.tag}</p>
+                      <p className="text-white/80 text-[10px] font-bold tracking-widest uppercase">{tx(offer.tag)}</p>
                     )}
                     <h3 className="text-white font-extrabold text-lg leading-tight">
-                      {offer.title}
+                      {tx(offer.title)}
                     </h3>
                     {offer.subtitle && (
-                      <p className="text-white/75 text-xs leading-snug">{offer.subtitle}</p>
+                      <p className="text-white/75 text-xs leading-snug">{tx(offer.subtitle)}</p>
                     )}
                     <button
                       onClick={() => onCategorySelect("")}
                       className="mt-1 bg-white text-xs font-bold px-4 py-2 rounded-full self-start"
                       style={{ color: offer.bgColor || "#5B3EF5" }}
                     >
-                      {offer.ctaText || "Explore"}
+                      {tx(offer.ctaText || "Explore")}
                     </button>
                   </div>
                   <div className="text-6xl opacity-20 select-none"></div>
@@ -1233,8 +1240,8 @@ function CustHome({
       {/* Services */}
       <div className="px-5 mt-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-foreground">Our Services</h2>
-          <button className="text-xs font-semibold" style={{ color: "#5B3EF5" }} onClick={() => onCategorySelect("")}>See all</button>
+          <h2 className="text-base font-bold text-foreground">{tx("Our Services")}</h2>
+          <button className="text-xs font-semibold" style={{ color: "#5B3EF5" }} onClick={() => onCategorySelect("")}>{tx("See all")}</button>
         </div>
         {categories.length === 0 ? (
           <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3 animate-pulse">
@@ -1253,11 +1260,11 @@ function CustHome({
                 <button key={cat.id} onClick={() => onCategorySelect(cat.id)} className="flex flex-col items-center gap-1.5 group">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden" style={{ background: hasRealImage(cat.imageUrl) ? 'transparent' : cat.color }}>
                     {hasRealImage(cat.imageUrl)
-                      ? <img src={cat.imageUrl!} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
+                      ? <img src={cat.imageUrl!} alt={tx(cat.name)} className="w-full h-full object-cover rounded-2xl" />
                       : <Icon size={22} color={cat.iconColor} />
                     }
                   </div>
-                  <span className="text-[11px] font-semibold text-foreground text-center leading-tight">{cat.name}</span>
+                  <span className="text-[11px] font-semibold text-foreground text-center leading-tight">{tx(cat.name)}</span>
                 </button>
               );
             })}
@@ -1268,7 +1275,7 @@ function CustHome({
       {/* Reels */}
       {reels.length > 0 && (
         <div className="px-5 mt-6">
-          <h2 className="text-base font-bold text-foreground mb-3">Reels</h2>
+          <h2 className="text-base font-bold text-foreground mb-3">{tx("Reels")}</h2>
           <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
             {reels.map((r) => (
               <button
@@ -1377,7 +1384,7 @@ function CustHome({
                       onClick={(e) => { e.stopPropagation(); addToCart(service.id, service.name); }}
                       className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] shadow-sm transition-all"
                     >
-                      {isLoggedIn ? '+ Add' : 'Sign in'}
+                      {isLoggedIn ? tx("+ Add") : tx("Sign in")}
                     </button>
                   </div>
                 </div>
@@ -1389,12 +1396,12 @@ function CustHome({
 
       {/* Why us */}
       <div className="mx-5 mt-5 mb-6 rounded-2xl bg-white border border-black/[0.08] p-4">
-        <h3 className="text-sm font-bold text-foreground mb-3">Why choose us?</h3>
+        <h3 className="text-sm font-bold text-foreground mb-3">{tx("Why choose us?")}</h3>
         <div className="flex justify-between">
           {[
-            { icon: Shield, label: "Verified Pros", sub: "Background checked" },
-            { icon: Clock,  label: "On Time",       sub: "Punctual service"  },
-            { icon: Star,   label: "5-Star Rated",  sub: "Avg 4.8 rating"   },
+            { icon: Shield, label: tx("Verified Pros"), sub: tx("Background checked") },
+            { icon: Clock,  label: tx("On Time"),       sub: tx("Punctual service")  },
+            { icon: Star,   label: tx("5-Star Rated"),  sub: tx("Avg 4.8 rating")   },
           ].map((t) => {
             const Icon = t.icon;
             return (
@@ -1426,6 +1433,7 @@ function CustServices({
   onServicePress: (id: string) => void;
   onLoginRequired?: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [selectedCatId, setSelectedCatId] = useState<string | null>(initialCategoryId ?? null);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [subs, setSubs] = useState<ApiSubCategory[]>([]);
@@ -1519,11 +1527,11 @@ function CustServices({
                   >
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden" style={{ background: hasRealImage(cat.imageUrl) ? 'transparent' : cat.color }}>
                       {hasRealImage(cat.imageUrl)
-                        ? <img src={cat.imageUrl!} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
+                        ? <img src={cat.imageUrl!} alt={tx(cat.name)} className="w-full h-full object-cover rounded-2xl" />
                         : <Icon size={22} color={cat.iconColor} />
                       }
                     </div>
-                    <span className="text-[11px] font-semibold text-center leading-tight">{cat.name}</span>
+                    <span className="text-[11px] font-semibold text-center leading-tight">{tx(cat.name)}</span>
                   </button>
                 );
               })}
@@ -1580,9 +1588,9 @@ function CustServices({
         {catalogue.length > 0 && (
           <section className="mb-7">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold">Explore services</h3>
+              <h3 className="text-sm font-bold">{tx("Explore services")}</h3>
               <button onClick={() => setCartOpen(true)} className="text-xs font-bold text-violet-600">
-                Cart{cart?.items.length ? ` (${cart.items.reduce((n, item) => n + item.quantity, 0)})` : ""}
+                {tx("Cart")}{cart?.items.length ? ` (${cart.items.reduce((n, item) => n + item.quantity, 0)})` : ""}
               </button>
             </div>
             <div className="flex flex-col gap-3">
@@ -1606,7 +1614,7 @@ function CustServices({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h4 className="font-bold text-base text-gray-900 leading-tight mb-1 line-clamp-2">{service.name}</h4>
-                        <p className="text-xs text-gray-500 line-clamp-1">{service.description || "Professional service"}</p>
+                        <p className="text-xs text-gray-500 line-clamp-1">{service.description || tx("Professional service")}</p>
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(service.id); }} className="flex-shrink-0 p-1 -mt-0.5">
                         <Heart size={15} fill={wishlistIds.has(service.id) ? "#EF4444" : "none"} color={wishlistIds.has(service.id) ? "#EF4444" : "#D1D5DB"} />
@@ -1623,7 +1631,7 @@ function CustServices({
                         onClick={(e) => { e.stopPropagation(); addToCart(service.id, service.name); }}
                         className="h-8 px-4 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8] shadow-sm"
                       >
-                        {isLoggedIn ? "+ Add" : "Sign in"}
+                        {isLoggedIn ? tx("+ Add") : tx("Sign in")}
                       </button>
                     </div>
                   </div>
@@ -1712,6 +1720,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
   onChange: (cart: ApiCart) => void;
   onPaymentComplete?: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [step, setStep] = useState(0);
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
   const [addrsLoading, setAddrsLoading] = useState(false);
@@ -1725,7 +1734,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
     d.setDate(today.getDate() + i);
     if (i === 0) return "Today";
     if (i === 1) return "Tomorrow";
-    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
   });
   const [selectedDate, setSelectedDate] = useState("Today");
   const [selectedSlot, setSelectedSlot] = useState<number>(9 * 60); // total minutes since midnight
@@ -1882,8 +1891,8 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
               {cart.items.length === 0 ? (
                 <div className="py-12 text-center">
                   <div className="text-4xl mb-3">🛒</div>
-                  <p className="text-sm font-bold text-gray-700">Your cart is empty</p>
-                  <p className="text-xs text-gray-400 mt-1">Add services to continue</p>
+                  <p className="text-sm font-bold text-gray-700">{tx("Your cart is empty")}</p>
+                  <p className="text-xs text-gray-400 mt-1">{tx("Add services to continue")}</p>
                 </div>
               ) : (
                 <>
@@ -2104,7 +2113,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                   className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
                 >
-                  Continue <ArrowRight size={16} />
+                  {tx("Continue")} <ArrowRight size={16} />
                 </button>
               )}
             </>
@@ -2115,7 +2124,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
             <>
               <div className="flex flex-col gap-3 mb-4">
                 <div className="bg-gray-50 rounded-2xl p-4">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Services</p>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{tx("Services")}</p>
                   {cart.items.map((item) => (
                     <div key={item.id}
                       className="flex justify-between items-center py-2 border-b border-black/[0.05] last:border-0">
@@ -2127,14 +2136,14 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                   ))}
                 </div>
                 {[
-                  { label: "Date", value: selectedDate },
-                   { label: "Time", value: getServiceWindowLabel(selectedSlot, maxDurationMinutes) },
-                   { label: "Duration", value: formatDuration(maxDurationMinutes) },
+                  { label: tx("Date"), value: selectedDate === "Today" ? tx("Today") : selectedDate === "Tomorrow" ? tx("Tomorrow") : selectedDate },
+                   { label: tx("Time"), value: getServiceWindowLabel(selectedSlot, maxDurationMinutes) },
+                   { label: tx("Duration"), value: formatDuration(maxDurationMinutes) },
                   {
-                    label: "Address",
+                    label: tx("Address"),
                     value: selectedAddress
                       ? `${selectedAddress.line1}${selectedAddress.city ? ", " + selectedAddress.city : ""}`
-                      : "No address selected",
+                      : tx("No address selected"),
                   },
                 ].map((r) => (
                   <div key={r.label} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
@@ -2144,7 +2153,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 ))}
                 <div className="flex items-center justify-between rounded-xl px-4 py-3"
                   style={{ background: "#EDE9FD" }}>
-                  <span className="text-sm font-bold">Total</span>
+                  <span className="text-sm font-bold">{tx("Total")}</span>
                   <span className="text-lg font-black" style={{ color: "#5B3EF5" }}>
                     ₹{cart.total.toLocaleString("en-IN")}
                   </span>
@@ -2157,7 +2166,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                 className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
               >
-                {confirming ? "Confirming…" : "Confirm Booking"}
+                {confirming ? tx("Confirming…") : tx("Confirm Booking")}
               </button>
             </>
           )}
@@ -2171,19 +2180,19 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                   <path d="M6 16L13 23L26 9" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold mb-1">Booking Confirmed!</h3>
+              <h3 className="text-lg font-bold mb-1">{tx("Booking Confirmed!")}</h3>
               <p className="text-xs text-gray-500 text-center mb-4">
-                Your booking is placed. We're finding the best available service provider near you.
+                {tx("Your booking is placed. We're finding the best available service provider near you.")}
               </p>
 
               {/* Status timeline */}
               <div className="w-full bg-gray-50 rounded-2xl p-4 mb-4 text-left">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">What happens next</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">{tx("What happens next")}</p>
                 {[
-                  { icon: "🔍", label: "Finding a service provider", sub: "We're matching a verified provider near you", active: true },
-                  { icon: "✅", label: "Partner accepts", sub: "You'll see their name in My Bookings", active: false },
-                   { icon: "🚗", label: "Partner arrives", sub: "Scheduled: " + selectedDate + " · " + getServiceWindowLabel(selectedSlot, maxDurationMinutes), active: false },
-                  { icon: "💳", label: "Pay after service", sub: "Cash, UPI, or card — your choice", active: false },
+                  { icon: "🔍", label: tx("Finding a service provider"), sub: tx("We're matching a verified provider near you"), active: true },
+                  { icon: "✅", label: tx("Partner accepts"), sub: tx("You'll see their name in My Bookings"), active: false },
+                   { icon: "🚗", label: tx("Partner arrives"), sub: tx("Scheduled: ") + (selectedDate === "Today" ? tx("Today") : selectedDate === "Tomorrow" ? tx("Tomorrow") : selectedDate) + " · " + getServiceWindowLabel(selectedSlot, maxDurationMinutes), active: false },
+                  { icon: "💳", label: tx("Pay after service"), sub: tx("Cash, UPI, or card — your choice"), active: false },
                 ].map((s, i) => (
                   <div key={i} className="flex items-start gap-3 mb-2 last:mb-0">
                     <span className="text-base w-6 flex-shrink-0">{s.icon}</span>
@@ -2191,7 +2200,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                       <p className={`text-xs font-bold ${s.active ? "text-violet-600" : "text-gray-700"}`}>{s.label}</p>
                       <p className="text-[10px] text-gray-400">{s.sub}</p>
                     </div>
-                    {s.active && <span className="ml-auto flex-shrink-0 text-[10px] font-bold text-violet-500 animate-pulse">Now</span>}
+                    {s.active && <span className="ml-auto flex-shrink-0 text-[10px] font-bold text-violet-500 animate-pulse">{tx("Now")}</span>}
                   </div>
                 ))}
               </div>
@@ -2204,15 +2213,15 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
 
               {createdOrder && (
                 <div className="w-full rounded-2xl bg-violet-50 border border-violet-100 p-3 mb-2">
-                  <p className="text-xs font-bold text-violet-700">Service-wise payment</p>
-                  <p className="text-[11px] text-violet-600 mt-1">Payment becomes available for each service when its partner arrives.</p>
+                  <p className="text-xs font-bold text-violet-700">{tx("Service-wise payment")}</p>
+                  <p className="text-[11px] text-violet-600 mt-1">{tx("Payment becomes available for each service when its partner arrives.")}</p>
                 </div>
               )}
               <button
                 onClick={onClose}
                 className="w-full py-3.5 rounded-2xl text-sm font-bold border border-gray-200 text-gray-600"
               >
-                Pay Later — View My Bookings
+                {tx("Pay Later — View My Bookings")}
               </button>
             </div>
           )}
@@ -2233,6 +2242,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
   onClose: () => void;
   onPaid: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null; testMode: boolean } | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -2339,9 +2349,9 @@ function PaymentModal({ booking, onClose, onPaid }: {
   };
 
   const METHOD_LABELS: Record<string, { icon: React.ReactNode; label: string; desc: string }> = {
-    cash:       { icon: <Banknote size={20} color="#10B981" />, label: "Cash on Delivery", desc: "Pay on delivery in cash" },
-    upi_manual: { icon: <Smartphone size={20} color="#3B82F6" />, label: "UPI Payment",      desc: config?.upiVpa ? `Pay to ${config.upiVpa}` : "Pay via UPI" },
-    razorpay:   { icon: <CreditCard size={20} color="#6366F1" />, label: "Card / Net Banking / UPI", desc: "Secure online payment" },
+    cash:       { icon: <Banknote size={20} color="#10B981" />, label: tx("Cash on Delivery"), desc: tx("Pay on delivery in cash") },
+    upi_manual: { icon: <Smartphone size={20} color="#3B82F6" />, label: tx("UPI Payment"),      desc: config?.upiVpa ? `${tx("Pay to")} ${config.upiVpa}` : tx("Pay via UPI") },
+    razorpay:   { icon: <CreditCard size={20} color="#6366F1" />, label: tx("Card / Net Banking / UPI"), desc: tx("Secure online payment") },
   };
 
   if (paid) {
@@ -2352,8 +2362,8 @@ function PaymentModal({ booking, onClose, onPaid }: {
             <X size={22} />
           </button>
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center"><Check size={32} color="#10B981" /></div>
-          <h3 className="text-lg font-bold text-gray-900">Payment Successful!</h3>
-          <p className="text-sm text-gray-500 text-center">Thank you for using ServeNow. Your payment has been recorded.</p>
+        <h3 className="text-lg font-bold text-gray-900">{tx("Payment Successful!")}</h3>
+          <p className="text-sm text-gray-500 text-center">{tx("Thank you for using ServeNow. Your payment has been recorded.")}</p>
         </div>
       </div>
     );
@@ -2365,27 +2375,27 @@ function PaymentModal({ booking, onClose, onPaid }: {
         {/* Header — sticky */}
         <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-base font-bold text-gray-900">Complete Payment</h3>
+            <h3 className="text-base font-bold text-gray-900">{tx("Complete Payment")}</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 leading-none"><X size={20} /></button>
           </div>
           <p className="text-xs text-gray-500">{booking.serviceName}{booking.proName ? ` · ${booking.proName}` : ''}</p>
           <div className="mt-3 bg-violet-50 rounded-xl px-4 py-3 flex items-baseline gap-1">
             <span className="text-2xl font-black text-violet-700">₹{booking.price}</span>
-            <span className="text-xs text-violet-400 font-medium">total</span>
+            <span className="text-xs text-violet-400 font-medium">{tx("total")}</span>
           </div>
         </div>
 
         {/* Payment methods — scrollable */}
         <div className="px-5 py-4 overflow-y-auto flex-1">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Choose payment method</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{tx("Choose payment method")}</p>
           {!config ? (
-            <div className="text-center py-4 text-gray-400 text-sm">Loading…</div>
+            <div className="text-center py-4 text-gray-400 text-sm">{tx("Loading…")}</div>
           ) : config.methods.length === 0 ? (
-            <div className="text-center py-4 text-gray-400 text-sm">No payment methods configured.</div>
+            <div className="text-center py-4 text-gray-400 text-sm">{tx("No payment methods configured.")}</div>
           ) : (
             <div className="flex flex-col gap-2">
               {config.methods.map(method => {
-                const info = METHOD_LABELS[method] ?? { icon: <CreditCard size={20} />, label: method, desc: "" };
+                const info = METHOD_LABELS[method] ?? { icon: <CreditCard size={20} />, label: tx(method), desc: "" };
                 const selected = selectedMethod === method;
                 return (
                   <button
@@ -2455,7 +2465,7 @@ function PaymentModal({ booking, onClose, onPaid }: {
             className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50 transition-all"
             style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}
           >
-            {submitting ? "Processing…" : selectedMethod === 'cash' ? "Confirm Cash Payment" : selectedMethod === 'upi_manual' ? "Confirm UPI Payment" : `Pay ₹${booking.price}`}
+            {submitting ? tx("Processing…") : selectedMethod === 'cash' ? tx("Confirm Cash Payment") : selectedMethod === 'upi_manual' ? tx("Confirm UPI Payment") : `${tx("Pay")} ₹${booking.price}`}
           </button>
         </div>
       </div>
@@ -2470,6 +2480,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
   onRefresh: () => void;
   onRebook: (categoryId: string) => void;
 }) {
+  const tx = usePhraseTranslator();
   const [tab, setTab] = useState<"searching" | "upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [payBooking, setPayBooking] = useState<ApiBooking | null>(null);
@@ -2557,12 +2568,12 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
     <>
     <div className="flex flex-col">
       <div className="px-5 pt-3 pb-4 bg-white border-b border-black/[0.08] flex items-center justify-between">
-        <h2 className="text-lg font-bold">My Bookings</h2>
-        <button onClick={onRefresh} className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>Refresh</button>
+        <h2 className="text-lg font-bold">{tx("My Bookings")}</h2>
+        <button onClick={onRefresh} className="text-xs font-semibold" style={{ color: "#5B3EF5" }}>{tx("Refresh")}</button>
       </div>
       <div className="flex mx-5 mt-4 bg-gray-100 rounded-xl p-1 gap-0.5">
         {(["searching", "upcoming", "past"] as const).map((t) => {
-          const label = t === "searching" ? "Searching" : t === "upcoming" ? "Upcoming" : "Past";
+          const label = t === "searching" ? tx("Searching") : t === "upcoming" ? tx("Upcoming") : tx("Past");
           const count = t === "searching" ? searchingBookings.length : t === "upcoming" ? upcomingBookings.length : pastBookings.length;
           const isActive = tab === t;
           return (
@@ -2633,12 +2644,14 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                             </p>
                           </div>
                           <span className="text-[10px] font-bold rounded-full px-2 py-1 bg-gray-100 text-gray-600 whitespace-nowrap">
-                            {item.status.replaceAll("_", " ")}
+                            {tx(item.status.replaceAll("_", " "))}
                           </span>
                         </div>
                         {cancellationFeeRate > 0 && canCancel && (
                           <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-3">
-                            Cancelling now may incur a {cancellationFeeRate}% fee (approximately ₹{Math.round(item.customerPrice * cancellationFeeRate / 100)}).
+                            {tx("Cancelling now may incur a {rate}% fee (approximately ₹{amount}).")
+                              .replace("{rate}", String(cancellationFeeRate))
+                              .replace("{amount}", String(Math.round(item.customerPrice * cancellationFeeRate / 100)))}
                           </p>
                         )}
                         <div className="flex gap-2 mt-3">
@@ -2648,7 +2661,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                               disabled={orderAction === `continue:${item.id}`}
                               className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-violet-200 text-violet-600 disabled:opacity-50"
                             >
-                              {orderAction === `continue:${item.id}` ? "Searching…" : "Continue Searching"}
+                              {orderAction === `continue:${item.id}` ? tx("Searching…") : tx("Continue Searching")}
                             </button>
                           )}
                           {needsPayment && (
@@ -2675,7 +2688,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                               disabled={orderAction === `cancel:${item.id}`}
                               className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-red-200 text-red-500 disabled:opacity-50"
                             >
-                              {orderAction === `cancel:${item.id}` ? "Cancelling…" : "Cancel Service"}
+                              {orderAction === `cancel:${item.id}` ? tx("Cancelling…") : tx("Cancel Service")}
                             </button>
                           )}
                         </div>
@@ -2713,7 +2726,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                     onClick={() => handleCancel(b.id)}
                     disabled={cancelling === b.id}
                     className="flex-1 py-2 rounded-xl text-xs font-bold border border-red-200 text-red-500 disabled:opacity-50">
-                    {cancelling === b.id ? "Cancelling…" : "Cancel"}
+                    {cancelling === b.id ? tx("Cancelling…") : tx("Cancel")}
                   </button>
                 )}
                 {["in_progress", "completed"].includes(b.status) && (
@@ -2749,7 +2762,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
           <div className="text-center py-12">
             <div className="text-4xl mb-3">{tab === "searching" ? "🔍" : tab === "upcoming" ? "📅" : "🕐"}</div>
             <p className="text-sm font-bold">
-              {tab === "searching" ? "No pending bookings" : tab === "upcoming" ? "No upcoming bookings" : "No past bookings"}
+              {tab === "searching" ? tx("No pending bookings") : tab === "upcoming" ? tx("No upcoming bookings") : tx("No past bookings")}
             </p>
             <p className="text-xs text-gray-400 mt-1">
               {tab === "searching" ? "Bookings being matched to a provider will appear here"
@@ -2802,12 +2815,12 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4" onClick={() => setReviewBooking(null)}>
         <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-base font-bold">Rate Your Experience</h3>
+            <h3 className="text-base font-bold">{tx("Rate Your Experience")}</h3>
             <button onClick={() => setReviewBooking(null)} className="text-gray-400 hover:text-gray-600">
               <X size={18} />
             </button>
           </div>
-          <p className="text-xs text-gray-400 mb-4">{reviewBooking.serviceName} · {reviewBooking.proName ?? "Professional"}</p>
+          <p className="text-xs text-gray-400 mb-4">{reviewBooking.serviceName} · {reviewBooking.proName ?? tx("Professional")}</p>
 
           {/* Star rating */}
           <div className="flex justify-center gap-2 mb-4">
@@ -2821,7 +2834,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
           <textarea
             value={reviewComment}
             onChange={(e) => setReviewComment(e.target.value)}
-            placeholder="Share your experience (optional)..."
+            placeholder={tx("Share your experience (optional)...")}
             rows={3}
             className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm resize-none outline-none focus:border-violet-400 mb-3"
           />
@@ -2833,7 +2846,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
             disabled={reviewLoading}
             className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
             style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
-            {reviewLoading ? "Submitting…" : "Submit Review"}
+            {reviewLoading ? tx("Submitting…") : tx("Submit Review")}
           </button>
         </div>
       </div>
@@ -2848,6 +2861,7 @@ function OrderItemPaymentModal({ orderId, item, onClose, onPaid }: {
   onClose: () => void;
   onPaid: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [config, setConfig] = useState<{ methods: string[]; upiVpa: string | null; testMode: boolean } | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -2921,26 +2935,26 @@ function OrderItemPaymentModal({ orderId, item, onClose, onPaid }: {
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Service payment</p>
-            <h3 className="text-lg font-bold text-gray-900">{item.serviceName ?? "Service"}</h3>
+            <p className="text-xs font-bold uppercase tracking-wide text-violet-600">{tx("Service payment")}</p>
+            <h3 className="text-lg font-bold text-gray-900">{item.serviceName ?? tx("Service")}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400"><X size={18} /></button>
         </div>
-        <p className="text-sm text-gray-500 mb-4">₹{item.customerPrice} · Payment unlocks service start.</p>
+        <p className="text-sm text-gray-500 mb-4">₹{item.customerPrice} · {tx("Payment unlocks service start.")}</p>
         {paid ? (
-          <div className="rounded-xl bg-emerald-50 p-4 text-center text-emerald-700 font-bold">Payment successful</div>
+          <div className="rounded-xl bg-emerald-50 p-4 text-center text-emerald-700 font-bold">{tx("Payment successful")}</div>
         ) : (
           <>
             <div className="flex flex-col gap-2">
               {(config?.methods.length ? config.methods : ["cash"]).map((method) => (
                 <button key={method} onClick={() => setSelected(method)} className={`rounded-xl border p-3 text-left ${selected === method ? "border-violet-500 bg-violet-50" : "border-gray-200"}`}>
                   <span className="font-semibold text-sm capitalize">{method.replace("_", " ")}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{method === "cash" ? "Pay the partner in cash" : method === "upi_manual" ? (config?.upiVpa ? `Pay to ${config.upiVpa}` : "Manual UPI payment") : `Secure ${method} checkout`}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{method === "cash" ? tx("Pay the partner in cash") : method === "upi_manual" ? (config?.upiVpa ? `${tx("Pay to")} ${config.upiVpa}` : tx("Manual UPI payment")) : `${tx("Secure")} ${method} ${tx("checkout")}`}</span>
                 </button>
               ))}
             </div>
-            {selected === "upi_manual" && <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional UPI reference" className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />}
-            <button onClick={pay} disabled={busy || !config} className="mt-4 w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? "Processing…" : `Pay ₹${item.customerPrice}`}</button>
+            {selected === "upi_manual" && <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={tx("Optional UPI reference")} className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />}
+            <button onClick={pay} disabled={busy || !config} className="mt-4 w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? tx("Processing…") : `${tx("Pay")} ₹${item.customerPrice}`}</button>
           </>
         )}
       </div>
@@ -2953,6 +2967,7 @@ function OrderItemPaymentModal({ orderId, item, onClose, onPaid }: {
 ═══════════════════════════════════════════════════════════════ */
 /* ────────────────────── SupportScreen ────────────────────────── */
 function SupportScreen({ onBack }: { onBack: () => void }) {
+  const tx = usePhraseTranslator();
   const token = auth.getToken();
   const [tickets, setTickets] = useState<ApiSupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2973,13 +2988,13 @@ function SupportScreen({ onBack }: { onBack: () => void }) {
   };
 
   async function submit() {
-    if (!subject.trim() || !message.trim()) { setErr("Subject and message are required."); return; }
+    if (!subject.trim() || !message.trim()) { setErr(tx("Subject and message are required.")); return; }
     setSending(true); setErr("");
     try {
       const t = await supportTicketsApi.create(subject.trim(), message.trim());
       setTickets(prev => [t, ...prev]);
       setSubject(""); setMessage(""); setShowForm(false);
-    } catch (e: any) { setErr(e.message ?? "Failed to submit ticket."); }
+    } catch (e: any) { setErr(e.message ?? tx("Failed to submit ticket.")); }
     finally { setSending(false); }
   }
 
@@ -2989,13 +3004,13 @@ function SupportScreen({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
           <ChevronLeft size={18} color="#374151" />
         </button>
-        <h2 className="text-lg font-bold text-gray-900">Help & Support</h2>
+        <h2 className="text-lg font-bold text-gray-900">{tx("Help & Support")}</h2>
       </div>
 
       <button onClick={() => setShowForm(v => !v)}
         className="flex items-center justify-between px-4 py-3.5 rounded-2xl text-white text-sm font-semibold"
         style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-        <span className="flex items-center gap-2"><HelpCircle size={16} /> New Support Ticket</span>
+        <span className="flex items-center gap-2"><HelpCircle size={16} /> {tx("New Support Ticket")}</span>
         <ChevronDown size={16} className={`transition-transform ${showForm ? "rotate-180" : ""}`} />
       </button>
 
@@ -3003,19 +3018,19 @@ function SupportScreen({ onBack }: { onBack: () => void }) {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
           {err && <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={12}/>{err}</p>}
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Subject</label>
-            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Brief description of your issue"
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Subject")}</label>
+            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder={tx("Brief description of your issue")}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Message</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Describe your issue in detail…"
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Message")}</label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder={tx("Describe your issue in detail…")}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-violet-400 resize-none" />
           </div>
           <button onClick={submit} disabled={sending}
             className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold"
             style={{ background: sending ? "#A78BFA" : "#5B3EF5" }}>
-            <Send size={14} />{sending ? "Sending…" : "Submit Ticket"}
+            <Send size={14} />{sending ? tx("Sending…") : tx("Submit Ticket")}
           </button>
         </div>
       )}
@@ -3025,7 +3040,7 @@ function SupportScreen({ onBack }: { onBack: () => void }) {
       ) : tickets.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-gray-400">
           <HelpCircle size={40} className="mb-3 opacity-30" />
-          <p className="text-sm">No support tickets yet</p>
+          <p className="text-sm">{tx("No support tickets yet")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -3055,6 +3070,7 @@ function SupportScreen({ onBack }: { onBack: () => void }) {
 
 /* ────────────────────── PoliciesScreen ────────────────────────── */
 function PoliciesScreen({ onBack }: { onBack: () => void }) {
+  const tx = usePhraseTranslator();
   const [policies, setPolicies] = useState<ApiPolicy[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
@@ -3079,7 +3095,7 @@ function PoliciesScreen({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
           <ChevronLeft size={18} color="#374151" />
         </button>
-        <h2 className="text-lg font-bold text-gray-900">Policies</h2>
+        <h2 className="text-lg font-bold text-gray-900">{tx("Policies")}</h2>
       </div>
 
       {loading ? (
@@ -3087,7 +3103,7 @@ function PoliciesScreen({ onBack }: { onBack: () => void }) {
       ) : policies.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-gray-400">
           <FileText size={40} className="mb-3 opacity-30"/>
-          <p className="text-sm">No policies available</p>
+          <p className="text-sm">{tx("No policies available")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -3109,7 +3125,7 @@ function PoliciesScreen({ onBack }: { onBack: () => void }) {
                     ? <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"/></div>
                     : detail
                       ? <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{detail.content}</p>
-                      : <p className="text-xs text-red-400">Failed to load content.</p>
+                      : <p className="text-xs text-red-400">{tx("Failed to load content.")}</p>
                   }
                 </div>
               )}
@@ -3136,16 +3152,17 @@ function CustProfile({
   onShowPolicies: () => void;
   onShowPrivacy: () => void;
 }) {
+  const tx = usePhraseTranslator();
   const [showEdit, setShowEdit] = useState(false);
 
   const menuItems = [
-    { icon: MapPin,      label: "Saved Addresses",    action: onShowAddresses },
-    { icon: Heart,       label: "Wishlist",            action: onShowWishlist },
-    { icon: Coins,       label: "Points & Rewards",    action: onShowPoints },
-    { icon: Bell,        label: "Notifications",       action: onShowNotifications },
-    { icon: HelpCircle,  label: "Help & Support",      action: onShowSupport },
-    { icon: FileText,    label: "Policies",            action: onShowPolicies },
-    { icon: Shield,      label: "Privacy & Security",  action: onShowPrivacy },
+    { icon: MapPin,      label: tx("Saved Addresses"),    action: onShowAddresses },
+    { icon: Heart,       label: tx("Wishlist"),            action: onShowWishlist },
+    { icon: Coins,       label: tx("Points & Rewards"),    action: onShowPoints },
+    { icon: Bell,        label: tx("Notifications"),       action: onShowNotifications },
+    { icon: HelpCircle,  label: tx("Help & Support"),      action: onShowSupport },
+    { icon: FileText,    label: tx("Policies"),            action: onShowPolicies },
+    { icon: Shield,      label: tx("Privacy & Security"),  action: onShowPrivacy },
   ];
 
   return (
@@ -3185,7 +3202,7 @@ function CustProfile({
         })}
 
         <button onClick={onLogout} className="mt-2 py-3.5 rounded-2xl text-sm font-bold text-red-500 border-2 border-red-100 bg-red-50">
-          Sign Out
+          {tx("Sign Out")}
         </button>
       </div>
 
@@ -3225,12 +3242,12 @@ interface AppSidebarProps {
   onLogout: () => void;
 }
 function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLoggedIn, user, onLogout }: AppSidebarProps) {
-  const { t } = useLanguage();
+  const tx = (source: string) => source;
   const tabLabels: Record<string, string> = {
-    home: t("common.home"),
-    services: t("common.services"),
-    bookings: t("common.bookings"),
-    profile: t("common.profile"),
+    home: "Home",
+    services: "Services",
+    bookings: "Bookings",
+    profile: "Profile",
   };
   return (
     <aside className="hidden md:flex flex-col flex-shrink-0"
@@ -3243,7 +3260,7 @@ function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLogge
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-tight">ServeNow</p>
-            <p className="text-white/60 text-xs">Customer Portal</p>
+            <p className="text-white/60 text-xs">{tx("Customer Portal")}</p>
           </div>
         </div>
       </div>
@@ -3270,7 +3287,7 @@ function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLogge
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mt-1"
           style={{ color: "rgba(255,255,255,0.5)" }}>
           <MapPin size={18} />
-          <span className="truncate max-w-[120px]">{location}</span>
+          <span className="truncate max-w-[120px]">{location === "Set your location" ? tx("Set your location") : location}</span>
         </button>
       </nav>
       {/* User footer */}
@@ -3283,19 +3300,19 @@ function AppSidebar({ activeTab, onTabChange, location, onLocationPress, isLogge
               </div>
               <div className="min-w-0">
                 <p className="text-white text-xs font-semibold truncate">{user.fullName}</p>
-                <p className="text-white/60 text-[10px]">Active</p>
+                <p className="text-white/60 text-[10px]">{tx("Active")}</p>
               </div>
             </div>
             <button onClick={onLogout}
               className="flex items-center gap-2 text-white/60 hover:text-white text-xs font-semibold transition-colors">
-              <LogOut size={14} /> Sign out
+              <LogOut size={14} /> {tx("Sign out")}
             </button>
           </>
         ) : (
           <button onClick={() => onTabChange("profile")}
             className="w-full py-2.5 rounded-xl text-sm font-bold transition-opacity hover:opacity-90 bg-white"
             style={{ color: "#5b3ef5" }}>
-            Sign in
+            {tx("Sign in")}
           </button>
         )}
       </div>
@@ -3333,13 +3350,14 @@ function AppShell({
   cartOpen, cart, onCartClose, onCartChange, onCartPaymentComplete,
   locationPickerOpen, addresses, onLocationSelect, onLocationPickerClose,
 }: AppShellProps) {
-  const { t } = useLanguage();
+  const tx = (source: string) => source;
   const tabLabels: Record<string, string> = {
-    home: t("common.home"),
-    services: t("common.services"),
-    bookings: t("common.bookings"),
-    profile: t("common.profile"),
+    home: "Home",
+    services: "Services",
+    bookings: "Bookings",
+    profile: "Profile",
   };
+  const translatedTitle = title;
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ background: "#f7f8fa" }}>
       {/* Desktop sidebar */}
@@ -3364,14 +3382,14 @@ function AppShell({
               <span className="font-bold text-sm" style={{ color: "#5b3ef5" }}>ServeNow</span>
             </div>
             <div>
-              <h1 className="font-bold text-lg md:text-xl" style={{ color: "#0f1117" }}>{title}</h1>
-              <p className="hidden md:block text-gray-400 text-sm">ServeNow Customer</p>
+              <h1 className="font-bold text-lg md:text-xl" style={{ color: "#0f1117" }}>{translatedTitle}</h1>
+              <p className="hidden md:block text-gray-400 text-sm">{tx("ServeNow Customer")}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onLocationPress} className="flex md:hidden items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200 max-w-[100px]">
               <MapPin size={11} color="#5B3EF5" />
-              <span className="truncate">{location === "Set your location" ? "Location" : location}</span>
+              <span className="truncate">{location === "Set your location" ? tx("Location") : location}</span>
             </button>
             {cartCount > 0 && (
               <button onClick={onCartOpen}
@@ -3433,6 +3451,7 @@ function AppShell({
    PRIVACY & SECURITY SCREEN
 ═══════════════════════════════════════════════════════════════ */
 function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; onBack: () => void; onUserUpdate: (u: ApiUser) => void }) {
+  const tx = usePhraseTranslator();
   const [tab, setTab] = useState<"profile" | "password">("profile");
 
   // Profile update
@@ -3479,7 +3498,7 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
         <button onClick={onBack} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
           <ChevronLeft size={18} color="#5B3EF5" />
         </button>
-        <h2 className="font-bold text-base">Privacy & Security</h2>
+        <h2 className="font-bold text-base">{tx("Privacy & Security")}</h2>
       </div>
 
       {/* Tabs */}
@@ -3489,7 +3508,7 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
             className="flex-1 py-2 rounded-lg text-xs font-bold"
             style={{ background: tab === t ? "#fff" : "transparent", color: tab === t ? "#5B3EF5" : "#9CA3AF",
               boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>
-            {t === "profile" ? "Edit Profile" : "Change Password"}
+            {t === "profile" ? tx("Edit Profile") : tx("Change Password")}
           </button>
         ))}
       </div>
@@ -3497,17 +3516,17 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
       {tab === "profile" && (
         <div className="px-5 flex flex-col gap-4">
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Full Name</label>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Full Name")}</label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)}
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Phone (optional)</label>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Phone (optional)")}</label>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel"
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Email</label>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Email")}</label>
             <input value={user.email} readOnly
               className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-400 cursor-not-allowed" />
           </div>
@@ -3517,7 +3536,7 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
           <button onClick={handleProfileSave} disabled={profileLoading}
             className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
             style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
-            {profileLoading ? "Saving…" : "Save Changes"}
+            {profileLoading ? tx("Saving…") : tx("Save Changes")}
           </button>
         </div>
       )}
@@ -3525,9 +3544,9 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
       {tab === "password" && (
         <div className="px-5 flex flex-col gap-4">
           {[
-            { label: "Current Password", value: currentPassword, set: setCurrentPassword },
-            { label: "New Password", value: newPassword, set: setNewPassword },
-            { label: "Confirm New Password", value: confirmPassword, set: setConfirmPassword },
+            { label: tx("Current Password"), value: currentPassword, set: setCurrentPassword },
+            { label: tx("New Password"), value: newPassword, set: setNewPassword },
+            { label: tx("Confirm New Password"), value: confirmPassword, set: setConfirmPassword },
           ].map(({ label, value, set }) => (
             <div key={label}>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">{label}</label>
@@ -3541,9 +3560,9 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
           <button onClick={handlePasswordChange} disabled={pwLoading}
             className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
             style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}>
-            {pwLoading ? "Changing…" : "Change Password"}
+            {pwLoading ? tx("Changing…") : tx("Change Password")}
           </button>
-          <p className="text-xs text-gray-400 text-center">Minimum 8 characters required</p>
+          <p className="text-xs text-gray-400 text-center">{tx("Minimum 8 characters required")}</p>
         </div>
       )}
     </div>
@@ -3559,6 +3578,7 @@ function ServiceDetailPage({
   onBack: () => void;
   onAddToCart: (serviceId: string, serviceName?: string) => void;
 }) {
+  const tx = usePhraseTranslator();
   const [service, setService] = useState<ApiService | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -3606,7 +3626,7 @@ function ServiceDetailPage({
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-400">Loading service…</p>
+        <p className="text-sm text-gray-400">{tx("Loading service…")}</p>
       </div>
     );
   }
@@ -3615,8 +3635,8 @@ function ServiceDetailPage({
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-6">
         <Wrench size={40} color="#D1D5DB" />
-        <p className="text-base font-semibold text-gray-700">Service not found</p>
-        <button onClick={onBack} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold">Go back</button>
+        <p className="text-base font-semibold text-gray-700">{tx("Service not found")}</p>
+        <button onClick={onBack} className="px-6 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold">{tx("Go back")}</button>
       </div>
     );
   }
@@ -3634,7 +3654,7 @@ function ServiceDetailPage({
         className="flex items-center gap-1.5 px-4 pt-4 pb-2 text-violet-600 font-semibold text-sm"
       >
         <ChevronLeft size={18} />
-        Back
+        {tx("Back")}
       </button>
 
       {/* Hero image */}
@@ -3663,7 +3683,7 @@ function ServiceDetailPage({
         {/* Meta pills */}
         <div className="flex gap-2 flex-wrap mb-5">
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-600">
-            <Clock size={12} color="#6B7280" /> {durationLabel}
+            <Clock size={12} color="#6B7280" /> {durationLabel} {tx("service")}
           </div>
           {((service as any).categoryName || service.category) && (
             <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-600">
@@ -3673,12 +3693,12 @@ function ServiceDetailPage({
         </div>
 
         {/* Sections */}
-        {renderSection("What's included", (service as any).whatIncluded)}
-        {renderSection('What to expect', (service as any).serviceProcess)}
-        {renderSection('Requirements', (service as any).requirements)}
-        {renderSection('Exclusions', (service as any).whatNotIncluded)}
-        {renderSection('Important notes', (service as any).importantNotes)}
-        {renderSection('Cancellation policy', (service as any).cancellationPolicy)}
+        {renderSection(tx("What's included"), (service as any).whatIncluded)}
+        {renderSection(tx("What to expect"), (service as any).serviceProcess)}
+        {renderSection(tx("Requirements"), (service as any).requirements)}
+        {renderSection(tx("Exclusions"), (service as any).whatNotIncluded)}
+        {renderSection(tx("Important notes"), (service as any).importantNotes)}
+        {renderSection(tx("Cancellation policy"), (service as any).cancellationPolicy)}
       </div>
 
       {/* Sticky footer */}
@@ -3686,7 +3706,7 @@ function ServiceDetailPage({
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div>
             <p className="text-xl font-black text-gray-900">₹{(service.customerPrice ?? 0).toLocaleString('en-IN')}</p>
-            <p className="text-xs text-gray-400">{durationLabel} service</p>
+            <p className="text-xs text-gray-400">{durationLabel} {tx("service")}</p>
           </div>
           <button
             onClick={handleAdd}
@@ -3696,7 +3716,7 @@ function ServiceDetailPage({
                 : 'bg-gradient-to-r from-[#5B3EF5] to-[#7C5BF8]'
             }`}
           >
-            {!isLoggedIn ? 'Sign in to book' : added ? '✓ Added' : '+ Add to Cart'}
+            {!isLoggedIn ? tx("Sign in to book") : added ? tx("✓ Added") : tx("+ Add to Cart")}
           </button>
         </div>
       </div>

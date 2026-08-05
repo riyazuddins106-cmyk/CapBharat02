@@ -79,7 +79,12 @@ async function main() {
   const cart = await request('GET', '/cart', undefined, token);
   check('cart contains selected services', cart.response.ok && cart.data?.items?.length === selected.length, cart.error);
 
-  const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  // Keep the fixture inside the configured booking window. Adding 24 hours
+  // can land outside the window depending on the time the smoke test runs.
+  const scheduledDate = new Date();
+  scheduledDate.setDate(scheduledDate.getDate() + 1);
+  scheduledDate.setHours(10, 0, 0, 0);
+  const scheduledAt = scheduledDate.toISOString();
   const checkout = await request('POST', '/orders/checkout', { scheduledAt, notes: 'Current order contract test' }, token);
   check('master order checkout', checkout.response.status === 201, checkout.error);
   const order = checkout.data as { id?: string; status?: string; items?: Array<{ id: string; status: string; partnerId?: string | null }> };

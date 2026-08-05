@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "bash", "web"]
+modules = ["nodejs-20", "bash", "web", "python-base-3.13"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -110,11 +110,11 @@ waitForPort = 3000
 
 [[ports]]
 localPort = 3000
-externalPort = 3001
+externalPort = 3003
 
 [[ports]]
 localPort = 4000
-externalPort = 3000
+externalPort = 3002
 
 [[ports]]
 localPort = 5000
@@ -122,7 +122,7 @@ externalPort = 5000
 
 [[ports]]
 localPort = 5001
-externalPort = 80
+externalPort = 3001
 
 [[ports]]
 localPort = 8000
@@ -134,19 +134,11 @@ externalPort = 8080
 
 [[ports]]
 localPort = 8081
-externalPort = 8081
-
-[[ports]]
-localPort = 8082
-externalPort = 3002
+externalPort = 80
 
 [[ports]]
 localPort = 8099
 externalPort = 8099
-
-[[ports]]
-localPort = 8100
-externalPort = 3003
 
 [deployment]
 deploymentTarget = "autoscale"

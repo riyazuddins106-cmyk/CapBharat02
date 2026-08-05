@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { X, Camera, AlertTriangle } from 'lucide-react';
-import { useLanguage } from '@/lib/language';
 
 interface Props {
   onScanned: (token: string) => void;
@@ -9,7 +8,7 @@ interface Props {
 }
 
 export function QRScannerModal({ onScanned, onClose }: Props) {
-  const { tx } = useLanguage();
+  const tx = (source: string) => source;
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);

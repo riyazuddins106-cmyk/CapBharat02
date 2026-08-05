@@ -7,14 +7,13 @@ import {
   Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
-  Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff, Globe2,
+  Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
   Send, Wallet, Smartphone, Zap, UserPlus, CheckCircle, Package, Navigation,
   AlertCircle, History as HistoryIcon, X, KeyRound, Download, Columns2, Camera,
 } from "lucide-react";
 import { adminAuth, authApi, adminApi } from "@/lib/api";
 import * as XLSX from "xlsx";
 import { DocumentVerificationView } from "./DocumentVerification";
-import { LOCALE_LABELS, SUPPORTED_LOCALES, useLanguage } from "@/lib/language";
 import type {
   AdminUser, BookingRow, ProfessionalRow, CustomerUser,
   AdminAccount,
@@ -317,7 +316,6 @@ function EmptyRow({ cols, text }: { cols: number; text: string }) {
 function Pagination({ page, total, pageSize, onChange }: {
   page: number; total: number; pageSize: number; onChange: (p: number) => void;
 }) {
-  const { tx } = useLanguage();
   const effectiveSize = pageSize === -1 ? total : pageSize;
   const totalPages = Math.max(1, pageSize === -1 ? 1 : Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * effectiveSize + 1;
@@ -325,18 +323,18 @@ function Pagination({ page, total, pageSize, onChange }: {
   return (
     <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
       <span className="text-white/40 text-xs tabular-nums">
-        {total === 0 ? tx("No results") : pageSize === -1 ? tx("All {count} records").replace("{count}", String(total)) : tx("{from}–{to} of {total}").replace("{from}", String(from)).replace("{to}", String(to)).replace("{total}", String(total))}
+        {total === 0 ? "No results" : pageSize === -1 ? `All ${total} records` : `${from}–${to} of ${total}`}
       </span>
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => onChange(page - 1)} disabled={page <= 1}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >{tx("Previous")}</button>
+        >Previous</button>
         <span className="px-2 text-white/40 text-xs font-medium tabular-nums">{page} / {totalPages}</span>
         <button
           onClick={() => onChange(page + 1)} disabled={page >= totalPages}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.1] text-white/50 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >{tx("Next")}</button>
+        >Next</button>
       </div>
     </div>
   );
@@ -565,14 +563,13 @@ function downloadChart(containerId: string, filename: string, format: "png" | "j
 
 
 function AccessDenied() {
-  const { tx } = useLanguage();
   return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)" }}>
         <ShieldCheck size={28} color="#EF4444" />
       </div>
-      <p className="text-white font-semibold text-base">{tx("Access Restricted")}</p>
-      <p className="text-white/40 text-sm max-w-xs">{tx("This section is only available to admin accounts.")}</p>
+      <p className="text-white font-semibold text-base">Access Restricted</p>
+      <p className="text-white/40 text-sm max-w-xs">This section is only available to admin accounts.</p>
     </div>
   );
 }
@@ -582,7 +579,6 @@ function AccessDenied() {
 ═══════════════════════════════════════════════════════════════════ */
 
 function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, refresh: string) => void }) {
-  const { tx } = useLanguage();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -596,7 +592,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
       adminAuth.store(data.accessToken, data.refreshToken, data.user);
       onLogin(data.user, data.accessToken, data.refreshToken);
     } catch (err: any) {
-      setError(err.message ?? tx("Login failed"));
+      setError(err.message ?? "Login failed");
     } finally { setLoading(false); }
   };
 
@@ -610,8 +606,8 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
           <span className="text-white font-bold text-xl">ServeNow Admin</span>
         </div>
         <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 p-6" style={{ background: "#161B27" }}>
-          <h2 className="text-white font-bold text-lg mb-1">{tx("Welcome back")}</h2>
-          <p className="text-white/40 text-sm mb-6">{tx("Sign in to the admin panel")}</p>
+          <h2 className="text-white font-bold text-lg mb-1">Welcome back</h2>
+          <p className="text-white/40 text-sm mb-6">Sign in to the admin panel</p>
           {error && (
             <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400 border border-red-400/20" style={{ background: "rgba(239,68,68,0.08)" }}>
               {error}
@@ -631,7 +627,7 @@ function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, ref
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
-            {loading ? tx("Signing in…") : tx("Sign in")}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
       </div>
@@ -669,7 +665,6 @@ const ADMIN_SIDEBAR = [
   { id: "sms-config",     icon: Smartphone,  label: "SMS Config",     adminOnly: true },
   { id: "otp-settings",       icon: KeyRound,    label: "OTP Settings",       adminOnly: true },
   { id: "booking-settings",   icon: Clock,       label: "Booking Settings",   adminOnly: true },
-  { id: "languages",          icon: Globe2,      label: "Languages",          adminOnly: true },
   { id: "admin-management",   icon: UserPlus,    label: "Admin Management",   adminOnly: true },
   { id: "settings",           icon: Settings,    label: "Settings",           adminOnly: true },
 ];
@@ -693,7 +688,7 @@ function adminShowError(msg: string) {
 
 const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch","orders",
   "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
-  "payment-config","email-config","sms-config","otp-settings","documents","payouts","languages","admin-management"] as const;
+  "payment-config","email-config","sms-config","otp-settings","documents","payouts","admin-management"] as const;
 
 // Sections that only role === 'admin' may access
 const ADMIN_ONLY_SECTIONS = new Set(
@@ -730,6 +725,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [proPage,      setProPage]      = useState(1);
   const [proPageSize,  setProPageSize]  = useState(50);
   const [proTotal,     setProTotal]     = useState(0);
+  const [proSearch,    setProSearch]    = useState("");
+  const [proLinkStatus, setProLinkStatus] = useState<"linked" | "unlinked">("linked");
+  const [proCategoryIds, setProCategoryIds] = useState<string[]>([]);
+  const [proSubCategoryIds, setProSubCategoryIds] = useState<string[]>([]);
   const [userList,     setUserList]     = useState<CustomerUser[]>([]);
   const [userPage,     setUserPage]     = useState(1);
   const [userPageSize, setUserPageSize] = useState(50);
@@ -784,7 +783,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
-  }, [accessToken, proPageSize]);
+  }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -795,10 +794,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   }, [userPage, userPageSize, accessToken]);
 
   useEffect(() => {
-    adminApi.getProfessionals(accessToken, proPage, proPageSize)
+    adminApi.getProfessionals(accessToken, proPage, proPageSize, proSearch, proLinkStatus, proCategoryIds, proSubCategoryIds)
       .then(p => { setProList(p.professionals); setProTotal(p.total); })
       .catch(() => {});
-  }, [proPage, proPageSize, accessToken]);
+  }, [proPage, proPageSize, proSearch, proLinkStatus, proCategoryIds, proSubCategoryIds, accessToken]);
 
   /* ── Notifications ── */
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -1131,7 +1130,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "booking-history" ? (
             <BookingHistoryView accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "pros" ? (
-            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} proPageSize={proPageSize} onProPageSizeChange={setProPageSize} />
+            <ProsView pros={proList} onEdit={editPro} onToggle={togglePro} onDelete={isAdmin ? deletePro : undefined} categories={categoryList} accessToken={accessToken} onCreateNew={() => setActiveSection("create-pro")} proPage={proPage} proTotal={proTotal} onProPageChange={setProPage} proPageSize={proPageSize} onProPageSizeChange={setProPageSize} search={proSearch} onSearchChange={value => { setProSearch(value); setProPage(1); }} linkStatus={proLinkStatus} onLinkStatusChange={value => { setProLinkStatus(value); setProPage(1); }} categoryIds={proCategoryIds} onCategoryIdsChange={value => { setProCategoryIds(value); setProPage(1); }} subCategoryIds={proSubCategoryIds} onSubCategoryIdsChange={value => { setProSubCategoryIds(value); setProPage(1); }} />
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
@@ -1170,8 +1169,6 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             isAdmin ? <OtpSettingsView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "booking-settings" ? (
             isAdmin ? <BookingSettingsView accessToken={accessToken} /> : <AccessDenied />
-          ) : activeSection === "languages" ? (
-            isAdmin ? <LanguagesView accessToken={accessToken} /> : <AccessDenied />
           ) : activeSection === "documents" ? (
             <DocumentVerificationView accessToken={accessToken} />
           ) : activeSection === "payouts" ? (
@@ -2871,7 +2868,7 @@ function CreateProfessionalView({
 }
 
 function ProsView({
-  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew, proPage, proTotal, onProPageChange, proPageSize, onProPageSizeChange,
+  pros, onEdit, onToggle, onDelete, categories, accessToken, onCreateNew, proPage, proTotal, onProPageChange, proPageSize, onProPageSizeChange, search, onSearchChange, linkStatus, onLinkStatusChange, categoryIds, onCategoryIdsChange, subCategoryIds, onSubCategoryIdsChange,
 }: {
   pros: ProfessionalRow[];
   onEdit: (id: string, patch: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }) => Promise<void>;
@@ -2885,8 +2882,15 @@ function ProsView({
   onProPageChange: React.Dispatch<React.SetStateAction<number>>;
   proPageSize: number;
   onProPageSizeChange: React.Dispatch<React.SetStateAction<number>>;
+  search: string;
+  onSearchChange: (value: string) => void;
+  linkStatus: "linked" | "unlinked";
+  onLinkStatusChange: (value: "linked" | "unlinked") => void;
+  categoryIds: string[];
+  onCategoryIdsChange: (value: string[]) => void;
+  subCategoryIds: string[];
+  onSubCategoryIdsChange: (value: string[]) => void;
 }) {
-  const [search,      setSearch]      = useState("");
   const [editTarget,  setEditTarget]  = useState<ProfessionalRow | null>(null);
   const [deleteId,    setDeleteId]    = useState<string | null>(null);
   const [form,        setForm]        = useState<ProPatch>({ name: "", title: "", bio: "", basePrice: 0, priceUnit: "/visit", badge: "", tags: "", categoryId: "", subCategoryId: "" });
@@ -2898,6 +2902,33 @@ function ProsView({
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
   const [editAvatarUploading, setEditAvatarUploading] = useState(false);
   const editAvatarInputRef = useRef<HTMLInputElement>(null);
+  const [filterSubCategories, setFilterSubCategories] = useState<SubCategory[]>([]);
+  const [searchDraft, setSearchDraft] = useState(search);
+
+  useEffect(() => {
+    setSearchDraft(search);
+  }, [search]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (searchDraft !== search) onSearchChange(searchDraft);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft, search, onSearchChange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(categories.filter(c => c.isActive).map(c => adminApi.getSubcategories(c.id, accessToken)))
+      .then(results => {
+        if (!cancelled) {
+          setFilterSubCategories(
+            results.flatMap(result => result.subcategories ?? []).filter(sub => sub.isActive),
+          );
+        }
+      })
+      .catch(() => { if (!cancelled) setFilterSubCategories([]); });
+    return () => { cancelled = true; };
+  }, [categories, accessToken]);
 
   const loadSubCats = async (categoryId: string) => {
     if (!categoryId) { setSubCats([]); return; }
@@ -3065,7 +3096,48 @@ function ProsView({
       )}
 
       <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
-        <div className="flex-1 min-w-[200px]"><SearchBar value={search} onChange={setSearch} placeholder="Search professionals…" /></div>
+        <div className="flex-1 min-w-[200px]">
+          <SearchBar value={searchDraft} onChange={setSearchDraft} placeholder="Search professionals by name, title, or login…" />
+        </div>
+        <div className="flex gap-1.5 flex-shrink-0">
+          {([
+            ["linked", "Linked Partners"],
+            ["unlinked", "Unlinked Profiles"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => onLinkStatusChange(value)}
+              className="rounded-lg px-3 py-2 text-xs font-semibold transition-all"
+              style={{
+                background: linkStatus === value ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.04)",
+                color: linkStatus === value ? "#a78bfa" : "rgba(255,255,255,0.4)",
+                border: linkStatus === value ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.07)",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <MultiSelect
+          label="Category"
+          options={categories.filter(c => c.isActive).map(c => ({ value: c.id, label: c.name }))}
+          selected={categoryIds}
+          onChange={value => {
+            onCategoryIdsChange(value);
+            const allowed = new Set(filterSubCategories.filter(sub => value.includes(sub.categoryId)).map(sub => sub.id));
+            onSubCategoryIdsChange(subCategoryIds.filter(id => allowed.has(id)));
+          }}
+          allLabel="All Categories"
+        />
+        <MultiSelect
+          label="Sub-category"
+          options={filterSubCategories
+            .filter(sub => categoryIds.length === 0 || categoryIds.includes(sub.categoryId))
+            .map(sub => ({ value: sub.id, label: sub.name }))}
+          selected={subCategoryIds}
+          onChange={onSubCategoryIdsChange}
+          allLabel="All Sub-categories"
+        />
         <ColumnVisibilityMenu columns={PV_COLS} hidden={pvColVis.hidden} onToggle={pvColVis.toggle} />
         <ExportBtn
           disabled={pvExporting}
@@ -3133,6 +3205,9 @@ function ProsView({
                         <div>
                           <p className="text-white font-semibold text-sm whitespace-nowrap">{p.name}</p>
                           <p className="text-white/40 text-xs whitespace-nowrap">{p.title}</p>
+                          <p className={p.userEmail ? "text-emerald-400/80 text-[10px] whitespace-nowrap" : "text-amber-400/70 text-[10px] whitespace-nowrap"}>
+                            {p.userEmail ? `Login: ${p.userEmail}` : "No partner login linked"}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -6112,6 +6187,7 @@ function OtpSettingsView({ accessToken }: { accessToken: string }) {
 function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
   type ScheduleConfig = {
     enabled: boolean;
+    payoutsPaused: boolean;
     frequency: "weekly" | "monthly";
     dayOfWeek: number;
     dayOfMonth: number;
@@ -6135,6 +6211,7 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
   };
   const DEFAULT_SCHEDULE: ScheduleConfig = {
     enabled: false,
+    payoutsPaused: false,
     frequency: "weekly",
     dayOfWeek: 5,
     dayOfMonth: 1,
@@ -6234,6 +6311,27 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
     }
   }
 
+  async function togglePayoutPause() {
+    const nextPaused = !schedule.payoutsPaused;
+    setSavingSchedule(true);
+    try {
+      const nextSchedule = { ...schedule, payoutsPaused: nextPaused };
+      await adminApi.saveSettings("payout_config", nextSchedule, accessToken);
+      setSchedule(nextSchedule);
+      setMsg({
+        text: nextPaused
+          ? "All partner payouts are now paused."
+          : "Partner payouts are unpaused. Manual and scheduled sends are available.",
+        ok: true,
+      });
+      await loadAutomation();
+    } catch (e: any) {
+      setMsg({ text: e.message ?? "Could not update the partner payout pause.", ok: false });
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
   async function openDetail(id: string) {
     setDetailLoading(true);
     try {
@@ -6245,13 +6343,17 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
     }
   }
 
-  async function resolve(id: string, nextStatus: "paid" | "rejected") {
+  async function resolve(id: string, nextStatus: "approved" | "paid" | "rejected") {
     setResolving(id);
     try {
       await adminApi.resolvePayout(id, nextStatus, accessToken);
       setMsg({
-        text: nextStatus === "paid" ? "Payout sent through RazorpayX." : "Payout request rejected.",
-        ok: nextStatus === "paid",
+        text: nextStatus === "paid"
+          ? "Payout sent through RazorpayX."
+          : nextStatus === "approved"
+            ? "Payout approved for the next scheduled run."
+            : "Payout request rejected.",
+        ok: nextStatus !== "rejected",
       });
       if (detail) await openDetail(detail.partner.id);
       await load();
@@ -6369,9 +6471,9 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
                 className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-40">
                 {savingSchedule ? "Saving…" : "Save schedule"}
               </button>
-              <button onClick={() => void runNow()} disabled={runningNow || !schedule.enabled}
+              <button onClick={() => void runNow()} disabled={runningNow || !schedule.enabled || schedule.payoutsPaused}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-amber-300 border border-amber-400/30 hover:bg-amber-500/10 disabled:opacity-40">
-                {runningNow ? <Loader2 size={12} className="animate-spin"/> : <Send size={12}/>} Run approved payouts now
+                {runningNow ? <Loader2 size={12} className="animate-spin"/> : <Send size={12}/>} {schedule.payoutsPaused ? "Payouts paused" : "Run approved payouts now"}
               </button>
               <span className="text-white/30 text-[10px]">The scheduled time uses UTC. Limits are capped server-side.</span>
             </div>
@@ -6394,6 +6496,36 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
             </div>
           </div>
         )}
+      </div>
+
+      <div
+        className={`rounded-2xl border p-4 flex flex-wrap items-center justify-between gap-3 ${
+          schedule.payoutsPaused
+            ? "border-red-400/40 bg-red-500/[0.08]"
+            : "border-amber-400/25 bg-amber-500/[0.05]"
+        }`}
+      >
+        <div>
+          <h3 className={`font-semibold text-sm ${schedule.payoutsPaused ? "text-red-200" : "text-amber-200"}`}>
+            {schedule.payoutsPaused ? "Partner payouts are paused" : "Emergency payout control"}
+          </h3>
+          <p className="text-white/45 text-xs mt-1 max-w-2xl">
+            {schedule.payoutsPaused
+              ? "Manual RazorpayX sends and automatic payout runs are blocked server-side. Existing requests remain unchanged."
+              : "Pause all partner money transfers temporarily. Customer payments and existing payout records are not affected."}
+          </p>
+        </div>
+        <button
+          onClick={() => void togglePayoutPause()}
+          disabled={savingSchedule || scheduleLoading}
+          className={`px-3 py-2 rounded-lg text-xs font-semibold border disabled:opacity-40 ${
+            schedule.payoutsPaused
+              ? "border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/10"
+              : "border-red-400/40 text-red-300 hover:bg-red-500/10"
+          }`}
+        >
+          {savingSchedule ? "Saving…" : schedule.payoutsPaused ? "Unpause partner payouts" : "Pause all partner payouts"}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -6549,7 +6681,7 @@ function PayoutsControlCenter({ accessToken }: { accessToken: string }) {
                               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-violet-300 border border-violet-500/30 hover:bg-violet-500/10 disabled:opacity-40">
                               <Clock size={11}/> Approve for schedule
                             </button>}
-                            <button onClick={() => void resolve(request.id, "paid")} disabled={resolving === request.id || !detail.partner.payoutUpiId}
+                            <button onClick={() => void resolve(request.id, "paid")} disabled={resolving === request.id || schedule.payoutsPaused || !detail.partner.payoutUpiId}
                               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 disabled:opacity-40">
                               {resolving === request.id ? <Loader2 size={11} className="animate-spin"/> : <Send size={11}/>} Send via RazorpayX
                             </button>
@@ -6971,128 +7103,6 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
       >
         {saving ? "Saving…" : "Save Booking Settings"}
       </button>
-    </div>
-  );
-}
-
-function LanguagesView({ accessToken }: { accessToken: string }) {
-  const [enabledLocales, setEnabledLocales] = useState<string[]>([...SUPPORTED_LOCALES]);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
-
-  useEffect(() => {
-    adminApi.getSettings("languages", accessToken)
-      .then(({ value }) => {
-        const configured = value as { enabledLocales?: unknown };
-        const values = Array.isArray(configured?.enabledLocales)
-          ? configured.enabledLocales.filter((locale): locale is string => typeof locale === "string")
-          : [...SUPPORTED_LOCALES];
-        setEnabledLocales(["en", ...values.filter((locale) => locale !== "en" && SUPPORTED_LOCALES.includes(locale as typeof SUPPORTED_LOCALES[number]))]);
-      })
-      .catch((e: any) => setMessage({ text: e.message ?? "Could not load language settings.", ok: false }))
-      .finally(() => setLoading(false));
-  }, [accessToken]);
-
-  const toggleLocale = (locale: string) => {
-    if (locale === "en") return;
-    setEnabledLocales((current) => current.includes(locale)
-      ? current.filter((item) => item !== locale)
-      : [...current, locale]);
-  };
-
-  const save = async () => {
-    setSaving(true);
-    setMessage(null);
-    try {
-      const normalized = ["en", ...enabledLocales.filter((locale) => locale !== "en")];
-      await adminApi.saveSettings("languages", { defaultLocale: "en", enabledLocales: normalized }, accessToken);
-      setEnabledLocales(normalized);
-      setMessage({ text: "Language availability saved. All apps will use this list.", ok: true });
-    } catch (e: any) {
-      setMessage({ text: e.message ?? "Could not save language settings.", ok: false });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex-1 overflow-y-auto min-h-0 pb-6 max-w-2xl space-y-5">
-      <div>
-        <h2 className="text-white font-bold text-base">Languages</h2>
-        <p className="text-white/40 text-xs mt-1">
-          Choose which languages appear in Customer Web, Partner Web, Customer Mobile, and Partner Mobile.
-        </p>
-      </div>
-
-      <div className="rounded-2xl p-5 border border-white/[0.07] space-y-5" style={CARD}>
-        {message && (
-          <div
-            className="px-3 py-2 rounded-lg text-xs font-medium border"
-            style={{
-              background: message.ok ? "rgba(22,163,74,0.1)" : "rgba(239,68,68,0.1)",
-              borderColor: message.ok ? "rgba(22,163,74,0.3)" : "rgba(239,68,68,0.3)",
-              color: message.ok ? "#4ade80" : "#f87171",
-            }}
-          >
-            {message.text}
-          </div>
-        )}
-
-        <div className="rounded-xl border border-violet-500/20 p-4" style={{ background: "rgba(91,62,245,0.08)" }}>
-          <div className="flex items-center gap-2">
-            <Globe2 size={17} className="text-violet-300" />
-            <p className="text-white text-sm font-bold">Default language: English</p>
-          </div>
-          <p className="text-white/45 text-xs mt-1">
-            English is always enabled and is used as the default and fallback language.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-white/60 text-xs font-bold uppercase tracking-wide">Available languages</p>
-          {loading ? (
-            <div className="text-white/40 text-sm py-4">Loading language settings…</div>
-          ) : (
-            SUPPORTED_LOCALES.map((locale) => {
-              const checked = enabledLocales.includes(locale);
-              const isEnglish = locale === "en";
-              return (
-                <label
-                  key={locale}
-                  className="flex items-center justify-between gap-4 rounded-xl border px-4 py-3 cursor-pointer transition-colors"
-                  style={{
-                    background: checked ? "rgba(91,62,245,0.08)" : "rgba(255,255,255,0.02)",
-                    borderColor: checked ? "rgba(124,91,248,0.35)" : "rgba(255,255,255,0.08)",
-                  }}
-                >
-                  <span>
-                    <span className="block text-white text-sm font-semibold">{LOCALE_LABELS[locale]}</span>
-                    <span className="block text-white/35 text-[11px] mt-0.5 uppercase">{locale}</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isEnglish}
-                    onChange={() => toggleLocale(locale)}
-                    className="h-4 w-4 accent-violet-500"
-                  />
-                </label>
-              );
-            })
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || loading}
-          className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
-        >
-          {saving ? "Saving…" : "Save Language Settings"}
-        </button>
-      </div>
     </div>
   );
 }

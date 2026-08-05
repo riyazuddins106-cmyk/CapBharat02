@@ -211,6 +211,16 @@
 **Fix:** Hide the legacy action for `upcoming`, show it after partner check-in (`in_progress`), and enforce the same state gate in legacy and service-order payment controllers.
 **Warning:** Keep unpaid `completed` legacy bookings payable so a partner completing before customer payment does not strand the payment.
 
+### Partner dispatch — profile/category mismatch
+**Problem:** The seeded partner service-link script previously linked the test partner to every active catalog service, so Rajan's Partner App showed Plumbing requests even though his profile was AC Repair. The profile also used a different AC sub-category than the AC Service catalog item.
+**Fix:** Dispatch and Partner order-item endpoints now require category equality and exact sub-category equality when the professional has a sub-category. The reconciliation script aligns the seeded account to the AC Service catalog sub-category, removes unrelated links, and expires stale requests.
+**Warning:** Do not use a broad “link partner to all services” seed for this marketplace. The service catalog and professional category/sub-category are the dispatch eligibility source of truth.
+
+### E2E fixtures — booking-hour boundary
+**Problem:** A smoke test that schedules exactly 24 hours from the current time can land outside the configured booking window and fail checkout for the correct reason.
+**Fix:** Use a deterministic future time inside the configured window, such as tomorrow at 10:00, while retaining server-side booking-hour validation.
+**Warning:** Do not weaken checkout validation to accommodate a time-dependent test fixture.
+
 ### Partner Dashboard has two job systems
 **Problem:** The Partner Dashboard’s legacy `/partner/jobs` query does not contain the newer per-service order-item requests. Rendering only that list makes Home look empty while the Jobs tab has pending requests.
 **Fix:** Fetch `/api/partner/order-item-jobs` on Dashboard as well, show pending requests separately from active work, and treat `payment_pending` / `payment_completed` as active until service completion.
@@ -319,8 +329,45 @@
 **Fix:** Keep the ngrok transport and `EXPO_PACKAGER_PROXY_URL` on HTTPS, but encode the QR/deep link as `exp://<ngrok-host>`.
 **Warning:** Do not put `exps://` in Expo Go QR codes; validate the manifest and bundle separately before changing tunnel infrastructure.
 
-### Localization — language availability is Admin-managed
-**Problem:** Five separate clients can drift if each hardcodes its own language list or infers a different default from browser/device settings.
-**Fix:** Keep locale definitions in the shared catalog, store enabled locales in the Admin-managed `languages` platform setting, expose a public read-only language configuration endpoint, and force English as default/fallback.
-**Files:** `packages/shared/src/i18n.ts`, `server/src/controllers/platformSettings.controller.ts`, `apps/admin-web/src/app/App.tsx`, each client language provider.
-**Warning:** Do not remove English from the enabled list or make browser/device locale override the configured English default. Full dynamic content translation must use shared keys rather than client-specific dictionaries.
+### Product language — English-only rollback
+**Problem:** Removing a language provider while leaving structured translation-key calls can render internal keys such as `common.home`, and stale HMR state can preserve deleted provider errors.
+**Fix:** Replace structured shell keys with explicit English labels, remove all language modules and server language routes, rebuild, restart the Vite workflows, and verify a fresh preview.
+**Files:** Customer Web, Partner Web, Admin Web, both mobile apps, shared package, platform settings controller, and API routes.
+**Warning:** When returning to English-only mode, remove the translation infrastructure rather than merely hiding selectors; new admin-created content is shown exactly as stored.
+
+### Admin payouts — action status and stale helper cleanup
+**Problem:** The payout detail UI had a schedule-approval action while its handler only accepted paid/rejected statuses. Separately, leftover Admin `tx(...)` calls caused the login page to crash after the language provider was removed.
+**Fix:** Align the handler with the server’s approved/paid/rejected contract, use explicit English messages, remove all remaining Admin translation-helper calls, rebuild, and capture a fresh preview.
+**Files:** `apps/admin-web/src/app/App.tsx`, `apps/admin-web/src/lib/api.ts`
+**Warning:** A clean payout API list does not prove actions work; verify each mutation branch and the post-restart Admin login screen separately. Sending money also remains dependent on RazorpayX configuration and partner UPI data.
+
+### Partner users versus professional profiles
+**Problem:** Partner authentication uses the `users` table, while Admin Professionals and payout records use `professionals`; duplicate display names can make a valid linked partner appear missing.
+**Fix:** Join Admin professional listings to `users`, search by linked email/name/title server-side, and display whether a partner login is linked.
+**Warning:** Do not delete same-name unlinked professional rows automatically; they may have historical bookings or payout references. Resolve duplicates by ID and relationship.
+
+### Admin Professionals default filter
+**Problem:** Showing every professional row in the main Admin list made legacy/catalog profiles look like active partners.
+**Fix:** Default the list to profiles with a linked user account and provide a separate unlinked-profile view.
+**Warning:** The filter is a view distinction only; it does not delete or deactivate unlinked records.
+
+### Admin Professionals filter/search behavior
+**Problem:** Binding every search keystroke to the page-level loading state remounted the Professionals view, causing the input to lose focus after one character.
+**Fix:** Keep the draft search local, debounce the committed query, and refresh only the Professionals data effect. Category and sub-category filters are sent as multi-value query parameters alongside link status.
+**Warning:** A null professional sub-category is intentionally excluded from a non-empty sub-category filter; “All Sub-categories” includes those records when no selection is active.
+
+### Customer Mobile shared-package type resolution
+**Problem:** The Customer Mobile Expo bundle could resolve the monorepo shared package through Metro while strict TypeScript could not resolve `@servenow/shared`, and checkout's cart query was declared after its dependent memo.
+**Fix:** Add the workspace source path to the app's TypeScript paths, declare the typed cart query before dependent calculations, and type slot callback parameters.
+**Warning:** Verify both `tsc --noEmit` and fresh Android/iOS Metro bundles; either check alone can miss a monorepo resolution problem.
+**Verification:** Repeated checks from the current workspace state passed for TypeScript, Android bundling, and iOS bundling.
+
+### Emergency partner payout pause
+**Problem:** Disabling only the payout scheduler still allowed an Admin to manually send an individual payout through RazorpayX.
+**Fix:** Store `payoutsPaused` in the existing payout configuration and enforce it in both the payout-run service and the low-level RazorpayX transfer service; mirror the state in Admin controls.
+**Warning:** The pause blocks future transfers and runs, but does not alter existing payout records or reverse a payout already accepted by the provider. Customer payment collection is independent.
+
+### GitHub branch history reconciliation
+**Problem:** A branch pushed from the Replit workspace can look like a newer branch while still omitting files and commits from an existing GitHub project when the repository roots are unrelated.
+**Finding:** `origin/main` already includes `origin/agent/30-minute-booking-slots`; `origin/servenow-updates` shares no merge base with either and contains only the workspace snapshot.
+**Safe approach:** Use the existing GitHub `main` as the content base, overlay/reconcile the intended workspace changes, verify the result, and only then change the default branch. Do not merge unrelated histories blindly or force-push the snapshot.

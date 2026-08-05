@@ -2,10 +2,11 @@ import { db } from '../config/database.js';
 import { payoutRequests, payoutRuns, platformSettings, professionals } from '../database/schema/index.js';
 import { and, eq, inArray } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
-import { createRazorpayUpiPayout } from './razorpayPayout.service.js';
+import { arePartnerPayoutsPaused, createRazorpayUpiPayout } from './razorpayPayout.service.js';
 
 export type PayoutScheduleConfig = {
   enabled: boolean;
+  payoutsPaused: boolean;
   frequency: 'weekly' | 'monthly';
   dayOfWeek: number;
   dayOfMonth: number;
@@ -16,6 +17,7 @@ export type PayoutScheduleConfig = {
 
 const DEFAULT_CONFIG: PayoutScheduleConfig = {
   enabled: false,
+  payoutsPaused: false,
   frequency: 'weekly',
   dayOfWeek: 5,
   dayOfMonth: 1,
@@ -200,6 +202,9 @@ async function processRun(runId: string, selected: ClaimedPayout[]) {
 export async function runPayouts(trigger: 'scheduled' | 'manual', now = new Date()) {
   if (running) return { skipped: true, reason: 'another payout run is already active' };
   const config = await getConfig();
+  if (config.payoutsPaused || await arePartnerPayoutsPaused()) {
+    return { skipped: true, reason: 'partner payouts are temporarily paused' };
+  }
   const key = trigger === 'scheduled' ? scheduleKey(now, config) : null;
   if (trigger === 'scheduled' && !key) return { skipped: true, reason: 'not due' };
   if (trigger === 'manual' && !config.enabled) return { skipped: true, reason: 'automatic payouts are disabled' };

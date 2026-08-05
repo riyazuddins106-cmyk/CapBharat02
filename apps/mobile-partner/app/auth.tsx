@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
 import { categoriesApi } from '@/lib/api';
 
 type Mode = 'login' | 'forgot' | 'reset' | 'register' | 'verify';
@@ -17,7 +16,7 @@ interface Category { id: string; name: string; isActive: boolean; }
 
 export default function AuthScreen() {
   const colors = useColors();
-  const { tx } = useLanguage();
+  const tx = (source: string) => source;
   const insets = useSafeAreaInsets();
   const { login, forgotPassword, resetPassword, resendOtp, registerPartner, verifySignupOtp } = useAuth();
 

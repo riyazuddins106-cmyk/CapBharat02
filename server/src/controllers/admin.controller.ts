@@ -591,11 +591,32 @@ export const adminController = {
   listProfessionals: asyncHandler(async (req: Request, res: Response) => {
     const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
     const offset = Number(req.query.offset ?? 0);
+    const search = String(req.query.search ?? '').trim();
+    const linkStatus = String(req.query.linkStatus ?? 'linked');
+    const categoryIds = String(req.query.categoryIds ?? '').split(',').map(id => id.trim()).filter(Boolean);
+    const subCategoryIds = String(req.query.subCategoryIds ?? '').split(',').map(id => id.trim()).filter(Boolean);
 
     const { subServiceCategories } = await import('../database/schema/subServiceCategories.js');
+    const filters = [
+      isNull(professionals.deletedAt),
+      linkStatus === 'unlinked' ? isNull(professionals.userId) : eq(professionals.userId, users.id),
+    ];
+    if (categoryIds.length) filters.push(inArray(professionals.categoryId, categoryIds));
+    if (subCategoryIds.length) filters.push(inArray(professionals.subCategoryId, subCategoryIds));
+    if (search) {
+      filters.push(or(
+        ilike(professionals.name, `%${search}%`),
+        ilike(professionals.title, `%${search}%`),
+        ilike(users.email, `%${search}%`),
+        ilike(users.fullName, `%${search}%`),
+      )!);
+    }
+    const professionalWhere = and(...filters);
     const rows = await db
       .select({
         id: professionals.id,
+        userId: professionals.userId,
+        userEmail: users.email,
         name: professionals.name,
         title: professionals.title,
         bio: professionals.bio,
@@ -614,9 +635,10 @@ export const adminController = {
         createdAt: professionals.createdAt,
       })
       .from(professionals)
+      .leftJoin(users, eq(professionals.userId, users.id))
       .leftJoin(serviceCategories, eq(professionals.categoryId, serviceCategories.id))
       .leftJoin(subServiceCategories, eq(professionals.subCategoryId, subServiceCategories.id))
-      .where(isNull(professionals.deletedAt))
+      .where(professionalWhere)
       .orderBy(desc(professionals.createdAt))
       .limit(limit)
       .offset(offset);
@@ -624,7 +646,8 @@ export const adminController = {
     const [{ total }] = await db
       .select({ total: count(professionals.id) })
       .from(professionals)
-      .where(isNull(professionals.deletedAt));
+      .leftJoin(users, eq(professionals.userId, users.id))
+      .where(professionalWhere);
 
     res.json({ success: true, data: { professionals: rows, total: Number(total) } });
   }),

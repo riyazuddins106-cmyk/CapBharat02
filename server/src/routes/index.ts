@@ -21,7 +21,6 @@ import dispatchRoutes from './dispatch.routes.js';
 import serviceWishlistRoutes from './serviceWishlist.routes.js';
 import ordersRoutes from './orders.routes.js';
 import { db } from '../config/database.js';
-import { getPublicLanguages } from '../controllers/platformSettings.controller.js';
 
 const router = Router();
 
@@ -50,10 +49,6 @@ router.get('/booking-config', async (_req, res) => {
     res.json({ success: true, data: { minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 30, is24Hours: false, openingHour: 8, closingHour: 20, slotIntervalMinutes: 30 } });
   }
 });
-
-// Public because every web/mobile client needs the Admin-selected language list
-// before authentication. English remains mandatory in the server response.
-router.get('/platform-settings/languages', getPublicLanguages);
 
 router.use('/auth', authRoutes);
 router.use('/profile', profileRoutes);

@@ -1,8 +1,8 @@
-import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import {
   orderItems, orderItemRequests, orderItemPayments, orders,
-  professionals, partnerServices, users, addresses,
+  professionals, partnerServices, users, addresses, services,
 } from '../database/schema/index.js';
 import { notificationDbService } from './notificationDb.service.js';
 import { notificationService } from './notification.service.js';
@@ -81,9 +81,16 @@ export const orderDispatchService = {
     const allCandidates = await db.select({ pro: professionals, user: users })
       .from(partnerServices)
       .innerJoin(professionals, eq(partnerServices.partnerId, professionals.id))
+      .innerJoin(services, eq(partnerServices.serviceId, services.id))
       .leftJoin(users, eq(professionals.userId, users.id))
       .where(and(
         eq(partnerServices.serviceId, orderItem.serviceId),
+        eq(services.id, orderItem.serviceId),
+        eq(services.categoryId, professionals.categoryId),
+        or(
+          isNull(professionals.subCategoryId),
+          eq(services.subCategoryId, professionals.subCategoryId),
+        ),
         eq(professionals.isActive, true),
         eq(professionals.availabilityStatus, 'available'),
         isNull(professionals.deletedAt),
