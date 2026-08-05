@@ -15,6 +15,7 @@ import {
   Pencil, Plus, Trash2, RefreshCw, Loader2, CheckCircle, AlertCircle,
   X, ExternalLink, ChevronLeft, Search, ArrowUpDown, Filter,
   FileText, Clock, User, Mail, Phone, Calendar, Building2,
+  Check, ChevronDown,
 } from "lucide-react";
 import {
   adminApi,
@@ -89,6 +90,183 @@ function StatusBadge({ status, style = "doc" }: { status: string; style?: "doc" 
     >
       {st.label}
     </span>
+  );
+}
+
+type FilterOption = { value: string; label: string };
+
+function FilterDropdown({
+  value,
+  onChange,
+  options,
+  minWidth = 160,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: FilterOption[];
+  minWidth?: number;
+  ariaLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0" style={{ minWidth }}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none hover:border-white/20 focus:border-violet-500/50 transition-colors"
+        style={INPUT_STY}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selected?.label ?? value}</span>
+        <ChevronDown size={14} className={`flex-shrink-0 text-white/35 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 right-0 z-[70] mt-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 py-1 shadow-2xl"
+          style={{ background: "#1b1b2b" }}
+          role="listbox"
+        >
+          {options.map((option) => {
+            const active = option.value === value;
+            return (
+              <button
+                type="button"
+                key={option.value}
+                role="option"
+                aria-selected={active}
+                onClick={() => { onChange(option.value); setOpen(false); }}
+                className="w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.07]"
+                style={{
+                  color: active ? "#c4b5fd" : "rgba(255,255,255,0.72)",
+                  background: active ? "rgba(91,62,245,0.16)" : undefined,
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryMultiSelect({
+  options,
+  selected,
+  onChange,
+}: {
+  options: FilterOption[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const allSelected = selected.length === 0;
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  function toggle(value: string) {
+    onChange(selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value]);
+  }
+
+  const label = allSelected
+    ? "All Categories"
+    : selected.length === 1
+      ? options.find((option) => option.value === selected[0])?.label ?? "1 Category"
+      : `${selected.length} Categories`;
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0" style={{ minWidth: 190 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none hover:border-white/20 focus:border-violet-500/50 transition-colors"
+        style={INPUT_STY}
+        aria-label="Filter by category"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown size={14} className={`flex-shrink-0 text-white/35 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 right-0 z-[70] mt-1 overflow-hidden rounded-xl border border-white/10 shadow-2xl"
+          style={{ background: "#1b1b2b" }}
+          role="listbox"
+          aria-multiselectable="true"
+        >
+          <div className="max-h-64 overflow-y-auto py-1">
+            <button
+              type="button"
+              role="option"
+              aria-selected={allSelected}
+              onClick={() => onChange([])}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[#292a42]"
+              style={{
+                color: allSelected ? "#c4b5fd" : "rgba(255,255,255,0.72)",
+                background: allSelected ? "rgba(91,62,245,0.16)" : undefined,
+              }}
+            >
+              <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+                allSelected ? "border-violet-400 bg-violet-400/20" : "border-white/20"
+              }`}>
+                {allSelected && <Check size={13} className="text-violet-300" />}
+              </span>
+              All Categories
+            </button>
+            <div className="border-t border-white/[0.07]" />
+            {options.map((option) => {
+              const active = selected.includes(option.value);
+              return (
+                <button
+                  type="button"
+                  key={option.value}
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => toggle(option.value)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm text-white/75 transition-colors hover:bg-[#292a42]"
+                  style={{ background: active ? "rgba(91,62,245,0.10)" : undefined }}
+                >
+                  <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+                    active ? "border-violet-400 bg-violet-400/20" : "border-white/20"
+                  }`}>
+                    {active && <Check size={13} className="text-violet-300" />}
+                  </span>
+                  <span className="truncate">{option.label}</span>
+                </button>
+              );
+            })}
+            {options.length === 0 && (
+              <p className="px-3 py-3 text-xs text-white/30">No categories available</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -451,6 +629,7 @@ function PartnerListView({
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState("");
   const [filter,   setFilter]   = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sort,     setSort]     = useState<"name" | "status" | "progress">("name");
 
   const load = useCallback(async () => {
@@ -464,6 +643,7 @@ function PartnerListView({
   const filtered = partners
     .filter((p) => {
       if (filter && p.overall_status !== filter) return false;
+      if (categoryFilter.length > 0 && (!p.category_name || !categoryFilter.includes(p.category_name))) return false;
       if (search) {
         const q = search.toLowerCase();
         return (
@@ -494,27 +674,34 @@ function PartnerListView({
             style={INPUT_STY}
           />
         </div>
-        <select
+        <CategoryMultiSelect
+          options={[...new Set(partners.map((p) => p.category_name).filter(Boolean) as string[])]
+            .sort((a, b) => a.localeCompare(b))
+            .map((category) => ({ value: category, label: category }))}
+          selected={categoryFilter}
+          onChange={setCategoryFilter}
+        />
+        <FilterDropdown
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
-          style={INPUT_STY as React.CSSProperties}
-        >
-          <option value="">All statuses</option>
-          {Object.entries(PARTNER_STATUS_STYLES).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-        <select
+          onChange={setFilter}
+          ariaLabel="Filter by status"
+          options={[
+            { value: "", label: "All statuses" },
+            ...Object.entries(PARTNER_STATUS_STYLES).map(([value, style]) => ({ value, label: style.label })),
+          ]}
+          minWidth={160}
+        />
+        <FilterDropdown
           value={sort}
-          onChange={(e) => setSort(e.target.value as any)}
-          className="px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
-          style={INPUT_STY as React.CSSProperties}
-        >
-          <option value="name">Sort: Name</option>
-          <option value="status">Sort: Status</option>
-          <option value="progress">Sort: Progress</option>
-        </select>
+          onChange={(value) => setSort(value as "name" | "status" | "progress")}
+          ariaLabel="Sort partners"
+          options={[
+            { value: "name", label: "Sort: Name" },
+            { value: "status", label: "Sort: Status" },
+            { value: "progress", label: "Sort: Progress" },
+          ]}
+          minWidth={150}
+        />
         <button
           onClick={load}
           title="Refresh"
@@ -950,6 +1137,7 @@ function ReviewQueueView({ accessToken }: { accessToken: string }) {
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState("");
   const [status,  setStatus]  = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sort,    setSort]    = useState("latest");
   const [previewDoc, setPreviewDoc] = useState<ReviewQueueRow | null>(null);
   const [reviewDoc,  setReviewDoc]  = useState<ReviewQueueRow | null>(null);
@@ -981,6 +1169,13 @@ function ReviewQueueView({ accessToken }: { accessToken: string }) {
     );
   }
 
+  const categoryOptions = [...new Set(docs.map((doc) => doc.category_name).filter(Boolean) as string[])]
+    .sort((a, b) => a.localeCompare(b))
+    .map((category) => ({ value: category, label: category }));
+  const visibleDocs = categoryFilter.length === 0
+    ? docs
+    : docs.filter((doc) => doc.category_name && categoryFilter.includes(doc.category_name));
+
   return (
     <div>
       {/* Filters */}
@@ -995,28 +1190,33 @@ function ReviewQueueView({ accessToken }: { accessToken: string }) {
             style={INPUT_STY}
           />
         </div>
-        <select
+        <CategoryMultiSelect
+          options={categoryOptions}
+          selected={categoryFilter}
+          onChange={setCategoryFilter}
+        />
+        <FilterDropdown
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
-          style={INPUT_STY as React.CSSProperties}
-        >
-          <option value="">All statuses</option>
-          {Object.entries(DOC_STATUS_STYLES).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-        <select
+          onChange={setStatus}
+          ariaLabel="Filter by document status"
+          options={[
+            { value: "", label: "All statuses" },
+            ...Object.entries(DOC_STATUS_STYLES).map(([value, style]) => ({ value, label: style.label })),
+          ]}
+          minWidth={160}
+        />
+        <FilterDropdown
           value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className="px-3 py-2 rounded-xl text-sm text-white border border-white/10 outline-none focus:border-violet-500/50"
-          style={INPUT_STY as React.CSSProperties}
-        >
-          <option value="latest">Latest Upload</option>
-          <option value="oldest">Oldest Upload</option>
-          <option value="name">Partner Name</option>
-          <option value="status">Status</option>
-        </select>
+          onChange={setSort}
+          ariaLabel="Sort documents"
+          options={[
+            { value: "latest", label: "Latest Upload" },
+            { value: "oldest", label: "Oldest Upload" },
+            { value: "name", label: "Partner Name" },
+            { value: "status", label: "Status" },
+          ]}
+          minWidth={160}
+        />
         <button
           onClick={() => load()}
           title="Refresh"
@@ -1028,21 +1228,21 @@ function ReviewQueueView({ accessToken }: { accessToken: string }) {
       </div>
 
       <p className="text-white/30 text-xs mb-4">
-        {docs.length} document{docs.length !== 1 ? "s" : ""}
+        {visibleDocs.length} document{visibleDocs.length !== 1 ? "s" : ""}
       </p>
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
           <Loader2 size={24} className="animate-spin" style={{ color: "#5B3EF5" }} />
         </div>
-      ) : docs.length === 0 ? (
+      ) : visibleDocs.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-white/20">
           <ShieldCheck size={32} className="mb-3" />
           <p className="text-sm">No documents found</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {docs.map((doc) => {
+          {visibleDocs.map((doc) => {
             const st = DOC_STATUS_STYLES[doc.status] ?? DOC_STATUS_STYLES["pending"];
             return (
               <div

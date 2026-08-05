@@ -477,12 +477,14 @@ export const documentService = {
              p.name  AS partner_name,
              u.email AS partner_email,
              u.phone AS partner_phone,
+              sc.name AS category_name,
              ru.full_name AS reviewer_name,
              dtc.label AS document_label,
              dtc.emoji AS document_emoji
       FROM partner_documents pd
       JOIN professionals p ON p.id = pd.professional_id
       JOIN users u ON u.id = p.user_id
+      LEFT JOIN service_categories sc ON sc.id = p.category_id
       LEFT JOIN users ru ON ru.id = pd.reviewed_by
       LEFT JOIN document_type_configs dtc ON dtc.type_key = pd.document_type
       ORDER BY

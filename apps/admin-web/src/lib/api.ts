@@ -585,6 +585,7 @@ export interface PartnerWithDocuments {
 export interface ReviewQueueRow extends PartnerDocumentRow {
   partner_phone: string | null;
   professional_id: string;
+  category_name: string | null;
   document_label: string | null;
   document_emoji: string | null;
 }

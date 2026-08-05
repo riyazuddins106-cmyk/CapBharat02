@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "bash", "web", "python-base-3.13"]
+modules = ["nodejs-20", "bash", "web", "python-base-3.13", "postgresql-16"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -72,8 +72,8 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile && ../../scripts/expo-tunnel.sh 8080 2>&1 | tee /tmp/metro-live.log"
-waitForPort = 8080
+args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile && ../../scripts/expo-tunnel.sh 8081 2>&1 | tee /tmp/metro-live.log"
+waitForPort = 8081
 
 [[workflows.workflow]]
 name = "Expo Partner App"
@@ -110,19 +110,19 @@ waitForPort = 3000
 
 [[ports]]
 localPort = 3000
-externalPort = 3003
-
-[[ports]]
-localPort = 4000
 externalPort = 3002
 
 [[ports]]
+localPort = 4000
+externalPort = 3001
+
+[[ports]]
 localPort = 5000
-externalPort = 5000
+externalPort = 80
 
 [[ports]]
 localPort = 5001
-externalPort = 3001
+externalPort = 3000
 
 [[ports]]
 localPort = 8000
@@ -134,7 +134,7 @@ externalPort = 8080
 
 [[ports]]
 localPort = 8081
-externalPort = 80
+externalPort = 8081
 
 [[ports]]
 localPort = 8099

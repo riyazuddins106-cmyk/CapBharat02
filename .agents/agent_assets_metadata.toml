@@ -12,11 +12,11 @@ id = "z3ReHYQpJ6Q9XbRTPxCuk"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
 title = "Customer App — Expo Go QR"
-description = "Scan this current QR code with Expo Go to open the Customer Mobile app."
+description = "Scan this current Customer App QR code with Expo Go."
 
 [[outputs]]
 id = "CnN3LIYRidf200aumm0xt"
 uri = "file://tmp-qr/partner-qr.png"
 type = "image"
 title = "Partner App — Expo Go QR"
-description = "Scan this current QR code with Expo Go to open the Partner Mobile app."
+description = "Scan this current Partner App QR code with Expo Go."
