@@ -469,8 +469,13 @@ function OrderServiceCard({ order, item, onAction, busy }: {
   const { accessToken } = useAuth();
   const canCancel = !['cancelled', 'service_started', 'service_completed'].includes(item.status);
   const canContinue = !item.partnerId && item.status !== 'cancelled';
-  const needsPayment = ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid';
   const cashReported = item.payment?.method === 'cash' && !!item.payment.cashReportedAt && item.payment.status !== 'paid';
+  // Cash is a two-step flow: the customer reports the cash, then the partner
+  // confirms receipt. Once reported, it must not remain in "Pay Now" or look
+  // like an unknown payment due.
+  const needsPayment = ['partner_arrived', 'payment_pending'].includes(item.status)
+    && item.payment?.status !== 'paid'
+    && !cashReported;
   const actionKey = (action: string) => `${action}:${item.id}`;
   const [showDetails, setShowDetails] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -677,12 +682,12 @@ export default function BookingsScreen() {
   const [orderActionBusy, setOrderActionBusy] = useState<string | null>(null);
   const [itemPayment, setItemPayment] = useState<{ order: Order; item: OrderItem } | null>(null);
 
-  const { data: bookings, isLoading, refetch } = useQuery({
+  const { data: bookings, isLoading: bookingsLoading, refetch } = useQuery({
     queryKey: ['/api/bookings', accessToken],
     queryFn: () => bookingsApi.list(accessToken!),
     enabled: !!accessToken,
   });
-  const { data: orders = [], refetch: refetchOrders } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['/api/orders', accessToken],
     queryFn: () => ordersApi.list(accessToken!),
     enabled: !!accessToken,
@@ -769,10 +774,37 @@ export default function BookingsScreen() {
   const pastBookings            = allBookings.filter((b) =>
     b.status === 'cancelled' || (b.status === 'completed' && b.paymentStatus === 'paid'),
   );
-  const filtered = tab === 'searching'       ? searchingBookings
+  const filteredLegacy = tab === 'searching'       ? searchingBookings
                  : tab === 'upcoming'        ? upcomingBookings
                  : tab === 'awaitingPayment' ? awaitingPaymentBookings
                  : pastBookings;
+
+  type OrderRow = { kind: 'order'; order: Order; item: OrderItem };
+  type BookingRow = { kind: 'booking'; booking: Booking };
+  const allOrderRows: OrderRow[] = orders.flatMap((order) =>
+    order.items.map((item) => ({ kind: 'order' as const, order, item })),
+  );
+  const searchingOrderRows = allOrderRows.filter(({ item }) => ['searching_partner', 'assigned'].includes(item.status));
+  const activeOrderRows = allOrderRows.filter(({ item }) =>
+    ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status),
+  );
+  const awaitingPaymentOrderRows = allOrderRows.filter(({ item }) =>
+    ['partner_arrived', 'payment_pending'].includes(item.status)
+      && item.payment?.status !== 'paid'
+      && !(item.payment?.method === 'cash' && !!item.payment.cashReportedAt),
+  );
+  const pastOrderRows = allOrderRows.filter(({ item }) => ['service_completed', 'cancelled'].includes(item.status));
+  const filteredOrderRows = tab === 'searching' ? searchingOrderRows
+    : tab === 'upcoming' ? activeOrderRows
+    : tab === 'awaitingPayment' ? awaitingPaymentOrderRows
+    : pastOrderRows;
+  // The legacy booking API is still supported for older bookings, but a
+  // multi-service order must be rendered from its individual order items.
+  // Otherwise two services collapse into one booking and the tab state becomes
+  // incorrect.
+  const listRows: Array<OrderRow | BookingRow> = allOrderRows.length > 0
+    ? filteredOrderRows
+    : filteredLegacy.map((booking) => ({ kind: 'booking' as const, booking }));
 
   if (!isAuthenticated) {
     return (
@@ -800,10 +832,15 @@ export default function BookingsScreen() {
         <View style={[styles.tabs, { backgroundColor: colors.muted, borderRadius: 100 }]}>
           {(['searching', 'upcoming', 'awaitingPayment', 'past'] as const).map((t) => {
             const label = t === 'searching' ? 'Search' : t === 'upcoming' ? 'Active' : t === 'awaitingPayment' ? 'Pay Now' : 'Past';
-            const count = t === 'searching' ? searchingBookings.length
-                        : t === 'upcoming'  ? upcomingBookings.length
-                        : t === 'awaitingPayment' ? awaitingPaymentBookings.length
-                        : pastBookings.length;
+            const count = allOrderRows.length > 0
+              ? t === 'searching' ? searchingOrderRows.length
+                : t === 'upcoming' ? activeOrderRows.length
+                : t === 'awaitingPayment' ? awaitingPaymentOrderRows.length
+                : pastOrderRows.length
+              : t === 'searching' ? searchingBookings.length
+                : t === 'upcoming' ? upcomingBookings.length
+                : t === 'awaitingPayment' ? awaitingPaymentBookings.length
+                : pastBookings.length;
             const isActive = tab === t;
             const tabColor = t === 'searching' ? '#7C3AED' : t === 'awaitingPayment' ? '#D97706' : colors.foreground;
             return (
@@ -830,30 +867,13 @@ export default function BookingsScreen() {
       </View>
 
       <FlatList
-        data={filtered}
-        keyExtractor={(b) => b.id}
+        data={listRows}
+        keyExtractor={(row) => row.kind === 'order' ? row.item.id : row.booking.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListHeaderComponent={
           <View>
-            {orders.flatMap(order => order.items
-              .filter(item => tab === 'searching'
-                ? ['searching_partner', 'assigned'].includes(item.status)
-                : tab === 'upcoming'
-                  ? ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status)
-                  : tab === 'awaitingPayment'
-                    ? ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid'
-                    : ['service_completed', 'cancelled'].includes(item.status))
-              .map(item => (
-                <OrderServiceCard
-                  key={item.id}
-                  order={order}
-                  item={item}
-                  busy={orderActionBusy}
-                  onAction={handleOrderAction}
-                />
-              )))}
             {tab === 'searching' ? (
               <View style={[styles.searchingBanner, { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' }]}>
                 <View style={styles.searchingRow}>
@@ -864,17 +884,14 @@ export default function BookingsScreen() {
                   </View>
                 </View>
               </View>
-             ) : tab === 'awaitingPayment' ? (
+             ) : tab === 'awaitingPayment' && awaitingPaymentOrderRows.length > 0 ? (
               <View style={[styles.searchingBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
                 <View style={styles.searchingRow}>
                   <Ionicons name="wallet-outline" size={20} color="#D97706" />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.searchingTitle, { color: '#D97706' }]}>Service Payment Due</Text>
                      <Text style={[styles.searchingText, { color: '#92400E' }]}>
-                       {orders.flatMap(order => order.items
-                         .filter(item => ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid')
-                         .map(item => `${item.serviceName ?? 'Service'} · ₹${item.customerPrice}${item.payment?.method === 'cash' && item.payment.cashReportedAt ? ' · cash reported, awaiting partner confirmation' : ''}`)
-                       ).join('  •  ') || 'Payment is due after your partner checks in.'}
+                        {awaitingPaymentOrderRows.map(({ item }) => `${item.serviceName ?? 'Service'} · ₹${item.customerPrice}`).join('  •  ')}
                      </Text>
                   </View>
                 </View>
@@ -883,7 +900,7 @@ export default function BookingsScreen() {
           </View>
         }
         ListEmptyComponent={
-          isLoading ? (
+          (bookingsLoading || ordersLoading) ? (
             <View style={styles.center}>
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Loading...</Text>
             </View>
@@ -919,9 +936,16 @@ export default function BookingsScreen() {
             </View>
           )
         }
-        renderItem={({ item }) => (
+        renderItem={({ item: row }) => row.kind === 'order' ? (
+          <OrderServiceCard
+            order={row.order}
+            item={row.item}
+            busy={orderActionBusy}
+            onAction={handleOrderAction}
+          />
+        ) : (
           <BookingCard
-            booking={item}
+            booking={row.booking}
             onCancel={(id) => Alert.alert('Cancel Booking', 'Are you sure you want to cancel?', [
               { text: 'Keep', style: 'cancel' },
               { text: 'Cancel Booking', style: 'destructive', onPress: () => cancelMutation.mutate(id) },
