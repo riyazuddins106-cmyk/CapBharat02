@@ -19,7 +19,18 @@ export function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  // Catalog, category, reel thumbnails, and uploaded media can be served from
+  // Supabase Storage or approved HTTPS image/CDN URLs stored in the database.
+  // Helmet's default `img-src 'self' data:` policy silently blocks those
+  // production assets, leaving the UI with broken-image icons and alt text.
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        imgSrc: ["'self'", "data:", "https:"],
+        mediaSrc: ["'self'", "data:", "https:"],
+      },
+    },
+  }));
   app.use(
     cors({
       origin: true,

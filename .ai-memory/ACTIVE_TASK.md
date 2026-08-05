@@ -74,6 +74,13 @@
 - [x] Confirmed `git diff --check` passes and local `main` is synchronized with `origin/main` at `9ecec1d88`
 - [ ] Live Razorpay/Stripe/RazorpayX provider transactions and refunds remain unverified until provider credentials are configured
 
+### Published image loading fix — 2026-08-05
+- [x] Confirmed the published service, category, and reel APIs return data and valid image URLs
+- [x] Confirmed published image requests succeed directly, but Helmet CSP was sending `img-src 'self' data:` and blocking HTTPS media in the browser
+- [x] Updated the server CSP to allow HTTPS images and media from Supabase Storage/CDNs
+- [x] Rebuilt the server, restarted the application workflow, and verified the local response header includes `img-src ... https:`
+- [ ] Republish the project so the published deployment receives the CSP fix
+
 ### GitHub branch comparison — 2026-08-05
 - [x] Confirmed `origin/main` already contains the full history of `origin/agent/30-minute-booking-slots`; that branch tip is the merge base of `main`.
 - [x] Confirmed `origin/servenow-updates` has unrelated history and is not a superset of either existing GitHub branch.

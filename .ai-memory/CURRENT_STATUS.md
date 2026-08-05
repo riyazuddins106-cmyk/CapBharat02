@@ -149,6 +149,13 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] `git diff --check` passed and local `main` matched `origin/main` at `9ecec1d88`.
 - [!] Real Razorpay/Stripe/RazorpayX provider transactions and refunds remain unverified until provider credentials are configured.
 
+### Published image loading fix (2026-08-05)
+- [x] Published `/api/services?featured=true`, `/api/categories`, and `/api/reels` all return populated data.
+- [x] The stored Unsplash image URLs return HTTP 200 with image content when requested directly.
+- [x] Root cause of broken images in the published browser was Helmet's default CSP: `img-src 'self' data:` blocked all HTTPS-hosted catalog/category/reel media.
+- [x] Updated `server/src/app.ts` to allow HTTPS images and media, rebuilt the server, restarted the API workflow, and verified the local CSP header.
+- [ ] Republish is required for the live deployment to receive this server-header fix.
+
 ### Emergency partner payout pause (2026-08-05)
 - [x] Admin Partner Payouts now has a persisted emergency pause/unpause control.
 - [x] When paused, manual RazorpayX sends and the Admin “Run approved payouts now” action are disabled in the UI.

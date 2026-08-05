@@ -376,3 +376,8 @@
 **Problem:** The handoff listed an old Partner Web preview port, and the current order smoke test has fewer assertions when payment test mode is disabled.
 **Fix:** Read the workflow's actual Vite output before screenshotting; Partner Web currently serves on port 4000. Treat the 16/16 current smoke result as complete for the enabled branches and record provider/payment gaps separately.
 **Warning:** Do not treat a refused screenshot on the stale port or a skipped disabled test-mode payment branch as an application failure. Real Razorpay/Stripe/RazorpayX transactions still need configured provider credentials.
+
+### Published media — CSP blocks external catalog images
+**Problem:** The production API returned valid service/category/reel image URLs and the image hosts returned HTTP 200, but the published browser showed broken-image icons and alt text.
+**Fix:** Configure Helmet's Content Security Policy with `img-src 'self' data: https:` and `media-src 'self' data: https:` so approved HTTPS CDN/Supabase media can render.
+**Warning:** A local fix does not change an already-published build; republish after changing server security headers.
