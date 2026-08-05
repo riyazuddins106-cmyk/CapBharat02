@@ -64,6 +64,16 @@
 - [x] Verified direct transfer creation is blocked before provider access
 - [x] Restored the original payout configuration after testing
 
+### Final verification refresh — 2026-08-05
+- [x] Re-ran the current order-item contract smoke test: 16/16 passed; test-mode payment was correctly skipped because payment test mode is disabled
+- [x] Confirmed admin, partner, and customer logins plus `/profile/me` access; unauthenticated `/orders` returned 401
+- [x] Confirmed booking config exposes 30-minute slots and the shared slot generator returned the expected 21 slots for an 08:00–20:00, 120-minute maximum service window
+- [x] Confirmed payout pause blocks both manual transfer creation and payout runs, then restored the original setting
+- [x] Fresh Customer and Partner Expo Android/iOS exports completed successfully
+- [x] Captured clean Customer Web, Admin Panel, and Partner Web previews; Partner Web is served on port 4000
+- [x] Confirmed `git diff --check` passes and local `main` is synchronized with `origin/main` at `9ecec1d88`
+- [ ] Live Razorpay/Stripe/RazorpayX provider transactions and refunds remain unverified until provider credentials are configured
+
 ### GitHub branch comparison — 2026-08-05
 - [x] Confirmed `origin/main` already contains the full history of `origin/agent/30-minute-booking-slots`; that branch tip is the merge base of `main`.
 - [x] Confirmed `origin/servenow-updates` has unrelated history and is not a superset of either existing GitHub branch.

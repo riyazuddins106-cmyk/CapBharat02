@@ -5,7 +5,7 @@
 
 ## Overall Completion: ~99%
 
-The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, admin controls, and admin-configurable booking hours. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 17/17 checks; live gateway transactions still require Razorpay/Stripe provider configuration.
+The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, admin controls, and admin-configurable booking hours. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 16/16 checks in the latest run; test-mode payment was skipped because test mode is disabled, and live gateway transactions still require Razorpay/Stripe provider configuration.
 
 ---
 
@@ -138,6 +138,16 @@ The service-level order implementation is complete for customer web/mobile, part
 - [x] Fresh Customer Expo verification after the fix completed both Android and iOS Metro bundles successfully with no build errors.
 - [x] Repeated the verification from the current workspace state: Customer Mobile TypeScript, Android bundle, and iOS bundle all passed again.
 - [!] Real Razorpay/Stripe payment and refund provider flows remain unverified because live gateway credentials are not configured.
+
+### Final verification refresh (2026-08-05)
+- [x] Re-ran the current order-item contract flow: 16/16 passed; the test-mode payment branch correctly skipped because payment test mode is disabled.
+- [x] Admin, partner, and customer seeded logins returned access tokens and `/profile/me` returned HTTP 200 for each role; unauthenticated `/orders` returned HTTP 401.
+- [x] `/booking-config` returned a 30-minute interval; shared slot generation returned 21 expected slots for an 08:00–20:00 window with a 120-minute maximum service duration.
+- [x] Controlled payout pause verification blocked both payout-run execution and direct transfer creation, then restored the original setting.
+- [x] Fresh Customer and Partner Expo Android/iOS exports completed successfully.
+- [x] Customer Web, Admin Panel, and Partner Web previews rendered; Partner Web is healthy on its configured port 4000.
+- [x] `git diff --check` passed and local `main` matched `origin/main` at `9ecec1d88`.
+- [!] Real Razorpay/Stripe/RazorpayX provider transactions and refunds remain unverified until provider credentials are configured.
 
 ### Emergency partner payout pause (2026-08-05)
 - [x] Admin Partner Payouts now has a persisted emergency pause/unpause control.

@@ -371,3 +371,8 @@
 **Problem:** A branch pushed from the Replit workspace can look like a newer branch while still omitting files and commits from an existing GitHub project when the repository roots are unrelated.
 **Finding:** `origin/main` already includes `origin/agent/30-minute-booking-slots`; `origin/servenow-updates` shares no merge base with either and contains only the workspace snapshot.
 **Safe approach:** Use the existing GitHub `main` as the content base, overlay/reconcile the intended workspace changes, verify the result, and only then change the default branch. Do not merge unrelated histories blindly or force-push the snapshot.
+
+### Verification — Partner Web port and payment test mode
+**Problem:** The handoff listed an old Partner Web preview port, and the current order smoke test has fewer assertions when payment test mode is disabled.
+**Fix:** Read the workflow's actual Vite output before screenshotting; Partner Web currently serves on port 4000. Treat the 16/16 current smoke result as complete for the enabled branches and record provider/payment gaps separately.
+**Warning:** Do not treat a refused screenshot on the stale port or a skipped disabled test-mode payment branch as an application failure. Real Razorpay/Stripe/RazorpayX transactions still need configured provider credentials.
