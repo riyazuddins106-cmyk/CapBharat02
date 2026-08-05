@@ -2606,11 +2606,11 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
       {orders.length > 0 && (
         <div className="px-5 mt-4 flex flex-col gap-3">
           {orders
-            .filter((order) => tab === "searching"
-              ? order.status === "searching_partners" || order.status === "partially_confirmed"
-              : tab === "upcoming"
-                ? ["fully_confirmed", "in_progress"].includes(order.status)
-                : ["completed", "partially_completed", "cancelled"].includes(order.status))
+             .filter((order) => tab === "searching"
+               ? order.items.some((item) => ["searching_partner", "assigned"].includes(item.status))
+               : tab === "upcoming"
+                 ? order.items.some((item) => ["partner_accepted", "partner_arrived", "payment_pending", "payment_completed", "service_started"].includes(item.status))
+                 : order.items.some((item) => ["service_completed", "cancelled"].includes(item.status)))
             .map((order) => (
               <div key={order.id} className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -2628,6 +2628,9 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                     const canContinue = !item.partnerId && item.status !== "cancelled";
                     const needsPayment = ["partner_arrived", "payment_pending"].includes(item.status)
                       && item.payment?.status !== "paid";
+                    const cashReported = item.payment?.method === "cash"
+                      && !!item.payment.cashReportedAt
+                      && item.payment.status !== "paid";
                     const canShowQr = ["partner_accepted", "partner_arrived", "payment_pending", "payment_completed", "service_started"].includes(item.status);
                     const cancellationFeeRate = item.status === "partner_accepted" ? 25
                       : ["partner_arrived", "payment_pending", "payment_completed"].includes(item.status) ? 50 : 0;
@@ -2664,7 +2667,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                               {orderAction === `continue:${item.id}` ? tx("Searching…") : tx("Continue Searching")}
                             </button>
                           )}
-                          {needsPayment && (
+                           {needsPayment && !cashReported && (
                             <button
                               onClick={() => handleOrderAction("pay", order.id, item.id)}
                               disabled={orderAction === `pay:${item.id}`}
@@ -2672,6 +2675,11 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                             >
                               {orderAction === `pay:${item.id}` ? "Paying…" : `Pay ₹${item.customerPrice}`}
                             </button>
+                          )}
+                          {cashReported && (
+                            <span className="flex-1 py-2 rounded-lg text-[11px] font-bold text-center bg-amber-50 text-amber-800 border border-amber-200">
+                              Cash reported · Awaiting partner confirmation
+                            </span>
                           )}
                           {canShowQr && (
                             <button

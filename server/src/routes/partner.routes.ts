@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/requireRole.js';
 
 const upload    = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5  * 1024 * 1024 } });
 const docUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const evidenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -18,6 +19,11 @@ router.post('/profile/avatar',     upload.single('avatar'), partnerController.up
 router.patch('/account',           partnerController.updateAccount);
 router.patch('/availability',      partnerController.updateAvailability);
 router.patch('/location',          partnerController.updateLocation);
+router.get('/schedule',             partnerController.schedule);
+router.get('/performance',          partnerController.performance);
+router.get('/evidence',             partnerController.listEvidence);
+router.post('/evidence',            evidenceUpload.single('file'), partnerController.uploadEvidence);
+router.post('/issues',              partnerController.reportIssue);
 router.get('/jobs',                partnerController.listJobs);
 router.get('/jobs/:id',            partnerController.getJob);
 router.patch('/jobs/:id/accept',   partnerController.acceptJob);
@@ -34,6 +40,7 @@ router.get('/order-item-jobs/:itemId',                      partnerController.ge
 router.patch('/order-item-jobs/:requestId/accept',          partnerController.acceptOrderItemJob);
 router.patch('/order-item-jobs/:requestId/reject',          partnerController.rejectOrderItemJob);
 router.patch('/order-item-jobs/:itemId/checkin',            partnerController.checkInOrderItem);
+router.patch('/order-item-jobs/:itemId/confirm-cash',        partnerController.confirmCashPayment);
 router.patch('/order-item-jobs/:itemId/complete',           partnerController.completeOrderItem);
 
 // KYC / verification documents

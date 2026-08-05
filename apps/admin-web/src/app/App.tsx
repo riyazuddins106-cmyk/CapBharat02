@@ -21,6 +21,7 @@ import type {
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
   DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow, AdminOrderDetail,
   AdminBookingDetail,
+  AdminCustomerDetail, AdminProfessionalDetail,
   PayoutPartnerRow, PayoutPartnerDetail,
 } from "@/lib/api";
 
@@ -647,7 +648,7 @@ const ADMIN_SIDEBAR = [
   { id: "dispatch",       icon: Navigation,  label: "Booking Operations Centre"     },
   { id: "orders",         icon: Package,     label: "Service Orders"                },
   { id: "pros",           icon: Users,       label: "Professionals"                 },
-  { id: "users",          icon: UserCheck,   label: "Users"                         },
+  { id: "users",          icon: UserCheck,   label: "Customers"                     },
   { id: "categories",     icon: Grid,        label: "Categories"                    },
   { id: "services",       icon: Package,     label: "Services"                      },
   { id: "reels",          icon: Film,        label: "Reels"                         },
@@ -733,6 +734,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [userPage,     setUserPage]     = useState(1);
   const [userPageSize, setUserPageSize] = useState(50);
   const [userTotal,    setUserTotal]    = useState(0);
+  const [userSearch,   setUserSearch]   = useState("");
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [reviewList,   setReviewList]   = useState<ReviewRow[]>([]);
   const [auditLogs,    setAuditLogs]    = useState<AuditLogRow[]>([]);
@@ -788,10 +790,10 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    adminApi.getUsers(accessToken, userPage, userPageSize)
+    adminApi.getUsers(accessToken, userPage, userPageSize, userSearch)
       .then(u => { setUserList(u.users); setUserTotal(u.total); })
       .catch(() => {});
-  }, [userPage, userPageSize, accessToken]);
+  }, [userPage, userPageSize, userSearch, accessToken]);
 
   useEffect(() => {
     adminApi.getProfessionals(accessToken, proPage, proPageSize, proSearch, proLinkStatus, proCategoryIds, proSubCategoryIds)
@@ -1134,7 +1136,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "create-pro" ? (
             <CreateProfessionalView categories={categoryList} accessToken={accessToken} onCreate={createPro} onCreated={() => setActiveSection("pros")} />
           ) : activeSection === "users" ? (
-            <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} userPageSize={userPageSize} onUserPageSizeChange={setUserPageSize} accessToken={accessToken} />
+             <UsersView users={userList} onEdit={editUser} onDelete={isAdmin ? deleteUser : undefined} onToggle={toggleUser} userPage={userPage} userTotal={userTotal} onUserPageChange={setUserPage} userPageSize={userPageSize} onUserPageSizeChange={setUserPageSize} accessToken={accessToken} search={userSearch} onSearchChange={value => { setUserSearch(value); setUserPage(1); }} />
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
@@ -2727,7 +2729,7 @@ function CreateProfessionalView({
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-6">
+      <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center justify-center py-24 gap-6">
         <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(22,163,74,0.15)" }}>
           <CheckCircle size={36} className="text-green-400" />
         </div>
@@ -2753,7 +2755,8 @@ function CreateProfessionalView({
   const activeCategories = categories.filter(c => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="flex-1 min-h-0 w-full overflow-y-auto pb-8">
+      <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h2 className="text-white text-xl font-bold">Create Professional</h2>
         <p className="text-white/40 text-sm mt-1">Creates a partner login account and professional profile in one step.</p>
@@ -2863,6 +2866,7 @@ function CreateProfessionalView({
           {saving ? "Creating…" : "Create Professional"}
         </button>
       </div>
+      </div>
     </div>
   );
 }
@@ -2904,6 +2908,8 @@ function ProsView({
   const editAvatarInputRef = useRef<HTMLInputElement>(null);
   const [filterSubCategories, setFilterSubCategories] = useState<SubCategory[]>([]);
   const [searchDraft, setSearchDraft] = useState(search);
+  const [detail, setDetail] = useState<AdminProfessionalDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     setSearchDraft(search);
@@ -3011,6 +3017,14 @@ function ProsView({
     finally { setBusyId(null); }
   };
 
+  const openDetail = async (id: string) => {
+    setDetailLoading(true);
+    setDetail(null);
+    try { setDetail(await adminApi.getProfessionalDetail(id, accessToken)); }
+    catch (err: any) { adminShowError(err.message ?? "Could not load professional details"); }
+    finally { setDetailLoading(false); }
+  };
+
   const { sort: pvSort, toggleSort: togglePvSort, applySortFn: sortPv } = useTableSort();
   const PV_COLS = ["Professional", "Category", "Sub-category", "Rating", "Status", "Actions"] as const;
   const pvColVis = useColumnVisibility(PV_COLS);
@@ -3092,6 +3106,13 @@ function ProsView({
           saving={saving}
           onConfirm={handleDelete}
           onCancel={() => setDeleteId(null)}
+        />
+      )}
+      {(detailLoading || detail) && (
+        <ProfessionalDetailModal
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => { setDetail(null); setDetailLoading(false); }}
         />
       )}
 
@@ -3224,6 +3245,7 @@ function ProsView({
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <ActionBtn variant="edit" onClick={() => openEdit(p)}>Edit</ActionBtn>
+                        <ActionBtn variant="edit" onClick={() => void openDetail(p.id)}>Details</ActionBtn>
                         <ActionBtn
                           variant={p.isActive ? "warn" : "green"}
                           onClick={() => handleToggle(p)}
@@ -3257,7 +3279,7 @@ const ROLE_COLOR: Record<string, string> = {
 
 function UsersView({
   users, onEdit, onDelete, onToggle, userPage, userTotal, onUserPageChange,
-  userPageSize, onUserPageSizeChange, accessToken,
+  userPageSize, onUserPageSizeChange, accessToken, search: serverSearch, onSearchChange,
 }: {
   users: CustomerUser[];
   onEdit: (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => Promise<void>;
@@ -3269,15 +3291,17 @@ function UsersView({
   userPageSize: number;
   onUserPageSizeChange: React.Dispatch<React.SetStateAction<number>>;
   accessToken: string;
+  search: string;
+  onSearchChange: (value: string) => void;
 }) {
-  const [search,     setSearch]     = useState("");
-  const [roleFilter, setRoleFilter] = useState<string[]>([]);
   const [uvExporting, setUvExporting] = useState(false);
   const [editTarget, setEditTarget] = useState<CustomerUser | null>(null);
   const [deleteId,   setDeleteId]   = useState<string | null>(null);
   const [form,       setForm]       = useState({ fullName: "", email: "", phone: "", role: "" });
   const [saving,     setSaving]     = useState(false);
   const [busyId,     setBusyId]     = useState<string | null>(null);
+  const [detail, setDetail] = useState<AdminCustomerDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const { sort: uvSort, toggleSort: toggleUvSort, applySortFn: sortUv } = useTableSort();
 
   const openEdit = (u: CustomerUser) => {
@@ -3308,12 +3332,15 @@ function UsersView({
     finally { setBusyId(null); }
   };
 
-  const filtered = users.filter(u =>
-    (roleFilter.length === 0 || roleFilter.includes(u.role)) &&
-    (u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-     u.email?.toLowerCase().includes(search.toLowerCase()) ||
-     u.role?.toLowerCase().includes(search.toLowerCase()))
-  );
+  const openDetail = async (id: string) => {
+    setDetailLoading(true);
+    setDetail(null);
+    try { setDetail(await adminApi.getCustomerDetail(id, accessToken)); }
+    catch (err: any) { adminShowError(err.message ?? "Could not load customer details"); }
+    finally { setDetailLoading(false); }
+  };
+
+  const filtered = users;
   const uvSorted = sortUv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
@@ -3345,40 +3372,35 @@ function UsersView({
           onCancel={() => setDeleteId(null)}
         />
       )}
+      {(detailLoading || detail) && (
+        <CustomerDetailModal
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => { setDetail(null); setDetailLoading(false); }}
+        />
+      )}
 
       <div className="flex-shrink-0 flex gap-2 flex-wrap items-center">
         <div className="flex-1 min-w-[200px]">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search users…" />
+          <SearchBar value={serverSearch} onChange={onSearchChange} placeholder="Search customers by name, email, or phone…" />
         </div>
-        <MultiSelect
-          label="Role"
-          options={["customer", "partner", "admin"]}
-          selected={roleFilter}
-          onChange={setRoleFilter}
-        />
-        {(search || roleFilter.length > 0) && (
-          <button onClick={() => { setSearch(""); setRoleFilter([]); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
+        {serverSearch && (
+          <button onClick={() => onSearchChange("")} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear</button>
         )}
         <ExportBtn
           disabled={uvExporting}
           onClick={() => {
             setUvExporting(true);
-            adminApi.getUsers(accessToken, 1, 9999)
+             adminApi.getUsers(accessToken, 1, 9999, serverSearch)
               .then(all => {
-                const rows = all.users
-                  .filter(u =>
-                    (roleFilter.length === 0 || roleFilter.includes(u.role)) &&
-                    (u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-                     u.email?.toLowerCase().includes(search.toLowerCase()) ||
-                     u.role?.toLowerCase().includes(search.toLowerCase()))
-                  );
+                 const rows = all.users;
                 exportToExcel(
                   rows.map(u => ({
                     Name: u.fullName, Email: u.email, Phone: u.phone ?? "—",
                     Role: u.role, Status: u.isActive ? "Active" : "Inactive",
                     Joined: new Date(u.createdAt ?? "").toLocaleDateString("en-IN"),
                   })),
-                  `Users_${new Date().toISOString().slice(0, 10)}.xlsx`
+                   `Customers_${new Date().toISOString().slice(0, 10)}.xlsx`
                 );
               })
               .catch(e => adminShowError(e?.message ?? "Export failed"))
@@ -3431,7 +3453,8 @@ function UsersView({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <ActionBtn variant="edit" onClick={() => openEdit(u)}>Edit</ActionBtn>
+                       <ActionBtn variant="edit" onClick={() => void openDetail(u.id)}>Details</ActionBtn>
+                       <ActionBtn variant="edit" onClick={() => openEdit(u)}>Edit</ActionBtn>
                       <ActionBtn
                         variant={u.isActive ? "warn" : "green"}
                         onClick={() => handleToggle(u)}
@@ -3444,7 +3467,7 @@ function UsersView({
                   </td>
                 </tr>
               ))}
-              {uvSorted.length === 0 && <EmptyRow cols={7} text="No users found" />}
+              {uvSorted.length === 0 && <EmptyRow cols={7} text="No customers found" />}
             </tbody>
           </table>
         </div>
@@ -3452,6 +3475,259 @@ function UsersView({
       </div>
     </div>
   );
+}
+
+function detailDate(value: unknown) {
+  if (!value) return "—";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+
+function DetailStat({ label, value, accent = "#a78bfa" }: { label: string; value: React.ReactNode; accent?: string }) {
+  return (
+    <div className="rounded-xl border border-white/[0.07] px-3 py-2.5" style={{ background: "rgba(255,255,255,0.025)" }}>
+      <p className="text-white/35 text-[10px] uppercase tracking-wide">{label}</p>
+      <p className="text-white font-bold text-base mt-1" style={{ color: accent }}>{value}</p>
+    </div>
+  );
+}
+
+function DetailPaymentRows({ payments }: { payments: Array<Record<string, any>> }) {
+  if (!payments.length) return <span className="text-white/25 text-xs">No payment recorded</span>;
+  return (
+    <div className="space-y-1.5">
+      {payments.map(payment => (
+        <div key={String(payment.id)} className="rounded-lg border border-white/[0.06] px-2.5 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.025)" }}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge label={String(payment.status ?? "unknown")} color={payment.status === "paid" ? "#16A34A" : payment.status === "refunded" ? "#F59E0B" : "#94A3B8"} />
+            <span className="text-white font-semibold">{fmt(Number(payment.amount ?? 0))}</span>
+            <span className="text-white/45">{payment.method ?? "Method pending"}</span>
+          </div>
+          <p className="text-white/35 mt-1">Created: {detailDate(payment.createdAt)} · Updated: {detailDate(payment.updatedAt)}</p>
+          {(payment.razorpayPaymentId || payment.stripePaymentIntentId) && (
+            <p className="text-white/25 mt-0.5 break-all">Ref: {payment.razorpayPaymentId ?? payment.stripePaymentIntentId}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CustomerDetailModal({
+  detail, loading, onClose,
+}: { detail: AdminCustomerDetail | null; loading: boolean; onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const allRows = useMemo(() => {
+    if (!detail) return [];
+    const legacy = detail.bookings.map(booking => ({
+      kind: "Legacy booking",
+      id: booking.id,
+      title: booking.serviceName,
+      status: booking.status,
+      amount: Number(booking.price ?? 0),
+      scheduledAt: booking.scheduledAt,
+      createdAt: booking.createdAt,
+      partner: booking.professionalName,
+      payments: booking.payments,
+      searchText: `${booking.serviceName} ${booking.status} ${booking.professionalName ?? ""} ${booking.id}`,
+    }));
+    const orderItems = detail.orders.flatMap(order => order.items.map(item => ({
+      kind: "Service order",
+      id: item.id,
+      title: item.serviceName ?? "Service",
+      status: item.status,
+      amount: Number(item.customerPrice ?? 0),
+      scheduledAt: item.scheduledAt ?? order.scheduledAt,
+      createdAt: item.createdAt ?? order.createdAt,
+      partner: item.partnerName,
+      payments: item.payments,
+      orderId: order.id,
+      searchText: `${item.serviceName ?? ""} ${item.status} ${item.partnerName ?? ""} ${order.id} ${item.id}`,
+    })));
+    return [...legacy, ...orderItems].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  }, [detail]);
+  const rows = allRows.filter(row => !search.trim() || row.searchText.toLowerCase().includes(search.trim().toLowerCase()));
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" style={{ background: "rgba(0,0,0,0.78)" }}>
+      <div className="w-full max-w-6xl max-h-[94vh] overflow-hidden rounded-2xl border border-white/10 flex flex-col" style={MODAL_BG}>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/[0.08]">
+          <div className="flex items-center gap-3 min-w-0">
+            {detail?.customer.avatarUrl
+              ? <img src={detail.customer.avatarUrl} alt="" className="w-11 h-11 rounded-xl object-cover" />
+              : <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold" style={{ background: "#0EA5E9" }}>{detail?.customer.fullName?.charAt(0).toUpperCase() ?? "C"}</div>}
+            <div className="min-w-0">
+              <h3 className="text-white font-bold text-lg truncate">{loading ? "Loading customer…" : detail?.customer.fullName}</h3>
+              {detail && <p className="text-white/45 text-xs truncate">{detail.customer.email} · {detail.customer.phone ?? "No phone"} · Joined {detailDate(detail.customer.createdAt)}</p>}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10"><X size={18} /></button>
+        </div>
+        {loading ? (
+          <div className="flex items-center justify-center h-64"><Loader2 size={28} className="animate-spin text-violet-400" /></div>
+        ) : detail ? (
+          <div className="overflow-y-auto p-5 space-y-5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <DetailStat label="Legacy bookings" value={detail.summary.legacyBookingCount} />
+              <DetailStat label="Service orders" value={detail.summary.serviceOrderCount} />
+              <DetailStat label="Services" value={detail.summary.serviceCount} />
+              <DetailStat label="Payments" value={detail.summary.paymentCount} />
+              <DetailStat label="Paid amount" value={fmt(detail.summary.paidAmount)} accent="#34D399" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search this customer's services, status, partner, or order ID…" /></div>
+              {search && <button onClick={() => setSearch("")} className="text-xs text-white/40 hover:text-white">Clear</button>}
+            </div>
+            <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.07] flex items-center justify-between">
+                <h4 className="text-white font-bold text-sm">Order and payment history</h4>
+                <span className="text-white/35 text-xs">{rows.length} record{rows.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div className="divide-y divide-white/[0.06]">
+                {rows.map(row => (
+                  <div key={`${row.kind}-${row.id}`} className="p-4 grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1.2fr] gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap"><Badge label={row.kind} color={row.kind === "Legacy booking" ? "#0EA5E9" : "#A78BFA"} /><Badge label={row.status.replace(/_/g, " ")} color={STATUS_COLOR[row.status] ?? "#94A3B8"} /></div>
+                      <p className="text-white font-semibold text-sm mt-2">{row.title}</p>
+                      <p className="text-white/40 text-xs mt-1">Partner: {row.partner ?? "Not assigned"} · Amount: {fmt(row.amount)}</p>
+                    </div>
+                    <div className="text-xs text-white/45 space-y-1">
+                      <p>Scheduled: <span className="text-white/70">{detailDate(row.scheduledAt)}</span></p>
+                      <p>Created: <span className="text-white/70">{detailDate(row.createdAt)}</span></p>
+                      {"orderId" in row && <p>Order ID: <span className="text-white/60 break-all">{row.orderId}</span></p>}
+                    </div>
+                    <DetailPaymentRows payments={row.payments} />
+                  </div>
+                ))}
+                {!rows.length && <p className="px-4 py-8 text-white/30 text-sm text-center">No matching customer history.</p>}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>,
+    document.body,
+  ) as unknown as React.ReactElement;
+}
+
+function ProfessionalDetailModal({
+  detail, loading, onClose,
+}: { detail: AdminProfessionalDetail | null; loading: boolean; onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const rows = useMemo(() => {
+    if (!detail) return [];
+    const legacy = detail.bookings.map(booking => ({
+      kind: "Legacy booking",
+      id: booking.id,
+      title: booking.serviceName,
+      status: booking.status,
+      customer: booking.customerName,
+      customerEmail: booking.customerEmail,
+      amount: Number(booking.price ?? 0),
+      payout: null,
+      scheduledAt: booking.scheduledAt,
+      createdAt: booking.createdAt,
+      completedAt: booking.completedAt,
+      payments: booking.payments,
+      searchText: `${booking.serviceName} ${booking.status} ${booking.customerName ?? ""} ${booking.customerEmail ?? ""} ${booking.id}`,
+    }));
+    const jobs = detail.jobs.map(job => ({
+      kind: "Service job",
+      id: job.id,
+      title: job.serviceName ?? "Service",
+      status: job.status,
+      customer: job.customerName,
+      customerEmail: job.customerEmail,
+      amount: Number(job.customerPrice ?? 0),
+      payout: Number(job.partnerPayout ?? 0),
+      scheduledAt: job.scheduledAt,
+      createdAt: job.createdAt,
+      completedAt: job.completedAt,
+      payments: job.payments,
+      searchText: `${job.serviceName ?? ""} ${job.status} ${job.customerName ?? ""} ${job.customerEmail ?? ""} ${job.id} ${job.orderId}`,
+    }));
+    return [...legacy, ...jobs].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  }, [detail]);
+  const filtered = rows.filter(row => !search.trim() || row.searchText.toLowerCase().includes(search.trim().toLowerCase()));
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" style={{ background: "rgba(0,0,0,0.78)" }}>
+      <div className="w-full max-w-6xl max-h-[94vh] overflow-hidden rounded-2xl border border-white/10 flex flex-col" style={MODAL_BG}>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/[0.08]">
+          <div className="flex items-center gap-3 min-w-0">
+            {detail?.professional.avatarUrl
+              ? <img src={detail.professional.avatarUrl} alt="" className="w-11 h-11 rounded-xl object-cover" />
+              : <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold" style={{ background: "#F59E0B" }}>{detail?.professional.name?.charAt(0).toUpperCase() ?? "P"}</div>}
+            <div className="min-w-0">
+              <h3 className="text-white font-bold text-lg truncate">{loading ? "Loading professional…" : detail?.professional.name}</h3>
+              {detail && <p className="text-white/45 text-xs truncate">{detail.professional.title} · {detail.professional.userEmail ?? "No login"} · {detail.professional.userPhone ?? "No phone"}</p>}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10"><X size={18} /></button>
+        </div>
+        {loading ? (
+          <div className="flex items-center justify-center h-64"><Loader2 size={28} className="animate-spin text-violet-400" /></div>
+        ) : detail ? (
+          <div className="overflow-y-auto p-5 space-y-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+              <DetailStat label="Legacy bookings" value={detail.summary.legacyBookingCount} />
+              <DetailStat label="Service jobs" value={detail.summary.serviceJobCount} />
+              <DetailStat label="Completed" value={detail.summary.completedJobCount} accent="#34D399" />
+              <DetailStat label="Payments" value={detail.summary.paymentCount} />
+              <DetailStat label="Paid customer total" value={fmt(detail.summary.paidAmount)} accent="#34D399" />
+              <DetailStat label="Payout requests" value={detail.summary.payoutRequestCount} />
+              <DetailStat label="Payout total" value={fmt(detail.summary.payoutAmount)} accent="#FBBF24" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1"><SearchBar value={search} onChange={setSearch} placeholder="Search jobs by service, customer, status, email, or ID…" /></div>
+              {search && <button onClick={() => setSearch("")} className="text-xs text-white/40 hover:text-white">Clear</button>}
+            </div>
+            <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.07] flex items-center justify-between"><h4 className="text-white font-bold text-sm">Assigned work and payment history</h4><span className="text-white/35 text-xs">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</span></div>
+              <div className="divide-y divide-white/[0.06]">
+                {filtered.map(row => (
+                  <div key={`${row.kind}-${row.id}`} className="p-4 grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1.2fr] gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap"><Badge label={row.kind} color={row.kind === "Legacy booking" ? "#0EA5E9" : "#F59E0B"} /><Badge label={row.status.replace(/_/g, " ")} color={STATUS_COLOR[row.status] ?? "#94A3B8"} /></div>
+                      <p className="text-white font-semibold text-sm mt-2">{row.title}</p>
+                      <p className="text-white/40 text-xs mt-1">Customer: {row.customer ?? "—"} · {row.customerEmail ?? "No email"}</p>
+                      <p className="text-white/50 text-xs mt-1">Customer price: {fmt(row.amount)}{row.payout !== null ? ` · Partner payout: ${fmt(row.payout)}` : ""}</p>
+                    </div>
+                    <div className="text-xs text-white/45 space-y-1">
+                      <p>Scheduled: <span className="text-white/70">{detailDate(row.scheduledAt)}</span></p>
+                      <p>Created: <span className="text-white/70">{detailDate(row.createdAt)}</span></p>
+                      <p>Completed: <span className="text-white/70">{detailDate(row.completedAt)}</span></p>
+                    </div>
+                    <DetailPaymentRows payments={row.payments} />
+                  </div>
+                ))}
+                {!filtered.length && <p className="px-4 py-8 text-white/30 text-sm text-center">No matching professional history.</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/[0.07]"><h4 className="text-white font-bold text-sm">Reviews</h4></div>
+                <div className="divide-y divide-white/[0.06]">
+                  {detail.reviews.map(review => <div key={String(review.id)} className="px-4 py-3 text-xs"><p className="text-amber-300">{"★".repeat(Number(review.rating ?? 0))} <span className="text-white/50">{review.customerName ?? "Customer"}</span></p><p className="text-white/60 mt-1">{review.comment ?? "No comment"} · {detailDate(review.createdAt)}</p></div>)}
+                  {!detail.reviews.length && <p className="px-4 py-5 text-white/30 text-xs">No reviews.</p>}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/[0.07]"><h4 className="text-white font-bold text-sm">Payout requests</h4></div>
+                <div className="divide-y divide-white/[0.06]">
+                  {detail.payouts.map(payout => <div key={String(payout.id)} className="px-4 py-3 text-xs flex items-center justify-between gap-3"><div><p className="text-white font-semibold">{fmt(Number(payout.amount ?? 0))} · <span className="text-white/50 capitalize">{String(payout.status).replace(/_/g, " ")}</span></p><p className="text-white/35 mt-1">Requested {detailDate(payout.requestedAt)} · Resolved {detailDate(payout.resolvedAt)}</p></div><span className="text-white/30 break-all text-right">{payout.providerPayoutId ?? "No provider ID"}</span></div>)}
+                  {!detail.payouts.length && <p className="px-4 py-5 text-white/30 text-xs">No payout requests.</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>,
+    document.body,
+  ) as unknown as React.ReactElement;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3694,12 +3970,6 @@ function CategoriesView({
 
       {/* Header */}
       <div className="flex flex-col gap-3">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-xs text-white/30">
-          <span>Dashboard</span>
-          <ChevronRight size={12} />
-          <span className="text-white/60 font-semibold">Services</span>
-        </div>
         {/* Title row */}
         <div className="flex items-center gap-3 flex-wrap">
           <div>
@@ -3949,16 +4219,8 @@ function SubCategoriesView({ category, accessToken, onBack }: { category: Catego
         />
       )}
 
-      {/* Header + Breadcrumb */}
+      {/* Header */}
       <div className="flex flex-col gap-3">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-xs text-white/30">
-          <span>Dashboard</span>
-          <ChevronRight size={12} />
-          <button onClick={onBack} className="hover:text-white/60 transition-colors">Services</button>
-          <ChevronRight size={12} />
-          <span className="text-white/60 font-semibold">{category.name}</span>
-        </div>
         {/* Title row */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-3">

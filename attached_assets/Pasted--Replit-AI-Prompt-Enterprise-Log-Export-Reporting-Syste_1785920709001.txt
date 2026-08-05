@@ -1,0 +1,580 @@
+# Replit AI Prompt – Enterprise Log Export & Reporting System
+
+## Objective
+
+Analyze the entire existing project architecture and the newly implemented logging system.
+
+Do NOT redesign the application.
+
+Do NOT replace any existing functionality.
+
+Extend the existing logging system by implementing a complete **Enterprise Log Export & Reporting Module** inside the existing Admin Panel.
+
+The implementation must automatically adapt to the current project architecture.
+
+---
+
+# Export Formats
+
+Support exporting logs in the following formats:
+
+* Excel (.xlsx)
+* CSV
+* PDF
+* JSON
+* ZIP (for very large exports)
+
+The export should preserve formatting and be suitable for business, technical, and audit purposes.
+
+---
+
+# Export Types
+
+Allow administrators to export:
+
+* System Logs
+* API Logs
+* Audit Logs
+* Authentication Logs
+* Booking Logs
+* Payment Logs
+* Wallet Logs
+* Transaction Logs
+* Notification Logs
+* SMS Logs
+* Email Logs
+* Push Notification Logs
+* Partner Logs
+* Customer Logs
+* Admin Activity Logs
+* Error Logs
+* Exception Logs
+* Background Job Logs
+* Scheduler Logs
+* Queue Logs
+* Webhook Logs
+* Database Logs
+* File Upload Logs
+* Security Logs
+
+---
+
+# Export Filters
+
+Support advanced filtering before export.
+
+Include filters for:
+
+Date Range
+
+Booking ID
+
+Order ID
+
+Transaction ID
+
+Payment ID
+
+Refund ID
+
+Wallet Transaction ID
+
+Invoice ID
+
+Customer ID
+
+Partner ID
+
+Admin ID
+
+User ID
+
+Phone Number
+
+Email
+
+Service Category
+
+Subcategory
+
+Service
+
+Booking Status
+
+Payment Status
+
+Refund Status
+
+Partner Status
+
+Customer Status
+
+API Name
+
+Endpoint
+
+HTTP Method
+
+Module
+
+Microservice (if applicable)
+
+Screen/Page
+
+Action Name
+
+Device Type
+
+Operating System
+
+Browser
+
+Application Version
+
+Server Version
+
+Environment
+
+IP Address
+
+Country
+
+City
+
+Trace ID
+
+Correlation ID
+
+Request ID
+
+Response Code
+
+HTTP Status
+
+Severity
+
+Error Code
+
+Error Type
+
+Execution Time
+
+Success
+
+Failure
+
+Cancelled
+
+Pending
+
+Completed
+
+Retry Count
+
+Webhook Status
+
+Notification Status
+
+Payment Gateway
+
+Provider
+
+Role
+
+Session ID
+
+---
+
+# Export Modes
+
+Support:
+
+Export Current Page
+
+Export Selected Rows
+
+Export Filtered Results
+
+Export Complete Dataset
+
+Export Errors Only
+
+Export Payments Only
+
+Export Bookings Only
+
+Export Audit Logs Only
+
+Export Failed Requests Only
+
+Export Today's Logs
+
+Export Yesterday
+
+Export Last 7 Days
+
+Export Last 30 Days
+
+Export Custom Range
+
+---
+
+# Report Metadata
+
+Every exported file must include:
+
+Report Name
+
+Export Timestamp
+
+Exported By
+
+Admin User
+
+Export Version
+
+Total Records
+
+Applied Filters
+
+Environment
+
+Generated From
+
+Application Version
+
+Server Version
+
+Timezone
+
+Company Name
+
+Page Numbers
+
+Generation Duration
+
+---
+
+# PDF Reports
+
+Professional printable layout.
+
+Include:
+
+Company Logo
+
+Report Title
+
+Summary
+
+Charts (if available)
+
+Statistics
+
+Tables
+
+Footer
+
+Page Number
+
+Generated Time
+
+Confidential Label
+
+---
+
+# Excel Reports
+
+Professional formatting.
+
+Include:
+
+Headers
+
+Filters
+
+Frozen Header Row
+
+Auto Column Width
+
+Sorting
+
+Color Coding
+
+Totals
+
+Summary Sheet
+
+Separate Worksheets for different log categories where appropriate.
+
+---
+
+# CSV Reports
+
+Proper UTF encoding.
+
+Escape special characters.
+
+Support large datasets.
+
+---
+
+# JSON Export
+
+Developer-friendly structured format.
+
+Maintain complete nested object structure.
+
+Support importing back into diagnostic tools.
+
+---
+
+# ZIP Export
+
+When export size exceeds configured limits:
+
+Automatically compress files.
+
+Split into multiple files if required.
+
+Generate manifest file.
+
+---
+
+# Search Before Export
+
+Users must be able to preview results before downloading.
+
+Display:
+
+Matching Records
+
+Estimated File Size
+
+Estimated Export Time
+
+Warnings for huge exports.
+
+---
+
+# Export History
+
+Create Export History.
+
+Store:
+
+Export ID
+
+Admin
+
+Time
+
+IP
+
+Filters Used
+
+Format
+
+File Size
+
+Record Count
+
+Download Count
+
+Status
+
+Duration
+
+Success
+
+Failure
+
+---
+
+# Download Center
+
+Create a Download Center inside Admin Panel.
+
+Allow administrators to:
+
+View previous exports
+
+Re-download reports
+
+Delete expired exports
+
+Check generation progress
+
+Cancel running exports
+
+---
+
+# Scheduled Reports
+
+Allow administrators to schedule automatic reports.
+
+Examples:
+
+Daily Error Report
+
+Daily Booking Report
+
+Daily Payment Report
+
+Weekly Revenue Report
+
+Monthly Audit Report
+
+Monthly Partner Report
+
+Monthly Customer Activity Report
+
+Monthly Security Report
+
+Support:
+
+Daily
+
+Weekly
+
+Monthly
+
+Custom Cron Schedule (if architecture supports)
+
+Automatically generate reports and store them for download.
+
+---
+
+# Security
+
+Only authorized roles should export logs.
+
+Support role-based permissions.
+
+Examples:
+
+Super Admin
+
+Finance
+
+Operations
+
+Support
+
+Developer
+
+Auditor
+
+Restrict sensitive exports based on permissions.
+
+---
+
+# Audit Every Export
+
+Every export must generate an audit record.
+
+Store:
+
+Who exported
+
+Role
+
+Time
+
+IP Address
+
+Device
+
+Browser
+
+Filters Used
+
+Format
+
+Downloaded File Name
+
+Number of Records
+
+Reason (optional)
+
+Duration
+
+Status
+
+---
+
+# Performance
+
+Exports must not block application performance.
+
+Large exports should execute in the background.
+
+Display progress.
+
+Allow cancellation.
+
+Prevent memory overflow.
+
+Implement batching and streaming for large datasets.
+
+---
+
+# Dashboard
+
+Create an Export Dashboard.
+
+Show:
+
+Today's Exports
+
+Largest Reports
+
+Most Downloaded Reports
+
+Average Generation Time
+
+Failed Exports
+
+Storage Usage
+
+Export Queue
+
+Scheduled Reports
+
+Recent Downloads
+
+---
+
+# Error Handling
+
+If export fails:
+
+Log complete exception.
+
+Store stack trace.
+
+Store failure reason.
+
+Allow retry.
+
+Notify administrator.
+
+---
+
+# Final Validation
+
+After implementation:
+
+Analyze the existing project.
+
+Integrate with the current logging system.
+
+Preserve all existing architecture.
+
+Do not create duplicate modules.
+
+Follow existing coding standards.
+
+Ensure scalability for millions of log records.
+
+The final solution should provide enterprise-grade log reporting, export management, scheduled reporting, audit tracking, secure downloads, and high-performance exports suitable for a production marketplace platform similar to Urban Company.

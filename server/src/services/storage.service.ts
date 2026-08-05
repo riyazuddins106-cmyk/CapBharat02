@@ -1,5 +1,5 @@
 import { AppError } from '../utils/AppError.js';
-import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET, BANNER_BUCKET, DOCUMENTS_BUCKET } from '../config/supabase.js';
+import { supabaseAdmin, AVATAR_BUCKET, CATEGORY_BUCKET, REELS_BUCKET, BANNER_BUCKET, DOCUMENTS_BUCKET, PARTNER_EVIDENCE_BUCKET } from '../config/supabase.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -100,6 +100,22 @@ export const storageService = {
     const { error } = await supabaseAdmin.storage.from(DOCUMENTS_BUCKET).upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
     if (error) throw AppError.internal(`Failed to upload document: ${error.message}`);
     return supabaseAdmin.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+
+  async uploadPartnerJobEvidence(proId: string, jobId: string, phase: 'before' | 'after', file: Express.Multer.File): Promise<string> {
+    const maxSize = 8 * 1024 * 1024;
+    if (file.size > maxSize) throw AppError.badRequest('Job photo must be smaller than 8MB.');
+    const detected = detectImageType(file.buffer);
+    if (!detected || !['image/png', 'image/jpeg', 'image/webp'].includes(detected.mime)) {
+      throw AppError.badRequest('Job evidence must be a PNG, JPEG, or WebP image.');
+    }
+    const path = `pro-${proId}/${jobId}/${phase}-${Date.now()}.${detected.ext}`;
+    const { error } = await supabaseAdmin.storage.from(PARTNER_EVIDENCE_BUCKET).upload(path, file.buffer, {
+      contentType: detected.mime,
+      upsert: false,
+    });
+    if (error) throw AppError.internal(`Failed to upload job evidence: ${error.message}`);
+    return supabaseAdmin.storage.from(PARTNER_EVIDENCE_BUCKET).getPublicUrl(path).data.publicUrl;
   },
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {

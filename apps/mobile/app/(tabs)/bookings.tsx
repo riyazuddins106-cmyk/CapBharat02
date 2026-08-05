@@ -470,6 +470,7 @@ function OrderServiceCard({ order, item, onAction, busy }: {
   const canCancel = !['cancelled', 'service_started', 'service_completed'].includes(item.status);
   const canContinue = !item.partnerId && item.status !== 'cancelled';
   const needsPayment = ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid';
+  const cashReported = item.payment?.method === 'cash' && !!item.payment.cashReportedAt && item.payment.status !== 'paid';
   const actionKey = (action: string) => `${action}:${item.id}`;
   const [showDetails, setShowDetails] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -547,7 +548,7 @@ function OrderServiceCard({ order, item, onAction, busy }: {
               </Text>
             </TouchableOpacity>
           )}
-          {needsPayment && (
+          {needsPayment && !cashReported && (
             <TouchableOpacity
               onPress={() => onAction('pay', order.id, item.id)}
               disabled={busy === actionKey('pay')}
@@ -557,6 +558,11 @@ function OrderServiceCard({ order, item, onAction, busy }: {
                 {busy === actionKey('pay') ? 'Paying…' : `Pay ₹${item.customerPrice}`}
               </Text>
             </TouchableOpacity>
+          )}
+          {cashReported && (
+            <View style={[styles.orderActionBtn, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+              <Text style={[styles.orderActionText, { color: '#92400E' }]}>Cash reported · Awaiting partner</Text>
+            </View>
           )}
           {canCancel && (
             <TouchableOpacity
@@ -858,13 +864,18 @@ export default function BookingsScreen() {
                   </View>
                 </View>
               </View>
-            ) : tab === 'awaitingPayment' ? (
+             ) : tab === 'awaitingPayment' ? (
               <View style={[styles.searchingBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
                 <View style={styles.searchingRow}>
                   <Ionicons name="wallet-outline" size={20} color="#D97706" />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.searchingTitle, { color: '#D97706' }]}>Service Payment Due</Text>
-                    <Text style={[styles.searchingText, { color: '#92400E' }]}>Payment is due after your partner checks in or completes the service.</Text>
+                     <Text style={[styles.searchingText, { color: '#92400E' }]}>
+                       {orders.flatMap(order => order.items
+                         .filter(item => ['partner_arrived', 'payment_pending'].includes(item.status) && item.payment?.status !== 'paid')
+                         .map(item => `${item.serviceName ?? 'Service'} · ₹${item.customerPrice}${item.payment?.method === 'cash' && item.payment.cashReportedAt ? ' · cash reported, awaiting partner confirmation' : ''}`)
+                       ).join('  •  ') || 'Payment is due after your partner checks in.'}
+                     </Text>
                   </View>
                 </View>
               </View>

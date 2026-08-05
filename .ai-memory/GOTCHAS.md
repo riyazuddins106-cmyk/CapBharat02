@@ -117,6 +117,11 @@
 **Fix:** The controller must accept both `availabilityStatus` (mobile) and `status` (legacy web). Do not change mobile to send `status` — it breaks the mobile app.
 **Files:** `server/src/controllers/partner.controller.ts`
 
+### Partner Mobile — payout history filter semantics
+**Problem:** Payout History needed both a date search and a status search without hiding older records.
+**Fix:** Default the local date range to Today–Today, provide one calendar that collects start and end dates, and combine it with an All statuses/Pending/Processing/Paid/Rejected dropdown.
+**Warning:** Keep status normalization aligned with backend values: `approved` and `processing` display/filter as Processing, while unknown values remain Pending.
+
 ---
 
 ## Expo Tunnel (Replit)
@@ -381,3 +386,24 @@
 **Problem:** The production API returned valid service/category/reel image URLs and the image hosts returned HTTP 200, but the published browser showed broken-image icons and alt text.
 **Fix:** Configure Helmet's Content Security Policy with `img-src 'self' data: https:` and `media-src 'self' data: https:` so approved HTTPS CDN/Supabase media can render.
 **Warning:** A local fix does not change an already-published build; republish after changing server security headers.
+
+### Partner Mobile completed-job timestamps
+**Problem:** Completed history previously displayed only the scheduled time; the completion moment was not persisted or returned by either Partner job API.
+**Fix:** Persist `completed_at` separately for legacy bookings and service-order items, set it on completion, and render it only on completed detail screens.
+**Warning:** Historical records created before this field was added may have no completion timestamp and should keep the scheduled time without inventing one.
+
+### Startup migrations — stale relation locks
+**Problem:** The API appeared stuck in `Service starting` while an idempotent migration waited on `professionals` or `users`; an older application query held the relation lock open, and later migration attempts queued behind it.
+**Fix:** Inspect `pg_stat_activity` and lock waiters, terminate only the stale migration/application backend sessions, then allow one clean migration run to finish.
+**Files:** `server/src/database/migrate.ts`, workflow/database runtime
+**Warning:** Do not start overlapping migration processes or terminate unrelated database sessions. The API binds only after migrations complete, so the proxy will correctly return 503/connection-refused during the wait.
+
+### Admin history views combine two booking models
+**Problem:** ServeNow retains both legacy bookings and newer service-order jobs, so a customer or professional history cannot be sourced from one table.
+**Fix:** Customer and Professional Details fetch and present both models, with payment records joined through their respective booking/payment tables and service-order item payment tables.
+**Warning:** Keep the two record identifiers and payment semantics distinct when extending these detail APIs; customer price and partner payout are not interchangeable.
+
+### Partner Schedule date filters
+**Problem:** The Partner Mobile Schedule endpoint could fail when PostgreSQL received JavaScript `Date` objects inside raw Drizzle SQL comparison fragments.
+**Fix:** Convert the calculated day bounds to ISO strings and explicitly cast them to `timestamptz` for both legacy bookings and service-order items.
+**Warning:** Keep the endpoint’s UTC day-boundary behavior consistent with the mobile client’s `YYYY-MM-DD` range; do not compare date-only strings directly to timestamp columns.

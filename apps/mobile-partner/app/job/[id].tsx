@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform,
+  View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform, Linking, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
@@ -33,6 +34,10 @@ export default function JobDetailScreen() {
   const [showScanner, setShowScanner] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [issueType, setIssueType] = useState('Customer unavailable');
+  const [issueMessage, setIssueMessage] = useState('');
+  const [evidencePhase, setEvidencePhase] = useState<'before' | 'after' | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   // Ref-based lock: guards against rapid-fire barcode events on Android where
   // multiple scan callbacks can fire before the state re-render runs.
@@ -42,6 +47,11 @@ export default function JobDetailScreen() {
   const { data: job, refetch } = useQuery({
     queryKey: ['/api/partner/jobs', id, accessToken],
     queryFn: () => partnerApi.getJob(id!, accessToken!),
+    enabled: !!accessToken && !!id,
+  });
+  const evidence = useQuery({
+    queryKey: ['/api/partner/evidence', 'booking', id, accessToken],
+    queryFn: () => partnerApi.listEvidence('booking', id!, accessToken!),
     enabled: !!accessToken && !!id,
   });
 
@@ -100,6 +110,36 @@ export default function JobDetailScreen() {
     },
     onError: (e: any) => Alert.alert('Error', e.message),
   });
+
+  const reportIssue = useMutation({
+    mutationFn: () => partnerApi.reportIssue({
+      jobType: 'booking',
+      jobId: id!,
+      issueType,
+      message: issueMessage.trim(),
+      priority: issueType === 'Unsafe location' ? 'urgent' : 'high',
+    }, accessToken!),
+    onSuccess: () => { setIssueOpen(false); setIssueMessage(''); Alert.alert('Issue reported', 'Operations has been notified and linked this report to the job.'); },
+    onError: (e: any) => Alert.alert('Could not report issue', e.message),
+  });
+
+  const uploadEvidence = async (phase: 'before' | 'after') => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.status !== 'granted') {
+        Alert.alert('Permission needed', 'Allow photo access to upload job evidence.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8 });
+      const uri = result.canceled ? null : result.assets?.[0]?.uri;
+      if (!uri) return;
+      setEvidencePhase(phase);
+      await partnerApi.uploadEvidence('booking', id!, phase, uri, accessToken!);
+      await evidence.refetch();
+      Alert.alert('Photo uploaded', `${phase === 'before' ? 'Before' : 'After'}-service evidence saved.`);
+    } catch (e: any) { Alert.alert('Upload failed', e.message); }
+    finally { setEvidencePhase(null); }
+  };
 
   const handleBarCodeScanned = ({ data }: { data: string }) => {
     // Double-guard: state check (for UI) + ref check (prevents rapid Android callbacks
@@ -218,6 +258,17 @@ export default function JobDetailScreen() {
   }
 
   // ── Job detail ───────────────────────────────────────────
+  const address = job.address
+    ? `${job.address.line1}${job.address.line2 ? `, ${job.address.line2}` : ''}, ${job.address.city}, ${job.address.state} ${job.address.postalCode}`
+    : 'Address not provided';
+  const customerPhone = job.customerPhone;
+  const reportIssuePrompt = () => {
+    if (!issueMessage.trim()) {
+      Alert.alert('Add details', 'Describe what happened before submitting the issue.');
+      return;
+    }
+    reportIssue.mutate();
+  };
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
@@ -236,6 +287,9 @@ export default function JobDetailScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Job Details</Text>
           <DetailRow icon="time-outline" label="Scheduled" value={fmtDate(job.scheduledAt)} colors={colors} />
+          {job.status === 'completed' && job.completedAt && (
+            <DetailRow icon="checkmark-circle-outline" label="Completed" value={fmtDate(job.completedAt)} colors={colors} />
+          )}
           <DetailRow icon="cash-outline" label="Earnings" value={`₹${job.price}`} colors={colors} bold />
           {job.paymentStatus != null && (
             <DetailRow
@@ -247,6 +301,28 @@ export default function JobDetailScreen() {
           )}
           {job.notes && <DetailRow icon="document-text-outline" label="Notes" value={job.notes} colors={colors} />}
         </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Customer contact</Text>
+          <View style={styles.contactRow}>
+            {job.customerPhone && <TouchableOpacity onPress={() => Linking.openURL(`tel:${job.customerPhone}`)} style={[styles.smallBtn, { backgroundColor: colors.secondary }]}><Ionicons name="call-outline" size={16} color={colors.primary} /><Text style={{ color: colors.primary, fontWeight: '700' }}>Call</Text></TouchableOpacity>}
+            {customerPhone && <TouchableOpacity onPress={() => Linking.openURL(`https://wa.me/${customerPhone.replace(/\D/g, '')}`)} style={[styles.smallBtn, { backgroundColor: '#DCFCE7' }]}><Ionicons name="logo-whatsapp" size={16} color="#16A34A" /><Text style={{ color: '#16A34A', fontWeight: '700' }}>WhatsApp</Text></TouchableOpacity>}
+          </View>
+        </View>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Service location</Text>
+          <DetailRow icon="location-outline" label="Address" value={address} colors={colors} />
+          {job.address && <TouchableOpacity onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(address)}`)}><Text style={[styles.mapLink, { color: colors.primary }]}>Open in Maps</Text></TouchableOpacity>}
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+          <View style={styles.cardHeaderRow}><Text style={[styles.cardTitle, { color: colors.foreground }]}>Job evidence</Text><Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{evidence.data?.length ?? 0} photos</Text></View>
+          <View style={styles.contactRow}>
+            {(['before', 'after'] as const).map(phase => <TouchableOpacity key={phase} onPress={() => uploadEvidence(phase)} disabled={evidencePhase !== null} style={[styles.smallBtn, { backgroundColor: colors.secondary, opacity: evidencePhase ? 0.6 : 1 }]}><Ionicons name="camera-outline" size={16} color={colors.primary} /><Text style={{ color: colors.primary, fontWeight: '700' }}>{evidencePhase === phase ? 'Uploading…' : `Add ${phase}`}</Text></TouchableOpacity>)}
+          </View>
+        </View>
+
+        <TouchableOpacity onPress={() => setIssueOpen(true)} style={[styles.issueBtn, { borderColor: '#FCA5A5' }]}><Ionicons name="flag-outline" size={17} color="#DC2626" /><Text style={{ color: '#DC2626', fontWeight: '800' }}>Report a job issue or no-show</Text></TouchableOpacity>
 
         {/* All services in this booking */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
@@ -299,6 +375,16 @@ export default function JobDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {issueOpen && <View style={styles.modalBackdrop}>
+        <View style={[styles.issueModal, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Report job issue</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 6 }}>Choose the closest issue and add operational details.</Text>
+          <View style={styles.issueChoices}>{['Customer unavailable', 'Wrong address', 'Unsafe location', 'Extra work required', 'Payment refusal', 'Other'].map(type => <TouchableOpacity key={type} onPress={() => setIssueType(type)} style={[styles.issueChoice, { borderColor: issueType === type ? colors.primary : colors.border, backgroundColor: issueType === type ? colors.secondary : colors.background }]}><Text style={{ color: issueType === type ? colors.primary : colors.foreground, fontSize: 12, fontWeight: '700' }}>{type}</Text></TouchableOpacity>)}</View>
+          <TextInput value={issueMessage} onChangeText={setIssueMessage} placeholder="What happened?" placeholderTextColor={colors.mutedForeground} multiline style={[styles.issueInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]} />
+          <View style={styles.contactRow}><TouchableOpacity onPress={() => setIssueOpen(false)} style={[styles.smallBtn, { borderWidth: 1, borderColor: colors.border }]}><Text style={{ color: colors.mutedForeground, fontWeight: '700' }}>Cancel</Text></TouchableOpacity><TouchableOpacity onPress={reportIssuePrompt} disabled={reportIssue.isPending} style={[styles.smallBtn, { backgroundColor: '#DC2626', flex: 1 }]}><Text style={{ color: '#fff', fontWeight: '800' }}>{reportIssue.isPending ? 'Sending…' : 'Send report'}</Text></TouchableOpacity></View>
+        </View>
+      </View>}
 
       {/* Accept / Reject for pending */}
       {job.status === 'pending' && (
@@ -383,6 +469,16 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, fontWeight: '700' },
   card: { padding: 16, borderWidth: 1, gap: 12 },
   cardTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  contactRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  smallBtn: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 9 },
+  mapLink: { marginLeft: 25, fontWeight: '700' },
+  issueBtn: { borderWidth: 1, borderRadius: 10, padding: 13, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center' },
+  modalBackdrop: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 18 },
+  issueModal: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 12 },
+  issueChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  issueChoice: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8 },
+  issueInput: { minHeight: 90, borderWidth: 1, borderRadius: 9, padding: 10, textAlignVertical: 'top' },
   detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   serviceRow: { paddingVertical: 2 },
   detailLabel: { fontSize: 13, width: 70 },

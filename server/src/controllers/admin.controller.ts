@@ -652,6 +652,245 @@ export const adminController = {
     res.json({ success: true, data: { professionals: rows, total: Number(total) } });
   }),
 
+  /** Full customer profile with legacy bookings, service orders, and payment timestamps. */
+  getCustomerDetail: asyncHandler(async (req: Request, res: Response) => {
+    const customerId = req.params.id;
+    const [customer] = await db.select({
+      id: users.id,
+      fullName: users.fullName,
+      email: users.email,
+      phone: users.phone,
+      role: users.role,
+      isActive: users.isActive,
+      avatarUrl: users.avatarUrl,
+      createdAt: users.createdAt,
+    }).from(users).where(and(eq(users.id, customerId), eq(users.role, 'customer'), isNull(users.deletedAt))).limit(1);
+    if (!customer) throw AppError.notFound('Customer not found.');
+
+    const [bookingRows, orderRows] = await Promise.all([
+      db.select({
+        booking: bookings,
+        professionalName: professionals.name,
+        address: addresses,
+      })
+        .from(bookings)
+        .leftJoin(professionals, eq(professionals.id, bookings.professionalId))
+        .leftJoin(addresses, eq(addresses.id, bookings.addressId))
+        .where(and(eq(bookings.customerId, customerId), isNull(bookings.deletedAt)))
+        .orderBy(desc(bookings.createdAt)),
+      db.select({
+        order: orders,
+        item: orderItems,
+        serviceName: services.name,
+        partnerName: professionals.name,
+        address: addresses,
+      })
+        .from(orders)
+        .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+        .leftJoin(services, eq(services.id, orderItems.serviceId))
+        .leftJoin(professionals, eq(professionals.id, orderItems.partnerId))
+        .leftJoin(addresses, eq(addresses.id, orders.addressId))
+        .where(eq(orders.customerId, customerId))
+        .orderBy(desc(orders.createdAt), desc(orderItems.createdAt)),
+    ]);
+
+    const bookingIds = bookingRows.map(({ booking }) => booking.id);
+    const itemIds = orderRows.map(({ item }) => item.id);
+    const [legacyPayments, orderPayments] = await Promise.all([
+      bookingIds.length
+        ? db.select().from(payments).where(inArray(payments.bookingId, bookingIds)).orderBy(desc(payments.createdAt))
+        : Promise.resolve([]),
+      itemIds.length
+        ? db.select().from(orderItemPayments).where(inArray(orderItemPayments.orderItemId, itemIds)).orderBy(desc(orderItemPayments.createdAt))
+        : Promise.resolve([]),
+    ]);
+    const paymentsByBooking = new Map<string, typeof legacyPayments>();
+    legacyPayments.forEach(payment => {
+      const list = paymentsByBooking.get(payment.bookingId) ?? [];
+      list.push(payment);
+      paymentsByBooking.set(payment.bookingId, list);
+    });
+    const paymentsByItem = new Map<string, typeof orderPayments>();
+    orderPayments.forEach(payment => {
+      const list = paymentsByItem.get(payment.orderItemId) ?? [];
+      list.push(payment);
+      paymentsByItem.set(payment.orderItemId, list);
+    });
+
+    const bookingsData = bookingRows.map(({ booking, professionalName, address }) => ({
+      ...booking,
+      professionalName: professionalName ?? booking.proName,
+      address,
+      payments: paymentsByBooking.get(booking.id) ?? [],
+    }));
+    const ordersById = new Map<string, any>();
+    for (const { order, item, serviceName, partnerName, address } of orderRows) {
+      const existing = ordersById.get(order.id) ?? {
+        ...order,
+        address,
+        items: [],
+      };
+      existing.items.push({
+        ...item,
+        serviceName,
+        partnerName,
+        payments: paymentsByItem.get(item.id) ?? [],
+      });
+      ordersById.set(order.id, existing);
+    }
+    const orderData = [...ordersById.values()];
+    const paidAmount = [...legacyPayments, ...orderPayments]
+      .filter(payment => payment.status === 'paid')
+      .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        customer,
+        summary: {
+          legacyBookingCount: bookingsData.length,
+          serviceOrderCount: orderData.length,
+          serviceCount: orderRows.length,
+          paymentCount: legacyPayments.length + orderPayments.length,
+          paidAmount,
+        },
+        bookings: bookingsData,
+        orders: orderData,
+      },
+    });
+  }),
+
+  /** Full professional profile with assigned jobs, payment history, reviews, and payouts. */
+  getProfessionalDetail: asyncHandler(async (req: Request, res: Response) => {
+    const professionalId = req.params.id;
+    const [profileRow] = await db.select({
+      professional: professionals,
+      userEmail: users.email,
+      userPhone: users.phone,
+      categoryName: serviceCategories.name,
+    })
+      .from(professionals)
+      .leftJoin(users, eq(users.id, professionals.userId))
+      .leftJoin(serviceCategories, eq(serviceCategories.id, professionals.categoryId))
+      .where(and(eq(professionals.id, professionalId), isNull(professionals.deletedAt)))
+      .limit(1);
+    if (!profileRow) throw AppError.notFound('Professional not found.');
+
+    const [bookingRows, orderRows, reviewRows, payoutRows] = await Promise.all([
+      db.select({
+        booking: bookings,
+        customerName: users.fullName,
+        customerEmail: users.email,
+        address: addresses,
+      })
+        .from(bookings)
+        .leftJoin(users, eq(users.id, bookings.customerId))
+        .leftJoin(addresses, eq(addresses.id, bookings.addressId))
+        .where(and(eq(bookings.professionalId, professionalId), isNull(bookings.deletedAt)))
+        .orderBy(desc(bookings.createdAt)),
+      db.select({
+        order: orders,
+        item: orderItems,
+        serviceName: services.name,
+        customerName: users.fullName,
+        customerEmail: users.email,
+        address: addresses,
+      })
+        .from(orderItems)
+        .innerJoin(orders, eq(orders.id, orderItems.orderId))
+        .leftJoin(services, eq(services.id, orderItems.serviceId))
+        .leftJoin(users, eq(users.id, orders.customerId))
+        .leftJoin(addresses, eq(addresses.id, orders.addressId))
+        .where(eq(orderItems.partnerId, professionalId))
+        .orderBy(desc(orderItems.createdAt)),
+      db.select({
+        review: reviews,
+        customerName: users.fullName,
+        customerEmail: users.email,
+      })
+        .from(reviews)
+        .leftJoin(users, eq(users.id, reviews.customerId))
+        .where(and(eq(reviews.professionalId, professionalId), isNull(reviews.deletedAt)))
+        .orderBy(desc(reviews.createdAt)),
+      db.select().from(payoutRequests)
+        .where(eq(payoutRequests.professionalId, professionalId))
+        .orderBy(desc(payoutRequests.requestedAt)),
+    ]);
+
+    const bookingIds = bookingRows.map(({ booking }) => booking.id);
+    const itemIds = orderRows.map(({ item }) => item.id);
+    const [legacyPayments, orderPayments] = await Promise.all([
+      bookingIds.length
+        ? db.select().from(payments).where(inArray(payments.bookingId, bookingIds)).orderBy(desc(payments.createdAt))
+        : Promise.resolve([]),
+      itemIds.length
+        ? db.select().from(orderItemPayments).where(inArray(orderItemPayments.orderItemId, itemIds)).orderBy(desc(orderItemPayments.createdAt))
+        : Promise.resolve([]),
+    ]);
+    const paymentsByBooking = new Map<string, typeof legacyPayments>();
+    legacyPayments.forEach(payment => {
+      const list = paymentsByBooking.get(payment.bookingId) ?? [];
+      list.push(payment);
+      paymentsByBooking.set(payment.bookingId, list);
+    });
+    const paymentsByItem = new Map<string, typeof orderPayments>();
+    orderPayments.forEach(payment => {
+      const list = paymentsByItem.get(payment.orderItemId) ?? [];
+      list.push(payment);
+      paymentsByItem.set(payment.orderItemId, list);
+    });
+
+    const bookingsData = bookingRows.map(({ booking, customerName, customerEmail, address }) => ({
+      ...booking,
+      customerName,
+      customerEmail,
+      address,
+      payments: paymentsByBooking.get(booking.id) ?? [],
+    }));
+    const jobsData = orderRows.map(({ order, item, serviceName, customerName, customerEmail, address }) => ({
+      ...item,
+      orderId: order.id,
+      orderStatus: order.status,
+      orderCreatedAt: order.createdAt,
+      orderScheduledAt: order.scheduledAt,
+      address,
+      customerName,
+      customerEmail,
+      serviceName,
+      payments: paymentsByItem.get(item.id) ?? [],
+    }));
+    const paidAmount = [...legacyPayments, ...orderPayments]
+      .filter(payment => payment.status === 'paid')
+      .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+    const payoutAmount = payoutRows.reduce((total, payout) => total + Number(payout.amount ?? 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        professional: {
+          ...profileRow.professional,
+          userEmail: profileRow.userEmail,
+          userPhone: profileRow.userPhone,
+          categoryName: profileRow.categoryName,
+        },
+        summary: {
+          legacyBookingCount: bookingsData.length,
+          serviceJobCount: jobsData.length,
+          completedJobCount: bookingsData.filter(row => row.status === 'completed').length
+            + jobsData.filter(row => row.status === 'service_completed').length,
+          paymentCount: legacyPayments.length + orderPayments.length,
+          paidAmount,
+          payoutRequestCount: payoutRows.length,
+          payoutAmount,
+        },
+        bookings: bookingsData,
+        jobs: jobsData,
+        reviews: reviewRows.map(({ review, customerName, customerEmail }) => ({ ...review, customerName, customerEmail })),
+        payouts: payoutRows,
+      },
+    });
+  }),
+
   createProfessional: asyncHandler(async (req: Request, res: Response) => {
     const { fullName, email, password, phone, title, bio, categoryId, subCategoryId, basePrice, priceUnit, badge, tags } = req.body as {
       fullName: string; email: string; password: string; phone?: string;
@@ -839,8 +1078,18 @@ export const adminController = {
   listUsers: asyncHandler(async (req: Request, res: Response) => {
     const limit  = Math.min(Number(req.query.limit  ?? 50), 100);
     const offset = Number(req.query.offset ?? 0);
+    const search = String(req.query.search ?? '').trim();
 
-    const whereClause = and(ne(users.role, 'admin'), isNull(users.deletedAt));
+    // Customer accounts belong here; partner accounts are managed through Professionals.
+    const conditions: any[] = [eq(users.role, 'customer'), isNull(users.deletedAt)];
+    if (search) {
+      conditions.push(or(
+        ilike(users.fullName, `%${search}%`),
+        ilike(users.email, `%${search}%`),
+        ilike(users.phone, `%${search}%`),
+      ));
+    }
+    const whereClause = and(...conditions);
 
     const rows = await db
       .select({
@@ -1053,7 +1302,9 @@ export const adminController = {
       .from(users)
       .where(eq(users.id, id));
     if (!target || target.deletedAt) throw AppError.notFound('User not found');
-    if (target.role === 'admin') throw AppError.forbidden('Cannot modify an admin account');
+    if (!['customer', 'partner'].includes(target.role)) {
+      throw AppError.forbidden('Cannot modify an admin or operations account from Users.');
+    }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (fullName !== undefined) patch.fullName = fullName.trim();
@@ -1082,7 +1333,9 @@ export const adminController = {
       .from(users)
       .where(eq(users.id, id));
     if (!target || target.deletedAt) throw AppError.notFound('User not found');
-    if (target.role === 'admin') throw AppError.forbidden('Cannot delete an admin account');
+    if (!['customer', 'partner'].includes(target.role)) {
+      throw AppError.forbidden('Cannot delete an admin or operations account from Users.');
+    }
 
     const [row] = await db
       .update(users)
@@ -1100,7 +1353,9 @@ export const adminController = {
       .from(users)
       .where(eq(users.id, req.params.id));
     if (!target || target.deletedAt) throw AppError.notFound('User not found');
-    if (target.role === 'admin') throw AppError.forbidden('Cannot suspend an admin account');
+    if (!['customer', 'partner'].includes(target.role)) {
+      throw AppError.forbidden('Cannot suspend an admin or operations account from Users.');
+    }
 
     const [row] = await db
       .update(users)
@@ -1118,7 +1373,9 @@ export const adminController = {
       .from(users)
       .where(eq(users.id, req.params.id));
     if (!target || target.deletedAt) throw AppError.notFound('User not found');
-    if (target.role === 'admin') throw AppError.forbidden('Cannot modify an admin account');
+    if (!['customer', 'partner'].includes(target.role)) {
+      throw AppError.forbidden('Cannot activate an admin or operations account from Users.');
+    }
 
     const [row] = await db
       .update(users)

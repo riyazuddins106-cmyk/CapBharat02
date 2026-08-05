@@ -359,11 +359,13 @@ export const ordersController = {
     if (existing?.status === 'paid') throw AppError.badRequest('This service has already been paid.');
 
     const fakeRef = `test_${Date.now()}`;
+    const isCash = method === 'cash';
     let paymentRecord;
     if (existing) {
       const [updated] = await db.update(orderItemPayments).set({
-        method: method as any, status: 'paid',
+        method: method as any, status: isCash ? 'created' : 'paid',
         notes: '[TEST MODE] Simulated payment',
+        cashReportedAt: isCash ? new Date() : null,
         updatedAt: new Date(),
       }).where(eq(orderItemPayments.id, existing.id)).returning();
       paymentRecord = updated;
@@ -374,22 +376,34 @@ export const ordersController = {
         customerId: req.user!.userId,
         amount: item.customerPrice,
         currency: 'INR',
-        status: 'paid',
+        status: isCash ? 'created' : 'paid',
         method: method as any,
         notes: '[TEST MODE] Simulated payment',
+        cashReportedAt: isCash ? new Date() : undefined,
         razorpayOrderId: method === 'razorpay' ? fakeRef : undefined,
         stripeSessionId: method === 'stripe' ? fakeRef : undefined,
       }).returning();
       paymentRecord = created;
     }
 
-    // Advance item status to payment_completed → service_started
-    await db.update(orderItems).set({
-      status: 'service_started',
-      updatedAt: new Date(),
-    }).where(eq(orderItems.id, itemId));
+    if (!isCash) {
+      await db.update(orderItems).set({
+        status: 'service_started',
+        updatedAt: new Date(),
+      }).where(eq(orderItems.id, itemId));
+    }
 
     await recomputeOrderStatus(orderId);
+    if (isCash) {
+      const service = await db.select({ name: services.name }).from(services).where(eq(services.id, item.serviceId)).limit(1);
+      void notificationDbService.create({
+        userId: order.customerId,
+        title: 'Cash payment reported',
+        body: `Cash payment of ₹${item.customerPrice} reported for ${service[0]?.name ?? 'your service'}. Your partner will confirm receipt.`,
+        type: 'payment',
+        data: { orderId, orderItemId: itemId, amount: item.customerPrice, method: 'cash' },
+      });
+    }
     sendSuccess(res, paymentRecord);
   }),
 
@@ -421,11 +435,13 @@ export const ordersController = {
       .where(eq(orderItemPayments.orderItemId, itemId)).limit(1);
     if (existing?.status === 'paid') throw AppError.badRequest('Already paid.');
 
-    const newStatus = method === 'cash' ? 'paid' : 'created';
+    const newStatus = 'created';
     let paymentRecord;
     if (existing) {
       const [updated] = await db.update(orderItemPayments).set({
-        method: method as any, status: newStatus as any, notes: notes ?? null, updatedAt: new Date(),
+        method: method as any, status: newStatus as any, notes: notes ?? null,
+        cashReportedAt: method === 'cash' ? new Date() : null,
+        updatedAt: new Date(),
       }).where(eq(orderItemPayments.id, existing.id)).returning();
       paymentRecord = updated;
     } else {
@@ -433,15 +449,22 @@ export const ordersController = {
         orderItemId: itemId, orderId, customerId: req.user!.userId,
         amount: item.customerPrice, currency: 'INR',
         status: newStatus as any, method: method as any, notes: notes ?? null,
+        cashReportedAt: method === 'cash' ? new Date() : undefined,
       }).returning();
       paymentRecord = created;
     }
 
-    if (method === 'cash') {
-      await db.update(orderItems).set({ status: 'service_started', updatedAt: new Date() })
-        .where(eq(orderItems.id, itemId));
-      await recomputeOrderStatus(orderId);
-    }
+    await recomputeOrderStatus(orderId);
+    const service = await db.select({ name: services.name }).from(services).where(eq(services.id, item.serviceId)).limit(1);
+    void notificationDbService.create({
+      userId: order.customerId,
+      title: method === 'cash' ? 'Cash payment reported' : 'Payment submitted',
+      body: method === 'cash'
+        ? `Cash payment of ₹${item.customerPrice} reported for ${service[0]?.name ?? 'your service'}. Your partner will confirm receipt.`
+        : `Payment details submitted for ${service[0]?.name ?? 'your service'}.`,
+      type: 'payment',
+      data: { orderId, orderItemId: itemId, amount: item.customerPrice, method },
+    });
 
     sendSuccess(res, paymentRecord);
   }),

@@ -580,6 +580,8 @@ export async function runMigrations() {
   // ── Add missing `reviewed` column to bookings ──────────────────────────────
   await run('column: bookings.reviewed',
     `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reviewed BOOLEAN NOT NULL DEFAULT false`);
+  await run('column: bookings.completed_at',
+    `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
 
   // ── Partner availability: new partners should be 'available' by default ──
   // The original CREATE TABLE used a hard-coded DEFAULT 'offline' which
@@ -666,6 +668,38 @@ export async function runMigrations() {
     `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancellation_fee INTEGER NOT NULL DEFAULT 0`);
   await run('column: order_items.cancelled_at',
     `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`);
+  await run('column: order_items.completed_at',
+    `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
+
+  await run('table: partner_job_evidence', `
+    CREATE TABLE IF NOT EXISTS partner_job_evidence (
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      professional_id UUID NOT NULL REFERENCES professionals(id) ON DELETE CASCADE,
+      booking_id      UUID REFERENCES bookings(id) ON DELETE CASCADE,
+      order_item_id   UUID REFERENCES order_items(id) ON DELETE CASCADE,
+      phase           VARCHAR(16) NOT NULL CHECK (phase IN ('before', 'after')),
+      file_url        VARCHAR(2048) NOT NULL,
+      file_name       VARCHAR(255),
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT partner_job_evidence_one_job CHECK (
+        (booking_id IS NOT NULL AND order_item_id IS NULL) OR
+        (booking_id IS NULL AND order_item_id IS NOT NULL)
+      )
+    )`);
+  await run('index: partner_job_evidence_booking',
+    `CREATE INDEX IF NOT EXISTS idx_partner_job_evidence_booking ON partner_job_evidence(booking_id, phase)`);
+  await run('index: partner_job_evidence_order_item',
+    `CREATE INDEX IF NOT EXISTS idx_partner_job_evidence_order_item ON partner_job_evidence(order_item_id, phase)`);
+  await run('column: support_tickets.booking_id',
+    `ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL`);
+  await run('column: support_tickets.order_item_id',
+    `ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS order_item_id UUID REFERENCES order_items(id) ON DELETE SET NULL`);
+  await run('column: support_tickets.issue_type',
+    `ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS issue_type VARCHAR(64)`);
+  await run('column: support_tickets.priority',
+    `ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS priority VARCHAR(16) NOT NULL DEFAULT 'normal'`);
+  await run('index: support_tickets_job',
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_job ON support_tickets(booking_id, order_item_id)`);
 
   await run('table: order_item_requests', `
     CREATE TABLE IF NOT EXISTS order_item_requests (
@@ -704,6 +738,12 @@ export async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_oip_item ON order_item_payments(order_item_id)`);
   await run('index: order_item_payments_customer',
     `CREATE INDEX IF NOT EXISTS idx_oip_customer ON order_item_payments(customer_id)`);
+  await run('column: order_item_payments.cash_reported_at',
+    `ALTER TABLE order_item_payments ADD COLUMN IF NOT EXISTS cash_reported_at TIMESTAMPTZ`);
+  await run('column: order_item_payments.cash_confirmed_at',
+    `ALTER TABLE order_item_payments ADD COLUMN IF NOT EXISTS cash_confirmed_at TIMESTAMPTZ`);
+  await run('column: order_item_payments.cash_confirmed_by_partner_id',
+    `ALTER TABLE order_item_payments ADD COLUMN IF NOT EXISTS cash_confirmed_by_partner_id UUID REFERENCES professionals(id) ON DELETE SET NULL`);
 
   console.log('[migrate] Done ✓');
   await sql.end();

@@ -10,6 +10,25 @@
 **Task:** Remove multilingual support and return ServeNow to English-only
 **Status:** COMPLETE. All language selectors, locale providers, translation catalogs, RTL behavior, and Admin language settings were removed from the web, mobile, and server surfaces.
 
+### Admin and Operations role separation — 2026-08-05
+- [x] Restrict regular Users to customer and partner accounts
+- [x] Keep Admin Management limited to admin and operations_manager accounts, with admin-only mutation/access
+- [ ] Align Admin API guards with the existing Operations sidebar permissions
+- [ ] Prevent Operations login from requesting admin-only data
+- [ ] Build, restart, and verify role-protected endpoints and Admin Panel behavior
+
+### Admin Create Professional scroll fix — 2026-08-05
+- [x] Give the Create Professional page its own vertical scroll area inside the fixed Admin Panel shell
+- [x] Rebuild and verify the Admin Web workflow starts cleanly
+
+### Admin Panel clickable sitemap — 2026-08-05
+- [x] Reverted the sitemap page, sidebar entry, header links, and sitemap navigation state at the user's request
+
+### Admin Panel breadcrumbs — 2026-08-05
+- [x] Removed the breadcrumb navigation from all Admin Panel pages at the user's request
+- [x] Removed the remaining Categories and Sub-category page breadcrumb rows
+- [x] Rebuild, restart, and verify the compact page headers
+
 ### Admin Partner Payout fix — 2026-08-04
 - [x] Fixed the Partner Payout Control Centre action handler to support `approved`, `paid`, and `rejected`
 - [x] Added clear success messaging for scheduled approval versus immediate RazorpayX payment
@@ -38,6 +57,28 @@
 - [x] Removed 17 unrelated service links and expired 2 stale unrelated requests
 - [x] Verified Rajan's live queue contains AC Service only
 - [x] Rebuilt Server and restarted API, Customer Expo, and Partner Expo workflows
+
+### Partner Mobile completed-job history — 2026-08-05
+- [x] Added completion timestamps to legacy bookings and service-order items
+- [x] Recorded the timestamp when a partner completes either job flow
+- [x] Exposed completion time in Partner Mobile job APIs and both completed-job detail screens
+- [x] Server build and Partner Mobile type-check passed; main application restarted successfully
+
+### Partner Mobile Jobs parity — 2026-08-05
+- [x] Read the uploaded Partner Web My Jobs reference from `attached_assets/image_1785931638710.png`
+- [x] Added All, Upcoming, In progress, Pending, Completed, and Cancelled filters to Partner Mobile
+- [x] Added live counts to the mobile filters
+- [x] Aligned new service requests, active service jobs, and completed service jobs with the corresponding filters
+- [x] Added explicit empty-state copy for new requests and active service jobs
+- [x] Partner Mobile type-check, Android export, `git diff --check`, workflow restart, and preview verification passed
+
+### Partner Mobile payout history filters — 2026-08-05
+- [x] Added payout history date filtering with Today as the default
+- [x] Added one calendar picker with start-date and end-date selection, month navigation, and Start over with today
+- [x] Removed the All time option at the user's request
+- [x] Added status dropdown options: All statuses, Pending, Processing, Paid, and Rejected
+- [x] Combined date and status filters so both can be applied at once
+- [x] Partner Mobile type-check, Android export, `git diff --check`, workflow restart, and live local Metro bundle verification passed; range labels present and All time absent
 
 ### Full web/mobile end-to-end verification — 2026-08-05
 - [x] Customer Web, Admin Web, Partner Web, and Server production builds passed
@@ -73,6 +114,39 @@
 - [x] Captured clean Customer Web, Admin Panel, and Partner Web previews; Partner Web is served on port 4000
 - [x] Confirmed `git diff --check` passes and local `main` is synchronized with `origin/main` at `9ecec1d88`
 - [ ] Live Razorpay/Stripe/RazorpayX provider transactions and refunds remain unverified until provider credentials are configured
+
+### Partner job operations parity — 2026-08-05
+- [x] Recovered the API after clearing stale Supabase migration locks held by an older application query
+- [x] Confirmed idempotent migrations completed, including partner evidence and job-linked support-ticket fields
+- [x] Added Partner Web legacy job-detail evidence gallery with before/after image upload
+- [x] Added Partner Web structured issue/no-show reporting with issue type, details, and priority
+- [x] Reused the existing typed partner evidence and issue APIs; no new integration or storage system was introduced
+- [x] Fixed the existing Partner Web service-request callback typing mismatch
+- [x] Partner Web strict TypeScript check, production build, workflow restart, API health, and preview passed
+
+### Partner Expo QR scanner refresh — 2026-08-05
+- [x] Updated the canonical QR scanner page to match the uploaded light reference layout
+- [x] Increased QR cards and QR panels to the reference proportions
+- [x] Kept the Partner QR image sourced from the current `partner-qr.png` file
+- [x] Restarted the Partner Expo workflow so the QR points to the refreshed Partner app bundle
+- [x] Verified the Partner tunnel manifest, Partner QR PNG, scanner HTML, and QR Codes preview
+- [x] Passed `bash -n scripts/expo-tunnel.sh` and `git diff --check`
+
+### Admin Customers and Professionals histories — 2026-08-05
+- [x] Renamed the Admin sidebar Users entry to Customers
+- [x] Limited the customer list to customer accounts and added server-backed name/email/phone search
+- [x] Added searchable Customer Details with profile, legacy bookings, service orders, payment history, assigned partners, and totals
+- [x] Added searchable Professional Details with linked login, legacy bookings, service jobs, customer details, payments, reviews, payouts, and totals
+- [x] Added detail routes and typed Admin API contracts for both customer and professional histories
+- [x] Fixed the professional service-job response shape so order IDs are not overwritten by order-item fields
+- [x] Admin Web and Server production builds passed; workflows restarted; API health returned HTTP 200
+- [x] Cleared one confirmed stale PostgreSQL application query that blocked startup migration; no unrelated database sessions were terminated
+
+### Partner Mobile Schedule fix — 2026-08-05
+- [x] Confirmed Schedule is intended to show assigned legacy bookings and service-order jobs for a selected day, with time, duration, customer/address, payout, and performance metrics
+- [x] Fixed Schedule date-range filtering by explicitly casting ISO bounds to `timestamptz` in both booking-model queries
+- [x] Server build and Partner Mobile type-check passed
+- [x] Restarted the API and Partner Expo workflows; Schedule requests returned HTTP 200 and Metro remained healthy
 
 ### Published image loading fix — 2026-08-05
 - [x] Confirmed the published service, category, and reel APIs return data and valid image URLs

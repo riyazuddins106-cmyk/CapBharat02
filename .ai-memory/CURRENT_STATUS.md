@@ -69,10 +69,27 @@ The service-level order implementation is complete for customer web/mobile, part
 
 ### Partner Mobile (apps/mobile-partner)
 - [x] Auth
-- [x] Job list (new / accepted / completed)
+- [x] Job list with All, Upcoming, In progress, Pending, Completed, and Cancelled filters
+- [x] New service request, active service job, and completed service job sections
 - [x] Job acceptance / check-in (QR scan) / completion
+- [x] Completed job details show the actual completion date/time when available
 - [x] Document upload
 - [x] Notifications
+
+### Partner Mobile Jobs parity (2026-08-05)
+- The Jobs tab now matches the Partner Web My Jobs structure from the uploaded reference.
+- Filters include All, Upcoming, In progress, Pending, Completed, and Cancelled, each with a live count.
+- Pending order-item requests appear under New service requests; assigned order-item jobs appear under In progress services; completed order-item jobs appear under Completed services.
+- Legacy booking jobs continue to use the same filters and job detail routes.
+- Partner Mobile type-check passed, a fresh Android export completed, `git diff --check` passed, and the Partner Expo workflow restarted successfully.
+
+### Partner Mobile Earnings payout filters (2026-08-05)
+- Payout History is now filtered by date and status directly in the Partner Mobile Earnings tab.
+- The default date filter is Today. Partners can open one calendar, select a start date and an end date in the same calendar, navigate months, or start over with Today.
+- The status dropdown includes All statuses, Pending, Processing, Paid, and Rejected.
+- Date and status filters combine; for example, a partner can view only Paid payouts for a selected date.
+- The All time option was removed at the user's request.
+- Partner Mobile type-check passed, a fresh Android export completed, `git diff --check` passed, and the live local Metro bundle contained the range-picker labels and no All time label.
 
 ### English-only product state (2026-08-04)
 - [x] Removed the multilingual locale catalog, translation helpers, language selectors, locale persistence, and RTL behavior from all clients.
@@ -273,6 +290,43 @@ The service-level order implementation is complete for customer web/mobile, part
 - Customer Web, Admin Web, Partner Web, and Server production builds passed; `git diff --check` passed.
 - Main workflow migrations completed successfully and the API served the Customer Web category, reel, offer, and featured-service requests with HTTP 200.
 - No deployment or GitHub push was performed for this rollback.
+
+### Partner job operations parity (2026-08-05)
+- Partner Web job details now show stored before/after evidence and allow PNG/JPEG/WebP uploads through Supabase-backed partner evidence APIs.
+- Partner Web job details now let partners report customer-unavailable/no-show, wrong address, unsafe location, extra work, payment refusal, or other issues with structured priority and details.
+- The API was temporarily blocked by stale PostgreSQL relation locks from an older application query; only those stale sessions were terminated, after which the full idempotent migration completed and the API returned HTTP 200.
+- Partner Web strict TypeScript check and production build passed. The restarted Partner Web workflow served on port 4000, and the final preview rendered the login screen without application browser errors.
+- The live evidence bucket was created/updated during startup. Real provider transactions/refunds remain unverified until Razorpay, Stripe, and RazorpayX credentials are configured.
+
+### Partner Expo QR scanner refresh (2026-08-05)
+- Updated `scripts/expo-tunnel.sh` and the canonical `tmp-qr/scanner.html` to match the uploaded QR reference: light gray background, larger white rounded cards, larger QR panels, updated spacing, and current-file messaging.
+- Partner QR cards continue to use `partner-qr.png`, so the displayed code is regenerated whenever the Partner Expo tunnel restarts.
+- Restarted the Partner Expo workflow; the current Partner tunnel is `exp://arose-unframed-eclipse.ngrok-free.dev` and its public manifest returned HTTP 200.
+- Final QR scanner preview was captured at `screenshots/qr-scanner-partner-updated.jpg`; scanner HTML and Partner PNG both returned HTTP 200.
+
+### Admin Customers and Professionals histories (2026-08-05)
+- Admin navigation now labels the customer-account area `Customers`; partner accounts are no longer mixed into that list.
+- Customer search is server-backed across full name, email, and phone.
+- Customer Details combines the customer profile, legacy bookings, newer service-order history, assigned partner names, payment status/method/amount/timestamps, gateway references, summary counts, and total paid amount.
+- Professional Details combines the professional and linked login profile, legacy bookings, assigned service jobs, customer details, customer price versus partner payout, payment history, reviews, payout requests, payout timestamps, and summary totals.
+- Both detail panels include local search across service, customer, status, email, order ID, and record ID.
+- Admin Web and Server production builds passed. The Admin Panel workflow serves on port 5001 and the API health endpoint returned HTTP 200 after restart.
+- Startup initially waited on a stale `users` relation lock held by an older customer-list query; PostgreSQL activity/lock inspection confirmed the blocker, it was terminated, and the single migration run completed successfully.
+
+### Admin Panel navigation improvements (2026-08-05)
+- The previously added clickable sitemap page, sidebar entry, and header links were reverted at the user's request.
+ - Removed the Admin Panel breadcrumb row at the user's request; pages now start directly with the page title.
+- Removed the remaining page-specific breadcrumb rows from Categories and Sub-category views; the Sub-category back button remains available.
+ - No sitemap references remain in Admin Web.
+- Added a dedicated scroll container to Create Professional so the complete form remains reachable inside the fixed-height Admin Panel shell.
+- Admin Web production build passed after the sitemap revert.
+
+### Partner Mobile Schedule fix (2026-08-05)
+- The Schedule tab is the partner’s day planner: it combines assigned legacy bookings and service-order jobs for the next seven days and lets the partner select a day.
+- Each scheduled job can show its appointment time, duration, service, customer, address/map link, and expected partner payout. The top metrics come from the partner performance endpoint.
+- The “Could not load schedule” error came from PostgreSQL date comparisons receiving raw JavaScript `Date` values in the Schedule controller.
+- Both date filters now use ISO timestamps explicitly cast to `timestamptz`.
+- Server build and Partner Mobile type-check passed. After restarting the API and Partner Expo workflows, `/api/partner/schedule?from=2026-08-05&to=2026-08-11` returned HTTP 200 and Metro served the Partner app.
 
 ### Admin Partner Payout fix (2026-08-04)
 - Fixed the payout Control Centre handler so the UI can correctly approve a request for scheduled payout, send it through RazorpayX, or reject it.

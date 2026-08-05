@@ -1,7 +1,7 @@
 import { db } from '../config/database.js';
 import {
   bookings, bookingPartnerRequests, professionals, users, payoutRequests,
-  payments, orderItems, orderItemPayments, bookingItems,
+  payments, orderItems, orderItemPayments, bookingItems, addresses,
 } from '../database/schema/index.js';
 import { eq, and, isNull, isNotNull, or, desc, sql, exists } from 'drizzle-orm';
 
@@ -39,12 +39,15 @@ export const partnerRepository = {
         price: bookings.price,
         createdAt: bookings.createdAt,
         updatedAt: bookings.updatedAt,
+        completedAt: bookings.completedAt,
         customerName: users.fullName,
         customerPhone: users.phone,
         paymentStatus: paymentStatusSub(bookings.id),
+        address: addresses,
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
+      .leftJoin(addresses, eq(bookings.addressId, addresses.id))
       .leftJoin(
         bookingPartnerRequests,
         and(
@@ -84,12 +87,15 @@ export const partnerRepository = {
         price: bookings.price,
         createdAt: bookings.createdAt,
         updatedAt: bookings.updatedAt,
+        completedAt: bookings.completedAt,
         customerName: users.fullName,
         customerPhone: users.phone,
         paymentStatus: paymentStatusSub(bookings.id),
+        address: addresses,
       })
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
+      .leftJoin(addresses, eq(bookings.addressId, addresses.id))
       .leftJoin(
         bookingPartnerRequests,
         and(
@@ -116,7 +122,11 @@ export const partnerRepository = {
   async updateStatus(bookingId: string, status: 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled') {
     const [updated] = await db
       .update(bookings)
-      .set({ status, updatedAt: new Date() })
+      .set({
+        status,
+        updatedAt: new Date(),
+        ...(status === 'completed' ? { completedAt: new Date() } : {}),
+      })
       .where(eq(bookings.id, bookingId))
       .returning();
     return updated;

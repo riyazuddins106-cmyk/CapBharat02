@@ -217,6 +217,89 @@ export interface CustomerUser {
   createdAt: string;
 }
 
+export interface AdminCustomerDetail {
+  customer: CustomerUser;
+  summary: {
+    legacyBookingCount: number;
+    serviceOrderCount: number;
+    serviceCount: number;
+    paymentCount: number;
+    paidAmount: number;
+  };
+  bookings: Array<Record<string, any> & {
+    id: string;
+    serviceName: string;
+    status: string;
+    price: number;
+    scheduledAt: string;
+    createdAt: string;
+    completedAt?: string | null;
+    professionalName?: string | null;
+    payments: Array<Record<string, any>>;
+  }>;
+  orders: Array<Record<string, any> & {
+    id: string;
+    status: string;
+    totalAmount: number;
+    scheduledAt: string;
+    createdAt: string;
+    items: Array<Record<string, any> & {
+      id: string;
+      serviceName: string | null;
+      status: string;
+      customerPrice: number;
+      scheduledAt: string;
+      payments: Array<Record<string, any>>;
+    }>;
+  }>;
+}
+
+export interface AdminProfessionalDetail {
+  professional: ProfessionalRow & {
+    userPhone?: string | null;
+    availabilityStatus?: string;
+    currentBookingStatus?: string;
+    city?: string | null;
+    area?: string | null;
+    pincode?: string | null;
+    completedJobs?: number;
+  };
+  summary: {
+    legacyBookingCount: number;
+    serviceJobCount: number;
+    completedJobCount: number;
+    paymentCount: number;
+    paidAmount: number;
+    payoutRequestCount: number;
+    payoutAmount: number;
+  };
+  bookings: Array<Record<string, any> & {
+    id: string;
+    serviceName: string;
+    status: string;
+    price: number;
+    scheduledAt: string;
+    createdAt: string;
+    completedAt?: string | null;
+    customerName?: string | null;
+    payments: Array<Record<string, any>>;
+  }>;
+  jobs: Array<Record<string, any> & {
+    id: string;
+    serviceName: string | null;
+    status: string;
+    customerPrice: number;
+    partnerPayout: number;
+    scheduledAt: string;
+    createdAt: string;
+    completedAt?: string | null;
+    customerName?: string | null;
+    payments: Array<Record<string, any>>;
+  }>;
+  reviews: Array<Record<string, any>>;
+  payouts: Array<Record<string, any>>;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -663,6 +746,8 @@ export const adminApi = {
     if (subCategoryIds.length) query.set('subCategoryIds', subCategoryIds.join(','));
     return request<{ professionals: ProfessionalRow[]; total: number }>(`/admin/professionals?${query.toString()}`, { token });
   },
+  getProfessionalDetail: (id: string, token: string) =>
+    request<AdminProfessionalDetail>(`/admin/professionals/${id}/detail`, { token }),
   updateProfessional: (id: string, data: { name?: string; title?: string; bio?: string; basePrice?: number; priceUnit?: string; badge?: string; tags?: string[]; categoryId?: string; subCategoryId?: string | null }, token: string) =>
     request<ProfessionalRow>(`/admin/professionals/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   suspendProfessional: (id: string, token: string) =>
@@ -686,8 +771,16 @@ export const adminApi = {
     request<AdminAccount>('/admin/admins', { method: 'POST', token, body: JSON.stringify(data) }),
   updateAdmin: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: 'admin' | 'operations_manager'; isActive?: boolean; password?: string }, token: string) =>
     request<AdminAccount>(`/admin/admins/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
-  getUsers: (token: string, page = 1, limit = 25) =>
-    request<{ users: CustomerUser[]; total: number }>(`/admin/users?offset=${(page - 1) * limit}&limit=${limit}`, { token }),
+  getUsers: (token: string, page = 1, limit = 25, search = '') => {
+    const query = new URLSearchParams({
+      offset: String((page - 1) * limit),
+      limit: String(limit),
+    });
+    if (search.trim()) query.set('search', search.trim());
+    return request<{ users: CustomerUser[]; total: number }>(`/admin/users?${query.toString()}`, { token });
+  },
+  getCustomerDetail: (id: string, token: string) =>
+    request<AdminCustomerDetail>(`/admin/users/${id}/detail`, { token }),
   updateUser: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: string }, token: string) =>
     request<CustomerUser>(`/admin/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
   deleteUser: (id: string, token: string) =>

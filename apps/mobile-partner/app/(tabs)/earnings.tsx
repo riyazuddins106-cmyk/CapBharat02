@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,6 +35,50 @@ function payoutStatus(status: string) {
   }
 }
 
+type PayoutStatusFilter = 'all' | 'pending' | 'processing' | 'paid' | 'rejected';
+
+const PAYOUT_STATUS_FILTERS: { key: PayoutStatusFilter; label: string }[] = [
+  { key: 'all', label: 'All statuses' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'paid', label: 'Paid' },
+  { key: 'rejected', label: 'Rejected' },
+];
+
+function payoutStatusKey(status: string): Exclude<PayoutStatusFilter, 'all'> {
+  if (status === 'paid') return 'paid';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'approved' || status === 'processing') return 'processing';
+  return 'pending';
+}
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatFilterDate(date: Date) {
+  const today = new Date();
+  if (dateKey(date) === dateKey(today)) return 'Today';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatFilterRange(start: Date, end: Date | null) {
+  if (!end || dateKey(start) === dateKey(end)) return formatFilterDate(start);
+  return `${formatFilterDate(start)} – ${formatFilterDate(end)}`;
+}
+
+function calendarDays(month: Date) {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1)),
+  ];
+}
+
 export default function EarningsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -45,6 +89,13 @@ export default function EarningsScreen() {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutNote, setPayoutNote] = useState('');
   const [showPayoutForm, setShowPayoutForm] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedPayoutStartDate, setSelectedPayoutStartDate] = useState(() => new Date());
+  const [selectedPayoutEndDate, setSelectedPayoutEndDate] = useState<Date | null>(() => new Date());
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarSelection, setCalendarSelection] = useState<'start' | 'end'>('start');
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState<PayoutStatusFilter>('all');
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
 
   const { data: earnings, isLoading } = useQuery({
     queryKey: ['/api/partner/earnings', accessToken],
@@ -85,6 +136,34 @@ export default function EarningsScreen() {
 
   const weekly: { date: string; amount: number }[] = earnings?.weekly ?? [];
   const maxAmount = Math.max(...weekly.map((w) => w.amount), 1);
+  const selectedStatusLabel = PAYOUT_STATUS_FILTERS.find((filter) => filter.key === payoutStatusFilter)?.label ?? 'All statuses';
+  const filteredPayouts = payouts.filter((payout) => {
+    const requestedDate = dateKey(new Date(payout.requestedAt));
+    const startDate = dateKey(selectedPayoutStartDate);
+    const endDate = dateKey(selectedPayoutEndDate ?? selectedPayoutStartDate);
+    const dateMatches = requestedDate >= startDate && requestedDate <= endDate;
+    const statusMatches = payoutStatusFilter === 'all' || payoutStatusKey(payout.status) === payoutStatusFilter;
+    return dateMatches && statusMatches;
+  });
+
+  function choosePayoutDate(date: Date) {
+    if (calendarSelection === 'start') {
+      setSelectedPayoutStartDate(date);
+      setSelectedPayoutEndDate(null);
+      setCalendarSelection('end');
+      setCalendarMonth(date);
+      return;
+    }
+
+    if (dateKey(date) < dateKey(selectedPayoutStartDate)) {
+      setSelectedPayoutStartDate(date);
+      setSelectedPayoutEndDate(selectedPayoutStartDate);
+    } else {
+      setSelectedPayoutEndDate(date);
+    }
+    setCalendarMonth(date);
+    setShowCalendar(false);
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -219,22 +298,86 @@ export default function EarningsScreen() {
           <View style={styles.historyHeader}>
             <View>
               <Text style={[styles.historyTitle, { color: colors.foreground }]}>Payout History</Text>
-              <Text style={[styles.historySub, { color: colors.mutedForeground }]}>Track your withdrawal requests</Text>
+              <Text style={[styles.historySub, { color: colors.mutedForeground }]}>
+                Showing {formatFilterRange(selectedPayoutStartDate, selectedPayoutEndDate)} · {selectedStatusLabel}
+              </Text>
             </View>
             <Ionicons name="receipt-outline" size={22} color={colors.primary} />
           </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.historyFilter, { borderTopColor: colors.border, borderBottomColor: colors.border }]}
+          >
+            <TouchableOpacity
+              onPress={() => {
+                const today = new Date();
+                setSelectedPayoutStartDate(today);
+                setSelectedPayoutEndDate(today);
+                setCalendarMonth(today);
+              }}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: dateKey(selectedPayoutStartDate) === dateKey(new Date())
+                    && dateKey(selectedPayoutEndDate ?? selectedPayoutStartDate) === dateKey(new Date())
+                    ? colors.primary
+                    : colors.muted,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="today-outline"
+                size={14}
+                color={dateKey(selectedPayoutStartDate) === dateKey(new Date())
+                  && dateKey(selectedPayoutEndDate ?? selectedPayoutStartDate) === dateKey(new Date())
+                  ? '#fff'
+                  : colors.mutedForeground}
+              />
+              <Text style={[styles.filterChipText, {
+                color: dateKey(selectedPayoutStartDate) === dateKey(new Date())
+                  && dateKey(selectedPayoutEndDate ?? selectedPayoutStartDate) === dateKey(new Date())
+                  ? '#fff'
+                  : colors.mutedForeground,
+              }]}>Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setCalendarSelection('start');
+                setCalendarMonth(selectedPayoutStartDate);
+                setShowCalendar(true);
+              }}
+              style={[styles.filterChip, { backgroundColor: colors.muted, borderColor: colors.border }]}
+            >
+              <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+              <Text style={[styles.filterChipText, { color: colors.foreground }]}>
+                {formatFilterRange(selectedPayoutStartDate, selectedPayoutEndDate)}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowStatusMenu(true)}
+              style={[styles.filterChip, { backgroundColor: payoutStatusFilter !== 'all' ? colors.primary : colors.muted, borderColor: colors.border }]}
+            >
+              <Ionicons name="funnel-outline" size={14} color={payoutStatusFilter !== 'all' ? '#fff' : colors.primary} />
+              <Text style={[styles.filterChipText, { color: payoutStatusFilter !== 'all' ? '#fff' : colors.foreground }]}>{selectedStatusLabel}</Text>
+              <Ionicons name="chevron-down" size={13} color={payoutStatusFilter !== 'all' ? '#fff' : colors.mutedForeground} />
+            </TouchableOpacity>
+          </ScrollView>
           {payoutsLoading ? (
             <View style={styles.historyLoading}>
               <ActivityIndicator color={colors.primary} />
             </View>
-          ) : payouts.length === 0 ? (
+          ) : filteredPayouts.length === 0 ? (
             <View style={styles.historyEmpty}>
               <Ionicons name="wallet-outline" size={30} color={colors.mutedForeground} />
-              <Text style={[styles.historyEmptyText, { color: colors.mutedForeground }]}>No payout requests yet</Text>
+              <Text style={[styles.historyEmptyText, { color: colors.mutedForeground }]}>
+                `No payout requests for ${formatFilterRange(selectedPayoutStartDate, selectedPayoutEndDate)}`
+              </Text>
             </View>
           ) : (
             <View>
-              {payouts.map((payout) => {
+              {filteredPayouts.map((payout) => {
                 const status = payoutStatus(payout.status);
                 return (
                   <View key={payout.id} style={[styles.payoutHistoryRow, { borderTopColor: colors.border }]}>
@@ -253,6 +396,123 @@ export default function EarningsScreen() {
             </View>
           )}
         </View>
+
+        <Modal visible={showCalendar} transparent animationType="fade" onRequestClose={() => setShowCalendar(false)}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.calendarModal, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+              <View style={styles.calendarModalHeader}>
+                <View>
+                  <Text style={[styles.calendarModalTitle, { color: colors.foreground }]}>Filter payout history</Text>
+                  <Text style={[styles.historySub, { color: colors.mutedForeground }]}>
+                    {calendarSelection === 'start' ? 'Choose start date' : 'Choose end date'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowCalendar(false)} style={styles.closeButton}>
+                  <Ionicons name="close" size={22} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.rangeSelectionRow}>
+                <TouchableOpacity
+                  onPress={() => setCalendarSelection('start')}
+                  style={[styles.rangeSelection, {
+                    backgroundColor: calendarSelection === 'start' ? colors.secondary : colors.muted,
+                    borderColor: calendarSelection === 'start' ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[styles.rangeSelectionLabel, { color: colors.mutedForeground }]}>Start date</Text>
+                  <Text style={[styles.rangeSelectionValue, { color: colors.foreground }]}>{formatFilterDate(selectedPayoutStartDate)}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setCalendarSelection('end')}
+                  style={[styles.rangeSelection, {
+                    backgroundColor: calendarSelection === 'end' ? colors.secondary : colors.muted,
+                    borderColor: calendarSelection === 'end' ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[styles.rangeSelectionLabel, { color: colors.mutedForeground }]}>End date</Text>
+                  <Text style={[styles.rangeSelectionValue, { color: colors.foreground }]}>
+                    {selectedPayoutEndDate ? formatFilterDate(selectedPayoutEndDate) : 'Select date'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.monthHeader}>
+                <TouchableOpacity
+                  onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                  style={styles.monthButton}
+                >
+                  <Ionicons name="chevron-back" size={18} color={colors.foreground} />
+                </TouchableOpacity>
+                <Text style={[styles.monthTitle, { color: colors.foreground }]}>
+                  {calendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                  style={styles.monthButton}
+                >
+                  <Ionicons name="chevron-forward" size={18} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.weekHeader}>
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                  <Text key={`${day}-${index}`} style={[styles.weekDay, { color: colors.mutedForeground }]}>{day}</Text>
+                ))}
+              </View>
+              <View style={styles.calendarGrid}>
+                {calendarDays(calendarMonth).map((day, index) => {
+                  const dayKey = day ? dateKey(day) : '';
+                  const isStart = dayKey === dateKey(selectedPayoutStartDate);
+                  const isEnd = !!selectedPayoutEndDate && dayKey === dateKey(selectedPayoutEndDate);
+                  const rangeEnd = selectedPayoutEndDate ?? selectedPayoutStartDate;
+                  const inRange = !!day && dayKey >= dateKey(selectedPayoutStartDate) && dayKey <= dateKey(rangeEnd);
+                  return day ? (
+                    <TouchableOpacity
+                      key={dateKey(day)}
+                      onPress={() => choosePayoutDate(day)}
+                      style={[
+                        styles.calendarDay,
+                        inRange && { backgroundColor: colors.secondary },
+                        (isStart || isEnd) && { backgroundColor: colors.primary, borderRadius: 999 },
+                      ]}
+                    >
+                      <Text style={[styles.calendarDayText, { color: isStart || isEnd ? '#fff' : colors.foreground }]}>{day.getDate()}</Text>
+                    </TouchableOpacity>
+                  ) : <View key={`empty-${index}`} style={styles.calendarDay} />;
+                })}
+              </View>
+              <TouchableOpacity
+                onPress={() => choosePayoutDate(new Date())}
+                style={[styles.calendarTodayButton, { backgroundColor: colors.secondary, borderRadius: colors.radius }]}
+              >
+                <Ionicons name="today-outline" size={16} color={colors.primary} />
+                <Text style={[styles.calendarTodayText, { color: colors.primary }]}>Start over with today</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showStatusMenu} transparent animationType="fade" onRequestClose={() => setShowStatusMenu(false)}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowStatusMenu(false)}>
+            <View style={[styles.statusMenu, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+              <Text style={[styles.calendarModalTitle, { color: colors.foreground }]}>Filter by status</Text>
+              {PAYOUT_STATUS_FILTERS.map((filter) => {
+                const selected = payoutStatusFilter === filter.key;
+                return (
+                  <TouchableOpacity
+                    key={filter.key}
+                    onPress={() => {
+                      setPayoutStatusFilter(filter.key);
+                      setShowStatusMenu(false);
+                    }}
+                    style={[styles.statusOption, selected && { backgroundColor: colors.secondary, borderRadius: colors.radius }]}
+                  >
+                    <Text style={[styles.statusOptionText, { color: selected ? colors.primary : colors.foreground }]}>{filter.label}</Text>
+                    {selected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Info note */}
         <View style={[styles.note, { backgroundColor: colors.secondary, borderRadius: colors.radius }]}>
@@ -323,6 +583,9 @@ const styles = StyleSheet.create({
   historyHeader: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   historyTitle: { fontSize: 16, fontWeight: '700' },
   historySub: { fontSize: 12, marginTop: 3 },
+  historyFilter: { padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderBottomWidth: 1 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderRadius: 999 },
+  filterChipText: { fontSize: 11, fontWeight: '700' },
   historyLoading: { paddingVertical: 28, alignItems: 'center' },
   historyEmpty: { paddingVertical: 28, alignItems: 'center', gap: 8 },
   historyEmptyText: { fontSize: 13 },
@@ -333,4 +596,26 @@ const styles = StyleSheet.create({
   payoutHistoryNote: { fontSize: 11 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999 },
   statusText: { fontSize: 11, fontWeight: '700' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  calendarModal: { width: '100%', maxWidth: 380, padding: 18, borderWidth: 1 },
+  calendarModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  calendarModalTitle: { fontSize: 17, fontWeight: '800' },
+  closeButton: { padding: 2 },
+  rangeSelectionRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  rangeSelection: { flex: 1, padding: 10, borderWidth: 1, borderRadius: 10, gap: 3 },
+  rangeSelectionLabel: { fontSize: 10, fontWeight: '600' },
+  rangeSelectionValue: { fontSize: 12, fontWeight: '700' },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 10 },
+  monthButton: { padding: 8 },
+  monthTitle: { fontSize: 15, fontWeight: '700' },
+  weekHeader: { flexDirection: 'row', marginBottom: 4 },
+  weekDay: { width: '14.2857%', textAlign: 'center', fontSize: 11, fontWeight: '700' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarDay: { width: '14.2857%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  calendarDayText: { fontSize: 13, fontWeight: '600' },
+  calendarTodayButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, marginTop: 14 },
+  calendarTodayText: { fontSize: 13, fontWeight: '700' },
+  statusMenu: { width: '100%', maxWidth: 340, padding: 18, borderWidth: 1 },
+  statusOption: { minHeight: 44, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  statusOptionText: { fontSize: 14, fontWeight: '600' },
 });

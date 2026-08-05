@@ -3,9 +3,9 @@ import {
   LayoutDashboard, Briefcase, DollarSign, User, Bell,
   LogOut, CheckCircle, Clock, XCircle, Loader2, TrendingUp,
   Star, RefreshCw, X, Check, AlertCircle, Pencil, Lock,
-  Calendar, Phone, FileText, Menu, BarChart2, Zap,
-  Upload, Shield, ChevronRight, ArrowLeft, Eye, Trash2, History as HistoryIcon,
-  QrCode, Wrench,
+  Calendar, ChevronDown, ChevronLeft, ChevronRight, Phone, FileText, Menu, BarChart2, Zap,
+  Upload, Shield, ArrowLeft, Eye, Trash2, History as HistoryIcon,
+  QrCode, Wrench, MapPin, MessageCircle, Navigation, CircleDot,
 } from 'lucide-react';
 import {
   authApi, partnerApi, notificationsApi, categoriesApi, payoutsApi, documentsApi, setRefreshHandler,
@@ -13,6 +13,7 @@ import {
   type OrderItemJob,
   type AppNotification, type AuthTokens, type Payout, type PartnerDocument,
   type DocumentTypeConfig, type PartnerDocumentHistory,
+  type PartnerScheduleJob, type PartnerPerformance, type PartnerEvidence,
 } from '@/lib/api';
 import { QRScannerModal } from '@/components/QRScannerModal';
 
@@ -28,6 +29,151 @@ function fmtDate(s: string) {
     day: 'numeric', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+type PayoutStatusFilter = 'all' | 'pending' | 'processing' | 'paid' | 'rejected';
+
+const PAYOUT_STATUS_FILTERS: { key: PayoutStatusFilter; label: string }[] = [
+  { key: 'all', label: 'All statuses' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'paid', label: 'Paid' },
+  { key: 'rejected', label: 'Rejected' },
+];
+
+function payoutStatusKey(status: string): Exclude<PayoutStatusFilter, 'all'> {
+  if (status === 'paid') return 'paid';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'approved' || status === 'processing') return 'processing';
+  return 'pending';
+}
+
+function payoutDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatPayoutFilterDate(date: Date) {
+  const today = new Date();
+  if (payoutDateKey(date) === payoutDateKey(today)) return 'Today';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatPayoutRange(start: Date, end: Date | null) {
+  if (!end || payoutDateKey(start) === payoutDateKey(end)) return formatPayoutFilterDate(start);
+  return `${formatPayoutFilterDate(start)} – ${formatPayoutFilterDate(end)}`;
+}
+
+function payoutCalendarDays(month: Date) {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1)),
+  ];
+}
+
+function Schedule({ token }: { token: string }) {
+  const [days, setDays] = useState<PartnerScheduleJob[]>([]);
+  const [performance, setPerformance] = useState<PartnerPerformance | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loading, setLoading] = useState(true);
+
+  const dateKey = (date: Date) => date.toISOString().slice(0, 10);
+  const dateOptions = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+    return { key: dateKey(date), date };
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const from = dateKey(new Date());
+      const end = new Date();
+      end.setDate(end.getDate() + 6);
+      const [schedule, stats] = await Promise.all([
+        partnerApi.getSchedule(from, dateKey(end), token),
+        partnerApi.getPerformance(token),
+      ]);
+      setDays(schedule);
+      setPerformance(stats);
+    } catch {
+      setDays([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+  useEffect(() => { load(); }, [load]);
+
+  const selectedJobs = days.filter(job => dateKey(new Date(job.scheduledAt)) === selectedDate);
+  const openMaps = (job: PartnerScheduleJob) => {
+    if (!job.address) return;
+    const address = `${job.address.line1}, ${job.address.city}, ${job.address.state} ${job.address.postalCode}`;
+    window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-white font-bold text-lg">Your schedule</h2>
+          <p className="text-white/40 text-sm mt-1">Plan visits and track your service performance.</p>
+        </div>
+        <button onClick={load} className="p-2 rounded-xl border border-white/10 text-white/50 hover:text-white hover:bg-white/5"><RefreshCw size={15}/></button>
+      </div>
+      {performance && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          {[
+            ['Completed', performance.jobsCompleted],
+            ['Completion', `${performance.completionRate}%`],
+            ['Acceptance', `${performance.acceptanceRate}%`],
+            ['Rating', performance.rating.toFixed(1)],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="rounded-2xl p-4 border border-white/[0.07]" style={CARD}>
+              <p className="text-white font-bold text-xl">{value}</p>
+              <p className="text-white/40 text-xs mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+        {dateOptions.map(({ key, date }) => (
+          <button key={key} onClick={() => setSelectedDate(key)}
+            className="min-w-[76px] rounded-xl border px-3 py-2.5 text-center transition-colors"
+            style={key === selectedDate ? { background: 'rgba(91,62,245,0.2)', borderColor: '#5B3EF5' } : { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+            <p className="text-white/40 text-[11px]">{date.toLocaleDateString('en-IN', { weekday: 'short' })}</p>
+            <p className="text-white font-bold text-lg">{date.getDate()}</p>
+          </button>
+        ))}
+      </div>
+      <div className="space-y-3">
+        <h3 className="text-white font-bold text-sm">{new Date(`${selectedDate}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+        {loading ? <div className="py-12 text-center text-white/30"><Loader2 size={22} className="animate-spin mx-auto"/></div>
+          : selectedJobs.length === 0 ? <div className="rounded-2xl border border-white/[0.07] p-10 text-center text-white/30 text-sm" style={CARD}>No jobs scheduled for this day.</div>
+            : selectedJobs.map(job => {
+              const address = job.address ? `${job.address.line1}, ${job.address.city}, ${job.address.state} ${job.address.postalCode}` : null;
+              return <div key={`${job.jobType}-${job.id}`} className="rounded-2xl border border-white/[0.07] p-4" style={CARD}>
+                <div className="flex items-start gap-3">
+                  <div className="rounded-xl px-2.5 py-2 text-center min-w-[72px]" style={{ background: 'rgba(91,62,245,0.15)' }}>
+                    <p className="text-violet-300 font-bold text-xs">{new Date(job.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-white/40 text-[10px] mt-1">{job.durationMinutes} min</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm">{job.serviceName}</p>
+                    <p className="text-white/50 text-xs mt-1">{job.customerName ?? 'Customer'} · <span className="text-emerald-400 font-semibold">₹{job.payout} payout</span></p>
+                    {address && <p className="text-white/35 text-xs mt-2 flex items-start gap-1"><MapPin size={12} className="mt-0.5 flex-shrink-0"/>{address}</p>}
+                  </div>
+                  {job.customerPhone && <a href={`tel:${job.customerPhone}`} className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"><Phone size={15}/></a>}
+                </div>
+                {address && <button onClick={() => openMaps(job)} className="mt-3 text-xs font-bold text-violet-300 flex items-center gap-1 hover:text-violet-200"><Navigation size={12}/> Open in Maps</button>}
+              </div>;
+            })}
+      </div>
+    </div>
+  );
 }
 
 const STATUS_COLOR: Record<JobStatus, string> = {
@@ -154,7 +300,7 @@ function PageHeader({ title, subtitle, onRefresh }: {
   );
 }
 
-function ServiceRequestCard({ item, pending, busy, onAccept, onReject }: {
+function ServiceRequestCard({ item, pending, busy, onAccept, onReject, onCheckIn, onComplete }: {
   item: OrderItemJob;
   pending?: boolean;
   busy?: boolean;
@@ -841,6 +987,13 @@ function Jobs({ token }: { token: string }) {
   const [filter,      setFilter]      = useState<JobStatus | 'all'>('all');
   const [serviceActionKey, setServiceActionKey] = useState<string | null>(null);
   const [serviceCheckinItem, setServiceCheckinItem] = useState<OrderItemJob | null>(null);
+  const [evidence, setEvidence] = useState<PartnerEvidence[]>([]);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [uploadingPhase, setUploadingPhase] = useState<'before' | 'after' | null>(null);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [issueType, setIssueType] = useState('Customer unavailable');
+  const [issueMessage, setIssueMessage] = useState('');
+  const [issueSending, setIssueSending] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -854,6 +1007,20 @@ function Jobs({ token }: { token: string }) {
     } finally { setLoading(false); }
   }, [token]);
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!selected) {
+      setEvidence([]);
+      return;
+    }
+    let active = true;
+    setEvidenceLoading(true);
+    partnerApi.listEvidence('booking', selected.id, token)
+      .then(rows => { if (active) setEvidence(rows); })
+      .catch(() => { if (active) setEvidence([]); })
+      .finally(() => { if (active) setEvidenceLoading(false); });
+    return () => { active = false; };
+  }, [selected, token]);
 
   // Auto-refresh every 30 s so new dispatched jobs appear without manual reload
   useEffect(() => {
@@ -948,6 +1115,43 @@ function Jobs({ token }: { token: string }) {
     } catch (e: any) {
       alert(e?.message ?? 'Check-in failed. Make sure the QR code belongs to this booking.');
     } finally { setCheckingIn(false); }
+  }
+
+  async function uploadJobEvidence(phase: 'before' | 'after', file: File) {
+    if (!selected) return;
+    setUploadingPhase(phase);
+    try {
+      const uploaded = await partnerApi.uploadEvidence('booking', selected.id, phase, file, token);
+      setEvidence(prev => [uploaded, ...prev]);
+    } catch (error: any) {
+      alert(error?.message ?? 'Evidence upload failed.');
+    } finally {
+      setUploadingPhase(null);
+    }
+  }
+
+  async function submitIssue() {
+    if (!selected || !issueMessage.trim()) {
+      alert('Add details before submitting the issue.');
+      return;
+    }
+    setIssueSending(true);
+    try {
+      await partnerApi.reportIssue({
+        jobType: 'booking',
+        jobId: selected.id,
+        issueType,
+        message: issueMessage.trim(),
+        priority: issueType === 'Unsafe location' ? 'urgent' : 'high',
+      }, token);
+      setIssueOpen(false);
+      setIssueMessage('');
+      alert('Issue reported to Operations.');
+    } catch (error: any) {
+      alert(error?.message ?? 'Could not report this issue.');
+    } finally {
+      setIssueSending(false);
+    }
   }
 
   const statuses: (JobStatus | 'all')[] = ['all', 'upcoming', 'in_progress', 'pending', 'completed', 'cancelled'];
@@ -1148,6 +1352,44 @@ function Jobs({ token }: { token: string }) {
               </div>
             )}
 
+            {/* Evidence */}
+            <div className="rounded-xl p-3 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-white/60 text-xs font-semibold uppercase tracking-wide">Job Evidence</p>
+                {evidenceLoading && <Loader2 size={13} className="animate-spin text-white/30"/>}
+              </div>
+              {evidence.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {evidence.map(item => (
+                    <a key={item.id} href={item.fileUrl} target="_blank" rel="noreferrer"
+                      className="rounded-lg overflow-hidden border border-white/[0.08] hover:border-violet-400/50 transition-colors">
+                      <img src={item.fileUrl} alt={`${item.phase} service evidence`} className="w-full h-20 object-cover"/>
+                      <p className="px-2 py-1.5 text-[10px] font-bold text-white/60 capitalize">{item.phase} service</p>
+                    </a>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                {(['before', 'after'] as const).map(phase => (
+                  <label key={phase}
+                    className={`flex-1 cursor-pointer rounded-lg border border-white/10 px-2 py-2 text-center text-xs font-bold text-violet-300 hover:bg-violet-500/10 transition-colors ${uploadingPhase ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {uploadingPhase === phase ? <Loader2 size={13} className="animate-spin mx-auto"/> : `Add ${phase} photo`}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        event.currentTarget.value = '';
+                        if (file) uploadJobEvidence(phase, file);
+                      }}/>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={() => setIssueOpen(true)}
+              className="w-full rounded-xl border border-red-400/30 px-3 py-2.5 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2">
+              <AlertCircle size={14}/> Report a job issue or no-show
+            </button>
+
             {/* Actions */}
             {selected.status === 'pending' && (
               <div className="flex gap-3 mt-2">
@@ -1178,6 +1420,35 @@ function Jobs({ token }: { token: string }) {
                 </PrimaryBtn>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {issueOpen && selected && (
+        <Modal title="Report Job Issue" onClose={() => setIssueOpen(false)}>
+          <div className="space-y-4">
+            <p className="text-white/50 text-xs leading-relaxed">Choose the closest issue and give Operations enough detail to act.</p>
+            <div className="flex flex-wrap gap-2">
+              {['Customer unavailable', 'Wrong address', 'Unsafe location', 'Extra work required', 'Payment refusal', 'Other'].map(type => (
+                <button key={type} onClick={() => setIssueType(type)}
+                  className="rounded-lg border px-2.5 py-2 text-xs font-bold transition-colors"
+                  style={issueType === type
+                    ? { color: '#A78BFA', borderColor: 'rgba(124,91,248,0.7)', background: 'rgba(124,91,248,0.15)' }
+                    : { color: 'rgba(255,255,255,0.55)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                  {type}
+                </button>
+              ))}
+            </div>
+            <textarea value={issueMessage} onChange={event => setIssueMessage(event.target.value)}
+              rows={4} placeholder="What happened?"
+              className="w-full rounded-xl border border-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500/60 resize-none"
+              style={INPUT_STY}/>
+            <div className="flex gap-2">
+              <button onClick={() => setIssueOpen(false)} className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-bold text-white/50 hover:bg-white/5">Cancel</button>
+              <PrimaryBtn loading={issueSending} onClick={submitIssue} className="flex-1 justify-center">
+                <AlertCircle size={14}/> Send report
+              </PrimaryBtn>
+            </div>
           </div>
         </Modal>
       )}
@@ -1352,16 +1623,15 @@ function Profile({ token, profile, setProfile }: {
     finally { setSaving(false); }
   }
 
-  async function toggleAvailability() {
+  async function setAvailability(status: 'available' | 'busy' | 'offline') {
     if (!profile) return;
     setAvailLoading(true); setMsg('');
     try {
-      const newStatus = profile.isActive ? 'offline' : 'available';
-      const updated = await partnerApi.updateAvailability(newStatus, token);
+      const updated = await partnerApi.updateAvailability(status, token);
       setProfile(updated);
-      setMsgOk(true); setMsg(profile.isActive ? 'You are now offline' : 'You are now available');
+      setMsgOk(true); setMsg(`Availability set to ${status}`);
       // When going available, push current GPS to server so dispatch can find nearby partners
-      if (newStatus === 'available' && navigator.geolocation) {
+      if (status === 'available' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           ({ coords }) => {
             partnerApi.updateLocation(coords.latitude, coords.longitude, token).catch(() => {});
@@ -1430,19 +1700,24 @@ function Profile({ token, profile, setProfile }: {
             )}
           </div>
           <div className="px-5 pb-5 flex flex-col gap-2">
-            {/* Availability toggle */}
-            <button onClick={toggleAvailability} disabled={availLoading}
-              className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-60 border ${
-                profile.isActive
-                  ? 'border-green-500/30 text-green-400 hover:bg-green-500/10'
-                  : 'border-red-500/30 text-red-400 hover:bg-red-500/10'
-              }`}>
-              {availLoading
-                ? <Loader2 size={13} className="animate-spin"/>
-                : profile.isActive ? <CheckCircle size={13}/> : <XCircle size={13}/>
-              }
-              {profile.isActive ? 'Go Offline' : 'Go Online'}
-            </button>
+            <div className="rounded-xl border border-white/[0.07] p-3">
+              <p className="text-white/40 text-[11px] uppercase tracking-wide font-bold mb-2">Availability</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['available', 'Available', '#16A34A', CheckCircle],
+                  ['busy', 'Busy', '#F59E0B', Clock],
+                  ['offline', 'Offline', '#EF4444', XCircle],
+                ] as const).map(([status, label, color, Icon]) => {
+                  const active = (profile.availabilityStatus ?? (profile.isActive ? 'available' : 'offline')) === status;
+                  return <button key={status} onClick={() => setAvailability(status)} disabled={availLoading}
+                    className="py-2 rounded-lg text-[11px] font-bold flex flex-col items-center gap-1 border transition-all disabled:opacity-60"
+                    style={{ borderColor: active ? `${color}80` : 'rgba(255,255,255,0.08)', color: active ? color : 'rgba(255,255,255,0.4)', background: active ? `${color}15` : 'transparent' }}>
+                    {availLoading && active ? <Loader2 size={13} className="animate-spin"/> : <Icon size={13}/>}
+                    {label}
+                  </button>;
+                })}
+              </div>
+            </div>
             <button onClick={() => {
               setTitle(profile.title); setBio(profile.bio);
               setPrice(String(profile.basePrice)); setPriceUnit(profile.priceUnit ?? 'visit');
@@ -1704,11 +1979,19 @@ function Payouts({ token }: { token: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [msg,      setMsg]      = useState('');
   const [msgOk,    setMsgOk]    = useState(true);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [payoutStartDate, setPayoutStartDate] = useState(() => new Date());
+  const [payoutEndDate, setPayoutEndDate] = useState<Date | null>(() => new Date());
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarSelection, setCalendarSelection] = useState<'start' | 'end'>('start');
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState<PayoutStatusFilter>('all');
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
 
-  const PAYOUT_STATUS: Record<string, { color: string; label: string }> = {
-    pending:  { color: '#F59E0B', label: 'Pending'  },
-    paid:     { color: '#16A34A', label: 'Paid'     },
-    rejected: { color: '#EF4444', label: 'Rejected' },
+  const PAYOUT_STATUS: Record<Exclude<PayoutStatusFilter, 'all'>, { color: string; label: string }> = {
+    pending:    { color: '#F59E0B', label: 'Pending' },
+    processing: { color: '#3B82F6', label: 'Processing' },
+    paid:       { color: '#16A34A', label: 'Paid' },
+    rejected:   { color: '#EF4444', label: 'Rejected' },
   };
 
   const load = useCallback(async () => {
@@ -1735,6 +2018,42 @@ function Payouts({ token }: { token: string }) {
       setMsgOk(true); setMsg('Payout request submitted');
     } catch (e: any) { setMsgOk(false); setMsg(e.message); }
     finally { setSubmitting(false); }
+  }
+
+  const selectedStatusLabel = PAYOUT_STATUS_FILTERS.find(filter => filter.key === payoutStatusFilter)?.label ?? 'All statuses';
+  const filteredPayouts = payouts.filter(payout => {
+    const requestedDate = payoutDateKey(new Date(payout.requestedAt));
+    const startDate = payoutDateKey(payoutStartDate);
+    const endDate = payoutDateKey(payoutEndDate ?? payoutStartDate);
+    const dateMatches = requestedDate >= startDate && requestedDate <= endDate;
+    const statusMatches = payoutStatusFilter === 'all' || payoutStatusKey(payout.status) === payoutStatusFilter;
+    return dateMatches && statusMatches;
+  });
+
+  function choosePayoutDate(date: Date) {
+    if (calendarSelection === 'start') {
+      setPayoutStartDate(date);
+      setPayoutEndDate(null);
+      setCalendarSelection('end');
+      setCalendarMonth(date);
+      return;
+    }
+
+    if (payoutDateKey(date) < payoutDateKey(payoutStartDate)) {
+      setPayoutStartDate(date);
+      setPayoutEndDate(payoutStartDate);
+    } else {
+      setPayoutEndDate(date);
+    }
+    setCalendarMonth(date);
+    setShowCalendar(false);
+  }
+
+  function resetPayoutRangeToToday() {
+    const today = new Date();
+    setPayoutStartDate(today);
+    setPayoutEndDate(today);
+    setCalendarMonth(today);
   }
 
   return (
@@ -1785,14 +2104,89 @@ function Payouts({ token }: { token: string }) {
       {/* Payout history */}
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
         <div className="px-5 py-4 border-b border-white/[0.07]">
-          <h3 className="text-white font-bold text-sm">Payout History</h3>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-white font-bold text-sm">Payout History</h3>
+              <p className="text-white/40 text-xs mt-1">
+                Showing {formatPayoutRange(payoutStartDate, payoutEndDate)} · {selectedStatusLabel}
+              </p>
+            </div>
+            <DollarSign size={18} className="text-violet-400 flex-shrink-0 mt-0.5" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            <button
+              type="button"
+              onClick={resetPayoutRangeToToday}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold transition-colors ${
+                payoutDateKey(payoutStartDate) === payoutDateKey(new Date())
+                  && payoutDateKey(payoutEndDate ?? payoutStartDate) === payoutDateKey(new Date())
+                  ? 'bg-violet-500 text-white border-violet-400'
+                  : 'bg-white/[0.04] text-white/50 border-white/[0.08] hover:text-white'
+              }`}
+            >
+              <Calendar size={13} /> Today
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCalendarSelection('start');
+                setCalendarMonth(payoutStartDate);
+                setShowCalendar(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/70 hover:text-white text-xs font-semibold transition-colors"
+            >
+              <Calendar size={13} className="text-violet-400" />
+              {formatPayoutRange(payoutStartDate, payoutEndDate)}
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowStatusMenu(current => !current)}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-semibold transition-colors ${
+                  payoutStatusFilter !== 'all'
+                    ? 'bg-violet-500 text-white border-violet-400'
+                    : 'bg-white/[0.04] text-white/70 border-white/[0.08] hover:text-white'
+                }`}
+              >
+                <span className={payoutStatusFilter === 'all' ? 'text-violet-400' : ''}>Filter</span>
+                {selectedStatusLabel}
+                <ChevronDown size={13} />
+              </button>
+              {showStatusMenu && (
+                <div className="absolute right-0 top-full mt-2 z-30 w-44 rounded-xl border border-white/[0.1] p-1.5 shadow-2xl" style={MODAL_BG}>
+                  {PAYOUT_STATUS_FILTERS.map(filter => (
+                    <button
+                      type="button"
+                      key={filter.key}
+                      onClick={() => {
+                        setPayoutStatusFilter(filter.key);
+                        setShowStatusMenu(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-left transition-colors ${
+                        payoutStatusFilter === filter.key
+                          ? 'bg-violet-500/15 text-violet-300'
+                          : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
+                      }`}
+                    >
+                      {filter.label}
+                      {payoutStatusFilter === filter.key && <Check size={13} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         {loading
           ? <div className="flex items-center justify-center h-32"><Loader2 size={22} className="animate-spin" style={{ color: '#5B3EF5' }}/></div>
-          : payouts.length === 0
+          : filteredPayouts.length === 0
             ? <div className="flex flex-col items-center justify-center py-16 text-white/20">
                 <DollarSign size={36} className="mb-3"/>
-                <p className="text-sm">No payout requests yet</p>
+                <p className="text-sm">
+                  {payouts.length === 0
+                    ? 'No payout requests yet'
+                    : `No payout requests for ${formatPayoutRange(payoutStartDate, payoutEndDate)}`}
+                </p>
               </div>
             : (
               <table className="w-full text-sm">
@@ -1804,8 +2198,8 @@ function Payouts({ token }: { token: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {payouts.map(p => {
-                    const s = PAYOUT_STATUS[p.status] ?? { color: '#6B7280', label: p.status };
+                  {filteredPayouts.map(p => {
+                    const s = PAYOUT_STATUS[payoutStatusKey(p.status)];
                     return (
                       <tr key={p.id} className="border-b border-white/[0.04] last:border-0">
                         <td className="px-4 py-3 text-white font-bold">{fmt(p.amount)}</td>
@@ -1825,6 +2219,102 @@ function Payouts({ token }: { token: string }) {
             )
         }
       </div>
+
+      {showCalendar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onMouseDown={event => {
+          if (event.target === event.currentTarget) setShowCalendar(false);
+        }}>
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] p-5 shadow-2xl" style={MODAL_BG}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-white font-bold">Filter payout history</h3>
+                <p className="text-white/40 text-xs mt-1">
+                  {calendarSelection === 'start' ? 'Choose start date' : 'Choose end date'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowCalendar(false)} className="p-1 text-white/40 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {[
+                { key: 'start' as const, label: 'Start date', value: formatPayoutFilterDate(payoutStartDate) },
+                { key: 'end' as const, label: 'End date', value: payoutEndDate ? formatPayoutFilterDate(payoutEndDate) : 'Select date' },
+              ].map(selection => (
+                <button
+                  type="button"
+                  key={selection.key}
+                  onClick={() => setCalendarSelection(selection.key)}
+                  className={`text-left rounded-xl border px-3 py-2 transition-colors ${
+                    calendarSelection === selection.key
+                      ? 'border-violet-400 bg-violet-500/15'
+                      : 'border-white/[0.08] bg-white/[0.04]'
+                  }`}
+                >
+                  <span className="block text-white/40 text-[10px] font-semibold">{selection.label}</span>
+                  <span className="block text-white text-xs font-bold mt-1">{selection.value}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-5 mb-3">
+              <button
+                type="button"
+                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/[0.05]"
+              >
+                <ChevronLeft size={17} />
+              </button>
+              <span className="text-white text-sm font-bold">
+                {calendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/[0.05]"
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 mb-1">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                <span key={`${day}-${index}`} className="text-center text-white/35 text-[11px] font-bold py-1">{day}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {payoutCalendarDays(calendarMonth).map((day, index) => {
+                if (!day) return <span key={`empty-${index}`} className="aspect-square" />;
+                const dayKey = payoutDateKey(day);
+                const isStart = dayKey === payoutDateKey(payoutStartDate);
+                const isEnd = !!payoutEndDate && dayKey === payoutDateKey(payoutEndDate);
+                const rangeEnd = payoutEndDate ?? payoutStartDate;
+                const inRange = dayKey >= payoutDateKey(payoutStartDate) && dayKey <= payoutDateKey(rangeEnd);
+                return (
+                  <button
+                    type="button"
+                    key={dayKey}
+                    onClick={() => choosePayoutDate(day)}
+                    className={`aspect-square flex items-center justify-center text-xs font-semibold transition-colors ${
+                      inRange ? 'bg-violet-500/15' : 'hover:bg-white/[0.06]'
+                    } ${isStart || isEnd ? '!bg-violet-500 !text-white rounded-full' : 'text-white/80'}`}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                resetPayoutRangeToToday();
+                setCalendarSelection('start');
+              }}
+              className="w-full mt-4 py-2.5 rounded-xl bg-violet-500/15 text-violet-300 text-xs font-bold hover:bg-violet-500/25 transition-colors"
+            >
+              <Calendar size={14} className="inline mr-1.5" /> Start over with today
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2161,10 +2651,11 @@ function Documents({ token }: { token: string }) {
 }
 
 /* ─── Root App ────────────────────────────────────────────────────── */
-type Page = 'dashboard' | 'jobs' | 'earnings' | 'payouts' | 'notifications' | 'documents' | 'profile';
+type Page = 'dashboard' | 'schedule' | 'jobs' | 'earnings' | 'payouts' | 'notifications' | 'documents' | 'profile';
 
 const NAV: { id: Page; label: string; Icon: React.ElementType }[] = [
   { id: 'dashboard',     label: 'Dashboard',    Icon: LayoutDashboard },
+  { id: 'schedule',      label: 'Schedule',     Icon: Calendar         },
   { id: 'jobs',          label: 'My Jobs',       Icon: Briefcase       },
   { id: 'earnings',      label: 'Earnings',      Icon: DollarSign      },
   { id: 'payouts',       label: 'Payouts',       Icon: FileText        },
@@ -2184,6 +2675,7 @@ interface SidebarContentProps {
 function SidebarContent({ page, navigate, unread, profile, logout }: SidebarContentProps) {
   const labels: Record<Page, string> = {
     dashboard: 'Dashboard',
+    schedule: 'Schedule',
     jobs: 'My Jobs',
     earnings: 'Earnings',
     payouts: 'Payouts',
@@ -2344,6 +2836,7 @@ export default function App() {
             <h1 className="text-white font-bold text-xl leading-none">
               {({
                 dashboard: 'Dashboard',
+                schedule: 'Schedule',
                 jobs: 'My Jobs',
                 earnings: 'Earnings',
                 payouts: 'Payouts',
@@ -2364,6 +2857,7 @@ export default function App() {
         {/* ── Scrollable content ── */}
         <div className="flex-1 overflow-y-auto p-6">
           {page === 'dashboard'     && <Dashboard     key={refreshKey} token={auth.accessToken} profile={profile}/>}
+          {page === 'schedule'      && <Schedule      key={refreshKey} token={auth.accessToken}/>}
           {page === 'jobs'          && <Jobs          key={refreshKey} token={auth.accessToken}/>}
           {page === 'earnings'      && <Earnings      key={refreshKey} token={auth.accessToken}/>}
           {page === 'payouts'       && <Payouts       key={refreshKey} token={auth.accessToken}/>}
@@ -2386,6 +2880,7 @@ export default function App() {
               )}
               <span>{({
                 dashboard: 'Dashboard',
+                schedule: 'Schedule',
                 jobs: 'My Jobs',
                 earnings: 'Earnings',
                 payouts: 'Payouts',

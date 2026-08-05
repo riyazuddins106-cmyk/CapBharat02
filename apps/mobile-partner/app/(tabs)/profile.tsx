@@ -287,6 +287,18 @@ export default function ProfileScreen() {
 
         <View style={{ padding: 16, gap: 12 }}>
 
+          <TouchableOpacity
+            onPress={() => router.push('/help')}
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius, flexDirection: 'row', alignItems: 'center' }]}
+          >
+            <Ionicons name="school-outline" size={22} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Help & Training</Text>
+              <Text style={[styles.securitySub, { color: colors.mutedForeground }]}>Job guidance, safety, and partner support</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+
           {/* ── Professional Info card ── */}
           {profile && (
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>

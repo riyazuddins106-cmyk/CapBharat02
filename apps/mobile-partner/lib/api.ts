@@ -140,10 +140,23 @@ export interface Job {
   price: number;
   createdAt: string;
   updatedAt: string;
+  completedAt?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  cashReportedAt?: string | null;
+  cashConfirmedAt?: string | null;
   customerName: string | null;
   customerPhone: string | null;
   services?: JobService[];
-  paymentStatus?: string | null;
+  address?: {
+    line1: string;
+    line2?: string | null;
+    city: string;
+    state: string;
+    postalCode: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
 }
 
 export interface Earnings {
@@ -179,6 +192,7 @@ export interface OrderItemJob {
   customerPrice?: number;
   orderStatus?: string;
   createdAt?: string;
+  completedAt?: string | null;
 }
 
 export interface OrderItemJobDetail extends OrderItemJob {
@@ -195,7 +209,43 @@ export interface OrderItemJobDetail extends OrderItemJob {
     state: string;
     postalCode: string;
   } | null;
-  payment: { status: string; method?: string | null; amount: number } | null;
+  payment: { status: string; method?: string | null; amount: number; cashReportedAt?: string | null; cashConfirmedAt?: string | null } | null;
+}
+
+export interface PartnerScheduleJob {
+  id: string;
+  jobType: 'booking' | 'order_item';
+  serviceName: string;
+  scheduledAt: string;
+  endTime: string;
+  status: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  payout: number;
+  durationMinutes: number;
+  address: OrderItemJobDetail['address'];
+}
+
+export interface PartnerPerformance {
+  rating: number;
+  reviewCount: number;
+  jobsCompleted: number;
+  totalJobs: number;
+  completionRate: number;
+  cancellationRate: number;
+  acceptanceRate: number;
+  onTimeArrival: number | null;
+}
+
+export interface PartnerEvidence {
+  id: string;
+  professionalId: string;
+  bookingId: string | null;
+  orderItemId: string | null;
+  phase: 'before' | 'after';
+  fileUrl: string;
+  fileName: string | null;
+  createdAt: string;
 }
 
 export interface OrderItemJobs {
@@ -222,6 +272,32 @@ async function uploadFile<T>(
     const name = uri.split('/').pop() ?? 'avatar.jpg';
     const ext = /\.(\w+)$/.exec(name)?.[1] ?? 'jpg';
     formData.append(fieldName, { uri, name, type: `image/${ext}` } as any);
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, json?.error?.message ?? 'Upload failed');
+  return json.data as T;
+}
+
+async function uploadEvidence<T>(
+  path: string,
+  fields: Record<string, string>,
+  uri: string,
+  token: string,
+): Promise<T> {
+  const formData = new FormData();
+  Object.entries(fields).forEach(([key, value]) => formData.append(key, value));
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    formData.append('file', blob, uri.split('/').pop() ?? 'job-photo.jpg');
+  } else {
+    const name = uri.split('/').pop() ?? 'job-photo.jpg';
+    const ext = /\.(\w+)$/.exec(name)?.[1] ?? 'jpg';
+    formData.append('file', { uri, name, type: `image/${ext === 'jpg' ? 'jpeg' : ext}` } as any);
   }
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
@@ -345,6 +421,8 @@ export const partnerApi = {
 
   completeOrderItem: (itemId: string, token: string) =>
     request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/complete`, { method: 'PATCH', token }),
+  confirmCashPayment: (itemId: string, token: string) =>
+    request<{ item: OrderItemJob; payment: { status: string } }>(`/api/partner/order-item-jobs/${itemId}/confirm-cash`, { method: 'PATCH', token }),
 
   getJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}`, { token }),
@@ -373,6 +451,27 @@ export const partnerApi = {
 
   listPayouts: (token: string) =>
     request<Payout[]>('/api/partner/payouts', { token }),
+
+  getSchedule: (from: string, to: string, token: string) =>
+    request<PartnerScheduleJob[]>(`/api/partner/schedule?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { token }),
+
+  getPerformance: (token: string) =>
+    request<PartnerPerformance>('/api/partner/performance', { token }),
+
+  listEvidence: (jobType: 'booking' | 'order_item', jobId: string, token: string) =>
+    request<PartnerEvidence[]>(`/api/partner/evidence?jobType=${jobType}&jobId=${encodeURIComponent(jobId)}`, { token }),
+
+  uploadEvidence: (jobType: 'booking' | 'order_item', jobId: string, phase: 'before' | 'after', uri: string, token: string) =>
+    uploadEvidence<PartnerEvidence>('/api/partner/evidence', { jobType, jobId, phase }, uri, token),
+
+  reportIssue: (data: {
+    jobType: 'booking' | 'order_item';
+    jobId: string;
+    issueType: string;
+    message: string;
+    priority?: 'normal' | 'high' | 'urgent';
+  }, token: string) =>
+    request<{ id: string }>('/api/partner/issues', { method: 'POST', body: JSON.stringify(data), token }),
 };
 
 // ── Documents ──────────────────────────────────────────────

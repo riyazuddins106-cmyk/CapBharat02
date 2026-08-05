@@ -157,6 +157,8 @@ export interface ApiOrderItem {
     method: string | null;
     amount: number;
     notes: string | null;
+    cashReportedAt?: string | null;
+    cashConfirmedAt?: string | null;
   } | null;
 }
 

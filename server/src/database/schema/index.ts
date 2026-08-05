@@ -30,3 +30,4 @@ export * from './orders.js';
 export * from './orderItems.js';
 export * from './orderItemRequests.js';
 export * from './orderItemPayments.js';
+export * from './partnerJobEvidence.js';

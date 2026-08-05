@@ -303,11 +303,67 @@ export const orderDispatchService = {
     return item;
   },
 
+  /** Partner confirms that the customer handed over the cash for this item. */
+  async confirmCashPayment(orderItemId: string, partnerId: string) {
+    const [item] = await db.select().from(orderItems).where(and(
+      eq(orderItems.id, orderItemId),
+      eq(orderItems.partnerId, partnerId),
+    )).limit(1);
+    if (!item) throw AppError.notFound('Service job not found or not assigned to you.');
+    if (!['partner_arrived', 'payment_pending'].includes(item.status)) {
+      throw AppError.badRequest('Cash can only be confirmed after check-in.');
+    }
+
+    const [payment] = await db.select().from(orderItemPayments)
+      .where(eq(orderItemPayments.orderItemId, orderItemId)).limit(1);
+    if (!payment || payment.method !== 'cash' || !payment.cashReportedAt) {
+      throw AppError.badRequest('The customer has not reported a cash payment for this service.');
+    }
+    if (payment.status === 'paid') throw AppError.badRequest('Cash payment is already confirmed.');
+
+    const now = new Date();
+    const [updatedPayment] = await db.update(orderItemPayments).set({
+      status: 'paid',
+      cashConfirmedAt: now,
+      cashConfirmedByPartnerId: partnerId,
+      updatedAt: now,
+    }).where(and(
+      eq(orderItemPayments.id, payment.id),
+      eq(orderItemPayments.status, 'created'),
+    )).returning();
+    if (!updatedPayment) throw AppError.badRequest('Cash payment was already updated.');
+
+    const [updatedItem] = await db.update(orderItems).set({
+      status: 'service_started',
+      updatedAt: now,
+    }).where(and(
+      eq(orderItems.id, orderItemId),
+      eq(orderItems.partnerId, partnerId),
+      inArray(orderItems.status, ['partner_arrived', 'payment_pending']),
+    )).returning();
+    if (!updatedItem) throw AppError.badRequest('Service is no longer waiting for cash confirmation.');
+
+    await recomputeOrderStatus(item.orderId);
+    const [order] = await db.select().from(orders).where(eq(orders.id, item.orderId)).limit(1);
+    const [service] = await db.select({ name: services.name }).from(services).where(eq(services.id, item.serviceId)).limit(1);
+    if (order) {
+      void notificationDbService.create({
+        userId: order.customerId,
+        title: 'Cash payment confirmed',
+        body: `₹${item.customerPrice} cash received for ${service?.name ?? 'your service'}. The service can now begin.`,
+        type: 'payment',
+        data: { orderId: item.orderId, orderItemId, amount: item.customerPrice, method: 'cash' },
+      });
+    }
+    return { item: updatedItem, payment: updatedPayment };
+  },
+
   /** Partner completes service */
   async completeItem(orderItemId: string, partnerId: string) {
     const [item] = await db.update(orderItems).set({
       status: 'service_completed',
       updatedAt: new Date(),
+      completedAt: new Date(),
     }).where(and(
       eq(orderItems.id, orderItemId),
       eq(orderItems.partnerId, partnerId),

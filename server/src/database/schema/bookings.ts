@@ -26,6 +26,7 @@ export const bookings = pgTable('bookings', {
   price: integer('price').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   assignmentType: varchar('assignment_type', { length: 16 }).notNull().default('auto'),
   assignedBy: uuid('assigned_by').references(() => users.id, { onDelete: 'set null' }),

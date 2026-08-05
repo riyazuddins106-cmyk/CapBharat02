@@ -6,6 +6,7 @@ export const CATEGORY_BUCKET   = 'categories';
 export const REELS_BUCKET      = 'reels';
 export const BANNER_BUCKET     = 'banners';
 export const DOCUMENTS_BUCKET  = 'partner-documents';
+export const PARTNER_EVIDENCE_BUCKET = 'partner-job-evidence';
 
 export const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
@@ -34,4 +35,5 @@ export async function ensureAvatarBucket() {
   await ensureBucket(REELS_BUCKET,     ['video/mp4', 'video/quicktime', 'video/webm', 'image/png', 'image/jpeg', 'image/webp']);
   await ensureBucket(BANNER_BUCKET,    ['image/png', 'image/jpeg', 'image/webp']);
   await ensureBucket(DOCUMENTS_BUCKET, ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
+  await ensureBucket(PARTNER_EVIDENCE_BUCKET, ['image/png', 'image/jpeg', 'image/webp'], '8MB');
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,10 +16,15 @@ const STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg: strin
   cancelled:   { label: 'Cancelled',   color: '#D4183D', bg: '#FEE2E2' },
 };
 
-const TABS: { key: string; label: string; statuses: JobStatus[] }[] = [
-  { key: 'active',    label: 'Active',    statuses: ['upcoming', 'pending', 'in_progress'] },
-  { key: 'completed', label: 'Completed', statuses: ['completed'] },
-  { key: 'cancelled', label: 'Cancelled', statuses: ['cancelled'] },
+type JobTabKey = 'all' | 'upcoming' | 'in_progress' | 'pending' | 'completed' | 'cancelled';
+
+const TABS: { key: JobTabKey; label: string; statuses: JobStatus[] }[] = [
+  { key: 'all',         label: 'All',         statuses: ['upcoming', 'in_progress', 'pending', 'completed', 'cancelled'] },
+  { key: 'upcoming',    label: 'Upcoming',    statuses: ['upcoming'] },
+  { key: 'in_progress', label: 'In progress', statuses: ['in_progress'] },
+  { key: 'pending',     label: 'Pending',     statuses: ['pending'] },
+  { key: 'completed',   label: 'Completed',   statuses: ['completed'] },
+  { key: 'cancelled',   label: 'Cancelled',   statuses: ['cancelled'] },
 ];
 
 function fmtDate(iso: string) {
@@ -94,7 +99,7 @@ function JobCard({ job }: { job: Job }) {
 function ServiceJobCard({ item, type, onAction }: {
   item: import('@/lib/api').OrderItemJob;
   type: 'pending' | 'active' | 'completed';
-  onAction: (action: 'accept' | 'reject' | 'checkin' | 'complete', item: import('@/lib/api').OrderItemJob) => void;
+  onAction: (action: 'accept' | 'reject' | 'checkin' | 'confirmCash' | 'complete', item: import('@/lib/api').OrderItemJob) => void;
 }) {
   const colors = useColors();
   const pending = type === 'pending';
@@ -147,6 +152,12 @@ function ServiceJobCard({ item, type, onAction }: {
              <Text style={[styles.actionText, { color: '#fff' }]}>Scan Customer QR</Text>
           </TouchableOpacity>
         )}
+         {active && item.paymentMethod === 'cash' && item.paymentStatus === 'created' && item.cashReportedAt && (
+           <TouchableOpacity onPress={() => onAction('confirmCash', item)} style={[styles.actionBtn, { backgroundColor: '#D97706' }]}>
+             <Ionicons name="cash-outline" size={15} color="#fff" />
+             <Text style={[styles.actionText, { color: '#fff' }]}>Confirm Cash Received</Text>
+           </TouchableOpacity>
+         )}
         {active && ['payment_completed', 'service_started'].includes(item.status ?? '') && (
           <TouchableOpacity onPress={() => onAction('complete', item)} style={[styles.actionBtn, { backgroundColor: '#16A34A' }]}>
             <Text style={[styles.actionText, { color: '#fff' }]}>Complete Service</Text>
@@ -168,14 +179,15 @@ export default function JobsScreen() {
     enabled: !!accessToken,
     refetchInterval: 30_000,
   });
-  const serviceAction = useMutation<unknown, Error, { action: 'accept' | 'reject' | 'checkin' | 'complete'; item: import('@/lib/api').OrderItemJob }>({
-    mutationFn: ({ action, item }: { action: 'accept' | 'reject' | 'checkin' | 'complete'; item: import('@/lib/api').OrderItemJob }) => {
+  const serviceAction = useMutation<unknown, Error, { action: 'accept' | 'reject' | 'checkin' | 'confirmCash' | 'complete'; item: import('@/lib/api').OrderItemJob }>({
+    mutationFn: ({ action, item }: { action: 'accept' | 'reject' | 'checkin' | 'confirmCash' | 'complete'; item: import('@/lib/api').OrderItemJob }) => {
       if (action === 'accept') return partnerApi.acceptOrderItemJob(item.requestId!, accessToken!);
       if (action === 'reject') return partnerApi.rejectOrderItemJob(item.requestId!, accessToken!);
        if (action === 'checkin') {
          router.push(`/service-job/${item.orderItemId}`);
          return Promise.resolve(item);
        }
+       if (action === 'confirmCash') return partnerApi.confirmCashPayment(item.orderItemId, accessToken!);
       return partnerApi.completeOrderItem(item.orderItemId, accessToken!);
     },
     onSuccess: () => {
@@ -183,7 +195,7 @@ export default function JobsScreen() {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
     },
   });
-  const [tab, setTab] = useState('active');
+  const [tab, setTab] = useState<JobTabKey>('all');
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
   const { data: jobs = [], isRefetching, refetch } = useQuery({
@@ -196,14 +208,39 @@ export default function JobsScreen() {
   });
 
   const activeTab = TABS.find((t) => t.key === tab)!;
-  const filtered = jobs.filter((j: Job) => activeTab.statuses.includes(j.status));
+  const pendingServiceJobs = serviceJobs.data?.pendingRequests ?? [];
+  const activeServiceJobs = serviceJobs.data?.activeJobs ?? [];
+  const completedServiceJobs = serviceJobs.data?.completedJobs ?? [];
+  const counts: Record<JobTabKey, number> = {
+    all: jobs.length + pendingServiceJobs.length + activeServiceJobs.length + completedServiceJobs.length,
+    upcoming: jobs.filter((j: Job) => j.status === 'upcoming').length + activeServiceJobs.length,
+    in_progress: jobs.filter((j: Job) => j.status === 'in_progress').length + activeServiceJobs.length,
+    pending: jobs.filter((j: Job) => j.status === 'pending').length + pendingServiceJobs.length,
+    completed: jobs.filter((j: Job) => j.status === 'completed').length + completedServiceJobs.length,
+    cancelled: jobs.filter((j: Job) => j.status === 'cancelled').length,
+  };
+  const filtered = tab === 'all'
+    ? jobs
+    : jobs.filter((j: Job) => activeTab.statuses.includes(j.status));
+  const showPendingServices = tab === 'all' || tab === 'pending';
+  const showActiveServices = tab === 'all' || tab === 'upcoming' || tab === 'in_progress';
+  const showCompletedServices = tab === 'all' || tab === 'completed';
+  const visibleServiceCount =
+    (showPendingServices ? pendingServiceJobs.length : 0)
+    + (showActiveServices ? activeServiceJobs.length : 0)
+    + (showCompletedServices ? completedServiceJobs.length : 0);
+  const hasVisibleJobs = filtered.length > 0 || visibleServiceCount > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>My Jobs</Text>
-        <View style={[styles.tabs, { backgroundColor: colors.muted, borderRadius: 100 }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.tabs, { backgroundColor: colors.muted, borderRadius: 100 }]}
+        >
           {TABS.map((t) => (
             <TouchableOpacity
               key={t.key}
@@ -211,11 +248,11 @@ export default function JobsScreen() {
               style={[styles.tabBtn, tab === t.key && { backgroundColor: colors.card, borderRadius: 100 }]}
             >
               <Text style={[styles.tabText, { color: tab === t.key ? colors.primary : colors.mutedForeground, fontWeight: tab === t.key ? '700' : '400' }]}>
-                {t.label}
+                {t.label} {counts[t.key]}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       <FlatList
@@ -226,34 +263,41 @@ export default function JobsScreen() {
         renderItem={({ item }) => <JobCard job={item} />}
         ListHeaderComponent={
           <View>
-            {activeTab.key === 'active' && !!serviceJobs.data?.pendingRequests.length && (
+            {showPendingServices && (
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-                New service requests ({serviceJobs.data.pendingRequests.length})
+                New service requests {pendingServiceJobs.length ? `(${pendingServiceJobs.length})` : ''}
               </Text>
             )}
-            {activeTab.key === 'active' && serviceJobs.data?.pendingRequests.map(item => (
+            {showPendingServices && pendingServiceJobs.map(item => (
               <ServiceJobCard key={item.requestId ?? item.orderItemId} item={item} type="pending" onAction={(action, selected) => serviceAction.mutate({ action, item: selected })} />
             ))}
-            {activeTab.key === 'active' && !!serviceJobs.data?.activeJobs.length && (
+            {showPendingServices && pendingServiceJobs.length === 0 && (
+              <Text style={[styles.sectionEmpty, { color: colors.mutedForeground }]}>No new service requests.</Text>
+            )}
+            {showActiveServices && (
               <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 8 }]}>In progress services</Text>
             )}
-            {activeTab.key === 'active' && serviceJobs.data?.activeJobs.map(item => (
+            {showActiveServices && activeServiceJobs.map(item => (
               <ServiceJobCard key={item.orderItemId} item={item} type="active" onAction={(action, selected) => serviceAction.mutate({ action, item: selected })} />
             ))}
-            {activeTab.key === 'completed' && serviceJobs.data?.completedJobs.map(item => (
+            {showActiveServices && activeServiceJobs.length === 0 && (
+              <Text style={[styles.sectionEmpty, { color: colors.mutedForeground }]}>No active service jobs.</Text>
+            )}
+            {showCompletedServices && completedServiceJobs.length > 0 && (
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 8 }]}>Completed services</Text>
+            )}
+            {showCompletedServices && completedServiceJobs.map(item => (
               <ServiceJobCard key={item.orderItemId} item={item} type="completed" onAction={(action, selected) => serviceAction.mutate({ action, item: selected })} />
             ))}
           </View>
         }
         ListEmptyComponent={
-          (activeTab.key === 'active' && ((serviceJobs.data?.pendingRequests.length ?? 0) > 0 || (serviceJobs.data?.activeJobs.length ?? 0) > 0))
-            ? null
-            : (
+          hasVisibleJobs ? null : (
               <View style={styles.empty}>
                 <Ionicons name="list-outline" size={48} color={colors.mutedForeground} />
                 <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No {activeTab.label.toLowerCase()} jobs</Text>
                 <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                  {tab === 'active'
+                  {tab === 'all' || tab === 'upcoming' || tab === 'in_progress' || tab === 'pending'
                   ? 'Make sure you are set to Available in your profile — new job requests will appear here automatically.'
                   : 'Your job history will appear here.'}
                 </Text>
@@ -268,8 +312,8 @@ export default function JobsScreen() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, gap: 12 },
   title: { fontSize: 24, fontWeight: '700' },
-  tabs: { flexDirection: 'row', padding: 3 },
-  tabBtn: { flex: 1, paddingVertical: 7, alignItems: 'center' },
+  tabs: { flexDirection: 'row', padding: 3, gap: 2 },
+  tabBtn: { paddingHorizontal: 11, paddingVertical: 7, alignItems: 'center' },
   tabText: { fontSize: 12 },
   card: { padding: 14, marginBottom: 12, borderWidth: 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -288,6 +332,7 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 9 },
   actionText: { fontSize: 12, fontWeight: '700' },
   sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  sectionEmpty: { fontSize: 12, marginBottom: 12 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyTitle: { fontSize: 17, fontWeight: '700' },
   emptyText: { fontSize: 13, textAlign: 'center', maxWidth: 260 },

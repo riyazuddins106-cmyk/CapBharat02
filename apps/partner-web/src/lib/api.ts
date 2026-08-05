@@ -63,6 +63,7 @@ export interface PartnerProfile {
   categoryId: string;
   subCategoryId: string | null;
   payoutUpiId: string | null;
+  availabilityStatus?: 'available' | 'busy' | 'offline';
 }
 export type JobStatus = 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
 export interface JobService {
@@ -79,6 +80,11 @@ export interface Job {
   customerName: string | null; customerPhone: string | null;
   paymentStatus?: string | null;
   services?: JobService[];
+  completedAt?: string | null;
+  address?: {
+    line1: string; line2?: string | null; city: string; state: string; postalCode: string;
+    latitude?: number | null; longitude?: number | null;
+  } | null;
 }
 export interface OrderItemJob {
   requestId?: string | null;
@@ -94,6 +100,10 @@ export interface OrderItemJob {
   customerPrice?: number;
   orderStatus?: string;
   createdAt?: string;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  cashReportedAt?: string | null;
+  cashConfirmedAt?: string | null;
 }
 export interface OrderItemJobs {
   pendingRequests: OrderItemJob[];
@@ -104,6 +114,19 @@ export interface Earnings {
   total: number; thisMonth: number; today: number;
   pendingPayout: number; paidOut: number; available: number;
   weekly: { date: string; amount: number }[];
+}
+export interface PartnerScheduleJob {
+  id: string; jobType: 'booking' | 'order_item'; serviceName: string; scheduledAt: string; endTime: string;
+  status: string; customerName: string | null; customerPhone: string | null; payout: number;
+  durationMinutes: number; address: Job['address'];
+}
+export interface PartnerPerformance {
+  rating: number; reviewCount: number; jobsCompleted: number; totalJobs: number;
+  completionRate: number; cancellationRate: number; acceptanceRate: number; onTimeArrival: number | null;
+}
+export interface PartnerEvidence {
+  id: string; professionalId: string; bookingId: string | null; orderItemId: string | null;
+  phase: 'before' | 'after'; fileUrl: string; fileName: string | null; createdAt: string;
 }
 export interface AppNotification {
   id: string; title: string; body: string; type: string;
@@ -233,6 +256,8 @@ export const partnerApi = {
     }),
   completeOrderItem: (itemId: string, token: string) =>
     request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/complete`, { method: 'PATCH', token }),
+  confirmCashPayment: (itemId: string, token: string) =>
+    request<{ item: OrderItemJob; payment: { status: string } }>(`/api/partner/order-item-jobs/${itemId}/confirm-cash`, { method: 'PATCH', token }),
   getJob: (id: string, token: string) => request<Job>(`/api/partner/jobs/${id}`, { token }),
   completeJob: (id: string, token: string) =>
     request<Job>(`/api/partner/jobs/${id}/complete`, { method: 'PATCH', token }),
@@ -247,6 +272,19 @@ export const partnerApi = {
     request<PartnerProfile>('/api/partner/availability', { method: 'PATCH', body: JSON.stringify({ status }), token }),
   updateLocation: (latitude: number, longitude: number, token: string) =>
     request<PartnerProfile>('/api/partner/location', { method: 'PATCH', body: JSON.stringify({ latitude, longitude }), token }),
+  getSchedule: (from: string, to: string, token: string) =>
+    request<PartnerScheduleJob[]>(`/api/partner/schedule?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { token }),
+  getPerformance: (token: string) => request<PartnerPerformance>('/api/partner/performance', { token }),
+  listEvidence: (jobType: 'booking' | 'order_item', jobId: string, token: string) =>
+    request<PartnerEvidence[]>(`/api/partner/evidence?jobType=${jobType}&jobId=${encodeURIComponent(jobId)}`, { token }),
+  uploadEvidence: (jobType: 'booking' | 'order_item', jobId: string, phase: 'before' | 'after', file: File, token: string) => {
+    const form = new FormData();
+    form.append('jobType', jobType); form.append('jobId', jobId); form.append('phase', phase); form.append('file', file);
+    return fetch('/api/partner/evidence', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
+      .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new ApiError(r.status, j?.error?.message ?? 'Upload failed'); return j.data as PartnerEvidence; });
+  },
+  reportIssue: (data: { jobType: 'booking' | 'order_item'; jobId: string; issueType: string; message: string; priority?: 'normal' | 'high' | 'urgent' }, token: string) =>
+    request<{ id: string }>('/api/partner/issues', { method: 'POST', body: JSON.stringify(data), token }),
 };
 
 export const payoutsApi = {

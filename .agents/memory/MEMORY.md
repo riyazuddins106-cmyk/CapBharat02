@@ -41,3 +41,8 @@
 - [Scheduled partner payouts](scheduled-partner-payouts.md) — automatic runs require explicit approval, caps, locking, recovery, and RazorpayX configuration.
 - [Partner App icon font loading](partner-app-icon-font-loading.md) — native Ionicons need a longer font-loading grace period than the web fallback.
 - [English-only product language](english-only-product-language.md) — ServeNow intentionally has no translation catalog, language settings, selectors, or RTL behavior; content displays exactly as stored.
+- [Migration lock diagnosis](migration-lock-diagnosis.md) — startup can remain offline when an older application query holds a relation lock; inspect pg_stat_activity before restarting repeatedly.
+- [Expo QR scanner styling](expo-qr-scanner-styling.md) — keep the reference layout in expo-tunnel.sh and load current customer/partner PNG files so tunnel refreshes preserve design and freshness.
+- [Admin history data model](admin-history-data-model.md) — customer and professional histories must combine legacy bookings with newer service-order jobs and keep payment/payout fields distinct.
+- [Partner Schedule date bounds](partner-schedule-date-bounds.md) — cast ISO day bounds to timestamptz when filtering timestamp columns through raw Drizzle SQL.
+- [Partner payout filter parity](partner-payout-filter-parity.md) — Partner Web and Mobile must share the same inclusive date-range and payout-status filters; no All time payout-history option.

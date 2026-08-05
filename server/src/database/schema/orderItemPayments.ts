@@ -2,6 +2,7 @@ import { pgTable, uuid, varchar, timestamp, integer } from 'drizzle-orm/pg-core'
 import { orderItems } from './orderItems.js';
 import { orders } from './orders.js';
 import { users } from './users.js';
+import { professionals } from './professionals.js';
 import { paymentStatusEnum, paymentMethodEnum } from './payments.js';
 
 export const orderItemPayments = pgTable('order_item_payments', {
@@ -19,6 +20,9 @@ export const orderItemPayments = pgTable('order_item_payments', {
   stripeSessionId: varchar('stripe_session_id', { length: 256 }),
   stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 256 }),
   notes: varchar('notes', { length: 512 }),
+  cashReportedAt: timestamp('cash_reported_at', { withTimezone: true }),
+  cashConfirmedAt: timestamp('cash_confirmed_at', { withTimezone: true }),
+  cashConfirmedByPartnerId: uuid('cash_confirmed_by_partner_id').references(() => professionals.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

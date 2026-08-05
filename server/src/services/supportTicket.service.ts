@@ -10,7 +10,17 @@ export const supportTicketService = {
     return supportTicketRepository.listForUser(userId);
   },
 
-  async create(data: { userId?: string; name: string; email: string; subject: string; message: string }) {
+  async create(data: {
+    userId?: string;
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+    bookingId?: string;
+    orderItemId?: string;
+    issueType?: string;
+    priority?: 'normal' | 'high' | 'urgent';
+  }) {
     return supportTicketRepository.create(data as NewSupportTicket);
   },
 
