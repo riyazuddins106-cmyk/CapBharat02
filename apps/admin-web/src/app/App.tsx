@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import {
   Bell, Home, BookOpen, Sparkles, DollarSign, Search, Clock, TrendingUp,
   BarChart2, Users, Settings, RefreshCw, Activity, LogOut,
-  Loader2, UserCheck, XCircle, Pencil, Trash2, ShieldOff,
+  Loader2, UserCheck, UserX, XCircle, Pencil, Trash2, ShieldOff,
   ShieldCheck, Star, Grid, Plus, ChevronDown, ChevronUp,
   Shield, HelpCircle, Lock, MessageSquare, ExternalLink, Tag,
   Film, ChevronRight, Image, Upload, CreditCard, Mail, Eye, EyeOff,
@@ -458,13 +458,14 @@ function Badge({ label, color }: { label: string; color: string }) {
 function ActionBtn({
   onClick, variant, children, disabled,
 }: {
-  onClick: () => void; variant: "edit" | "danger" | "warn" | "green"; children: React.ReactNode; disabled?: boolean;
+  onClick: () => void; variant: "edit" | "danger" | "warn" | "green" | "purple"; children: React.ReactNode; disabled?: boolean;
 }) {
   const styles = {
     edit:   { borderColor: "rgba(91,62,245,0.3)",  color: "#7C5BF8" },
     danger: { borderColor: "rgba(239,68,68,0.3)",  color: "#EF4444" },
     warn:   { borderColor: "rgba(245,158,11,0.3)", color: "#F59E0B" },
     green:  { borderColor: "rgba(22,163,74,0.3)",  color: "#16A34A" },
+    purple: { borderColor: "rgba(167,139,250,0.3)", color: "#a78bfa" },
   };
   return (
     <button
@@ -473,6 +474,30 @@ function ActionBtn({
       style={styles[variant]}
     >
       {children}
+    </button>
+  );
+}
+
+/** Compact icon-only button for dense table action columns. */
+function IconBtn({
+  icon: Icon, label, onClick, color = "rgba(255,255,255,0.35)", disabled,
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  color?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className="p-1.5 rounded-lg transition-colors disabled:opacity-40 hover:bg-white/[0.07]"
+      style={{ color }}
+    >
+      <Icon size={14} />
     </button>
   );
 }
@@ -3094,6 +3119,11 @@ function ProsView({
   const [searchDraft, setSearchDraft] = useState(search);
   const [detail, setDetail] = useState<AdminProfessionalDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [resetTarget, setResetTarget] = useState<ProfessionalRow | null>(null);
+  // Per-column client-side filters
+  const [pvColName,     setPvColName]     = useState("");
+  const [pvColCategory, setPvColCategory] = useState("");
+  const [pvColStatus,   setPvColStatus]   = useState("");
 
   useEffect(() => {
     setSearchDraft(search);
@@ -3214,11 +3244,16 @@ function ProsView({
   const pvColVis = useColumnVisibility(PV_COLS);
   const [pvExporting, setPvExporting] = useState(false);
 
-  const filtered = pros.filter(p =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.categoryName?.toLowerCase().includes(search.toLowerCase()) ||
-    p.title?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = pros.filter(p => {
+    const n = pvColName.toLowerCase(), cat = pvColCategory.toLowerCase(), s = pvColStatus.toLowerCase();
+    const baseMatch = !search || p.name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.categoryName?.toLowerCase().includes(search.toLowerCase()) ||
+      p.title?.toLowerCase().includes(search.toLowerCase());
+    return baseMatch
+      && (!n   || (p.name ?? "").toLowerCase().includes(n))
+      && (!cat || (p.categoryName ?? "").toLowerCase().includes(cat))
+      && (!s   || (p.isActive ? "active" : "suspended").includes(s));
+  });
   const pvSorted = sortPv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
@@ -3393,6 +3428,33 @@ function ProsView({
                 {pvColVis.isVisible("Status")       && <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Status</th>}
                 {pvColVis.isVisible("Actions")      && <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>}
               </tr>
+              {/* Per-column filter row */}
+              <tr className="border-b border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
+                {pvColVis.isVisible("Professional") && (
+                  <td className="px-3 py-1.5">
+                    <input value={pvColName} onChange={e => setPvColName(e.target.value)} placeholder="Name…"
+                      className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder:text-white/20 border border-white/[0.06] outline-none focus:border-violet-500/40"
+                      style={{ background: "rgba(255,255,255,0.03)" }} />
+                  </td>
+                )}
+                {pvColVis.isVisible("Category") && (
+                  <td className="px-3 py-1.5">
+                    <input value={pvColCategory} onChange={e => setPvColCategory(e.target.value)} placeholder="Category…"
+                      className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder:text-white/20 border border-white/[0.06] outline-none focus:border-violet-500/40"
+                      style={{ background: "rgba(255,255,255,0.03)" }} />
+                  </td>
+                )}
+                {pvColVis.isVisible("Sub-category") && <td className="px-3 py-1.5" />}
+                {pvColVis.isVisible("Rating")       && <td className="px-3 py-1.5" />}
+                {pvColVis.isVisible("Status") && (
+                  <td className="px-3 py-1.5">
+                    <input value={pvColStatus} onChange={e => setPvColStatus(e.target.value)} placeholder="Status…"
+                      className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder:text-white/20 border border-white/[0.06] outline-none focus:border-violet-500/40"
+                      style={{ background: "rgba(255,255,255,0.03)" }} />
+                  </td>
+                )}
+                {pvColVis.isVisible("Actions") && <td className="px-3 py-1.5" />}
+              </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {pvSorted.map((p) => (
@@ -3426,18 +3488,17 @@ function ProsView({
                     </td>
                   )}
                   {pvColVis.isVisible("Actions")      && (
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <ActionBtn variant="edit" onClick={() => openEdit(p)}>Edit</ActionBtn>
-                        <ActionBtn variant="edit" onClick={() => void openDetail(p.id)}>Details</ActionBtn>
-                        <ActionBtn
-                          variant={p.isActive ? "warn" : "green"}
-                          onClick={() => handleToggle(p)}
-                          disabled={busyId === p.id}
-                        >
-                          {p.isActive ? "Suspend" : "Activate"}
-                        </ActionBtn>
-                        {onDelete && <ActionBtn variant="danger" onClick={() => setDeleteId(p.id)}>Delete</ActionBtn>}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-0.5">
+                        <IconBtn icon={Eye}      label="View details"               onClick={() => void openDetail(p.id)} color="#7C5BF8" />
+                        <IconBtn icon={Pencil}   label="Edit"                       onClick={() => openEdit(p)}           color="#7C5BF8" />
+                        <IconBtn icon={p.isActive ? UserX : UserCheck}
+                                 label={p.isActive ? "Suspend" : "Activate"}
+                                 onClick={() => handleToggle(p)}
+                                 disabled={busyId === p.id}
+                                 color={p.isActive ? "#F59E0B" : "#16A34A"} />
+                        <IconBtn icon={KeyRound} label="Reset password"            onClick={() => setResetTarget(p)}     color="#a78bfa" />
+                        {onDelete && <IconBtn icon={Trash2} label="Delete" onClick={() => setDeleteId(p.id)} color="#EF4444" />}
                       </div>
                     </td>
                   )}
@@ -3449,6 +3510,15 @@ function ProsView({
         </div>
         <Pagination page={proPage} total={proTotal} pageSize={proPageSize} onChange={p => { onProPageChange(p); }} />
       </div>
+      {resetTarget && (
+        <ResetPasswordModal
+          targetId={resetTarget.id}
+          targetName={resetTarget.name}
+          type="professional"
+          accessToken={accessToken}
+          onClose={() => setResetTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -3531,7 +3601,17 @@ function UsersView({
     finally { setDetailLoading(false); }
   };
 
-  const filtered = users;
+  // Apply per-column client-side filters on top of the server-returned page
+  const filtered = users.filter(u => {
+    const n = colName.toLowerCase(), e = colEmail.toLowerCase(),
+          p = colPhone.toLowerCase(), r = colRole.toLowerCase(),
+          s = colStatus.toLowerCase();
+    return (!n || (u.fullName ?? "").toLowerCase().includes(n))
+        && (!e || (u.email   ?? "").toLowerCase().includes(e))
+        && (!p || (u.phone   ?? "").toLowerCase().includes(p))
+        && (!r || (u.role    ?? "").toLowerCase().includes(r))
+        && (!s || (u.isActive ? "active" : "suspended").includes(s));
+  });
   const uvSorted = sortUv(filtered as Record<string, unknown>[]) as typeof filtered;
 
   return (
@@ -3572,11 +3652,21 @@ function UsersView({
       )}
 
       <div className="flex-shrink-0 flex gap-2 flex-wrap items-center">
-        <div className="flex-1 min-w-[200px]">
-          <SearchBar value={serverSearch} onChange={onSearchChange} placeholder="Search customers by name, email, or phone…" />
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <input
+            value={serverSearch}
+            onChange={e => { onSearchChange(e.target.value); onUserPageChange(1); }}
+            placeholder="Quick search across all columns (server-side)…"
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] pl-9 pr-8 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
+          />
+          {serverSearch && (
+            <button onClick={() => { onSearchChange(""); onUserPageChange(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-xs">✕</button>
+          )}
         </div>
-        {serverSearch && (
-          <button onClick={() => onSearchChange("")} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear</button>
+        {(colName || colEmail || colPhone || colRole || colStatus) && (
+          <button onClick={() => { setColName(""); setColEmail(""); setColPhone(""); setColRole(""); setColStatus(""); }}
+            className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear filters</button>
         )}
         <ExportBtn
           disabled={uvExporting}
@@ -3612,7 +3702,29 @@ function UsersView({
                 <SortTh label="Role"   field="role"      sort={uvSort} onSort={toggleUvSort} />
                 <SortTh label="Status" field="isActive"  sort={uvSort} onSort={toggleUvSort} />
                 <SortTh label="Joined" field="createdAt" sort={uvSort} onSort={toggleUvSort} />
-                <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">Actions</th>
+                <th className="px-3 py-3 text-center text-white/40 text-xs font-semibold">Details</th>
+                <th className="px-3 py-3 text-center text-white/40 text-xs font-semibold">Edit</th>
+                <th className="px-3 py-3 text-center text-white/40 text-xs font-semibold">Suspend</th>
+                <th className="px-3 py-3 text-center text-white/40 text-xs font-semibold">Reset PW</th>
+                {onDelete && <th className="px-3 py-3 text-center text-white/40 text-xs font-semibold">Delete</th>}
+              </tr>
+              {/* Per-column filter row */}
+              <tr className="border-b border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
+                {([
+                  [colName,   setColName,   "Name…"],
+                  [colEmail,  setColEmail,  "Email…"],
+                  [colPhone,  setColPhone,  "Phone…"],
+                  [colRole,   setColRole,   "Role…"],
+                  [colStatus, setColStatus, "Status…"],
+                ] as [string, React.Dispatch<React.SetStateAction<string>>, string][]).map(([val, setter, ph], i) => (
+                  <td key={i} className="px-3 py-1.5">
+                    <input value={val} onChange={e => setter(e.target.value)} placeholder={ph}
+                      className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder:text-white/20 border border-white/[0.06] outline-none focus:border-violet-500/40 transition-colors"
+                      style={{ background: "rgba(255,255,255,0.03)" }} />
+                  </td>
+                ))}
+                <td className="px-3 py-1.5 text-white/20 text-[10px] text-center">↑↓</td>
+                <td /><td /><td /><td />{onDelete && <td />}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -3633,37 +3745,47 @@ function UsersView({
                   </td>
                   <td className="px-4 py-3 text-white/60 whitespace-nowrap">{u.email}</td>
                   <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{u.phone ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <Badge label={u.role} color={ROLE_COLOR[u.role] ?? "#5B3EF5"} />
+                  <td className="px-4 py-3"><Badge label={u.role} color={ROLE_COLOR[u.role] ?? "#5B3EF5"} /></td>
+                  <td className="px-4 py-3"><Badge label={u.isActive ? "Active" : "Inactive"} color={u.isActive ? "#16A34A" : "#EF4444"} /></td>
+                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">{new Date(u.createdAt).toLocaleDateString("en-IN")}</td>
+                  <td className="px-3 py-3 text-center">
+                    <IconBtn icon={Eye}     label="View details" onClick={() => void openDetail(u.id)} color="#7C5BF8" />
                   </td>
-                  <td className="px-4 py-3">
-                    <Badge label={u.isActive ? "Active" : "Inactive"} color={u.isActive ? "#16A34A" : "#EF4444"} />
+                  <td className="px-3 py-3 text-center">
+                    <IconBtn icon={Pencil}  label="Edit"         onClick={() => openEdit(u)}           color="#7C5BF8" />
                   </td>
-                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
-                    {new Date(u.createdAt).toLocaleDateString("en-IN")}
+                  <td className="px-3 py-3 text-center">
+                    <IconBtn icon={u.isActive ? UserX : UserCheck}
+                             label={u.isActive ? "Suspend" : "Activate"}
+                             onClick={() => handleToggle(u)}
+                             disabled={busyId === u.id}
+                             color={u.isActive ? "#F59E0B" : "#16A34A"} />
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                       <ActionBtn variant="edit" onClick={() => void openDetail(u.id)}>Details</ActionBtn>
-                       <ActionBtn variant="edit" onClick={() => openEdit(u)}>Edit</ActionBtn>
-                      <ActionBtn
-                        variant={u.isActive ? "warn" : "green"}
-                        onClick={() => handleToggle(u)}
-                        disabled={busyId === u.id}
-                      >
-                        {u.isActive ? "Suspend" : "Activate"}
-                      </ActionBtn>
-                      {onDelete && <ActionBtn variant="danger" onClick={() => setDeleteId(u.id)}>Delete</ActionBtn>}
-                    </div>
+                  <td className="px-3 py-3 text-center">
+                    <IconBtn icon={KeyRound} label="Reset password" onClick={() => setResetTarget(u)} color="#a78bfa" />
                   </td>
+                  {onDelete && (
+                    <td className="px-3 py-3 text-center">
+                      <IconBtn icon={Trash2} label="Delete" onClick={() => setDeleteId(u.id)} color="#EF4444" />
+                    </td>
+                  )}
                 </tr>
               ))}
-              {uvSorted.length === 0 && <EmptyRow cols={7} text="No customers found" />}
+              {uvSorted.length === 0 && <EmptyRow cols={onDelete ? 11 : 10} text="No customers found" />}
             </tbody>
           </table>
         </div>
         <Pagination page={userPage} total={userTotal} pageSize={userPageSize} onChange={p => onUserPageChange(p)} />
       </div>
+      {resetTarget && (
+        <ResetPasswordModal
+          targetId={resetTarget.id}
+          targetName={resetTarget.fullName}
+          type="user"
+          accessToken={accessToken}
+          onClose={() => setResetTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -7684,6 +7806,8 @@ function AdminManagementView({
   const [editing, setEditing] = useState<AdminAccount | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [adminSearch, setAdminSearch] = useState("");
+  const [resetAdminTarget, setResetAdminTarget] = useState<AdminAccount | null>(null);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -7883,12 +8007,24 @@ function AdminManagementView({
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] overflow-hidden" style={CARD}>
-        <div className="px-5 py-4 border-b border-white/[0.07] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-white/[0.07] flex items-center justify-between gap-3">
           <div>
             <h3 className="text-white font-semibold text-sm">Admin Accounts</h3>
             <p className="text-white/35 text-xs mt-1">{admins.length} account{admins.length === 1 ? "" : "s"}</p>
           </div>
-          <button onClick={() => void load()} className="text-white/40 hover:text-white/80" title="Refresh admin accounts">
+          <div className="flex items-center gap-2 flex-1 max-w-xs">
+            <div className="relative flex-1">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/25" />
+              <input
+                value={adminSearch}
+                onChange={e => setAdminSearch(e.target.value)}
+                placeholder="Search by name, email, role…"
+                className="w-full rounded-xl pl-7 pr-3 py-1.5 text-xs text-white border border-white/[0.07] outline-none focus:border-violet-500/40"
+                style={{ background: "rgba(255,255,255,0.04)" }}
+              />
+            </div>
+          </div>
+          <button onClick={() => void load()} className="text-white/40 hover:text-white/80 flex-shrink-0" title="Refresh admin accounts">
             <RefreshCw size={15} />
           </button>
         </div>
@@ -7898,7 +8034,16 @@ function AdminManagementView({
           <p className="px-5 py-8 text-center text-white/35 text-sm">No admin accounts found.</p>
         ) : (
           <div className="divide-y divide-white/[0.05]">
-            {admins.map(admin => (
+            {admins
+              .filter(admin => {
+                if (!adminSearch.trim()) return true;
+                const q = adminSearch.toLowerCase();
+                return admin.fullName.toLowerCase().includes(q)
+                    || admin.email.toLowerCase().includes(q)
+                    || admin.role.toLowerCase().includes(q)
+                    || (admin.phone ?? "").toLowerCase().includes(q);
+              })
+              .map(admin => (
               <div key={admin.id} className="px-5 py-3 flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: "#5B3EF5" }}>
                   {admin.fullName.charAt(0).toUpperCase()}
@@ -7909,20 +8054,30 @@ function AdminManagementView({
                   </p>
                   <p className="text-white/40 text-xs truncate">{admin.email}{admin.phone ? ` · ${admin.phone}` : ""}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <Badge label={admin.role === "operations_manager" ? "Operations" : "Admin"} color="#7C5BF8" />
                   <span className={`text-[10px] font-semibold ${admin.isActive ? "text-emerald-400" : "text-red-400"}`}>
                     {admin.isActive ? "Active" : "Disabled"}
                   </span>
                   {admin.id !== currentUserId && (
-                    <button
-                      onClick={() => openEdit(admin)}
-                      className="ml-1 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-                      title={`Edit ${admin.fullName}`}
-                      aria-label={`Edit ${admin.fullName}`}
-                    >
-                      <Pencil size={13} />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => openEdit(admin)}
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                        title={`Edit ${admin.fullName}`}
+                        aria-label={`Edit ${admin.fullName}`}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => setResetAdminTarget(admin)}
+                        className="p-1.5 rounded-lg text-violet-400/50 hover:text-violet-300 hover:bg-violet-500/10 transition-colors"
+                        title={`Reset password for ${admin.fullName}`}
+                        aria-label={`Reset password for ${admin.fullName}`}
+                      >
+                        <KeyRound size={13} />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -7930,6 +8085,17 @@ function AdminManagementView({
           </div>
         )}
       </div>
+
+      {resetAdminTarget && (
+        <ResetPasswordModal
+          targetId={resetAdminTarget.id}
+          targetName={resetAdminTarget.fullName}
+          type="admin"
+          accessToken={accessToken}
+          onClose={() => setResetAdminTarget(null)}
+          onSuccess={() => setMessage({ text: `Password reset successfully for ${resetAdminTarget.fullName}.`, type: "success" })}
+        />
+      )}
 
       {editing && (
         <div
