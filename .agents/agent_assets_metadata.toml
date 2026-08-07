@@ -11,12 +11,19 @@ title = "ServeNow — Complete Technical Documentation"
 id = "z3ReHYQpJ6Q9XbRTPxCuk"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
-title = "Customer App — Expo Go QR"
-description = "Scan this current Customer App QR code with Expo Go."
+title = "ServeNow Customer Expo Go QR"
+description = "Scan this current QR code in Expo Go for the Customer App."
 
 [[outputs]]
 id = "CnN3LIYRidf200aumm0xt"
 uri = "file://tmp-qr/partner-qr.png"
 type = "image"
-title = "Partner App — Expo Go QR"
-description = "Scan this current Partner App QR code with Expo Go."
+title = "ServeNow Partner Expo Go QR"
+description = "Scan this current QR code in Expo Go for the Partner App."
+
+[[outputs]]
+id = "M4aNKMl2fOqdxUhEEjeEo"
+uri = "file://screenshots/servenow-qr-scanner.jpg"
+type = "image"
+title = "ServeNow Expo Go QR Scanner"
+description = "Both current Expo Go QR codes, verified after restarting the tunnels."

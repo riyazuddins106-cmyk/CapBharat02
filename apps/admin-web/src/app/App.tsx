@@ -795,10 +795,10 @@ function AccessDenied() {
    LOGIN PAGE
 ═══════════════════════════════════════════════════════════════════ */
 
-function LoginPage({ onLogin }: { onLogin: (user: AdminUser, access: string, refresh: string) => void }) {
+function LoginPage({ onLogin, initialError = "" }: { onLogin: (user: AdminUser, access: string, refresh: string) => void; initialError?: string }) {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
+  const [error, setError]       = useState(initialError);
   const [loading, setLoading]   = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -9239,6 +9239,7 @@ export default function App() {
   const [accessToken,  setAccessToken]  = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [checking,     setChecking]     = useState(true);
+  const [authError,    setAuthError]    = useState("");
 
   useEffect(() => {
     (async () => {
@@ -9256,7 +9257,12 @@ export default function App() {
 
   useEffect(() => {
     const forceLogout = () => {
+      // Clear both tokens before switching away from the panel. Otherwise a
+      // stale tab can immediately mount the panel again and leave its content
+      // spinner running while every request is rejected with 401.
+      adminAuth.clear();
       setUser(null); setAccessToken(null); setRefreshToken(null);
+      setAuthError("Your admin session expired. Please sign in again to load the dashboard.");
     };
     const onTokenRefreshed = (e: Event) => {
       const { accessToken: a, refreshToken: r, user: u } = (e as CustomEvent).detail;
@@ -9271,6 +9277,7 @@ export default function App() {
   }, []);
 
   const handleLogin = (u: AdminUser, access: string, refresh: string) => {
+    setAuthError("");
     setUser(u); setAccessToken(access); setRefreshToken(refresh);
   };
 
@@ -9287,6 +9294,6 @@ export default function App() {
     );
   }
 
-  if (!user || !accessToken) return <LoginPage onLogin={handleLogin} />;
+  if (!user || !accessToken) return <LoginPage onLogin={handleLogin} initialError={authError} />;
   return <AdminPanel user={user} accessToken={accessToken} onLogout={handleLogout} />;
 }
