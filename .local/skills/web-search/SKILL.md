@@ -21,14 +21,17 @@ description: Search the web, fetch content, extract branding profiles, and captu
 
 ## Available Functions
 
-### webSearch({ query, count? })
+### webSearch({ query, count?, category?, includeDomains?, isTextExtended? })
 
 **Parameters:**
 
 - `query` (str, required): Natural language search query phrased as a complete question
 - `count` (number, optional): Number of results, 1-10
+- `category` (str, optional): One of `company`, `people`, `news`, `personal site`. Response gains `publishedDate`, `author` and `entities`. `people` searches LinkedIn and each result's `entities[].properties` holds structured work history, education and location.
+- `includeDomains` (list of str, optional): Limit to specific sites. Not allowed with `category: "people"`.
+- `isTextExtended` (bool, optional): Increase returned text from 300 to 800 characters. Use when looking for high-pri info.
 
-**Returns:** Dict with `searchAnswer` and `resultPages` (list of title/url/snippet dicts)
+**Returns:** Dict with `searchAnswer` and `resultPages` (list of title/url/snippet dicts). Whenever you pass any argument beyond `query` and `count`, each result also carries `publishedDate`, `author` and `entities` where the search engine has them. `entities[].properties` is the structured record.
 
 **Example:**
 
@@ -94,8 +97,8 @@ if (searchResult.resultPages.length > 0) {
 
 ## Limitations
 
-- Cannot access social media platforms (LinkedIn, Instagram, Facebook, Reddit, YouTube)
-- X/Twitter is the exception: read posts, users, and trends with the `externalApi__x` callback — read `.local/skills/external-apis/references/x.md`
+- You can search social media (LinkedIn, Instagram, Facebook, Reddit, YouTube), but you can't open the pages via `webFetch`. For people on LinkedIn use `category: "people"`.
+- X/Twitter is not reached through either function. Read posts, users and trends with the separate `externalApi__x` function — see `.local/skills/external-apis/references/x.md`
 - Cannot download media files (images, videos, audio)
 - Paywalled or authenticated content may be inaccessible
 

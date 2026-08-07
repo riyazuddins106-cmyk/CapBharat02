@@ -5,6 +5,7 @@ import {
   bookings, users, professionals, serviceCategories, reviews, payoutRequests, payoutRuns,
   orders, orderItems, orderItemPayments, services, addresses,
   bookingItems, bookingPartnerRequests, bookingAssignmentLogs,
+  subServiceCategories,
 } from '../database/schema/index.js';
 import { payments } from '../database/schema/payments.js';
 import { eq, desc, count, sum, ne, isNull, isNotNull, and, or, avg, sql, gte, lte, ilike, inArray } from 'drizzle-orm';
@@ -1498,7 +1499,38 @@ export const adminController = {
   /* ──────────────────── Service Categories ───────────────────── */
   listCategories: asyncHandler(async (_req: Request, res: Response) => {
     const rows = await db
-      .select()
+      .select({
+        id: serviceCategories.id,
+        name: serviceCategories.name,
+        description: serviceCategories.description,
+        iconName: serviceCategories.iconName,
+        color: serviceCategories.color,
+        iconColor: serviceCategories.iconColor,
+        imageUrl: serviceCategories.imageUrl,
+        sortOrder: serviceCategories.sortOrder,
+        featured: serviceCategories.featured,
+        isActive: serviceCategories.isActive,
+        createdAt: serviceCategories.createdAt,
+        updatedAt: serviceCategories.updatedAt,
+        serviceCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM services
+          WHERE services.category_id = ${serviceCategories.id}
+            AND services.deleted_at IS NULL
+        )`,
+        subCategoryCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM sub_service_categories
+          WHERE sub_service_categories.category_id = ${serviceCategories.id}
+            AND sub_service_categories.deleted_at IS NULL
+        )`,
+        partnerCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM professionals
+          WHERE professionals.category_id = ${serviceCategories.id}
+            AND professionals.deleted_at IS NULL
+        )`,
+      })
       .from(serviceCategories)
       .orderBy(serviceCategories.sortOrder, serviceCategories.name);
     res.json({ success: true, data: { categories: rows, total: rows.length } });
@@ -1585,20 +1617,50 @@ export const adminController = {
 
   deleteCategory: asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const [existing] = await db
-      .select({ id: serviceCategories.id })
-      .from(serviceCategories)
-      .where(eq(serviceCategories.id, id));
-    if (!existing) throw AppError.notFound('Category not found');
+    const result = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: serviceCategories.id, name: serviceCategories.name })
+        .from(serviceCategories)
+        .where(eq(serviceCategories.id, id));
+      if (!existing) throw AppError.notFound('Category not found');
 
-    // Deactivate instead of hard-delete (FK references prevent deletion)
-    const [row] = await db
-      .update(serviceCategories)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(serviceCategories.id, id))
-      .returning({ id: serviceCategories.id });
-    await auditLogService.record(req.user!.userId, 'category.delete', 'category', id);
-    res.json({ success: true, data: { id: row.id } });
+      // A category may be permanently removed only when it has no visible
+      // sub-categories and no linked records that would break FK references.
+      const [{ total: subCategoryCount }] = await tx
+        .select({ total: count() })
+        .from(subServiceCategories)
+        .where(and(eq(subServiceCategories.categoryId, id), isNull(subServiceCategories.deletedAt)));
+      const [{ total: partnerCount }] = await tx
+        .select({ total: count() })
+        .from(professionals)
+        .where(eq(professionals.categoryId, id));
+      const [{ total: serviceCount }] = await tx
+        .select({ total: count() })
+        .from(services)
+        .where(eq(services.categoryId, id));
+      const [{ total: bookingCount }] = await tx
+        .select({ total: count() })
+        .from(bookings)
+        .where(eq(bookings.categoryId, id));
+
+      const blockedBy: string[] = [];
+      if (Number(subCategoryCount) > 0) blockedBy.push(`${subCategoryCount} sub-categor${Number(subCategoryCount) === 1 ? "y" : "ies"}`);
+      if (Number(partnerCount) > 0) blockedBy.push(`${partnerCount} partner${Number(partnerCount) === 1 ? "" : "s"}`);
+      if (Number(serviceCount) > 0) blockedBy.push(`${serviceCount} service${serviceCount === 1 ? "" : "s"}`);
+      if (Number(bookingCount) > 0) blockedBy.push(`${bookingCount} booking${bookingCount === 1 ? "" : "s"}`);
+      if (blockedBy.length > 0) {
+        throw AppError.conflict(`Cannot permanently delete "${existing.name}". Remove its ${blockedBy.join(", ")} first.`);
+      }
+
+      // Soft-deleted sub-categories are removed by the category FK cascade.
+      await tx.delete(serviceCategories).where(eq(serviceCategories.id, id));
+      return { id, name: existing.name };
+    });
+
+    await auditLogService.record(req.user!.userId, 'category.permanent_delete', 'category', id, {
+      name: result.name,
+    });
+    res.json({ success: true, data: { id: result.id } });
   }),
 
   /* ──────────────────────── Reviews ──────────────────────────── */

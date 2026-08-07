@@ -309,6 +309,8 @@ export interface Category {
   iconColor: string;
   imageUrl?: string | null;
   serviceCount: number;
+  subCategoryCount?: number;
+  partnerCount?: number;
   sortOrder: number;
   featured: boolean;
   isActive: boolean;

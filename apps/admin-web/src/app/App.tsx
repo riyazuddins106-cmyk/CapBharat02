@@ -618,8 +618,18 @@ function ExportBtn({ onClick, disabled }: { onClick: () => void; disabled?: bool
 
 type SortState = { field: string; dir: "asc" | "desc" } | null;
 
-function SortTh({ label, field, sort, onSort, className = "" }: {
+function SortTh({
+  label,
+  field,
+  sort,
+  onSort,
+  className = "",
+  filterValue,
+  onFilter,
+  filterPlaceholder,
+}: {
   label: string; field: string; sort: SortState; onSort: (f: string) => void; className?: string;
+  filterValue?: string; onFilter?: (value: string) => void; filterPlaceholder?: string;
 }) {
   const active = sort?.field === field;
   return (
@@ -627,10 +637,24 @@ function SortTh({ label, field, sort, onSort, className = "" }: {
       className={`px-4 py-3 text-left text-xs font-semibold whitespace-nowrap cursor-pointer select-none transition-colors ${active ? "text-violet-400" : "text-white/40 hover:text-white/60"} ${className}`}
       onClick={() => onSort(field)}
     >
-      <span className="flex items-center gap-1">
-        {label}
-        {active ? (sort!.dir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronDown size={11} className="opacity-20" />}
-      </span>
+      <div className="flex flex-col gap-2 min-w-[92px]">
+        <span className="flex items-center gap-1">
+          {label}
+          {active ? (sort!.dir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronDown size={11} className="opacity-20" />}
+        </span>
+        {onFilter && (
+          <input
+            value={filterValue ?? ""}
+            onChange={e => onFilter(e.target.value)}
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+            placeholder={filterPlaceholder ?? "Filter…"}
+            aria-label={`Filter ${label}`}
+            className="w-full min-w-0 rounded-md border border-white/10 px-2 py-1 text-[11px] font-normal text-white outline-none placeholder:text-white/25 focus:border-violet-400/60"
+            style={{ background: "rgba(255,255,255,0.05)" }}
+          />
+        )}
+      </div>
     </th>
   );
 }
@@ -943,10 +967,20 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
     setTimeout(() => setActionMsg(null), 3000);
   };
 
+  const loadServices = useCallback(async () => {
+    try {
+      const sv = await adminApi.getServices(accessToken);
+      setServiceList(sv.services);
+    } catch (err: any) {
+      showMsg(err.message ?? "Failed to load services", "error");
+    }
+  }, [accessToken]);
+
   const load = useCallback(async () => {
     setLoading(true);
+    void loadServices();
     try {
-      const [s, b, p, u, c, r, a, o, rl, sv, d, ord] = await Promise.all([
+      const [s, b, p, u, c, r, a, o, rl, d, ord] = await Promise.all([
         adminApi.getStats(accessToken),
         adminApi.getBookings(accessToken),
         adminApi.getProfessionals(accessToken, 1, proPageSize),
@@ -956,7 +990,6 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         adminApi.getAuditLogs(accessToken),
         adminApi.getOffers(accessToken),
         adminApi.getReels(accessToken),
-        adminApi.getServices(accessToken),
         adminApi.getDispatch(accessToken),
         adminApi.getOrders(accessToken),
       ]);
@@ -971,13 +1004,12 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       setAuditLogs(a.logs);
       setOfferList(o.offers);
       setReelList(rl.reels);
-      setServiceList(sv.services);
       setDispatchList(d);
       setOrderList(ord);
     } catch (err: any) {
       showMsg(err.message ?? "Failed to load data", "error");
     } finally { setLoading(false); }
-  }, [accessToken]);
+  }, [accessToken, loadServices]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1113,7 +1145,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   };
   const deleteCategory = async (id: string) => {
     await adminApi.deleteCategory(id, accessToken);
-    showMsg("Category deactivated"); load();
+    showMsg("Category permanently deleted"); load();
   };
 
   /* ── Review handlers ── */
@@ -4272,8 +4304,8 @@ function CategoriesView({
       )}
       {deleteId && (
         <ConfirmDialog
-          title="Delete Category?"
-          body="This will remove the category. Existing professionals and bookings are not affected."
+          title="Permanently Delete Category?"
+          body="This permanently removes the category. It is allowed only when it has no sub-categories, partners, services, or bookings."
           confirmLabel="Delete"
           saving={saving}
           onConfirm={handleDelete}
@@ -4299,8 +4331,9 @@ function CategoriesView({
               Featured: c.featured ? "Yes" : "No",
               Status: c.isActive ? "Active" : "Inactive",
               "Sort Order": c.sortOrder,
-              "Sub-categories": subCounts[c.id] ?? 0,
-              Partners: c.serviceCount,
+               "Sub-categories": c.subCategoryCount ?? subCounts[c.id] ?? 0,
+               Partners: c.partnerCount ?? 0,
+               Services: c.serviceCount,
             })),
             `Categories_${new Date().toISOString().slice(0, 10)}.xlsx`
           )} disabled={filtered.length === 0} />
@@ -4361,14 +4394,14 @@ function CategoriesView({
                 {/* Stats + arrow */}
                 <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/[0.06]">
                   <div>
-                    <p className="text-white font-bold text-sm leading-none">
-                      {subCounts[c.id] !== undefined ? subCounts[c.id] : <span className="text-white/30">—</span>}
+                   <p className="text-white font-bold text-sm leading-none">
+                      {c.subCategoryCount ?? (subCounts[c.id] !== undefined ? subCounts[c.id] : <span className="text-white/30">—</span>)}
                     </p>
                     <p className="text-white/30 text-[10px] mt-0.5">Sub-cats</p>
                   </div>
                   <div className="w-px h-7 bg-white/[0.08]" />
                   <div>
-                    <p className="text-white font-bold text-sm leading-none">{c.serviceCount}</p>
+                     <p className="text-white font-bold text-sm leading-none">{c.partnerCount ?? 0}</p>
                     <p className="text-white/30 text-[10px] mt-0.5">Partners</p>
                   </div>
                   <div className="flex-1" />
@@ -8971,19 +9004,57 @@ function ServicesView({
   const { sort: svSort, toggleSort: toggleSvSort, applySortFn: sortSv } = useTableSort();
 
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
-  const hasSvFilters = search || filterCat || filterStatus !== "all";
-  const resetSvFilters = () => { setSearch(""); setFilterCat(""); setFilterStatus("all"); setSvPage(1); };
+  const [columnFilters, setColumnFilters] = useState({
+    name: "",
+    categoryName: "",
+    customerPrice: "",
+    partnerPayout: "",
+    commission: "",
+    duration: "",
+    isActive: "",
+  });
+  const setColumnFilter = (field: keyof typeof columnFilters, value: string) => {
+    setColumnFilters(filters => ({ ...filters, [field]: value }));
+    setSvPage(1);
+  };
+  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const hasSvFilters = search || filterCat || filterStatus !== "all" || hasColumnFilters;
+  const resetSvFilters = () => {
+    setSearch("");
+    setFilterCat("");
+    setFilterStatus("all");
+    setColumnFilters({ name: "", categoryName: "", customerPrice: "", partnerPayout: "", commission: "", duration: "", isActive: "" });
+    setSvPage(1);
+  };
 
   const filtered = services.filter(s => {
-    const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase());
+    const includes = (value: string | number | null | undefined, filter: string) =>
+      !filter || String(value ?? "").toLowerCase().includes(filter.trim().toLowerCase());
+    const matchSearch = !search || [
+      s.name,
+      s.categoryName,
+      s.subCategoryName,
+      s.customerPrice,
+      s.partnerPayout,
+      s.commission,
+      s.duration,
+      s.isActive ? "Active" : "Inactive",
+    ].some(value => String(value ?? "").toLowerCase().includes(search.trim().toLowerCase()));
     const matchCat    = !filterCat || s.categoryId === filterCat;
     const matchStatus = filterStatus === "all" || (filterStatus === "active" ? s.isActive : !s.isActive);
-    return matchSearch && matchCat && matchStatus;
+    return matchSearch && matchCat && matchStatus
+      && includes(`${s.name} ${s.requiredSkill ?? ""}`, columnFilters.name)
+      && includes(`${s.categoryName ?? ""} ${s.subCategoryName ?? ""}`, columnFilters.categoryName)
+      && includes(s.customerPrice, columnFilters.customerPrice)
+      && includes(s.partnerPayout, columnFilters.partnerPayout)
+      && includes(s.commission, columnFilters.commission)
+      && includes(s.duration, columnFilters.duration)
+      && includes(s.isActive ? "Active" : "Inactive", columnFilters.isActive);
   });
   const svSorted = sortSv(filtered as Record<string, unknown>[]) as typeof filtered;
   const svEff    = svPageSize === -1 ? svSorted.length : svPageSize;
   const svPaged  = svSorted.slice((svPage - 1) * svEff, svPage * svEff);
-  useEffect(() => { setSvPage(1); }, [search, filterCat, filterStatus]);
+  useEffect(() => { setSvPage(1); }, [search, filterCat, filterStatus, columnFilters]);
   const exportServices = () => exportToExcel(
     svSorted.map(s => ({
       Service: s.name, Category: s.categoryName ?? "—",
@@ -9026,19 +9097,34 @@ function ServicesView({
         <div className="flex items-center gap-1.5 text-xs text-white/30">
           <span>Dashboard</span><ChevronRight size={12} /><span className="text-white/60 font-semibold">Services</span>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-white font-bold text-xl">Service Catalogue</h2>
             <p className="text-white/35 text-xs mt-0.5">{filtered.length} service{filtered.length !== 1 ? "s" : ""}</p>
           </div>
-          <div className="flex-1 min-w-0" />
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+            <Plus size={14} /> Add Service
+          </button>
+        </div>
+        <div className="flex-shrink-0 flex gap-2 flex-wrap items-center">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setSvPage(1); }}
+              placeholder="Quick search across all columns…"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] pl-9 pr-8 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
+            />
+            {search && (
+              <button onClick={() => { setSearch(""); setSvPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-xs">✕</button>
+            )}
+          </div>
           <div className="w-48 flex-shrink-0">
             <SelectInput value={filterCat} onChange={v => { setFilterCat(v); setSvPage(1); }}>
               <option value="">All categories</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </SelectInput>
           </div>
-          {/* Status filter */}
           <div className="flex gap-1 flex-shrink-0">
             {(["all", "active", "inactive"] as const).map(s => (
               <button key={s} onClick={() => { setFilterStatus(s); setSvPage(1); }}
@@ -9051,30 +9137,18 @@ function ServicesView({
               >{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</button>
             ))}
           </div>
-          <div className="w-52 flex-shrink-0">
-            <SearchBar value={search} onChange={v => { setSearch(v); setSvPage(1); }} placeholder="Search services…" />
-          </div>
           {hasSvFilters && (
-            <button onClick={resetSvFilters} className="text-xs text-white/40 hover:text-white/70 transition-colors px-1 flex-shrink-0">Clear</button>
+            <button onClick={resetSvFilters} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2 flex-shrink-0">Clear filters</button>
           )}
           <ExportBtn onClick={exportServices} />
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap flex-shrink-0" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
-            <Plus size={14} /> Add Service
-          </button>
         </div>
       </div>
 
-      {/* Table */}
-      {svSorted.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-white/20">
-          <Package size={44} className="mb-3" />
-          <p className="text-sm">{hasSvFilters ? "No services match the filters." : "No services yet. Create your first service above."}</p>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
-          <RowsBar total={svSorted.length} pageSize={svPageSize} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      {/* Table — keep the full table shell visible when filters return no rows, like Customers */}
+      <div className="rounded-2xl border border-white/[0.07] flex-shrink-0 overflow-hidden" style={CARD}>
+        <RowsBar total={svSorted.length} pageSize={svPageSize} onPageSizeChange={n => { setSvPageSize(n); setSvPage(1); }} />
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <SortTh label="Service"    field="name"           sort={svSort} onSort={toggleSvSort} />
@@ -9085,6 +9159,30 @@ function ServicesView({
                 <SortTh label="Duration"   field="duration"       sort={svSort} onSort={toggleSvSort} />
                 <SortTh label="Status"     field="isActive"       sort={svSort} onSort={toggleSvSort} />
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold"></th>
+              </tr>
+              <tr className="border-b border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
+                {([
+                  [columnFilters.name,          "Service…",    "name"],
+                  [columnFilters.categoryName,  "Category…",   "categoryName"],
+                  [columnFilters.customerPrice, "Price…",      "customerPrice"],
+                  [columnFilters.partnerPayout, "Payout…",     "partnerPayout"],
+                  [columnFilters.commission,    "Commission…", "commission"],
+                  [columnFilters.duration,      "Duration…",   "duration"],
+                  [columnFilters.isActive,      "Status…",     "isActive"],
+                ] as [string, string, keyof typeof columnFilters][]).map(([value, placeholder, field]) => (
+                  <td key={field} className="px-3 py-1.5">
+                    <input
+                      value={value}
+                      onChange={e => setColumnFilter(field, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      onKeyDown={e => e.stopPropagation()}
+                      placeholder={placeholder}
+                      className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder:text-white/20 border border-white/[0.06] outline-none focus:border-violet-500/40 transition-colors"
+                      style={{ background: "rgba(255,255,255,0.03)" }}
+                    />
+                  </td>
+                ))}
+                <td className="px-3 py-1.5 text-white/20 text-[10px] text-center">↑↓</td>
               </tr>
             </thead>
             <tbody>
@@ -9124,11 +9222,10 @@ function ServicesView({
               ))}
               {filtered.length === 0 && <EmptyRow cols={8} text="No services match the filters" />}
             </tbody>
-          </table>
-          </div>
-          <Pagination page={svPage} total={svSorted.length} pageSize={svPageSize} onChange={setSvPage} />
+        </table>
         </div>
-      )}
+        <Pagination page={svPage} total={svSorted.length} pageSize={svPageSize} onChange={setSvPage} />
+      </div>
     </div>
   );
 }

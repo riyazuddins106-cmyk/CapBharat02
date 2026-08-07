@@ -1,6 +1,6 @@
 ---
 name: expo
-description: Guidelines for building mobile applications using Expo, covering UI design, animations, React context patterns, and native device feature permission (Camera, Location, FileUploads)
+description: Guidelines for building mobile applications using Expo, covering UI design, animations, React context patterns, native device permissions, and failed Expo Launch publishes
 ---
 
 Always follow these guidelines when building a mobile application using Expo:
@@ -284,6 +284,7 @@ Replit has a built-in publishing flow for Expo apps called **Expo Launch**. Expo
 - If the user asks what **Expo Launch** is: explain it is Replit's built-in flow for building and submitting the app to the App Store (iOS). More info is in the Replit docs.
 - If the user asks about **Google Play (Android)** publishing: let them know it is **not currently supported** on Replit. Do not call `SuggestUserAction({ action: "deploy", message: "..." })` for Android-only requests.
 - Do not attempt to help with EAS CLI commands or manual App Store submission — Replit's Expo Launch handles App Store publishing.
+- If an App Store publish fails, read `.local/skills/expo/references/publish-failure-debugging.md` and use `getExpoLaunchLogs()` instead of asking the user to copy build errors from Expo.
 
 ## Forbidden Changes
 - NEVER edit package.json directly. See package management skill for instructions on installing packages.
@@ -301,6 +302,7 @@ Before writing code, identify whether any reference below applies to the task. I
 - `.local/skills/expo/references/react-context.md` - Use this reference when creating or modifying shared state with React context, provider composition, or context-based hooks.
 - `.local/skills/expo/references/design-and-aesthetics.md` - Use this reference when designing or restyling UI, selecting iconography, or implementing animations and visual polish. Read "Cross-Artifact Design Consistency" when this Expo artifact is part of a multi-artifact project with a design system or sibling web app.
 - `.local/skills/expo/references/device-features-and-permissions.md` - Use this reference when implementing camera, location, notifications, contacts, file uploads, or any permission request/denial flow.
+- `.local/skills/expo/references/publish-failure-debugging.md` - Use this reference when an App Store publish fails or the user asks why Expo Launch failed.
 - mobile-ui skill's `.local/skills/mobile-ui/references/keyboard.md` - Use this reference when implementing any keyboard handling — forms with multiple inputs, chat/messaging UIs, FlatList with inputs, or keyboard utilities (dismiss, detect visibility).
 - mobile-ui skill's `.local/skills/mobile-ui/references/sheets.md` - Use this reference when implementing modals, sheets, formSheet presentations, auth flows (login/register), wizards, or overlay UI.
 - mobile-ui skill's `.local/skills/mobile-ui/references/tabs.md` - Use this reference when implementing tab bars — covers NativeTabs with liquid glass support (SDK 54+) and classic Tabs fallback with detailed code examples.
