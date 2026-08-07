@@ -5,7 +5,7 @@ import {
   bookings, users, professionals, serviceCategories, reviews, payoutRequests, payoutRuns,
   orders, orderItems, orderItemPayments, services, addresses,
   bookingItems, bookingPartnerRequests, bookingAssignmentLogs,
-  subServiceCategories,
+  subServiceCategories, partnerServices,
 } from '../database/schema/index.js';
 import { payments } from '../database/schema/payments.js';
 import { eq, desc, count, sum, ne, isNull, isNotNull, and, or, avg, sql, gte, lte, ilike, inArray } from 'drizzle-orm';
@@ -1498,7 +1498,7 @@ export const adminController = {
 
   /* ──────────────────── Service Categories ───────────────────── */
   listCategories: asyncHandler(async (_req: Request, res: Response) => {
-    const rows = await db
+    const categoryRows = await db
       .select({
         id: serviceCategories.id,
         name: serviceCategories.name,
@@ -1512,27 +1512,45 @@ export const adminController = {
         isActive: serviceCategories.isActive,
         createdAt: serviceCategories.createdAt,
         updatedAt: serviceCategories.updatedAt,
-        serviceCount: sql<number>`(
-          SELECT COUNT(*)::int
-          FROM services
-          WHERE services.category_id = ${serviceCategories.id}
-            AND services.deleted_at IS NULL
-        )`,
-        subCategoryCount: sql<number>`(
-          SELECT COUNT(*)::int
-          FROM sub_service_categories
-          WHERE sub_service_categories.category_id = ${serviceCategories.id}
-            AND sub_service_categories.deleted_at IS NULL
-        )`,
-        partnerCount: sql<number>`(
-          SELECT COUNT(*)::int
-          FROM professionals
-          WHERE professionals.category_id = ${serviceCategories.id}
-            AND professionals.deleted_at IS NULL
-        )`,
       })
       .from(serviceCategories)
       .orderBy(serviceCategories.sortOrder, serviceCategories.name);
+
+    const rows = await Promise.all(categoryRows.map(async (category) => {
+      const [{ total: serviceCount }] = await db
+        .select({ total: count() })
+        .from(services)
+        .where(and(eq(services.categoryId, category.id), isNull(services.deletedAt)));
+
+      const [{ total: subCategoryCount }] = await db
+        .select({ total: count() })
+        .from(subServiceCategories)
+        .where(and(eq(subServiceCategories.categoryId, category.id), isNull(subServiceCategories.deletedAt)));
+
+      const [{ total: partnerCount }] = await db
+        .select({ total: sql<number>`COUNT(DISTINCT ${professionals.id})::int` })
+        .from(professionals)
+        .leftJoin(partnerServices, eq(partnerServices.partnerId, professionals.id))
+        .leftJoin(services, eq(services.id, partnerServices.serviceId))
+        .where(and(
+          isNull(professionals.deletedAt),
+          or(
+            eq(professionals.categoryId, category.id),
+            and(
+              eq(services.categoryId, category.id),
+              isNull(services.deletedAt),
+            ),
+          ),
+        ));
+
+      return {
+        ...category,
+        serviceCount: Number(serviceCount ?? 0),
+        subCategoryCount: Number(subCategoryCount ?? 0),
+        partnerCount: Number(partnerCount ?? 0),
+      };
+    }));
+
     res.json({ success: true, data: { categories: rows, total: rows.length } });
   }),
 

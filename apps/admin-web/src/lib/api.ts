@@ -59,6 +59,34 @@ function getApiBase(): string {
 const API_BASE = getApiBase();
 const apiPath = (path: string) => `${API_BASE}/api${path}`;
 
+async function parseApiResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') ?? '';
+  const raw = await response.text();
+  let payload: any = null;
+
+  if (raw && contentType.toLowerCase().includes('application/json')) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      // Keep the raw response below so an invalid JSON response is still
+      // reported as a useful error instead of "Unexpected token <".
+    }
+  }
+
+  if (!response.ok) {
+    const serverMessage = payload?.error?.message ?? payload?.message;
+    const fallback = raw.trim().startsWith('<')
+      ? 'The upload endpoint returned an HTML page instead of an API response. Please try again.'
+      : raw.trim();
+    throw new Error(serverMessage || fallback || `HTTP ${response.status}`);
+  }
+
+  if (!payload) {
+    throw new Error('The server returned an empty or invalid API response.');
+  }
+  return (payload.data ?? payload) as T;
+}
+
 export interface PlatformPolicyRow {
   id: string;
   slug: string;
@@ -762,8 +790,8 @@ export const adminApi = {
     request<{ id: string }>(`/admin/professionals/${id}`, { method: 'DELETE', token }),
   uploadProfessionalAvatar: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('avatar', file);
-    return fetch(`/api/admin/professionals/${id}/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ProfessionalRow; }));
+    return fetch(apiPath(`/admin/professionals/${id}/avatar`), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => parseApiResponse<ProfessionalRow>(r));
   },
 
   // Users
@@ -811,8 +839,8 @@ export const adminApi = {
     request<{ id: string }>(`/admin/categories/${id}`, { method: 'DELETE', token }),
   uploadCategoryImage: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('image', file);
-    return fetch(`/api/admin/categories/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as Category; }));
+    return fetch(apiPath(`/admin/categories/${id}/image`), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => parseApiResponse<Category>(r));
   },
 
   // Subcategories
@@ -828,8 +856,8 @@ export const adminApi = {
     request<SubCategory>(`/admin/subcategories/${id}/restore`, { method: 'PATCH', token }),
   uploadSubcategoryImage: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('image', file);
-    return fetch(`/api/admin/subcategories/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as SubCategory; }));
+    return fetch(apiPath(`/admin/subcategories/${id}/image`), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => parseApiResponse<SubCategory>(r));
   },
 
   // Reels
@@ -858,13 +886,13 @@ export const adminApi = {
     request<ReelRow[]>('/admin/reels/deleted', { token }),
   uploadReelThumbnail: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('image', file);
-    return fetch(`/api/admin/reels/${id}/thumbnail`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ReelRow; }));
+    return fetch(apiPath(`/admin/reels/${id}/thumbnail`), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => parseApiResponse<ReelRow>(r));
   },
   uploadReelVideo: (id: string, file: File, token: string) => {
     const fd = new FormData(); fd.append('video', file);
-    return fetch(`/api/admin/reels/${id}/video`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-      .then(r => r.json().then((j: any) => { if (!r.ok) throw new Error(j?.error?.message ?? `HTTP ${r.status}`); return j.data as ReelRow; }));
+    return fetch(apiPath(`/admin/reels/${id}/video`), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => parseApiResponse<ReelRow>(r));
   },
 
   // Reviews
@@ -954,10 +982,9 @@ export const adminApi = {
   uploadBannerImage: async (file: File, token: string): Promise<string> => {
     const fd = new FormData();
     fd.append('image', file);
-    const res = await fetch('/api/admin/offers/image', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error?.message ?? 'Upload failed.');
-    return json.data.url;
+    const data = await fetch(apiPath('/admin/offers/image'), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+      .then(r => parseApiResponse<{ url: string }>(r));
+    return data.url;
   },
 
   // Services
