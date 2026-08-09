@@ -41,18 +41,20 @@ Code runs inline in the `codeExecution` sandbox -- no script files are needed.
 ## Workflow
 
 ```text
-1. SEARCH     -- searchIntegrations({ query }) to find the integration and read its status
+1. SEARCH     -- searchIntegrations({ mode: 'search', queries: [...] }) to find the integration and read its status
    -- status added     -- EXECUTE -- OUTPUT
    -- status not_added
-      or not_setup     -- CONNECT (via `integrations` skill) -- EXECUTE -- OUTPUT
+      or not_setup
+      or requires_setup -- CONNECT (via `integrations` skill) -- EXECUTE -- OUTPUT
 2. EXECUTE    -- listConnections(connectorName) inside "use impure", then call the API via getClient() or proxyFetch()
 ```
 
-- **SEARCH**: Call `searchIntegrations({ query })` (see "Calling `searchIntegrations`" below for the exact params and result shape). Its `status` field is the source of truth for whether a connection needs setup -- do NOT use `listConnections().length` to decide this (see "Deciding whether setup is needed" below).
+- **SEARCH**: Call `searchIntegrations({ mode: 'search', queries: [...] })` (see "Calling `searchIntegrations`" below for the exact params and result shape). Its `status` field is the source of truth for whether a connection needs setup -- do NOT use `listConnections().length` to decide this (see "Deciding whether setup is needed" below).
   - `added` -- a connection is already bound to this Repl. Skip straight to EXECUTE.
   - `not_added` -- authorized at the account level but not bound to this Repl. Bind it via the `integrations` skill, then EXECUTE.
   - `not_setup` -- not authorized yet. Set it up via the `integrations` skill (`ProposeIntegration` drives OAuth), then EXECUTE.
-- **CONNECT** (only when status is `not_setup` or `not_added`): Use `searchIntegrations`, `ProposeIntegration`, and `addIntegration` to set up the connection. See the `integrations` skill for the full lifecycle details.
+  - `requires_setup` -- available in the catalog but not configured yet. Set it up via the `integrations` skill.
+- **CONNECT** (when status is not `added`): Use `searchIntegrations`, `ProposeIntegration`, and, for `not_added`, `addIntegration` as directed by the `integrations` skill.
 - **EXECUTE**: This is the **only** step that calls `listConnections`, and only call it because you are about to call the API. Call `listConnections(connectorName)` inside a `"use impure"` function, then make the API call in the same `codeExecution` block via `getClient()` or `proxyFetch()`. Never call `listConnections` to "check" or "probe" a connection -- if you are not about to call the API, do not call it.
 - **OUTPUT**: Return the answer or confirmation to the user.
 
@@ -60,37 +62,54 @@ Code runs inline in the `codeExecution` sandbox -- no script files are needed.
 
 ## Deciding whether setup is needed
 
-Use `searchIntegrations({ query }).integrations[].status`, NOT `listConnections`, to decide whether a connection needs to be set up:
+Use `searchIntegrations(...).integrations[].status`, NOT `listConnections`, to decide whether a connection needs to be set up:
 
 - `status: 'added'` -- bound to this Repl, ready to use. Go to EXECUTE.
 - `status: 'not_added'` -- authorized at the account level but not bound here. Bind via the `integrations` skill.
 - `status: 'not_setup'` -- not authorized. Drive OAuth via the `integrations` skill.
+- `status: 'requires_setup'` -- catalog-only. Configure and authorize it via the `integrations` skill.
 
 Do **not** branch on `listConnections(connectorName).length === 0` for this decision. `listConnections` exists to hand credentials to your sandbox code, and it drops any connection whose credentials are withheld (e.g. credential-blocked account contexts) -- so it can return an empty array even when an account-level connection genuinely exists. That makes it an unreliable presence check and would push you into a needless re-connect prompt. `searchIntegrations`'s `status` does not have that blind spot.
 
 ## Calling `searchIntegrations`
 
-`searchIntegrations` takes exactly one argument -- an object with a single `query` field -- and takes no other params:
+`searchIntegrations` takes exactly one argument in one of two modes: **search** (one to three non-empty `queries`, optionally scoped by `statuses`) or **list** (optionally scoped by `statuses`). Search phrases are classified together in one model call.
 
 ```ts
-searchIntegrations({ query: string }): Promise<{
+searchIntegrations(
+  | { mode: 'search'; queries: Array<string>; statuses?: Array<IntegrationStatus> }
+  | { mode: 'list'; statuses?: Array<IntegrationStatus> }
+): Promise<{
   integrations: Array<{
-    id: string;            // "connector:<id>" or "connection:<id>"
-    integrationType: 'connector' | 'connection';
+    id: string;            // "connector:<id>", "connection:<id>", or "connector_catalog:<slug>"
+    integrationType: 'connector' | 'connection' | 'connector_catalog';
     displayName: string;   // human-readable, e.g. "Google Sheets"
     description: string;
-    status: 'added' | 'not_added' | 'not_setup';
+    status: IntegrationStatus;
   }>;
   askForBlueprintConfirmation: boolean;
 }>
+// IntegrationStatus = 'added' | 'not_added' | 'not_setup' | 'requires_setup'
 ```
 
-How to build the `query` so a match is found reliably:
+**Search mode** -- how to build `queries` so matches are found reliably:
 
-- `query` is a **natural-language description of what you need**. The callback fetches the available connectors and connections, then uses an LLM classifier to pick the ones that semantically match your `query` -- it is **not** a literal substring or slug match, so `"spreadsheet"` can match `Google Sheets` and `"issue tracker"` can match `Linear`.
-- Describe the capability or product in plain terms (`"Google Sheets"`, `"payments"`, `"issue tracker"`). You do not need the exact `displayName` or the connector slug.
-- `query: ''` (empty string) skips the classifier and returns **every** available connector and connection (capped at 50). Use this to enumerate what is available when you are unsure what to ask for, then pick the right entry from `integrations` by `displayName`.
-- If a specific `query` returns no matching entry, retry with `query: ''` and scan the full list rather than assuming the integration does not exist.
+- Each string is a natural-language product or capability description. An integration may match any string; the strings are alternatives, not requirements.
+- Use one focused string for a clear request. Add up to two synonyms or adjacent capabilities only when useful, e.g. `{ mode: 'search', queries: ['email', 'mailbox', 'inbox'] }`.
+- Add `statuses` to scope candidates before matching: `{ mode: 'search', queries: ['email'], statuses: ['added', 'not_added'] }` searches existing authorizations only.
+- If a scoped search returns nothing, widen the statuses or use list mode before concluding the integration is unavailable.
+
+**List mode** -- list integrations by status with no classifier call:
+
+```ts
+searchIntegrations({ mode: 'list', statuses: ['added', 'not_added'] })          // existing authorizations
+searchIntegrations({ mode: 'list', statuses: ['not_setup', 'requires_setup'] }) // available to set up
+searchIntegrations({ mode: 'list' })                                             // every integration
+```
+
+- `['added', 'not_added']` answers "what has the user already authorized?" `not_added` items are not ready until attached with `addIntegration`.
+- `['not_setup', 'requires_setup']` answers "what could the user connect?"; both are set up via `ProposeIntegration`.
+- If a scoped call returns nothing, the product may still exist in the other scope -- check before concluding it does not exist.
 
 Read `status` (not array length) to decide setup, and read `id` to feed the other integration callbacks (`viewIntegration`, `addIntegration`) and the `ProposeIntegration` model tool.
 
@@ -488,9 +507,9 @@ console.log(`Deleted message ID abc123`);
 
 ## Key Points
 
-- **Decide setup via `searchIntegrations` `status`** (`added` / `not_added` / `not_setup`), not `listConnections().length`
+- **Decide setup via `searchIntegrations` `status`** (`added` / `not_added` / `not_setup` / `requires_setup`), not `listConnections().length`
 - **Call `listConnections(connectorName)` only inside `"use impure"` when you need the credentials** -- it is a credential fetch for the EXECUTE step, never a status check or probe
-- **Search -- propose -- add** when status is `not_setup` or `not_added` (see `integrations` skill)
+- **Use the `integrations` skill** whenever status is not `added`
 - **All code runs in the `codeExecution` sandbox** -- no script files needed
 - **Use `console.log()`** to see output -- functions execute silently without it (but never log credentials)
 - **Prefer `conn.getClient()` when `conn.hasClient`** over importing an SDK — it returns an initialized client with no `await import` and no raw token handling. Otherwise use `conn.proxyFetch()`.

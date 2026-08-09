@@ -384,8 +384,8 @@ When the user wants to communicate decisions to candidates (confirmations, rejec
 
 #### Prerequisites
 
-- The Gmail integration must be connected. Use `searchIntegrations({ query: "gmail" })` to check availability.
-- If not connected, guide the user through setup: use `proposeIntegration`with the Gmail connector ID to trigger OAuth. After the user authorizes, use`addIntegration`to wire it to the project, then`proposeIntegration` again to establish the token.
+- The Gmail integration must be connected. Use `searchIntegrations({ mode: "search", queries: ["gmail"] })` to check availability.
+- Follow the returned status and exact ID: use `added` directly, call `addIntegration` for `not_added`, or call `ProposeIntegration` for `not_setup` or `requires_setup`.
 
 - Use `listConnections('google-mail')` inside `"use impure"` to get credentials once connected.
 
@@ -646,8 +646,8 @@ Use Google Sheets as the central tracking system for the entire hiring pipeline.
 
 #### Prerequisites (2)
 
-- Google Sheets integration must be connected. Use `searchIntegrations({ query: "google sheets" })` to check availability.
-- If not connected, guide the user through setup: use `proposeIntegration`with connector ID`connector:ccfg_google-sheet_E42A9F6CA62546F68A1FECA0E8`.
+- Google Sheets integration must be connected. Use `searchIntegrations({ mode: "search", queries: ["google sheets"] })` to check availability.
+- Follow the returned status and exact ID: use `added` directly, call `addIntegration` for `not_added`, or call `ProposeIntegration` for `not_setup` or `requires_setup`.
 
 - Use `listConnections('google-sheet')` inside `"use impure"` to get credentials once connected.
 
@@ -793,8 +793,8 @@ Use Google Calendar to schedule interviews directly, rather than just proposing 
 
 #### Prerequisites (3)
 
-- Google Calendar integration must be connected. Use `searchIntegrations({ query: "google calendar" })` to check availability.
-- If not connected, guide the user through setup: use `proposeIntegration`with connector ID`connector:ccfg_google-calendar_DDDBAC03DE404369B74F32E78D`.
+- Google Calendar integration must be connected. Use `searchIntegrations({ mode: "search", queries: ["google calendar"] })` to check availability.
+- Follow the returned status and exact ID: use `added` directly, call `addIntegration` for `not_added`, or call `ProposeIntegration` for `not_setup` or `requires_setup`.
 
 - Use `listConnections('google-calendar')` inside `"use impure"` to get credentials once connected.
 
@@ -933,8 +933,8 @@ Task format (adapt to the platform):
 
 ###### Setup for any notification channel
 
-1. Use `searchIntegrations({ query: "[platform name]" })` to check availability
-2. If not connected, guide the user through setup with `proposeIntegration` using the connector ID from the table above
+1. Use `searchIntegrations({ mode: "search", queries: ["[platform name]"] })` to check availability
+2. Follow the returned status and exact ID: use `added` directly, call `addIntegration` for `not_added`, or call `ProposeIntegration` for `not_setup` or `requires_setup`
 
 3. Use `listConnections('[connection name]')` inside `"use impure"` to get credentials once connected
 4. Ask the user where to send notifications (channel, project, board, or database)

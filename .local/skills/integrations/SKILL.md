@@ -1,6 +1,6 @@
 ---
 name: integrations
-description: Search and manage Replit integrations including blueprints, connectors, and connections. Use for authentication, databases, payments, and third-party API integrations.
+description: Search and manage Replit integrations including connectors and connections. Use for authentication, databases, payments, and third-party API integrations.
 ---
 
 # Integrations Skill
@@ -9,7 +9,7 @@ Integrations allow first-class usage of Third-Party (and some First-party) techn
 
 **Before asking the user for any API key, secret, or credential, always search for a Replit integration first.** Replit integrations handle OAuth and secrets securely, and many common services (Google Sheets, Linear, Stripe, GitHub, OpenAI, etc.) are already supported. Asking the user for credentials when an integration exists adds a lot of unnecessary friction. Users typically do not know about our integration system, you must proactive in suggesting it when it (and only when) it is relevant.
 
-Integrations include blueprints (code templates), connectors (OAuth/API integrations + templates), and connections (already established integrations).
+Integrations include catalog connectors, configured connectors, and established connections.
 
 ## When to Use
 
@@ -31,75 +31,68 @@ As a web search (use web-search skill if available), searching files within the 
 
 ## Integration Lifecycle
 
-There are four integration types, and they represent different stages of a lifecycle:
+`searchIntegrations` returns three integration ID types across four statuses. Follow the status-driven lifecycle exactly:
 
 ```text
 connector (not_setup)
     -- user completes OAuth via ProposeIntegration
-    -- connection (not_added)
-        -- addIntegration        -- code-side wiring (npm packages, scaffolds, project registration)
-        -- ProposeIntegration    -- platform-side binding (registers this Repl with connectors so the credential proxy will serve secrets)
-        -- now it is a functioning connection (added + authorized, ready to use)
+    -- connection (added)         -- accepted proposals bind automatically; ready to use
+
+connection (not_added)
+    -- addIntegration             -- binds the existing authorization to the current environment
+    -- connection (added)         -- ready to use
+
+connection (added)
+    -- no setup action            -- ready to use
 
 connector_catalog (requires_setup)
     -- ProposeIntegration         -- creates/configures the connector and authorizes it inline
-    -- connection (added)         -- attached to this Repl and ready to use
-
-blueprint (not_installed)
-    -- addIntegration or ProposeIntegration
-    -- blueprint (installed, code + packages added to project), ready to use
+    -- connection (added)         -- bound to the current environment and ready to use
 ```
 
 ### Connectors
 
 - An available OAuth/API integration that has **not yet been authorized** by the user
 - Status: `not_setup`
-- Cannot be added directly -- must use `ProposeIntegration` which allows the user through the OAuth flow
+- Use `ProposeIntegration` with the exact returned ID. After acceptance, the server attaches the resulting connection automatically; do not call `addIntegration` afterward
 - Example ID: `connector:ccfg_google-sheet_E42A9F6DA6...`
 
 ### Connections
 
 - A connector that has **already been authorized** at the account level
-- Status: `not_added` (authorized at account level but not bound to this Repl) or `added` (active in this Repl)
-- Both `addIntegration` AND `ProposeIntegration` are required on first setup -- they do orthogonal things:
-  - `addIntegration` does code-side wiring (npm install, scaffolds, project registration). It does NOT touch the platform's connection-state backend.
-  - `ProposeIntegration` does platform-side binding (registers this Repl with connectors-v2 as a permitted consumer). Without it the credential proxy at `connectors.replit.com/api/v2/connection` returns nothing for this Repl, even though the underlying credentials exist at the account level.
+- Status: `not_added` (authorized at account level but not bound to the current environment) or `added` (active in that environment)
+- For `not_added`, call `addIntegration` once with the exact returned ID. In a Repl it binds to the Repl; in a conversation it binds to the conversation's sandbox
+- For `added`, no setup action is needed unless runtime access fails with "not connected" or an authentication error
+- Do not call `ProposeIntegration` after `addIntegration` unless runtime access then fails
 - Example ID: `connection:conn_linear_01MG99PAJR6MQ5...`
 
-NOTE: You must not delay calling `ProposeIntegration` even if it waits for the user. You will be blocked and not have access to test the feature you build because you don't have access to real data, real APIs, etc, which is even more inefficient than reaching out to the user as soon as you know you need the integration to get accepted.
+For `not_setup` and `requires_setup`, call `ProposeIntegration` as soon as the user confirms they want the integration. The tool waits for the required authorization or setup and attaches the accepted connection automatically.
 
 ### Catalog Connectors
 
 - A connector in the OpenInt catalog that does not yet have a workspace connector configuration
 - Status: `requires_setup`
-- Use `ProposeIntegration` directly with its exact `connector_catalog:<name>` id; it opens the inline setup flow and attaches the resulting connection to this Repl
+- Use `ProposeIntegration` directly with its exact `connector_catalog:<name>` id; it opens the inline setup flow and binds the resulting connection to the current environment
 - Do not send the user to workspace Settings or call `addIntegration` first
 - Example ID: `connector_catalog:google-calendar`
-
-### Blueprints
-
-- These are just code templates that install packages and scaffold integration boilerplate
-- Status: `not_installed` or `previously_installed`
-- Use `addIntegration` directly; if `requiresConfirmation` is True, use `ProposeIntegration` instead
-- Example ID: `blueprint:javascript_openai`
-
----
 
 ## Available Functions
 
 `searchIntegrations`, `viewIntegration`, and `addIntegration` are available directly in the `codeExecution` sandbox. **Always use `console.log()` on return values** -- functions execute silently with no output if you don't. `ProposeIntegration` is a model tool, not a code execution callback; call it outside `codeExecution` when this skill tells you to prompt the user.
 
-### searchIntegrations({ query })
+### searchIntegrations({ mode, queries?, statuses? })
 
-Search for available integrations. **Always run this first.** Try a few different query terms if the first search returns nothing -- results depend on keyword matching.
+Search or list available integrations. **Always run this first.** Search mode accepts one to three alternative phrases and classifies them together in one model call. List mode performs no semantic search.
 
 **Returns:** Dict with:
 
-- `integrations`: list of integration objects, each with `id`, `displayName`, `description`, `integrationType`, `status`
-- `askForBlueprintConfirmation`: boolean -- if True, blueprint additions in this environment will require user confirmation; expect `requiresConfirmation: True` back from `addIntegration` and be ready to call `ProposeIntegration` instead
+- `integrations`: list of integration objects, each with `id`, `displayName`, `description`, `integrationType`, and `status`
 
 ```javascript
-const results = await searchIntegrations({ query: "Google Sheets" });
+const results = await searchIntegrations({
+  mode: "search",
+  queries: ["Google Sheets", "spreadsheet"],
+});
 console.log(results);
 // { integrations: [{ id: 'connector:ccfg_google-sheet_...', displayName: 'Google Sheets',
 //   description: '...', integrationType: 'connector', status: 'not_setup' }], ... }
@@ -112,9 +105,11 @@ for (const item of results.integrations) {
 
 **Notes:**
 
-- When the user has not explicitly requested a specific provider, at least search with a generic, capability-focused query to ensure all relevant options are returned. For example, when user asks "build an icon generating app", prefer `searchIntegrations({ query: "image generation" })` instead of `searchIntegrations({ query: "OpenAI image generation" })`
+- Search mode is semantic, not exact-name or keyword matching. Broad discovery queries are valid, such as `queries: ["productivity integrations"]` or `queries: ["tools for managing customer support"]`.
+- Use one focused phrase for a clear provider or capability. Add up to two alternatives when the request is broad or ambiguous, such as `queries: ["payments", "credit card processing", "billing"]`. Do not make separate searches for synonyms.
+- When the user has not explicitly requested a provider, use capability-focused phrases so all relevant options can match.
+- Use `{ mode: "list" }` to enumerate every integration, or add `statuses` to list/search only particular states.
 - If a connector has already been authorized by the user or a teammate, it will appear as a `connection` (not a `connector`) in results
-- Try multiple queries if needed: `"stripe"`, `"payments"`, `"stripe payment processing"` may return different results
 - The `id` field is the exact string to pass to subsequent functions
 
 ---
@@ -136,32 +131,28 @@ console.log(info.renderedContent);  // Same blob you'd get from addIntegration
 
 ### addIntegration({ integrationId })
 
-Add a blueprint or connection to the current project. **Do not use for connectors or catalog connectors** (those with `status: not_setup` or `requires_setup`) -- use `ProposeIntegration` for those.
+Bind an authorized connection to the current environment. Only pass a `connection:<id>` result with `status: not_added`; use `ProposeIntegration` for `not_setup` or `requires_setup` results.
 
 **Returns:** Dict with:
 
 - `success`: boolean
-- `requiresConfirmation`: boolean -- if True, call `ProposeIntegration` instead
-- `connectionAlreadyAdded`: boolean -- if True, the connection is already wired to this project; skip addIntegration but still call `ProposeIntegration` to ensure the platform binding is current (tokens expire, bindings can be stale)
+- `requiresConfirmation`: always `false` for connection results
+- `connectionAlreadyAdded`: boolean -- True when the connection was already bound and no bind was needed. Either way a successful call leaves it bound
 - `renderedContent`: same XML blob as `viewIntegration`
-- `observations`: list of stringified observation objects (verbose; contains npm install output)
 
-**Side effect:** Automatically installs required packages. This will restart or crash a running dev server -- be aware if calling mid-session while the workflow is running.
+**Side effect:** Binds the connection to the current environment. It does not edit project files or install packages.
 
 ```javascript
 const result = await addIntegration({ integrationId: "connection:conn_linear_01KG10PAJR6MQ525SQSWEB8QHC" });
-console.log(result.success);       // true
-console.log(result.observations);  // Contains package installation output as stringified objects
-
-// Handle confirmation requirement
-if (!result.success && result.requiresConfirmation) {
-  console.log("Call ProposeIntegration with connection:conn_linear_01KG10PAJR6MQ525SQSWEB8QHC next.");
-}
+console.log(result.success);          // true
+console.log(result.renderedContent);  // SDK setup details
 ```
 
 **After calling addIntegration:**
 
 - Read `renderedContent` to get the code snippet
+- Add any required package to application code explicitly when the snippet calls for it
+- Do not call `ProposeIntegration` unless runtime access later fails
 - The snippet handles token refresh and expiry -- use it as-is, don't simplify it
 - Never cache the client object the snippet creates -- tokens expire
 
@@ -177,17 +168,13 @@ Propose a connector to the user. This is a **model tool**, not a code execution 
 
 - Connectors with `status: not_setup` (drives OAuth + binding)
 - Catalog connectors with `status: requires_setup` (creates/configures the connector, then authorizes and binds it inline)
-- Connections with `status: not_added` after calling `addIntegration` (drives the binding only)
-- Connections with `status: added` if runtime fails with "not connected" (re-binds / refreshes)
-- Blueprints where `addIntegration` returns `requiresConfirmation: True`
+- Connections with `status: added` only when runtime access fails with "not connected" or an authentication error (refreshes or rebinds the connection)
 
 Always explain to the user what is about to happen, then call the `ProposeIntegration` tool with the exact id returned by `searchIntegrations`, such as `{ proposal: [{ integrationId: "connector:ccfg_google-sheet_E42A9F6CA62546F68A1FECA0E8" }] }` or `{ proposal: [{ integrationId: "connector_catalog:google-calendar" }] }`.
 
 **Notes:**
 
-- After the user completes OAuth, the connector becomes a `connection`
-- After the user completes catalog setup, the connection is already attached to this Repl; do not call `addIntegration` again
-- After a `connector (not_setup)` OAuth proposal, call `addIntegration` with the new `connection:...` ID on the next agent loop
+- After the user accepts either setup flow, the server attaches the resulting connection and returns its setup details; do not call `addIntegration` afterward
 - There is no user-visible message automatically shown when this exits -- explain what you're doing in your chat response before calling it
 
 ---
@@ -213,7 +200,7 @@ When the user wants to connect to Databricks, use the `databricks-m2m` connector
 - **Not logging results:** `searchIntegrations` and all other functions return silently unless you `console.log()` the output
 - **Calling addIntegration on a connector:** Will fail or behave unexpectedly. Check `integrationType` first
 - **Sending catalog connectors to Settings:** `requires_setup` results are set up inline with `ProposeIntegration`; pass the exact `connector_catalog:<name>` id
-- **Asking for API keys when a connection exists:** If `searchIntegrations` returns a `connection`, the user is already authenticated at the account level -- use `addIntegration` to wire the project, then `ProposeIntegration` to bind this Repl to the connection. Both steps are always required.
+- **Asking for API keys when a connection exists:** If `searchIntegrations` returns a `not_added` connection, the user is already authenticated -- call `addIntegration` once. If it returns `added`, use it directly.
 - **Caching the client:** The boilerplate snippet is explicit about this. Tokens expire. Always call `getUncachable___Client()` fresh
-- **Package install side effects:** `addIntegration` runs package installation (e.g. npm, uv), which can crash a running dev server. Restart the workflow after adding integrations
-- **Connection added but runtime still fails:** If `addIntegration` succeeds for a `connection` but the app throws "not connected" at runtime, the token may be expired or missing. Call `ProposeIntegration` with the same connection ID to trigger re-authorization, then restart the workflow
+- **Package installs:** `addIntegration` does not install packages. Follow the returned snippet's package instructions before using it in application code.
+- **Added connection fails at runtime:** If an `added` connection returns "not connected" or an authentication error, call `ProposeIntegration` with its exact `connection:<id>` to refresh or rebind it, then retry

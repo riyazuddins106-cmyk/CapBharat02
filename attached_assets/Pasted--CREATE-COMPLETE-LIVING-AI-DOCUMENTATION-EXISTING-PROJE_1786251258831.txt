@@ -1,0 +1,1162 @@
+# CREATE COMPLETE LIVING AI DOCUMENTATION — EXISTING PROJECT
+
+You are working on an existing, fully developed project imported from GitHub.
+
+The project currently does NOT have a `/docs` directory.
+
+Your task is to create a **complete, accurate, living documentation system** for this existing project.
+
+The documentation will become the permanent knowledge base for future AI agents.
+
+Future AI agents must use this documentation to understand the project and should NOT repeatedly scan the entire codebase for every task.
+
+---
+
+# 🚨 CRITICAL: DOCUMENTATION ONLY
+
+For this task, DO NOT modify the application.
+
+DO NOT:
+
+* Add features
+* Fix bugs
+* Refactor code
+* Change UI/UX
+* Change database schema
+* Change APIs
+* Change business logic
+* Change authentication
+* Change authorization
+* Install packages
+* Update dependencies
+* Change configuration
+* Change environment variables
+* Change deployment
+* Run database migrations
+* Delete existing functionality
+
+You may ONLY:
+
+1. Analyze the existing project.
+2. Create `/docs`.
+3. Create documentation files inside `/docs`.
+4. Create links between documentation files.
+
+After completing the documentation, STOP.
+
+---
+
+# 1. FIRST UNDERSTAND THE EXISTING PROJECT
+
+Before writing documentation, inspect the repository and understand the actual implementation.
+
+Identify:
+
+* Applications
+* Web applications
+* Mobile applications
+* Backend
+* Shared packages
+* Database
+* ORM
+* Authentication
+* Authorization
+* User roles
+* APIs
+* Services
+* Components
+* State management
+* Navigation
+* Business modules
+* Booking/order systems
+* Payments
+* Notifications
+* File uploads
+* External integrations
+* Webhooks
+* Background jobs
+* Environment configuration
+* Testing
+* Deployment
+* Database relationships
+* Important workflows
+* Business rules
+* Error handling
+* Security mechanisms
+
+IMPORTANT:
+
+Do NOT blindly read every file.
+
+First map the repository structure.
+
+Then inspect important configuration files, entry points, database schemas, API routes, services, modules and workflows.
+
+The documentation must describe the **actual code that exists now**.
+
+Never invent functionality.
+
+If something cannot be verified, write:
+
+`UNKNOWN — REQUIRES VERIFICATION`
+
+---
+
+# 2. CREATE THIS DOCUMENTATION STRUCTURE
+
+Create:
+
+```text
+docs/
+│
+├── README.md
+│
+├── 00-PROJECT-OVERVIEW.md
+├── 01-ARCHITECTURE.md
+├── 02-TECH-STACK.md
+├── 03-REPOSITORY-STRUCTURE.md
+├── 04-DATABASE.md
+├── 05-AUTHENTICATION-AUTHORIZATION.md
+├── 06-API.md
+├── 07-ENVIRONMENT-CONFIGURATION.md
+├── 08-TESTING.md
+├── 09-DEPLOYMENT.md
+├── 10-INTEGRATIONS.md
+│
+├── modules/
+│
+├── workflows/
+│
+├── business-rules/
+│
+└── ai/
+    ├── AI-INSTRUCTIONS.md
+    ├── CURRENT-STATE.md
+    ├── CHANGELOG.md
+    ├── DECISIONS.md
+    ├── KNOWN-ISSUES.md
+    └── TASK-HISTORY.md
+```
+
+Create additional documentation files when required by the actual project.
+
+Do not create empty or meaningless files.
+
+---
+
+# 3. DOCUMENTATION INDEX
+
+Create:
+
+`docs/README.md`
+
+Explain:
+
+* What the documentation contains
+* How an AI agent should use it
+* Which file must be read first
+* Where architecture is documented
+* Where database information is documented
+* Where APIs are documented
+* Where modules are documented
+* Where workflows are documented
+* Where business rules are documented
+* Where current state is documented
+* Where changes are recorded
+
+Define this AI reading order:
+
+```text
+1. docs/ai/AI-INSTRUCTIONS.md
+2. docs/ai/CURRENT-STATE.md
+3. docs/00-PROJECT-OVERVIEW.md
+4. Relevant module documentation
+5. Relevant workflow documentation
+6. Relevant business-rule documentation
+7. Only then inspect relevant source files
+```
+
+---
+
+# 4. PROJECT OVERVIEW
+
+Create:
+
+`docs/00-PROJECT-OVERVIEW.md`
+
+Document the actual project:
+
+* Purpose
+* Main users
+* User roles
+* Applications
+* Major features
+* Major modules
+* Major workflows
+* External services
+* Current status
+* Important constraints
+* Architecture principles
+
+Only include verified information.
+
+---
+
+# 5. ARCHITECTURE
+
+Create:
+
+`docs/01-ARCHITECTURE.md`
+
+Document:
+
+* Overall architecture
+* Frontend architecture
+* Backend architecture
+* Mobile architecture
+* Database architecture
+* API architecture
+* Authentication architecture
+* Authorization architecture
+* Application relationships
+* Module relationships
+* Data flow
+* External services
+* Important dependencies
+
+Use Mermaid diagrams where useful.
+
+Diagrams must represent the actual implementation.
+
+---
+
+# 6. TECHNOLOGY STACK
+
+Create:
+
+`docs/02-TECH-STACK.md`
+
+Document actual:
+
+* Programming languages
+* Frameworks
+* Libraries
+* Database
+* ORM
+* Authentication technology
+* Payment providers
+* Mobile framework
+* Package manager
+* Build tools
+* Testing tools
+* Deployment technology
+
+Use exact versions where available.
+
+Never guess versions.
+
+---
+
+# 7. REPOSITORY STRUCTURE
+
+Create:
+
+`docs/03-REPOSITORY-STRUCTURE.md`
+
+Document:
+
+* Major directories
+* Applications
+* Backend
+* Frontend
+* Mobile
+* Shared packages
+* Configuration
+* Tests
+* Scripts
+* Important files
+
+For important directories explain:
+
+* Purpose
+* Important files
+* Related modules
+
+---
+
+# 8. DATABASE
+
+Create:
+
+`docs/04-DATABASE.md`
+
+Document the actual database.
+
+For every important table/model document:
+
+* Table name
+* Purpose
+* Columns
+* Data types
+* Primary keys
+* Foreign keys
+* Relationships
+* Indexes
+* Constraints
+* Status fields
+* Important business meaning
+
+Use the actual schema/migrations as the source of truth.
+
+Document important relationships and data flow.
+
+---
+
+# 9. AUTHENTICATION AND AUTHORIZATION
+
+Create:
+
+`docs/05-AUTHENTICATION-AUTHORIZATION.md`
+
+Document:
+
+* Registration
+* Login
+* Logout
+* Sessions
+* Access tokens
+* Refresh tokens
+* Password handling
+* Roles
+* Permissions
+* Admin access
+* Customer access
+* Partner access
+* Protected routes
+* Middleware
+* Authorization rules
+
+NEVER document actual:
+
+* Passwords
+* API keys
+* JWT secrets
+* Tokens
+* Private keys
+* Database passwords
+* Supabase service-role values
+
+Only document variable names and their purpose.
+
+---
+
+# 10. API DOCUMENTATION
+
+Create:
+
+`docs/06-API.md`
+
+Document important APIs actually found in the project.
+
+For each API endpoint:
+
+```text
+Method:
+Path:
+Purpose:
+Authentication:
+Required Role:
+Request:
+Response:
+Errors:
+Database Interaction:
+Related Module:
+Source Files:
+```
+
+Do not invent endpoints.
+
+---
+
+# 11. ENVIRONMENT CONFIGURATION
+
+Create:
+
+`docs/07-ENVIRONMENT-CONFIGURATION.md`
+
+Document:
+
+* Environment variable name
+* Purpose
+* Required/optional
+* Development/production usage
+* Related service
+
+NEVER include actual secret values.
+
+---
+
+# 12. TESTING
+
+Create:
+
+`docs/08-TESTING.md`
+
+Document:
+
+* Testing framework
+* Existing tests
+* Unit tests
+* Integration tests
+* E2E tests
+* Backend testing
+* Web testing
+* Mobile testing
+* Test commands
+* Build commands
+* Lint commands
+* Type-check commands
+* Known testing limitations
+
+Use actual commands from the repository.
+
+---
+
+# 13. DEPLOYMENT
+
+Create:
+
+`docs/09-DEPLOYMENT.md`
+
+Document the actual deployment setup:
+
+* Web deployment
+* Backend deployment
+* Mobile builds
+* Environment configuration
+* Database migrations
+* Production configuration
+* Build commands
+* Start commands
+* Important deployment dependencies
+
+Never expose secrets.
+
+---
+
+# 14. EXTERNAL INTEGRATIONS
+
+Create:
+
+`docs/10-INTEGRATIONS.md`
+
+Document actual integrations such as:
+
+* Payment gateways
+* Email
+* SMS
+* Push notifications
+* Storage
+* Maps
+* OAuth
+* Third-party APIs
+* Webhooks
+* Analytics
+
+For each integration document:
+
+* Purpose
+* Where used
+* API interaction
+* Webhook behavior
+* Configuration
+* Error handling
+* Related modules
+* Source files
+
+---
+
+# 15. MODULE DOCUMENTATION
+
+Analyze the actual project and create documentation inside:
+
+`docs/modules/`
+
+Create a document for every important module that actually exists.
+
+Examples could include:
+
+* Customer
+* Partner
+* Admin
+* Authentication
+* Booking
+* Orders
+* Services
+* Categories
+* Payments
+* Notifications
+* Reviews
+* Wallet
+* Transactions
+* Payouts
+* Coupons
+
+Do not assume a module exists. Verify it.
+
+Each module document must contain:
+
+```text
+# Module Name
+
+## Purpose
+
+## Responsibilities
+
+## User Roles
+
+## Screens / Pages
+
+## Components
+
+## Services
+
+## APIs
+
+## Database Tables
+
+## Business Rules
+
+## Dependencies
+
+## Important Source Files
+
+## Data Flow
+
+## Current Behavior
+
+## Known Issues
+
+## Important Constraints
+
+## Related Modules
+
+## Related Workflows
+
+## Related Documentation
+```
+
+### IMPORTANT
+
+The `Important Source Files` section is mandatory.
+
+Always provide actual paths discovered in the repository.
+
+This allows future AI agents to jump directly to relevant code.
+
+---
+
+# 16. WORKFLOW DOCUMENTATION
+
+Create documentation inside:
+
+`docs/workflows/`
+
+for important workflows actually discovered.
+
+Examples:
+
+* Registration
+* Login
+* Booking
+* Partner acceptance
+* Partner rejection
+* Payment
+* Cancellation
+* Refund
+* Service completion
+* Partner onboarding
+* Customer onboarding
+* Notifications
+* Order lifecycle
+
+Each workflow should contain:
+
+```text
+## Trigger
+
+## Preconditions
+
+## Step-by-Step Flow
+
+## API Calls
+
+## Database Changes
+
+## Notifications
+
+## Business Rules
+
+## Final State
+
+## Error Scenarios
+
+## Related Modules
+
+## Related Source Files
+```
+
+Use diagrams where useful.
+
+---
+
+# 17. BUSINESS RULE DOCUMENTATION
+
+Create documentation inside:
+
+`docs/business-rules/`
+
+for important business rules discovered.
+
+Examples:
+
+* Booking rules
+* Payment rules
+* Pricing rules
+* Partner rules
+* Cancellation rules
+* Availability rules
+* Time-slot rules
+* Commission rules
+* Notification rules
+
+Each rule:
+
+```text
+RULE ID:
+RULE NAME:
+CURRENT BEHAVIOR:
+APPLIES TO:
+EXCEPTIONS:
+SOURCE FILES:
+RELATED MODULE:
+RELATED WORKFLOW:
+```
+
+Only document rules that can be verified from the implementation.
+
+---
+
+# 18. AI-INSTRUCTIONS.md — CRITICAL FILE
+
+Create:
+
+`docs/ai/AI-INSTRUCTIONS.md`
+
+This file controls all future AI development.
+
+It must contain these rules:
+
+## BEFORE ANY DEVELOPMENT
+
+1. Read `AI-INSTRUCTIONS.md`.
+2. Read `CURRENT-STATE.md`.
+3. Read `00-PROJECT-OVERVIEW.md`.
+4. Identify the affected module.
+5. Read the relevant module documentation.
+6. Read relevant workflow documentation.
+7. Read relevant business rules.
+8. Identify relevant source files.
+9. Inspect ONLY the necessary source code.
+10. Do NOT scan the entire repository unless the task genuinely requires it.
+
+## BEFORE IMPLEMENTATION
+
+Create a concise implementation plan containing:
+
+* Requested change
+* Affected modules
+* Files likely to change
+* Database impact
+* API impact
+* UI impact
+* Business-rule impact
+* Tests required
+* Documentation requiring updates
+* Risks
+
+If the request is ambiguous, ask the user before making assumptions.
+
+## DURING IMPLEMENTATION
+
+* Preserve existing architecture.
+* Reuse existing components/services.
+* Do not duplicate functionality.
+* Do not redesign UI unless explicitly requested.
+* Do not modify unrelated modules.
+* Follow existing project conventions.
+* Preserve backward compatibility whenever possible.
+* Do not remove existing functionality unless explicitly requested.
+* Never expose secrets.
+
+## AFTER IMPLEMENTATION
+
+The AI MUST:
+
+1. Run relevant tests.
+2. Run relevant build/lint/type checks.
+3. Fix errors caused by its changes.
+4. Verify the affected workflow.
+5. Update affected documentation.
+6. Update `CURRENT-STATE.md`.
+7. Update `CHANGELOG.md`.
+8. Update `KNOWN-ISSUES.md` if necessary.
+9. Update `DECISIONS.md` if an architectural decision was made.
+10. Update affected module documentation.
+11. Update affected workflow documentation.
+12. Update affected business-rule documentation.
+13. Update `TASK-HISTORY.md`.
+14. Report exactly what changed.
+
+Documentation updates are mandatory.
+
+---
+
+# 19. CURRENT-STATE.md
+
+Create:
+
+`docs/ai/CURRENT-STATE.md`
+
+This is the current project snapshot.
+
+Include:
+
+```text
+# CURRENT PROJECT STATE
+
+## Last Updated
+
+## Project Status
+
+## Completed Features
+
+## Features In Progress
+
+## Known Issues
+
+## Recently Changed
+
+## Important Architecture Decisions
+
+## Important Business Rules
+
+## Current Database State
+
+## Current API State
+
+## Current Deployment State
+
+## Technical Debt
+
+## Pending Work
+
+## Documentation Status
+```
+
+Future AI agents MUST read this before development.
+
+---
+
+# 20. CHANGELOG.md
+
+Create:
+
+`docs/ai/CHANGELOG.md`
+
+For this initial documentation task record ONLY:
+
+`Initial project documentation generated.`
+
+Do NOT invent historical changes.
+
+For future changes use:
+
+```text
+## YYYY-MM-DD — Change Title
+
+### Request
+
+### Reason
+
+### Changes
+
+### Files Changed
+
+### Database Changes
+
+### API Changes
+
+### UI Changes
+
+### Business Rule Changes
+
+### Tests
+
+### Result
+
+### Documentation Updated
+```
+
+---
+
+# 21. DECISIONS.md
+
+Create:
+
+`docs/ai/DECISIONS.md`
+
+Document important existing architectural decisions only when they can be verified.
+
+Use:
+
+```text
+## Decision: [Title]
+
+Date:
+
+Problem:
+
+Decision:
+
+Reason:
+
+Alternatives:
+
+Impact:
+
+Affected Modules:
+
+Source Files:
+```
+
+---
+
+# 22. KNOWN-ISSUES.md
+
+Create:
+
+`docs/ai/KNOWN-ISSUES.md`
+
+Document only verified existing issues.
+
+DO NOT fix them during this documentation task.
+
+Use:
+
+```text
+Issue:
+
+Severity:
+
+Affected Module:
+
+Current Behavior:
+
+Expected Behavior:
+
+Known Cause:
+
+Workaround:
+
+Status:
+
+Related Files:
+```
+
+---
+
+# 23. TASK-HISTORY.md
+
+Create:
+
+`docs/ai/TASK-HISTORY.md`
+
+Add only this initial task:
+
+```text
+## Initial Documentation
+
+Task:
+Create complete AI project documentation.
+
+Result:
+Documentation system created from the existing project.
+
+Application functionality changed:
+NO
+```
+
+Future AI tasks must be recorded here.
+
+---
+
+# 24. FUTURE GITHUB / REPLIT IMPORT BEHAVIOR
+
+Add this permanent rule to `AI-INSTRUCTIONS.md`:
+
+```text
+When this project is imported or cloned from GitHub:
+
+1. Check whether /docs exists.
+2. If /docs does not exist:
+   - Analyze the current project.
+   - Generate the documentation system.
+   - Do not begin unrelated feature development until documentation exists.
+3. If /docs exists:
+   - Read AI-INSTRUCTIONS.md.
+   - Read CURRENT-STATE.md.
+   - Use documentation as the primary project context.
+4. If documentation is outdated:
+   - Update only the affected documentation from the actual source code.
+5. Continue development only after the project context is understood.
+```
+
+---
+
+# 25. DOCUMENTATION MUST FOLLOW EVERY FUTURE CODE CHANGE
+
+Permanent workflow:
+
+```text
+USER REQUEST
+     ↓
+READ DOCUMENTATION
+     ↓
+IDENTIFY AFFECTED AREA
+     ↓
+INSPECT RELEVANT CODE
+     ↓
+CREATE PLAN
+     ↓
+IMPLEMENT
+     ↓
+TEST
+     ↓
+VERIFY
+     ↓
+UPDATE DOCUMENTATION
+     ↓
+UPDATE CURRENT-STATE
+     ↓
+UPDATE CHANGELOG
+     ↓
+UPDATE TASK-HISTORY
+```
+
+The documentation must never intentionally describe old behavior.
+
+If documentation and source code disagree:
+
+**The actual source code is the implementation truth.**
+
+Correct the documentation.
+
+---
+
+# 26. DO NOT REBUILD ALL DOCUMENTATION AFTER EVERY CHANGE
+
+Only update affected documentation.
+
+Example:
+
+### UI-only change
+
+Update the affected module documentation.
+
+### Database change
+
+Update:
+
+* Database documentation
+* Affected module documentation
+* API documentation
+* Business rules if applicable
+* CURRENT-STATE
+* CHANGELOG
+
+### New workflow
+
+Update:
+
+* Workflow documentation
+* Module documentation
+* API documentation
+* Database documentation if affected
+* Business rules if affected
+* CURRENT-STATE
+* CHANGELOG
+
+Do not unnecessarily rewrite unrelated documentation.
+
+---
+
+# 27. SECURITY
+
+NEVER write these into documentation:
+
+* Passwords
+* API keys
+* JWT secrets
+* Supabase service-role key
+* Database passwords
+* Payment secrets
+* Private keys
+* Actual `.env` values
+* Authentication tokens
+
+Only document variable names and their purpose.
+
+---
+
+# 28. SOURCE CODE REFERENCES
+
+For important functionality always record exact source paths.
+
+Example:
+
+```text
+Booking Service:
+server/src/services/booking.service.ts
+
+Booking Routes:
+server/src/routes/booking.routes.ts
+
+Booking UI:
+apps/customer-web/src/pages/Booking.tsx
+```
+
+These are examples only.
+
+Use the actual paths discovered in THIS project.
+
+---
+
+# 29. DO NOT COPY THE ENTIRE CODEBASE INTO DOCUMENTATION
+
+Documentation should explain the implementation.
+
+Do NOT copy large source files into `/docs`.
+
+Use:
+
+* File paths
+* Function/class names
+* Short explanations
+* Data structures
+* Relationships
+* API definitions
+* Business rules
+* Diagrams
+
+---
+
+# 30. FINAL VALIDATION
+
+Before finishing, verify:
+
+* Major applications documented
+* Major modules documented
+* Database documented
+* APIs documented
+* Authentication documented
+* Authorization documented
+* Workflows documented
+* Business rules documented
+* Integrations documented
+* Testing documented
+* Deployment documented
+* Important source files referenced
+* AI instructions created
+* Current state created
+* Changelog created
+* Decisions created
+* Known issues created
+* Task history created
+* Documentation links work
+* No secrets were written
+* No application code was changed
+
+---
+
+# 31. FINAL REPORT
+
+After completing the documentation, provide:
+
+## Documentation Created
+
+List all files created.
+
+## Project Architecture
+
+Short summary.
+
+## Applications
+
+List them.
+
+## Major Modules
+
+List them.
+
+## Major Workflows
+
+List them.
+
+## Database
+
+Summary.
+
+## APIs
+
+Summary.
+
+## Integrations
+
+List them.
+
+## Known Issues
+
+Only verified issues.
+
+## Unknown Areas
+
+Anything that could not be verified.
+
+## Documentation Coverage
+
+Explain what is fully documented and what requires future verification.
+
+---
+
+# FINAL COMMAND
+
+This is a **DOCUMENTATION-ONLY TASK**.
+
+Create and validate `/docs`.
+
+DO NOT:
+
+* Build features
+* Fix bugs
+* Refactor
+* Change UI
+* Change APIs
+* Change database
+* Change authentication
+* Change business logic
+* Install packages
+
+After `/docs` is completely created and validated:
+
+**STOP AND WAIT FOR MY NEXT INSTRUCTION.**
