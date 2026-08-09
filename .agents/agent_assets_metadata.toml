@@ -11,15 +11,15 @@ title = "ServeNow — Complete Technical Documentation"
 id = "z3ReHYQpJ6Q9XbRTPxCuk"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
-title = "Customer App — Expo Go QR"
-description = "Fresh live QR code for the currently running ServeNow Customer Expo app."
+title = "Customer App — Current Expo Go QR"
+description = "Fresh QR generated from the currently running Customer Expo tunnel. Scan with Expo Go."
 
 [[outputs]]
 id = "CnN3LIYRidf200aumm0xt"
 uri = "file://tmp-qr/partner-qr.png"
 type = "image"
-title = "Partner App — Expo Go QR"
-description = "Fresh live QR code for the currently running ServeNow Partner Expo app."
+title = "Partner App — Current Expo Go QR"
+description = "Fresh QR generated from the currently running Partner Expo tunnel. Scan with Expo Go."
 
 [[outputs]]
 id = "M4aNKMl2fOqdxUhEEjeEo"

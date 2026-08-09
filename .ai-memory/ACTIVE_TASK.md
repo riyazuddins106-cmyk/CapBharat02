@@ -7,8 +7,21 @@
 ---
 
 ## ▶ Current Task
-**Task:** Runtime verification and documentation repair
-**Status:** COMPLETE. Investigated the Replit preview and Expo Go report, verified the running web/mobile services, and recorded the findings in the required documentation files. No application code was changed.
+**Task:** Correct documentation source-of-truth handling after duplicate memory updates
+**Started:** 2026-08-09
+**Status:** IN PROGRESS — Step 1 of 4 complete
+
+### Documentation source-of-truth correction — 2026-08-09
+- [x] Identified that `.ai-memory/` and `docs/ai/` are authoritative; `.agents/memory/` is not the project task log.
+- [x] Remove duplicate `.agents/memory/` notes created during the previous response.
+- [ ] Record the process failure and prevention rule in authoritative documentation.
+- [ ] Verify the authoritative files and finish the task.
+
+### Files changed so far
+- `.ai-memory/ACTIVE_TASK.md` — registered this process-repair task before making further changes.
+
+### Notes for next session
+The previous response followed the session snapshot’s `.agents/memory/` reminder instead of the repository’s `replit.md` and `.ai-memory/START_HERE.md` rules. The authoritative documentation already contained the Expo incident. Do not create parallel task records.
 
 ### Runtime verification and documentation repair — 2026-08-09
 - [x] Confirmed the screenshot error was caused by stopped workflows and no listener on the Replit preview port.
