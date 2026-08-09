@@ -1,0 +1,292 @@
+# CONTINUE / COMPLETE PROJECT DOCUMENTATION FROM GITHUB
+
+This is a NEW Replit account/session.
+
+You have NO previous conversation history and must NOT assume anything was completed previously.
+
+The GitHub repository is the ONLY source of truth for the current project:
+
+https://github.com/riyazuddins106-cmyk/CapBharat02.git
+
+## FIRST STEP — CHECK THE REPOSITORY
+
+Before doing anything else:
+
+1. Inspect the repository.
+2. Check whether `/docs` already exists.
+3. Check which documentation files already exist.
+4. Check which files are missing.
+5. Check whether existing documentation is complete or incomplete.
+
+DO NOT assume that documentation is missing simply because this is a new Replit account.
+
+---
+
+# IF `/docs` EXISTS
+
+Continue from the documentation already present in GitHub.
+
+* Preserve existing documentation.
+* Do not recreate existing files.
+* Do not unnecessarily reread the entire project.
+* Complete only missing or incomplete documentation.
+* Use the existing documentation as the starting context.
+
+# IF `/docs` DOES NOT EXIST
+
+Create the complete documentation system from the existing project.
+
+---
+
+# DOCUMENTATION STRUCTURE
+
+The final project should contain:
+
+```text id="0w7n6f"
+docs/
+├── README.md
+├── 00-PROJECT-OVERVIEW.md
+├── 01-ARCHITECTURE.md
+├── 02-TECH-STACK.md
+├── 03-REPOSITORY-STRUCTURE.md
+├── 04-DATABASE.md
+├── 05-AUTHENTICATION-AUTHORIZATION.md
+├── 06-API.md
+├── 07-ENVIRONMENT-CONFIGURATION.md
+├── 08-TESTING.md
+├── 09-DEPLOYMENT.md
+├── 10-INTEGRATIONS.md
+│
+├── modules/
+├── workflows/
+├── business-rules/
+│
+└── ai/
+    ├── AI-INSTRUCTIONS.md
+    ├── CURRENT-STATE.md
+    ├── CHANGELOG.md
+    ├── DECISIONS.md
+    ├── KNOWN-ISSUES.md
+    └── TASK-HISTORY.md
+```
+
+Create additional files when the actual project requires them.
+
+Do not create empty meaningless documentation.
+
+---
+
+# PURPOSE
+
+This documentation is the project's permanent AI knowledge base.
+
+Future AI agents must:
+
+1. Read the documentation first.
+2. Identify the affected module.
+3. Read the relevant documentation.
+4. Inspect only the relevant source files.
+5. Make the requested change.
+6. Test the change.
+7. Update the documentation.
+8. Update the project current state and change history.
+
+The goal is to avoid unnecessarily scanning the entire project for every request.
+
+---
+
+# WHAT TO DOCUMENT
+
+Analyze the actual implementation and document:
+
+* Project purpose
+* Applications
+* Web applications
+* Mobile applications
+* Backend
+* Architecture
+* Technology stack
+* Repository structure
+* Database
+* Tables
+* Relationships
+* Authentication
+* Authorization
+* Roles
+* Permissions
+* APIs
+* Environment variables
+* Testing
+* Deployment
+* External integrations
+* Payments
+* Notifications
+* Webhooks
+* Important modules
+* Important workflows
+* Business rules
+* Known issues
+* Important source files
+
+Never invent functionality.
+
+If something cannot be verified, write:
+
+`UNKNOWN — REQUIRES VERIFICATION`
+
+---
+
+# IMPORTANT SOURCE FILE REFERENCES
+
+For every important module and workflow, document the actual source file paths.
+
+Future AI agents should be able to use the documentation to quickly locate the relevant code.
+
+Do NOT copy entire source files into documentation.
+
+---
+
+# AI-INSTRUCTIONS.md
+
+Create or complete:
+
+`docs/ai/AI-INSTRUCTIONS.md`
+
+It must instruct future AI agents to:
+
+* Read documentation before coding.
+* Read CURRENT-STATE.md.
+* Identify affected modules.
+* Read relevant module/workflow/business-rule documentation.
+* Inspect only relevant source files.
+* Make an implementation plan.
+* Avoid unrelated changes.
+* Preserve architecture.
+* Test changes.
+* Update documentation after every code change.
+* Update CURRENT-STATE.md.
+* Update CHANGELOG.md.
+* Update TASK-HISTORY.md.
+
+---
+
+# CURRENT-STATE.md
+
+Create or complete:
+
+`docs/ai/CURRENT-STATE.md`
+
+It must describe the actual current state of the project.
+
+Include:
+
+* Project status
+* Completed features
+* In-progress features
+* Known issues
+* Recent changes
+* Architecture decisions
+* Business rules
+* Database state
+* API state
+* Deployment state
+* Technical debt
+* Pending work
+
+---
+
+# CHANGELOG.md
+
+Create or complete:
+
+`docs/ai/CHANGELOG.md`
+
+Do not invent historical changes.
+
+If this is the first documented state, record:
+
+`Initial project documentation generated.`
+
+---
+
+# TASK-HISTORY.md
+
+Create or complete:
+
+`docs/ai/TASK-HISTORY.md`
+
+Do not invent previous AI tasks.
+
+Record only tasks that can be verified from the repository/documentation.
+
+---
+
+# SECURITY
+
+NEVER put actual secrets in `/docs`.
+
+Never document actual values of:
+
+* SUPABASE_SERVICE_ROLE_KEY
+* SUPABASE_DATABASE_URL
+* JWT_SECRET
+* JWT_REFRESH_SECRET
+* NGROK_AUTHTOKEN
+* NGROK_AUTHTOKEN_2
+* Passwords
+* API keys
+* Private keys
+* Authentication tokens
+
+Only document variable names and their purpose.
+
+---
+
+# APPLICATION CODE MUST NOT BE CHANGED
+
+This task is documentation-only.
+
+Do NOT:
+
+* Add features
+* Fix bugs
+* Refactor
+* Change UI
+* Change APIs
+* Change database
+* Change business logic
+* Install packages
+* Update dependencies
+* Change environment variables
+* Run migrations
+* Deploy
+
+---
+
+# FINAL CHECK
+
+Before stopping:
+
+1. Verify `/docs`.
+2. Verify all required documentation files.
+3. Verify important modules.
+4. Verify important workflows.
+5. Verify business rules.
+6. Verify AI instructions.
+7. Verify current state.
+8. Verify changelog.
+9. Verify decisions.
+10. Verify known issues.
+11. Verify task history.
+12. Verify no secrets are documented.
+13. Verify application code was not modified.
+
+Then report:
+
+* Documentation already present
+* Documentation created
+* Documentation completed
+* Documentation still missing, if any
+* Confirmation that application code was not changed
+
+Then STOP.

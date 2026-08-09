@@ -81,3 +81,13 @@ names, deployment, integrations, modules, workflows, business rules, and AI
 maintenance files are documented. Exact endpoint field schemas, complete UI
 route inventories, production provider configuration, and test execution
 commands remain areas for targeted verification.
+
+## Documentation Workflow
+
+The repository root guidance requires every future functionality change to
+start from `docs/ai/AI-INSTRUCTIONS.md` and `docs/ai/CURRENT-STATE.md`, then
+inspect only the affected documentation and source files. After implementation,
+testing, and verification, the affected documentation plus
+`CURRENT-STATE.md`, `CHANGELOG.md`, and `TASK-HISTORY.md` must be updated
+without waiting for the user to repeat the instruction. A full-repository scan
+is not the default.

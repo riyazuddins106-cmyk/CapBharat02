@@ -3,6 +3,13 @@
 
 ---
 
+## Documentation workflow verification — 2026-08-09
+
+The documentation-first workflow passed its fresh-session verification:
+required documentation files are discoverable, targeted-reading and automatic
+update rules are present, no application directories were changed, and
+`git diff --check` passed.
+
 ## Overall Completion: ~99%
 
 The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, admin controls, and admin-configurable booking hours. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 16/16 checks in the latest run; test-mode payment was skipped because test mode is disabled, and live gateway transactions still require Razorpay/Stripe provider configuration.

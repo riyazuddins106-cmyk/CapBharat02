@@ -27,3 +27,17 @@ Changes Made: Added MASTER_INDEX.md, ARCHITECTURE.md, MODULES.md, CURRENT_STATUS
 Database Changes: None
 API Changes: None
 Remaining Work: Update this log and CURRENT_STATUS.md after each future change session
+
+## 2026-08-09 — Automatic documentation workflow
+
+Date: 2026-08-09
+Feature/Change: Made the documentation-first workflow explicit for fresh
+sessions.
+Files Modified: `replit.md`, `docs/ai/`
+Changes Made: Future agents must read targeted documentation first, avoid
+full-project scans by default, and update the affected documentation and AI
+state after functionality changes without waiting for a repeated instruction.
+Database Changes: None
+API Changes: None
+Remaining Work: Push this repository change to GitHub so fresh imports receive
+the rule.
