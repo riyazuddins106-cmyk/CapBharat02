@@ -4,6 +4,25 @@
 
 2026-08-09
 
+## Runtime Verification — 2026-08-09
+
+The uploaded Replit preview screenshot was investigated from the running
+workflow state rather than inferred from the image. The immediate error was
+that the configured workflows were stopped, so no process was listening on the
+preview port. After starting the existing workflows, the API health endpoint,
+Customer Web, Admin Panel, Partner Web, and QR scanner returned successfully.
+
+Both current Expo tunnel roots returned HTTP 200 manifests, and both
+manifest-declared Android launch bundles returned HTTP 200 JavaScript. The
+generic Expo Go download error was not reproduced with the fresh QR codes.
+Tunnel hostnames change between sessions, so QR images must be regenerated
+after a tunnel restart.
+
+No application source code, database schema, migration, package, or deployment
+configuration was changed during this investigation. Starting the existing
+application workflow did run its normal idempotent startup migration checks;
+no manual migration or schema change was performed.
+
 ## Project Status
 
 Existing multi-application ServeNow marketplace imported from GitHub. The
@@ -32,8 +51,8 @@ future verification.
 
 ## Recently Changed
 
-Initial documentation generated from the current repository. No application
-code was changed by this documentation task.
+Initial documentation generated from the current repository. The 2026-08-09
+runtime investigation also changed no application code.
 
 ## Important Architecture Decisions
 

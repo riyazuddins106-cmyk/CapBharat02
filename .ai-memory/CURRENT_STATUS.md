@@ -10,6 +10,14 @@ required documentation files are discoverable, targeted-reading and automatic
 update rules are present, no application directories were changed, and
 `git diff --check` passed.
 
+## Runtime Verification and Documentation Repair — 2026-08-09
+
+- The uploaded screenshot showed Replit's "couldn't reach this app" page because the configured workflows were stopped and no process was listening on the preview port.
+- After starting the existing workflows, the API health endpoint returned HTTP 200, and Customer Web, Admin Panel, Partner Web, and the QR scanner returned their expected pages.
+- The Customer and Partner Expo tunnels returned HTTP 200 manifests and HTTP 200 Android launch bundles. The earlier Expo Go message was not reproduced with the fresh QR codes; QR URLs must be regenerated after tunnel restarts because tunnel hostnames change.
+- No application source code, database schema, migrations, package configuration, or deployment configuration was changed for this investigation.
+- The verified development routes are Customer Web `/`, Admin Panel `/admin-panel/`, Partner Web `/partner/`, and the QR scanner on the routed QR service port.
+
 ## Overall Completion: ~99%
 
 The service-level order implementation is complete for customer web/mobile, partner mobile, provider-backed payment/refund handling, payment gating, admin controls, and admin-configurable booking hours. The main customer web/API/admin workflows are running in preview. The current-contract order-item flow passes 16/16 checks in the latest run; test-mode payment was skipped because test mode is disabled, and live gateway transactions still require Razorpay/Stripe provider configuration.

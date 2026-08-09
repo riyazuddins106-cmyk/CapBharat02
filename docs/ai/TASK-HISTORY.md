@@ -33,3 +33,27 @@ Files changed: Documentation history only.
 
 Future AI tasks must be recorded here with the affected modules, source files,
 verification, and documentation updates.
+
+## 2026-08-09 — Runtime Verification and Documentation Repair
+
+Task: Investigate the Replit preview failure and Expo Go download report,
+verify the live test surfaces, and document the findings without changing the
+application.
+
+Result: Confirmed the screenshot was caused by stopped workflows and no
+listener on the preview port. Started the existing workflows, verified API
+health and web/QR routes, and confirmed both Expo manifests and Android
+launch bundles returned HTTP 200. The generic Expo Go error was not reproduced
+with fresh QR codes.
+
+Application functionality changed: NO
+
+Files changed: Documentation records only.
+
+Verification: Customer Web `/`, Admin Panel `/admin-panel/`, Partner Web
+`/partner/`, the QR scanner route, API health, both Expo manifests, and both
+Android launch bundles were checked.
+
+Documentation updated: `.ai-memory/ACTIVE_TASK.md`,
+`.ai-memory/CURRENT_STATUS.md`, `.ai-memory/GOTCHAS.md`,
+`docs/ai/CURRENT-STATE.md`, and `docs/ai/CHANGELOG.md`.

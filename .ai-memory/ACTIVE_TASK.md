@@ -7,8 +7,16 @@
 ---
 
 ## ▶ Current Task
-**Task:** Remove multilingual support and return ServeNow to English-only
-**Status:** COMPLETE. All language selectors, locale providers, translation catalogs, RTL behavior, and Admin language settings were removed from the web, mobile, and server surfaces.
+**Task:** Runtime verification and documentation repair
+**Status:** COMPLETE. Investigated the Replit preview and Expo Go report, verified the running web/mobile services, and recorded the findings in the required documentation files. No application code was changed.
+
+### Runtime verification and documentation repair — 2026-08-09
+- [x] Confirmed the screenshot error was caused by stopped workflows and no listener on the Replit preview port.
+- [x] Started the existing workflows without changing application code.
+- [x] Confirmed API health and Customer Web, Admin Panel, Partner Web, QR server, Customer Expo, and Partner Expo availability.
+- [x] Confirmed both current Expo manifests and Android launch bundles return HTTP 200.
+- [x] Recorded the verified root causes, URLs, tunnel checks, and no-code-change scope in `.ai-memory` and `docs/ai`.
+- [x] Removed the mistaken duplicate documentation edits from `.agents/memory`.
 
 ### Admin and Operations role separation — 2026-08-05
 - [x] Restrict regular Users to customer and partner accounts

@@ -16,6 +16,11 @@
 > Every entry here cost real debugging time. Don't repeat it.
 > Add a new entry any time a fix took more than one attempt.
 
+### Documentation — use the authoritative memory directory
+**Problem:** A runtime investigation was recorded in `.agents/memory/`, while this project’s required continuity files are `.ai-memory/ACTIVE_TASK.md`, `.ai-memory/CURRENT_STATUS.md`, and `.ai-memory/GOTCHAS.md`.
+**Fix:** Update all three `.ai-memory` files after every completed task, then update the affected `docs/ai` records.
+**Warning:** Do not treat similarly named `.agents/memory` files as a substitute; verify the required `.ai-memory` files before reporting completion.
+
 ---
 
 ## Format for new entries

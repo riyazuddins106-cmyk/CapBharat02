@@ -106,3 +106,52 @@ Future entries should use:
 ### Result
 ### Documentation Updated
 ```
+
+## 2026-08-09 — Runtime Verification and Documentation Repair
+
+### Request
+Investigate the Replit preview and Expo Go download report, verify the actual
+running services and testing URLs, and document the result without releasing
+the project.
+
+### Reason
+The uploaded screenshot showed the Replit no-port preview page, and the
+documentation workflow requires verified findings to be recorded for future
+sessions.
+
+### Changes
+Inspected workflow states and logs, started the existing workflows, checked API
+health and web routes, validated the QR service, and requested the current Expo
+manifests and Android launch bundles directly through both tunnels.
+
+### Files Changed
+Documentation records only. No application source files were changed.
+
+### Database Changes
+No schema or data change was made. Starting the existing application workflow
+ran its normal idempotent startup migration checks; no manual migration was
+initiated by this documentation repair.
+
+### API Changes
+None.
+
+### UI Changes
+None.
+
+### Business Rule Changes
+None.
+
+### Tests
+API health returned HTTP 200. Customer Web, Admin Panel, Partner Web, and QR
+scanner routes returned successfully. Both Expo manifests and both Android
+launch bundles returned HTTP 200.
+
+### Result
+The screenshot’s immediate cause was stopped workflows and no listener on the
+preview port. The current Expo tunnels and bundles were healthy; the generic
+Expo Go error was not reproduced with fresh QR codes.
+
+### Documentation Updated
+`.ai-memory/ACTIVE_TASK.md`, `.ai-memory/CURRENT_STATUS.md`,
+`.ai-memory/GOTCHAS.md`, `docs/ai/CURRENT-STATE.md`,
+`docs/ai/CHANGELOG.md`, and `docs/ai/TASK-HISTORY.md`.
