@@ -1,5 +1,12 @@
 # Current Status
 
+## Latest Verification
+
+The CapBharat repository is loaded on the active branch. Admin Web production
+build passes, Admin Panel serves at `/admin-panel/`, and the API health endpoint
+returns HTTP 200 after the required Supabase/JWT secrets are present. The
+browser console is clean after startup completes.
+
 ## Last Session Summary
 
 The Admin Services menu now follows the Customers table pattern: global search toolbar, category/status controls, export, rows-per-page bar, sortable headers, and a dedicated per-column filter row. The table shell remains visible when filters return no matches, with an in-table empty row like Customers. The Services API returns 18 records and the Admin Panel build passes.

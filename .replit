@@ -108,38 +108,6 @@ task = "shell.exec"
 args = "node -e \"const http=require('http'),fs=require('fs'),path=require('path');http.createServer((req,res)=>{const f=path.join('/home/runner/workspace/tmp-qr',req.url==='/'?'scanner.html':req.url);try{const d=fs.readFileSync(f);res.writeHead(200,{'Content-Type':req.url.endsWith('.png')?'image/png':'text/html','Cache-Control':'no-cache'});res.end(d);}catch(e){res.writeHead(404);res.end();}}).listen(3000);\""
 waitForPort = 3000
 
-[[ports]]
-localPort = 3000
-externalPort = 3002
-
-[[ports]]
-localPort = 4000
-externalPort = 3001
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
-
-[[ports]]
-localPort = 8000
-externalPort = 8000
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
-localPort = 8081
-externalPort = 8081
-
-[[ports]]
-localPort = 8099
-externalPort = 8099
-
 [deployment]
 deploymentTarget = "autoscale"
 build = ["pnpm", "build"]
@@ -155,3 +123,15 @@ SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
 
 [userenv.production]
 NODE_ENV = "production"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
