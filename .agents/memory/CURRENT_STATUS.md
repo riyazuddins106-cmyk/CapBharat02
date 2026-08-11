@@ -5,7 +5,16 @@
 The CapBharat repository is loaded on the active branch. Admin Web production
 build passes, Admin Panel serves at `/admin-panel/`, and the API health endpoint
 returns HTTP 200 after the required Supabase/JWT secrets are present. The
-browser console is clean after startup completes.
+browser console is clean after startup completes. Fresh admin login and
+click-through navigation to Professionals, Categories, Audit Logs, Services,
+and Service Orders all render without the global spinner.
+
+## Admin Spinner Fix
+
+Admin startup now blocks only on Dashboard stats and Bookings. Customers and
+Professionals remain page-specific loads, while Services, Categories, Reviews,
+Audit Logs, Offers, Reels, Dispatch, and Orders hydrate serially so a burst of
+duplicate Supabase requests cannot leave the shared shell pending.
 
 ## Last Session Summary
 

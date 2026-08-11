@@ -48,3 +48,4 @@
 - [Partner payout filter parity](partner-payout-filter-parity.md) — Partner Web and Mobile must share the same inclusive date-range and payout-status filters; no All time payout-history option.
 - [Customer Expo port ownership](customer-expo-port-ownership.md) — Customer Expo must use its declared free Metro port; stale starter services on that port make Expo exit before QR downloads work.
 - [Admin catalog upload routing](admin-catalog-upload-routing.md) — multipart uploads must share the API base; category partner counts include service-linked partners.
+- [Admin initial-load concurrency](admin-initial-load-concurrency.md) — keep the startup request set small; duplicate concurrent Supabase queries can leave the global Admin spinner pending.
