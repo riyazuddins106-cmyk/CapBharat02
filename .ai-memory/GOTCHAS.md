@@ -251,6 +251,12 @@
 **Fix:** With the current mapping, use the QR scanner on external `:3001` (local 3000), Partner Web on external `:3000` (local 4000), Customer Web on external `:5000`, and Admin Panel on the default path.
 **Warning:** Do not infer a public URL from a local port; check `.replit` port mappings and verify each route returns the expected HTML before sharing it.
 
+### Replit — public API path can reach the starter API artifact
+**Problem:** ServeNow's server returns 200 on local port 8000, but public `/api/*` requests can be routed to the separate starter API artifact, which returns 404 for ServeNow endpoints.
+**Fix:** Verify the public proxy target and remove or correct the competing `/api` artifact route before treating web-client 404s as application-controller failures.
+**Files:** `.replit`, artifact route configuration, `server/`
+**Warning:** A healthy local server does not prove the public API path is wired to that server.
+
 ---
 
 ## Admin Operations

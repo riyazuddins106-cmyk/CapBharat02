@@ -12,14 +12,14 @@ id = "z3ReHYQpJ6Q9XbRTPxCuk"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
 title = "Customer App — Current Expo Go QR"
-description = "Fresh QR generated from the currently running Customer Expo tunnel. Scan with Expo Go."
+description = "Fresh QR for the currently running Customer Expo session. Open Expo Go and scan this image."
 
 [[outputs]]
 id = "CnN3LIYRidf200aumm0xt"
 uri = "file://tmp-qr/partner-qr.png"
 type = "image"
 title = "Partner App — Current Expo Go QR"
-description = "Fresh QR generated from the currently running Partner Expo tunnel. Scan with Expo Go."
+description = "Fresh QR for the currently running Partner Expo session. Open Expo Go and scan this image."
 
 [[outputs]]
 id = "M4aNKMl2fOqdxUhEEjeEo"

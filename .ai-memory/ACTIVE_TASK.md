@@ -11,6 +11,13 @@
 **Started:** 2026-08-09
 **Status:** IN PROGRESS — Step 1 of 4 complete
 
+### Runtime investigation — 2026-08-11
+- [x] Confirmed Customer Expo's first failure: port 8081 was occupied by the mockup preview, so Metro exited before serving a bundle.
+- [x] Released the conflicting mockup workflow and restarted Customer Expo; Customer and Partner manifests and Android bundles returned HTTP 200.
+- [x] Confirmed the public web routes: Customer `/`, Admin `/admin-panel/`, Partner `/partner/`, QR scanner `/qr/`.
+- [x] Confirmed the separate public API routing issue: `/api/*` reaches the starter API artifact and returns 404, while ServeNow's server on local port 8000 returns 200 for the same endpoints.
+- [ ] Repair the public API route and make the workflow port ownership persistent.
+
 ### Documentation source-of-truth correction — 2026-08-09
 - [x] Identified that `.ai-memory/` and `docs/ai/` are authoritative; `.agents/memory/` is not the project task log.
 - [x] Remove duplicate `.agents/memory/` notes created during the previous response.

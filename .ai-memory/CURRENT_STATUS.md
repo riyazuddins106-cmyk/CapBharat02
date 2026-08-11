@@ -3,6 +3,14 @@
 
 ---
 
+## Runtime Investigation — 2026-08-11
+
+- Customer Expo's initial “failed to download” report was reproduced from the workflow log: the mockup preview already owned port 8081, Expo asked whether to use 8082, and non-interactive Expo skipped the dev server with exit code 1.
+- After stopping only the conflicting mockup workflow and restarting Customer Expo, both Customer and Partner Expo manifests returned HTTP 200 and both Android launch bundles returned HTTP 200.
+- Verified public routes on the current development domain: Customer Web `/`, Admin Panel `/admin-panel/`, Partner Web `/partner/`, and QR scanner `/qr/`.
+- A separate public API routing issue remains: `/api/health`, `/api/categories`, and `/api/services` return 404 through the public proxy because the standalone starter API artifact receives them; the ServeNow server on local port 8000 returns 200 for those same paths.
+- No application source, package, database, migration, or deployment files were changed during this investigation.
+
 ## Documentation workflow verification — 2026-08-09
 
 The documentation-first workflow passed its fresh-session verification:
