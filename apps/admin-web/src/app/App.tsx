@@ -912,6 +912,24 @@ const ADMIN_ONLY_SECTIONS = new Set(
   ADMIN_SIDEBAR.filter(s => s.adminOnly).map(s => s.id)
 );
 
+const INITIAL_REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * The panel loads several independent datasets at startup. A queued database
+ * request must not keep the whole navigation shell behind one spinner, so
+ * every startup request has a finite client-side bound.
+ */
+function withInitialRequestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} request timed out`)), INITIAL_REQUEST_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessToken: string; onLogout: () => void }) {
   const isAdmin = user.role === "admin";
   const [activeSection, setActiveSection] = useState(() => {
@@ -978,38 +996,46 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
 
   const load = useCallback(async () => {
     setLoading(true);
-    void loadServices();
     try {
-      const [s, b, p, u, c, r, a, o, rl, d, ord] = await Promise.all([
-        adminApi.getStats(accessToken),
-        adminApi.getBookings(accessToken),
-        adminApi.getProfessionals(accessToken, 1, proPageSize),
-        adminApi.getUsers(accessToken),
-        adminApi.getCategories(accessToken),
-        adminApi.getReviews(accessToken),
-        adminApi.getAuditLogs(accessToken),
-        adminApi.getOffers(accessToken),
-        adminApi.getReels(accessToken),
-        adminApi.getDispatch(accessToken),
-        adminApi.getOrders(accessToken),
+      // Keep the blocking request set deliberately small. Customers and
+      // Professionals already have page-specific effects below, so starting
+      // them here would duplicate the first requests after login.
+      const [statsResult, bookingsResult] = await Promise.allSettled([
+        withInitialRequestTimeout(adminApi.getStats(accessToken), "Dashboard stats"),
+        withInitialRequestTimeout(adminApi.getBookings(accessToken), "Bookings"),
       ]);
-      setStats(s);
-      setBookingList(b.bookings);
-      setProList(p.professionals);
-      setProTotal(p.total);
-      setUserList(u.users);
-      setUserTotal(u.total);
-      setCategoryList(c.categories);
-      setReviewList(r.reviews);
-      setAuditLogs(a.logs);
-      setOfferList(o.offers);
-      setReelList(rl.reels);
-      setDispatchList(d);
-      setOrderList(ord);
-    } catch (err: any) {
-      showMsg(err.message ?? "Failed to load data", "error");
-    } finally { setLoading(false); }
-  }, [accessToken, loadServices]);
+
+      if (statsResult.status === "fulfilled") setStats(statsResult.value);
+      else showMsg(statsResult.reason?.message ?? "Failed to load dashboard stats", "error");
+      if (bookingsResult.status === "fulfilled") setBookingList(bookingsResult.value.bookings);
+      else showMsg(bookingsResult.reason?.message ?? "Failed to load bookings", "error");
+    } finally {
+      // Dashboard and navigation must remain usable even when another
+      // dataset is slow or temporarily unavailable.
+      setLoading(false);
+    }
+
+    // Hydrate non-critical datasets serially. This prevents the initial
+    // dashboard from opening a burst of expensive Supabase queries that can
+    // exhaust the server connection pool and leave browser requests pending.
+    const secondaryLoads: Array<[string, () => Promise<void>]> = [
+      ["Services", async () => setServiceList((await withInitialRequestTimeout(adminApi.getServices(accessToken), "Services")).services)],
+      ["Categories", async () => setCategoryList((await withInitialRequestTimeout(adminApi.getCategories(accessToken), "Categories")).categories)],
+      ["Reviews", async () => setReviewList((await withInitialRequestTimeout(adminApi.getReviews(accessToken), "Reviews")).reviews)],
+      ["Audit logs", async () => setAuditLogs((await withInitialRequestTimeout(adminApi.getAuditLogs(accessToken), "Audit logs")).logs)],
+      ["Offers", async () => setOfferList((await withInitialRequestTimeout(adminApi.getOffers(accessToken), "Offers")).offers)],
+      ["Reels", async () => setReelList((await withInitialRequestTimeout(adminApi.getReels(accessToken), "Reels")).reels)],
+      ["Dispatch", async () => setDispatchList(await withInitialRequestTimeout(adminApi.getDispatch(accessToken), "Dispatch"))],
+      ["Orders", async () => setOrderList(await withInitialRequestTimeout(adminApi.getOrders(accessToken), "Orders"))],
+    ];
+    for (const [label, loadSecondary] of secondaryLoads) {
+      try {
+        await loadSecondary();
+      } catch (err: any) {
+        showMsg(err.message ?? `Failed to load ${label.toLowerCase()}`, "error");
+      }
+    }
+  }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
 
