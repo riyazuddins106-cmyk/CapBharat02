@@ -74,21 +74,83 @@ export default function ProfileScreen() {
   const reviewCount = bookings.filter((b) => b.reviewed).length;
   const [editModal,  setEditModal]  = useState(false);
   const [fullName,   setFullName]   = useState(user?.fullName ?? '');
+  const [username,   setUsername]   = useState(user?.username ?? '');
+  const [email,      setEmail]      = useState(user?.email ?? '');
   const [phone,      setPhone]      = useState(user?.phone ?? '');
   const [localAvatar, setLocalAvatar] = useState<string | null>(user?.avatarUrl ?? null);
   const [uploading,  setUploading]  = useState(false);
+  const [identityField, setIdentityField] = useState<'email' | 'phone' | null>(null);
+  const [identityTarget, setIdentityTarget] = useState('');
+  const [identityCode, setIdentityCode] = useState('');
+  const [identityDevCode, setIdentityDevCode] = useState<string | undefined>(undefined);
+  const [identityMsg, setIdentityMsg] = useState<string | null>(null);
+  const [identityLoading, setIdentityLoading] = useState(false);
 
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
   const updateMutation = useMutation({
-    mutationFn: () => profileApi.update({ fullName, phone: phone || undefined }, accessToken!),
+    mutationFn: () => profileApi.update({ fullName }, accessToken!),
     onSuccess: (updatedUser) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       updateUser(updatedUser);
+      setFullName(updatedUser.fullName);
+      setUsername(updatedUser.username);
+      setEmail(updatedUser.email);
+      setPhone(updatedUser.phone ?? '');
       setEditModal(false);
     },
     onError: (e: any) => Alert.alert('Error', e.message),
   });
+
+  const requestIdentityChange = async (field: 'email' | 'phone', value: string) => {
+    const next = value.trim();
+    if (!next) {
+      setIdentityMsg(`${field === 'email' ? 'Email' : 'Phone'} is required.`);
+      return;
+    }
+    setIdentityLoading(true);
+    setIdentityMsg(null);
+    try {
+      const res = await profileApi.requestIdentityChange(field, next, accessToken!);
+      setIdentityField(field);
+      setIdentityTarget(next);
+      setIdentityCode('');
+      setIdentityDevCode(res.devCode);
+      setIdentityMsg(res.devCode ? `OTP requested. Dev code: ${res.devCode}` : 'OTP requested. Enter the verification code to continue.');
+    } catch (e: any) {
+      Alert.alert('Verification failed', e.message);
+    } finally {
+      setIdentityLoading(false);
+    }
+  };
+
+  const verifyIdentityChange = async () => {
+    if (!identityField) return;
+    if (!identityCode.trim()) {
+      setIdentityMsg('Enter the OTP to continue.');
+      return;
+    }
+    setIdentityLoading(true);
+    setIdentityMsg(null);
+    try {
+      const updated = await profileApi.verifyIdentityChange(identityField, identityTarget, identityCode.trim(), accessToken!);
+      updateUser(updated);
+      setFullName(updated.fullName);
+      setUsername(updated.username);
+      setEmail(updated.email);
+      setPhone(updated.phone ?? '');
+      setIdentityField(null);
+      setIdentityTarget('');
+      setIdentityCode('');
+      setIdentityDevCode(undefined);
+      setIdentityMsg(null);
+      Alert.alert('Success', `${identityField === 'email' ? 'Email' : 'Phone'} updated successfully.`);
+    } catch (e: any) {
+      Alert.alert('Verification failed', e.message);
+    } finally {
+      setIdentityLoading(false);
+    }
+  };
 
   const pickAndUploadAvatar = async () => {
     try {
@@ -254,11 +316,68 @@ export default function ProfileScreen() {
               value={fullName} onChangeText={setFullName}
               style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
             />
+            <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Username</Text>
+            <TextInput
+              value={username}
+              editable={false}
+              style={[styles.input, { backgroundColor: colors.muted, color: colors.mutedForeground, borderRadius: colors.radius }]}
+            />
+            <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+            />
             <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Phone</Text>
             <TextInput
               value={phone} onChangeText={setPhone} keyboardType="phone-pad"
               style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
             />
+            <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
+              Save full name directly. Request OTP verification before saving a changed email or phone.
+            </Text>
+            {identityMsg && <Text style={[styles.helperText, { color: colors.destructive }]}>{identityMsg}</Text>}
+            {(email.trim() !== (user?.email ?? '') || phone.trim() !== (user?.phone ?? '')) && !identityField && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (email.trim() !== (user?.email ?? '') && phone.trim() !== (user?.phone ?? '')) {
+                    setIdentityMsg('Verify one contact change at a time.');
+                    return;
+                  }
+                  if (email.trim() !== (user?.email ?? '')) void requestIdentityChange('email', email);
+                  else if (phone.trim() !== (user?.phone ?? '')) void requestIdentityChange('phone', phone);
+                }}
+                disabled={identityLoading}
+                style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.saveBtnText}>{identityLoading ? 'Sending OTP…' : 'Request Verification'}</Text>
+              </TouchableOpacity>
+            )}
+            {identityField && (
+              <View style={[styles.identityBox, { backgroundColor: colors.muted, borderRadius: colors.radius }]}>
+                <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: 0 }]}>
+                  Verify {identityField === 'email' ? 'Email' : 'Phone'}
+                </Text>
+                {identityDevCode ? <Text style={[styles.helperText, { color: colors.primary }]}>Dev OTP: {identityDevCode}</Text> : null}
+                <TextInput
+                  value={identityCode}
+                  onChangeText={setIdentityCode}
+                  placeholder="Enter OTP"
+                  keyboardType="number-pad"
+                  style={[styles.input, { backgroundColor: colors.card, color: colors.foreground, borderRadius: colors.radius }]}
+                />
+                <TouchableOpacity
+                  onPress={verifyIdentityChange}
+                  disabled={identityLoading}
+                  style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.saveBtnText}>{identityLoading ? 'Verifying…' : 'Verify & Save'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity
               onPress={() => updateMutation.mutate()}
               disabled={updateMutation.isPending}
@@ -308,6 +427,8 @@ const styles = StyleSheet.create({
   editSheetTitle:   { fontSize: 18, fontWeight: '700' },
   fieldLabel:       { fontSize: 13, fontWeight: '600', marginBottom: -4 },
   input:            { padding: 12, fontSize: 14 },
+  helperText:       { fontSize: 11, lineHeight: 16 },
+  identityBox:      { padding: 12, gap: 10 },
   saveBtn:          { paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText:      { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

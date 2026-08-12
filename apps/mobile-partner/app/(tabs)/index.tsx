@@ -6,7 +6,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { partnerApi, notificationsApi, type Job, type OrderItemJob } from '@/lib/api';
+import {
+  partnerApi,
+  notificationsApi,
+  documentsApi,
+  type Job,
+  type OrderItemJob,
+  type DocumentTypeConfig,
+  type PartnerDocument,
+  type PartnerProfile,
+} from '@/lib/api';
 import { NativeIcon } from '@/components/NativeIcon';
 
 const STATUS_CONFIG = {
@@ -16,6 +25,117 @@ const STATUS_CONFIG = {
   completed:   { label: 'Completed',   color: '#16A34A', bg: '#DCFCE7' },
   cancelled:   { label: 'Cancelled',   color: '#D4183D', bg: '#FEE2E2' },
 } as const;
+
+type DashboardNoticeKind = 'danger' | 'warning' | 'neutral' | 'success';
+
+interface DashboardNotice {
+  label: string;
+  message: string;
+  kind: DashboardNoticeKind;
+  action?: string;
+}
+
+function getDashboardNotice(
+  profile: PartnerProfile,
+  documentTypes: DocumentTypeConfig[],
+  documents: PartnerDocument[],
+): DashboardNotice {
+  const required = documentTypes.filter(type => type.is_active && type.is_mandatory);
+  const docByType = Object.fromEntries(documents.map(document => [document.document_type, document]));
+  const missing = required.filter(type => !docByType[type.type_key]);
+  const attention = required.filter(type => {
+    const document = docByType[type.type_key];
+    if (!document) return false;
+    return ['rejected', 're_upload_required', 'expired'].includes(document.status);
+  });
+  const pending = required.filter(type => {
+    const document = docByType[type.type_key];
+    return Boolean(document && ['pending', 'under_review'].includes(document.status));
+  });
+
+  if (missing.length > 0) {
+    return {
+      label: 'Documents Required',
+      message: 'Upload the required documents to become eligible for jobs.',
+      kind: 'danger',
+      action: 'Upload Documents',
+    };
+  }
+  if (attention.length > 0) {
+    return {
+      label: 'Documents Need Attention',
+      message: 'Update your rejected or expired documents to start receiving job requests.',
+      kind: 'danger',
+      action: 'Update Documents',
+    };
+  }
+  if (pending.length > 0) {
+    return {
+      label: 'Documents Under Review',
+      message: 'Your documents are being reviewed. You will be eligible to receive jobs after approval.',
+      kind: 'warning',
+      action: 'View Documents',
+    };
+  }
+
+  const availability = profile.availabilityStatus ?? 'available';
+  if (availability === 'offline') {
+    return {
+      label: 'Offline',
+      message: 'You are offline and will not receive new job requests. Go online when you are ready.',
+      kind: 'neutral',
+    };
+  }
+  if (availability === 'busy') {
+    return {
+      label: 'Busy',
+      message: 'You are marked as busy and will not receive new job requests. Set yourself to Available when ready.',
+      kind: 'warning',
+    };
+  }
+  return {
+    label: 'Available',
+    message: 'You are available and eligible to receive new job requests.',
+    kind: 'success',
+  };
+}
+
+function DashboardStatusNotice({
+  notice,
+  onAction,
+}: {
+  notice: DashboardNotice;
+  onAction: () => void;
+}) {
+  const colors = useColors();
+  const tone = {
+    danger: { background: '#FEF2F2', border: '#FECACA', icon: '#B91C1C' },
+    warning: { background: '#FFFBEB', border: '#FDE68A', icon: '#B45309' },
+    neutral: { background: '#F3F4F6', border: '#D1D5DB', icon: '#4B5563' },
+    success: { background: '#F0FDF4', border: '#BBF7D0', icon: '#15803D' },
+  }[notice.kind];
+
+  return (
+    <View style={[styles.statusNotice, { backgroundColor: tone.background, borderColor: tone.border, borderRadius: colors.radius }]}>
+      <View style={[styles.statusNoticeIcon, { backgroundColor: `${tone.icon}18` }]}>
+        <Ionicons
+          name={notice.kind === 'success' ? 'checkmark-circle-outline' : notice.kind === 'neutral' ? 'cloud-offline-outline' : 'alert-circle-outline'}
+          size={20}
+          color={tone.icon}
+        />
+      </View>
+      <View style={styles.statusNoticeCopy}>
+        <Text style={[styles.statusNoticeLabel, { color: tone.icon }]}>{notice.label}</Text>
+        <Text style={[styles.statusNoticeMessage, { color: colors.foreground }]}>{notice.message}</Text>
+      </View>
+      {notice.action && (
+        <TouchableOpacity onPress={onAction} style={[styles.statusNoticeAction, { borderColor: tone.icon }]} activeOpacity={0.8}>
+          <Text style={[styles.statusNoticeActionText, { color: tone.icon }]}>{notice.action}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -152,7 +272,34 @@ export default function DashboardScreen() {
     enabled: !!accessToken,
   });
 
+  const {
+    data: documentTypes = [],
+    isLoading: areDocumentTypesLoading,
+    isError: areDocumentTypesError,
+    refetch: refetchDocumentTypes,
+  } = useQuery({
+    queryKey: ['doc-types', accessToken],
+    queryFn: () => documentsApi.listTypes(accessToken!),
+    enabled: !!accessToken,
+    refetchOnMount: 'always',
+  });
+
+  const {
+    data: documents = [],
+    isLoading: areDocumentsLoading,
+    isError: areDocumentsError,
+    refetch: refetchDocuments,
+  } = useQuery({
+    queryKey: ['docs', accessToken],
+    queryFn: () => documentsApi.list(accessToken!),
+    enabled: !!accessToken,
+    refetchOnMount: 'always',
+  });
+
   const availabilityStatus = profile?.availabilityStatus ?? 'available';
+  const dashboardNotice = profile && !areDocumentTypesLoading && !areDocumentsLoading && !areDocumentTypesError && !areDocumentsError
+    ? getDashboardNotice(profile, documentTypes, documents)
+    : null;
 
   const availabilityMutation = useMutation({
     mutationFn: (status: 'available' | 'offline' | 'busy') =>
@@ -295,7 +442,12 @@ export default function DashboardScreen() {
       <FlatList
         data={activeJobs.slice(0, 5)}
         keyExtractor={(j) => j.id}
-        refreshControl={<RefreshControl refreshing={isRefetching || isServiceRefetching} onRefresh={() => { refetch(); refetchServiceJobs(); }} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isRefetching || isServiceRefetching} onRefresh={() => {
+          refetch();
+          refetchServiceJobs();
+          refetchDocumentTypes();
+          refetchDocuments();
+        }} tintColor={colors.primary} />}
         ListHeaderComponent={
           <View style={styles.content}>
             {/* Stats */}
@@ -319,6 +471,13 @@ export default function DashboardScreen() {
                 colors={colors}
               />
             </View>
+
+             {dashboardNotice && (
+               <DashboardStatusNotice
+                 notice={dashboardNotice}
+                 onAction={() => router.push('/documents')}
+               />
+             )}
 
             {pendingServiceJobs.length > 0 && (
               <>
@@ -405,6 +564,13 @@ const styles = StyleSheet.create({
   onlineText: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
   content: { padding: 16, gap: 16 },
   statsRow: { flexDirection: 'row', gap: 10 },
+  statusNotice: { borderWidth: 1, padding: 13, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  statusNoticeIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  statusNoticeCopy: { flex: 1, gap: 3 },
+  statusNoticeLabel: { fontSize: 13, fontWeight: '800' },
+  statusNoticeMessage: { fontSize: 12, lineHeight: 17 },
+  statusNoticeAction: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7, alignSelf: 'center' },
+  statusNoticeActionText: { fontSize: 10, fontWeight: '800' },
   statCard: { flex: 1, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1 },
   statValue: { fontSize: 16, fontWeight: '800' },
   statLabel: { fontSize: 10, textAlign: 'center' },

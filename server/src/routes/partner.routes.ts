@@ -39,6 +39,7 @@ router.get('/order-item-jobs',                              partnerController.li
 router.get('/order-item-jobs/:itemId',                      partnerController.getOrderItemJob);
 router.patch('/order-item-jobs/:requestId/accept',          partnerController.acceptOrderItemJob);
 router.patch('/order-item-jobs/:requestId/reject',          partnerController.rejectOrderItemJob);
+router.patch('/order-item-jobs/:itemId/pass',               partnerController.passOrderItemJob);
 router.patch('/order-item-jobs/:itemId/checkin',            partnerController.checkInOrderItem);
 router.patch('/order-item-jobs/:itemId/confirm-cash',        partnerController.confirmCashPayment);
 router.patch('/order-item-jobs/:itemId/complete',           partnerController.completeOrderItem);

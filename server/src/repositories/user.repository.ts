@@ -1,6 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { users, type NewUser, type User } from '../database/schema/users.js';
+import { usernameCandidate } from '../utils/username.js';
 
 export const userRepository = {
   async findByEmail(email: string): Promise<User | undefined> {
@@ -10,6 +11,32 @@ export const userRepository = {
       .where(and(eq(users.email, email), isNull(users.deletedAt)))
       .limit(1);
     return user;
+  },
+
+  async findByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.phone, phone), isNull(users.deletedAt)))
+      .limit(1);
+    return user;
+  },
+
+  async findByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+    return user;
+  },
+
+  async generateUsername(fullName: string, email: string): Promise<string> {
+    for (let suffix = 0; suffix < 1000; suffix += 1) {
+      const candidate = usernameCandidate(fullName, email, suffix);
+      if (!(await this.findByUsername(candidate))) return candidate;
+    }
+    throw new Error('Could not generate a unique username.');
   },
 
   async findById(id: string): Promise<User | undefined> {

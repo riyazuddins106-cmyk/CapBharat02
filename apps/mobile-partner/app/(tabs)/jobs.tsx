@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Platform, ScrollView, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -173,11 +173,11 @@ export default function JobsScreen() {
   const insets = useSafeAreaInsets();
   const { accessToken } = useAuth();
   const queryClient = useQueryClient();
-  const serviceJobs = useQuery({
+  const { data: serviceJobData, refetch: refetchServiceJobs } = useQuery({
     queryKey: ['/api/partner/order-item-jobs', accessToken],
     queryFn: () => partnerApi.listOrderItemJobs(accessToken!),
     enabled: !!accessToken,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
   const serviceAction = useMutation<unknown, Error, { action: 'accept' | 'reject' | 'checkin' | 'confirmCash' | 'complete'; item: import('@/lib/api').OrderItemJob }>({
     mutationFn: ({ action, item }: { action: 'accept' | 'reject' | 'checkin' | 'confirmCash' | 'complete'; item: import('@/lib/api').OrderItemJob }) => {
@@ -193,6 +193,7 @@ export default function JobsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/order-item-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/partner/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/partner/earnings'] });
     },
   });
   const [tab, setTab] = useState<JobTabKey>('all');
@@ -204,13 +205,23 @@ export default function JobsScreen() {
     enabled: !!accessToken,
     // Auto-refresh every 30 s so incoming dispatch requests appear without
     // requiring a manual pull-to-refresh.
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && accessToken) {
+        void refetchServiceJobs();
+        void refetch();
+      }
+    });
+    return () => subscription.remove();
+  }, [accessToken, refetch, refetchServiceJobs]);
+
   const activeTab = TABS.find((t) => t.key === tab)!;
-  const pendingServiceJobs = serviceJobs.data?.pendingRequests ?? [];
-  const activeServiceJobs = serviceJobs.data?.activeJobs ?? [];
-  const completedServiceJobs = serviceJobs.data?.completedJobs ?? [];
+  const pendingServiceJobs = serviceJobData?.pendingRequests ?? [];
+  const activeServiceJobs = serviceJobData?.activeJobs ?? [];
+  const completedServiceJobs = serviceJobData?.completedJobs ?? [];
   const counts: Record<JobTabKey, number> = {
     all: jobs.length + pendingServiceJobs.length + activeServiceJobs.length + completedServiceJobs.length,
     upcoming: jobs.filter((j: Job) => j.status === 'upcoming').length + activeServiceJobs.length,

@@ -61,6 +61,7 @@ the manifest uses a range or when the package was not directly inspected.
 
 ## Testing
 
-E2E source files exist under `server/src/e2e/`, but no configured test runner
-script was verified. No ESLint configuration or lint script was found.
-See [`08-TESTING.md`](08-TESTING.md).
+E2E source files exist under `server/src/e2e/`, and the individual E2E, CRUD,
+payment, Admin browser, build, and mobile type-check commands are verified. No
+unified root test runner or ESLint configuration/lint script is configured.
+See [`08-TESTING.md`](08-TESTING.md) for the exact commands and latest results.

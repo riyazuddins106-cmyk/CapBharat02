@@ -60,7 +60,13 @@ Browser state → `lib/api.ts` → Express API → rendered customer state.
 
 ## Current Behavior
 
+Profile and account forms display the immutable username. Full name remains
+directly editable; email and phone changes require a target-specific OTP
+request and verification before saving.
+
 Customer Web supports catalog browsing and customer account/booking surfaces.
+Visible booking and order state refreshes every 10 seconds and on browser
+focus/visibility return.
 
 ## Known Issues
 

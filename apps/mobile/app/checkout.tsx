@@ -20,6 +20,13 @@ type BookingConfig = {
   closingHour: number;
   slotIntervalMinutes: number;
   is24Hours: boolean;
+  searchDurationMinutes: number;
+  cancellationFeeAfterAcceptancePercent: number;
+  cancellationFeeAfterAcceptanceMinAmount: number;
+  cancellationFeeAfterAcceptanceMaxAmount: number;
+  cancellationFeeAfterCheckinPercent: number;
+  cancellationFeeAfterCheckinMinAmount: number;
+  cancellationFeeAfterCheckinMaxAmount: number;
 };
 const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   minAdvanceMinutes: 30,
@@ -29,7 +36,45 @@ const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   closingHour: 20,
   slotIntervalMinutes: 30,
   is24Hours: false,
+  searchDurationMinutes: 10,
+  cancellationFeeAfterAcceptancePercent: 20,
+  cancellationFeeAfterAcceptanceMinAmount: 50,
+  cancellationFeeAfterAcceptanceMaxAmount: 500,
+  cancellationFeeAfterCheckinPercent: 20,
+  cancellationFeeAfterCheckinMinAmount: 50,
+  cancellationFeeAfterCheckinMaxAmount: 500,
 };
+
+function CancellationPolicyNotice({ bookingConfig, compact = false }: {
+  bookingConfig: BookingConfig;
+  compact?: boolean;
+}) {
+  return (
+    <View style={[styles.policyNotice, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+        <Ionicons name="shield-checkmark-outline" size={17} color="#B45309" style={{ marginTop: 1 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#78350F', fontSize: 12, fontWeight: '800' }}>Cancellation policy</Text>
+          {compact ? (
+            <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16, marginTop: 3 }}>
+              Free cancellation before a partner accepts. A cancellation fee may apply after acceptance or check-in.
+            </Text>
+          ) : (
+            <View style={{ marginTop: 3, gap: 2 }}>
+              <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16 }}>Free cancellation before a partner accepts.</Text>
+              <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16 }}>
+                After acceptance: {bookingConfig.cancellationFeeAfterAcceptancePercent}% · min ₹{bookingConfig.cancellationFeeAfterAcceptanceMinAmount} · max ₹{bookingConfig.cancellationFeeAfterAcceptanceMaxAmount}
+              </Text>
+              <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16 }}>
+                After check-in: {bookingConfig.cancellationFeeAfterCheckinPercent}% · min ₹{bookingConfig.cancellationFeeAfterCheckinMinAmount} · max ₹{bookingConfig.cancellationFeeAfterCheckinMaxAmount}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
 
 function buildScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
   const base = new Date();
@@ -58,6 +103,43 @@ function buildScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
   return base.toISOString();
 }
 
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
+}
+
+function formatBookingDateLabel(scheduledAt: string | undefined, fallback: string): string {
+  if (!scheduledAt) return fallback;
+  const date = new Date(scheduledAt);
+  if (Number.isNaN(date.getTime())) return fallback;
+
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (isSameCalendarDay(date, today)) return 'Today';
+  if (isSameCalendarDay(date, tomorrow)) return 'Tomorrow';
+  return date.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function formatBookingTimeLabel(
+  scheduledAt: string | undefined,
+  durationMinutes: number,
+  fallbackSlot: number,
+): string {
+  if (!scheduledAt) return getServiceWindowLabel(fallbackSlot, durationMinutes);
+  const date = new Date(scheduledAt);
+  if (Number.isNaN(date.getTime())) return getServiceWindowLabel(fallbackSlot, durationMinutes);
+  return getServiceWindowLabel(
+    date.getHours() * 60 + date.getMinutes(),
+    durationMinutes,
+  );
+}
+
 const STEP_TITLES = ['Your Cart', 'Select Address', 'Select Date', 'Select Time Slot', 'Booking Summary'];
 
 export default function CheckoutScreen() {
@@ -80,6 +162,7 @@ export default function CheckoutScreen() {
   const [selectedDate, setSelectedDate] = useState('Today');
   const [selectedSlot, setSelectedSlot] = useState<number>(9 * 60); // total minutes since midnight
   const [done, setDone] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
 
   // ── Fetch booking config (public, no auth) ────────────────────────────────
   const { data: bookingConfig = DEFAULT_BOOKING_CONFIG } = useQuery<BookingConfig>({
@@ -181,6 +264,7 @@ export default function CheckoutScreen() {
     onSuccess: (order: Order) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart', accessToken] });
       queryClient.invalidateQueries({ queryKey: ['/api/orders', accessToken] });
+      setCompletedOrder(order);
       setDone(true);
       setStep(5);
     },
@@ -190,6 +274,30 @@ export default function CheckoutScreen() {
   });
 
   const selectedAddress = addresses.find((a: Address) => a.id === selectedAddressId);
+  const completedDurationMinutes = useMemo(() => {
+    const durations = completedOrder?.items
+      ?.map((item) => item.durationMinutes)
+      .filter((duration): duration is number => Number.isFinite(duration) && duration > 0) ?? [];
+    return durations.length ? Math.max(...durations) : maxDurationMinutes;
+  }, [completedOrder, maxDurationMinutes]);
+  const completedDateLabel = formatBookingDateLabel(completedOrder?.scheduledAt, selectedDate);
+  const completedTimeLabel = formatBookingTimeLabel(
+    completedOrder?.scheduledAt,
+    completedDurationMinutes,
+    selectedSlot,
+  );
+  const completedServiceLabel = completedOrder?.items
+    ?.map((item) => `${item.serviceName ?? 'Service'}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`)
+    .join(', ');
+  const completedAddressLabel = selectedAddress
+    ? [
+        selectedAddress.line1,
+        selectedAddress.line2,
+        selectedAddress.city,
+        selectedAddress.state,
+        selectedAddress.postalCode,
+      ].filter(Boolean).join(', ')
+    : 'Not selected';
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
   if (!accessToken) {
@@ -475,6 +583,8 @@ export default function CheckoutScreen() {
               <Text style={[styles.totalValue, { color: colors.primary }]}>₹{cart.total.toLocaleString('en-IN')}</Text>
             </View>
 
+            <CancellationPolicyNotice bookingConfig={bookingConfig} />
+
             <TouchableOpacity
               onPress={() => checkoutMutation.mutate()}
               disabled={checkoutMutation.isPending}
@@ -497,18 +607,29 @@ export default function CheckoutScreen() {
             <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
               We're finding the best professional for your service.
             </Text>
+            <CancellationPolicyNotice bookingConfig={bookingConfig} compact />
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border, width: '100%' }]}>
               <Text style={[styles.summaryCardTitle, { color: colors.mutedForeground }]}>BOOKING DETAILS</Text>
+               {completedServiceLabel && (
+                 <>
+                   <Text style={[styles.infoLabel, { color: colors.mutedForeground, marginBottom: 2 }]}>Service</Text>
+                   <Text style={[styles.infoValue, { color: colors.foreground }]} numberOfLines={3}>
+                     {completedServiceLabel}
+                   </Text>
+                 </>
+               )}
               <Text style={[styles.infoLabel, { color: colors.mutedForeground, marginBottom: 2 }]}>Date · Time</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>{selectedDate} · {selectedSlot}</Text>
-              {selectedAddress && (
-                <>
-                  <Text style={[styles.infoLabel, { color: colors.mutedForeground, marginTop: 8, marginBottom: 2 }]}>Address</Text>
-                  <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                    {selectedAddress.line1}, {selectedAddress.city}
-                  </Text>
-                </>
-              )}
+               <Text style={[styles.infoValue, { color: colors.foreground }]}>
+                 {completedDateLabel} · {completedTimeLabel}
+               </Text>
+               <Text style={[styles.infoLabel, { color: colors.mutedForeground, marginTop: 8, marginBottom: 2 }]}>Duration</Text>
+               <Text style={[styles.infoValue, { color: colors.foreground }]}>
+                 {formatDuration(completedDurationMinutes)}
+               </Text>
+               <Text style={[styles.infoLabel, { color: colors.mutedForeground, marginTop: 8, marginBottom: 2 }]}>Address</Text>
+               <Text style={[styles.infoValue, { color: colors.foreground }]} numberOfLines={4}>
+                 {completedAddressLabel}
+               </Text>
               <Text style={[styles.infoLabel, { color: '#D97706', marginTop: 8 }]}>Status: Pending</Text>
             </View>
             <TouchableOpacity
@@ -546,6 +667,7 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderRadius: 14, padding: 14 },
   totalLabel: { fontSize: 15, fontWeight: '700' },
   totalValue: { fontSize: 20, fontWeight: '900' },
+  policyNotice: { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 12 },
   primaryBtn: { padding: 16, borderRadius: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   outlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, borderRadius: 14, borderWidth: 2, borderStyle: 'dashed' },

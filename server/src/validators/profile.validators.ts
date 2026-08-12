@@ -2,7 +2,17 @@ import { z } from 'zod';
 
 export const updateProfileSchema = z.object({
   fullName: z.string().trim().min(2).max(255).optional(),
-  phone: z.string().trim().min(7).max(20).optional(),
+}).strict();
+
+export const identityRequestSchema = z.object({
+  field: z.enum(['email', 'phone']),
+  value: z.string().trim().min(1),
+});
+
+export const identityVerifySchema = z.object({
+  field: z.enum(['email', 'phone']),
+  value: z.string().trim().min(1),
+  code: z.string().trim().min(4).max(6),
 });
 
 export const changePasswordSchema = z.object({
@@ -16,4 +26,7 @@ export const changePasswordSchema = z.object({
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type IdentityField = z.infer<typeof identityRequestSchema>['field'];
+export type IdentityRequestInput = z.infer<typeof identityRequestSchema>;
+export type IdentityVerifyInput = z.infer<typeof identityVerifySchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

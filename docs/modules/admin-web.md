@@ -61,11 +61,34 @@ Admin action → API route/role check → service/database → refreshed admin s
 
 ## Current Behavior
 
-The UI contains dashboard, management, dispatch, and operational surfaces.
+The UI contains dashboard, management, dispatch, booking history, and
+operational surfaces. Sidebar navigation is hash-addressable and supports
+browser back/forward. The Booking Operations Centre loads and refreshes its
+unified dispatch queue independently, polling while open. It combines legacy
+booking rows with itemized service-order jobs and labels their source. It
+supports matching booking/order detail views, eligible partner lookup,
+assignment, stop-searching, restart-dispatch, and source-appropriate
+cancellation controls for both models, plus shared filtering, sorting, column
+visibility, and export. Booking History provides server-side search,
+date/status filtering, detail, payment controls, pagination, export, and
+refresh.
+
+Account Settings displays immutable username and routes email/phone changes
+through OTP verification. Admin-managed customer and staff forms preserve
+contact editing through the role-protected identity request/verify endpoints.
+
+Booking Settings configures cancellation policy separately for partner
+acceptance and check-in. Each stage has a percentage rate plus minimum and
+maximum rupee fees. The API and customer clients apply the same bounded formula
+and cap the result at the service amount.
 
 ## Known Issues
 
-Exact page-by-page route inventory is `UNKNOWN — REQUIRES VERIFICATION`.
+The unified Operations Centre provides item-level assignment, stop-searching,
+restart-dispatch, and unpaid cancellation for service-order rows. Provider-backed
+refund remains on the Service Orders refund path. The Operations Centre is a
+unified operational queue, not a destructive database merge; both legacy and
+itemized models must remain distinguishable.
 
 ## Important Constraints
 

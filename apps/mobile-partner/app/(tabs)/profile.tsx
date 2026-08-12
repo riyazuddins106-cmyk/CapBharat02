@@ -51,7 +51,7 @@ export default function ProfileScreen() {
   const colors   = useColors();
   const insets   = useSafeAreaInsets();
   const router   = useRouter();
-  const { user, logout, accessToken } = useAuth();
+  const { user, logout, accessToken, updateUser } = useAuth();
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const [uploading, setUploading] = useState(false);
 
@@ -62,7 +62,12 @@ export default function ProfileScreen() {
 
   // Form state
   const [proForm,  setProForm]  = useState({ title: '', bio: '', basePrice: '', priceUnit: '/visit', tags: '', payoutUpiId: '' });
-  const [acctForm, setAcctForm] = useState({ fullName: '', phone: '' });
+  const [acctForm, setAcctForm] = useState({ username: '', email: '', phone: '', fullName: '' });
+  const [acctOtp, setAcctOtp] = useState('');
+  const [acctOtpTarget, setAcctOtpTarget] = useState('');
+  const [acctOtpField, setAcctOtpField] = useState<'email' | 'phone' | ''>('');
+  const [acctOtpDevCode, setAcctOtpDevCode] = useState('');
+  const [acctOtpStep, setAcctOtpStep] = useState(false);
   const [pwForm,   setPwForm]   = useState({ currentPw: '', newPw: '', confirmPw: '' });
 
   // Inline error / success messages per modal
@@ -185,21 +190,64 @@ export default function ProfileScreen() {
 
   // ── Account ───────────────────────────────────────────────────────────────
   const updateAcctMutation = useMutation({
-    mutationFn: () => partnerApi.updateAccount({
-      fullName: acctForm.fullName.trim() || undefined,
-      phone:    acctForm.phone.trim() || undefined,
-    }, accessToken!),
+    mutationFn: async () => {
+      const nextFullName = acctForm.fullName.trim();
+      if (nextFullName && nextFullName !== user?.fullName) {
+        await partnerApi.updateAccount({ fullName: nextFullName }, accessToken!);
+      }
+      const nextEmail = acctForm.email.trim();
+      const nextPhone = acctForm.phone.trim();
+      if (nextEmail && nextEmail !== user?.email) {
+        const requested = await partnerApi.requestIdentityChange('email', nextEmail, accessToken!);
+        setAcctOtpField('email');
+        setAcctOtpTarget(requested.target);
+        setAcctOtpDevCode(requested.devCode ?? '');
+        setAcctOtpStep(true);
+        return;
+      }
+      if (nextEmail !== user?.email) {
+        throw new Error('Email is required.');
+      }
+      if (nextPhone && nextPhone !== (user?.phone ?? '')) {
+        const requested = await partnerApi.requestIdentityChange('phone', nextPhone, accessToken!);
+        setAcctOtpField('phone');
+        setAcctOtpTarget(requested.target);
+        setAcctOtpDevCode(requested.devCode ?? '');
+        setAcctOtpStep(true);
+        return;
+      }
+      if (nextPhone !== (user?.phone ?? '')) {
+        throw new Error('Phone is required.');
+      }
+    },
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setAcctOk('Account details saved successfully!');
-      setTimeout(() => { setAcctModal(false); setAcctOk(''); }, 1200);
+      if (!acctOtpStep) {
+        setAcctOk('Account details saved successfully!');
+        setTimeout(() => { setAcctModal(false); setAcctOk(''); }, 1200);
+      }
     },
     onError: (e: any) => setAcctErr(e.message ?? 'Failed to save. Please try again.'),
+  });
+
+  const verifyAcctMutation = useMutation({
+    mutationFn: () => partnerApi.verifyIdentityChange(acctOtpField as 'email' | 'phone', acctOtpTarget, acctOtp, accessToken!),
+    onSuccess: (updatedUser) => {
+      updateUser(updatedUser);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setAcctOk('Verification successful!');
+      setAcctOtp('');
+      setAcctOtpStep(false);
+      setTimeout(() => { setAcctModal(false); setAcctOk(''); }, 1200);
+    },
+    onError: (e: any) => setAcctErr(e.message ?? 'Invalid OTP. Please try again.'),
   });
 
   const handleSaveAcct = () => {
     setAcctErr(''); setAcctOk('');
     if (!acctForm.fullName.trim()) { setAcctErr('Full name is required.'); return; }
+    if (!acctForm.phone.trim()) { setAcctErr('Phone is required.'); return; }
+    if (!acctForm.email.trim() && !acctOtpStep) { setAcctErr('Email is required.'); return; }
     updateAcctMutation.mutate();
   };
 
@@ -238,8 +286,9 @@ export default function ProfileScreen() {
   };
 
   const openEditAcct = () => {
-    setAcctForm({ fullName: user?.fullName ?? '', phone: user?.phone ?? '' });
+    setAcctForm({ username: user?.username ?? '', email: user?.email ?? '', phone: user?.phone ?? '', fullName: user?.fullName ?? '' });
     setAcctErr(''); setAcctOk('');
+    setAcctOtp(''); setAcctOtpStep(false); setAcctOtpField(''); setAcctOtpTarget(''); setAcctOtpDevCode('');
     setAcctModal(true);
   };
 
@@ -525,6 +574,20 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
+            <FormField label="Username" colors={colors}>
+              <TextInput value={acctForm.username} editable={false} selectTextOnFocus={false}
+                placeholderTextColor={colors.mutedForeground}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.mutedForeground, borderRadius: colors.radius, opacity: 0.8 }]}
+              />
+            </FormField>
+
+            <FormField label="Email" colors={colors}>
+              <TextInput value={acctForm.email} editable={false} selectTextOnFocus={false}
+                placeholderTextColor={colors.mutedForeground}
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.mutedForeground, borderRadius: colors.radius, opacity: 0.8 }]}
+              />
+            </FormField>
+
             <FormField label="Full Name *" colors={colors}>
               <TextInput
                 value={acctForm.fullName}
@@ -546,13 +609,36 @@ export default function ProfileScreen() {
               />
             </FormField>
 
+            {acctOtpStep && (
+              <View style={{ marginTop: 12 }}>
+                <FormField label={`OTP for ${acctOtpField.toUpperCase()}`} colors={colors}>
+                  <TextInput
+                    value={acctOtp}
+                    onChangeText={(v) => { setAcctOtp(v); setAcctErr(''); }}
+                    placeholder="123456"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="number-pad"
+                    style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius }]}
+                  />
+                </FormField>
+                {!!acctOtpDevCode && <Text style={styles.successText}>Dev code: {acctOtpDevCode}</Text>}
+                <TouchableOpacity
+                  onPress={() => verifyAcctMutation.mutate()}
+                  disabled={verifyAcctMutation.isPending}
+                  style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: verifyAcctMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
+                >
+                  <Text style={styles.saveBtnText}>{verifyAcctMutation.isPending ? 'Verifying…' : 'Verify OTP'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {!!acctErr && <Text style={styles.errorText}>{acctErr}</Text>}
             {!!acctOk  && <Text style={styles.successText}>{acctOk}</Text>}
 
             <TouchableOpacity
               onPress={handleSaveAcct}
-              disabled={updateAcctMutation.isPending}
-              style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: updateAcctMutation.isPending ? 0.7 : 1, marginTop: 8 }]}
+              disabled={updateAcctMutation.isPending || verifyAcctMutation.isPending}
+              style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: (updateAcctMutation.isPending || verifyAcctMutation.isPending) ? 0.7 : 1, marginTop: 8 }]}
             >
               <Text style={styles.saveBtnText}>{updateAcctMutation.isPending ? 'Saving…' : 'Save Changes'}</Text>
             </TouchableOpacity>

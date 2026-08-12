@@ -22,6 +22,8 @@ const adminOnly = requireRole('admin');
 // Dashboard stats
 router.get('/stats', adminController.getStats);
 router.patch('/me', adminController.updateOwnAdminProfile);
+router.post('/me/identity/request', adminController.requestOwnIdentityChange);
+router.post('/me/identity/verify', adminController.verifyOwnIdentityChange);
 
 // Analytics timeseries
 router.get('/analytics/timeseries', adminController.getAnalyticsTimeseries);
@@ -31,7 +33,11 @@ router.get('/bookings',                        adminController.listBookings);
 router.get('/bookings/:id',                    adminController.getBooking);
 router.get('/orders',                          adminController.listOrders);
 router.get('/orders/:orderId',                 adminController.getOrder);
+router.get('/orders/:orderId/items/:itemId/eligible-partners', adminController.getOrderItemEligiblePartners);
 router.patch('/orders/:orderId/items/:itemId/dispatch', adminController.continueOrderItemDispatch);
+router.patch('/orders/:orderId/items/:itemId/assign', adminController.assignOrderItemPartner);
+router.patch('/orders/:orderId/items/:itemId/stop-searching', adminController.stopOrderItemSearching);
+router.patch('/orders/:orderId/items/:itemId/cancel', adminController.cancelOrderItem);
 router.patch('/orders/:orderId/items/:itemId/refund',   adminController.refundOrderItem);
 router.patch('/bookings/:id',                  adminController.updateBooking);
 router.patch('/bookings/:id/cancel',           adminController.cancelBooking);
@@ -54,9 +60,13 @@ router.post('/professionals/:id/avatar',        adminOnly, upload.single('avatar
 router.get('/admins',                  adminOnly, adminController.listAdmins);
 router.post('/admins',                 adminOnly, adminController.createAdmin);
 router.patch('/admins/:id',             adminOnly, adminController.updateAdmin);
+router.post('/admins/:id/identity/request', adminOnly, adminController.requestAdminIdentityChange);
+router.post('/admins/:id/identity/verify', adminOnly, adminController.verifyAdminIdentityChange);
 router.get('/users',                  adminController.listUsers);
 router.get('/users/:id/detail',        adminController.getCustomerDetail);
 router.patch('/users/:id',            adminController.updateUser);
+router.post('/users/:id/identity/request', adminController.requestUserIdentityChange);
+router.post('/users/:id/identity/verify', adminController.verifyUserIdentityChange);
 router.delete('/users/:id',           adminOnly, adminController.deleteUser);
 router.patch('/users/:id/suspend',             adminController.suspendUser);
 router.patch('/users/:id/activate',            adminController.activateUser);

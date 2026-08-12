@@ -254,7 +254,23 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresInSeconds, setOtpExpiresInSeconds] = useState(600);
+  const [devCode, setDevCode] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
+
+  function applyOtpTiming(result?: { devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }) {
+    setDevCode(result?.devCode ?? "");
+    setOtpExpiresInSeconds(result?.expiresInSeconds ?? 600);
+    setResendCooldown(result?.resendAfterSeconds ?? 60);
+  }
   async function handleLogin() {
     setError(""); setLoading(true);
     try {
@@ -269,6 +285,7 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
     setError(""); setLoading(true);
     try {
       const res = await authApi.register(fullName, email, password, phone || undefined);
+      applyOtpTiming(res);
       setOtpPurpose("signup");
       setScreen("verify-otp");
     } catch (e: any) {
@@ -295,11 +312,24 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
     try {
       const res = await authApi.forgotPassword(email);
       setOtpPurpose("password_reset");
+      applyOtpTiming(res);
       setSuccess("Reset code sent.");
       setScreen("verify-otp");
     } catch (e: any) {
       setError(e?.response?.data?.error?.message ?? "Failed to send reset code.");
     } finally { setLoading(false); }
+  }
+
+  async function handleResendOtp() {
+    if (resendCooldown > 0 || resendLoading) return;
+    setError(""); setResendLoading(true);
+    try {
+      const res = await authApi.resendOtp(email, otpPurpose);
+      applyOtpTiming(res);
+      setSuccess(tx("Code resent — check your email."));
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? "Could not resend code.");
+    } finally { setResendLoading(false); }
   }
 
   async function handleReset() {
@@ -358,14 +388,16 @@ function LoginScreen({ onLogin }: LoginScreenProps) {
           <p className="text-gray-400 text-xs mb-5">{tx("Enter the 6-digit code sent to")} <span className="font-bold text-gray-600">{email}</span></p>
           {success && <p className="text-green-600 text-xs mb-3">{success}</p>}
           <AuthInput placeholder={tx("Enter 6-digit OTP")} value={otp} onChange={setOtp} />
+           <p className="text-gray-400 text-[11px] mt-2 text-center">
+             {tx("Code expires in")} {Math.ceil(otpExpiresInSeconds / 60)} {tx("minutes")}.
+           </p>
+           {devCode && <p className="text-gray-500 text-[11px] mt-1 text-center">{tx("Development code")}: <strong>{devCode}</strong></p>}
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
           <div className="mt-5"><AuthBtn label={tx("Verify OTP")} onClick={handleVerifyOtp} loading={loading} /></div>
-          <button onClick={async () => {
-            setError("");
-            await authApi.resendOtp(email, otpPurpose);
-            setSuccess(tx("Code resent!"));
-          }} className="text-xs font-semibold mt-4 text-center w-full text-gray-400">
-            {tx("Didn't receive it?")} <span style={{ color: "#5B3EF5" }}>{tx("Resend code")}</span>
+           <button onClick={handleResendOtp} disabled={resendCooldown > 0 || resendLoading} className="text-xs font-semibold mt-4 text-center w-full text-gray-400 disabled:opacity-50">
+             {tx("Didn't receive it?")} <span style={{ color: "#5B3EF5" }}>
+               {resendLoading ? tx("Sending…") : resendCooldown > 0 ? `${tx("Resend code in")} ${resendCooldown}s` : tx("Resend code")}
+             </span>
           </button>
         </>}
 
@@ -1081,19 +1113,59 @@ function ProfileEditModal({ user, onSave, onClose }: {
 }) {
   const tx = usePhraseTranslator();
   const [fullName, setFullName] = useState(user.fullName);
+  const [username] = useState(user.username ?? "");
+  const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [otpField, setOtpField] = useState<"email" | "phone" | null>(null);
+  const [otpTarget, setOtpTarget] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpDevCode, setOtpDevCode] = useState("");
 
   async function handleSave() {
     if (!fullName.trim()) { setError(tx("Name is required.")); return; }
+    const emailChanged = email.trim().toLowerCase() !== user.email;
+    const phoneChanged = phone.trim() !== (user.phone ?? "");
+    if (emailChanged && phoneChanged) {
+      setError(tx("Verify one contact change at a time."));
+      return;
+    }
     setSaving(true);
     try {
-      const updated = await profileApi.update({ fullName: fullName.trim(), phone: phone.trim() || undefined });
+      let updated = user;
+      if (fullName.trim() !== user.fullName) {
+        updated = await profileApi.update({ fullName: fullName.trim() });
+      }
+      if (emailChanged || phoneChanged) {
+        const field = emailChanged ? "email" : "phone";
+        const value = emailChanged ? email : phone;
+        const requested = await profileApi.requestIdentityChange(field, value);
+        setOtpField(field);
+        setOtpTarget(requested.target);
+        setOtpDevCode(requested.devCode ?? "");
+        setOtpCode("");
+        setError(tx("Enter the verification code to finish saving this change."));
+        onSave(updated);
+        return;
+      }
       onSave(updated);
     } catch (e: any) {
       setError(e?.response?.data?.error?.message ?? tx("Update failed."));
     } finally { setSaving(false); }
+  }
+
+  async function verifyContact() {
+    if (!otpField || !otpCode.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await profileApi.verifyIdentityChange(otpField, otpTarget, otpCode.trim());
+      onSave(updated);
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? tx("Verification failed."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -1111,13 +1183,30 @@ function ProfileEditModal({ user, onSave, onClose }: {
             <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={tx("Your full name")} />
           </div>
           <div>
+            <p className="text-xs font-bold text-gray-500 mb-1.5">{tx("Username")}</p>
+            <div className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-400">{username}</div>
+          </div>
+          <div>
             <p className="text-xs font-bold text-gray-500 mb-1.5">{tx("Phone")}</p>
             <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" type="tel" />
           </div>
           <div>
             <p className="text-xs font-bold text-gray-500 mb-1.5">{tx("Email")}</p>
-            <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-400">{user.email}</div>
+            <input className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" type="email" />
           </div>
+          <p className="text-xs text-gray-500">{tx("A changed email or phone is saved only after OTP verification.")}</p>
+          {otpField && (
+            <div className="rounded-xl border border-purple-100 bg-purple-50 p-3 flex flex-col gap-2">
+              <p className="text-xs font-semibold text-purple-800">
+                {tx(`Verify your new ${otpField === "email" ? "email address" : "phone number"}`)}
+              </p>
+              {otpDevCode && <p className="text-xs text-amber-700">{tx("Dev OTP")}: <strong>{otpDevCode}</strong></p>}
+              <input className="w-full bg-white rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-300" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder={tx("Enter OTP")} inputMode="numeric" />
+              <button onClick={verifyContact} disabled={saving || !otpCode.trim()} className="w-full py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
+                {saving ? tx("Verifying…") : tx("Verify and Save")}
+              </button>
+            </div>
+          )}
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <button onClick={handleSave} disabled={saving} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}>
             {saving ? tx("Saving…") : tx("Save Changes")}
@@ -1681,6 +1770,12 @@ type CheckoutBookingConfig = {
   closingHour: number;
   slotIntervalMinutes: number;
   is24Hours: boolean;
+  cancellationFeeAfterAcceptancePercent: number;
+  cancellationFeeAfterAcceptanceMinAmount: number;
+  cancellationFeeAfterAcceptanceMaxAmount: number;
+  cancellationFeeAfterCheckinPercent: number;
+  cancellationFeeAfterCheckinMinAmount: number;
+  cancellationFeeAfterCheckinMaxAmount: number;
 };
 const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = {
   minAdvanceMinutes: 30,
@@ -1689,7 +1784,58 @@ const DEFAULT_CHECKOUT_CFG: CheckoutBookingConfig = {
   closingHour: 20,
   slotIntervalMinutes: 30,
   is24Hours: false,
+  cancellationFeeAfterAcceptancePercent: 20,
+  cancellationFeeAfterAcceptanceMinAmount: 50,
+  cancellationFeeAfterAcceptanceMaxAmount: 500,
+  cancellationFeeAfterCheckinPercent: 20,
+  cancellationFeeAfterCheckinMinAmount: 50,
+  cancellationFeeAfterCheckinMaxAmount: 500,
 };
+
+type CancellationPolicyConfig = Pick<
+  CheckoutBookingConfig,
+  "cancellationFeeAfterAcceptancePercent"
+  | "cancellationFeeAfterAcceptanceMinAmount"
+  | "cancellationFeeAfterAcceptanceMaxAmount"
+  | "cancellationFeeAfterCheckinPercent"
+  | "cancellationFeeAfterCheckinMinAmount"
+  | "cancellationFeeAfterCheckinMaxAmount"
+>;
+
+function CancellationPolicyNotice({ bookingConfig, compact = false }: {
+  bookingConfig: CancellationPolicyConfig;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`rounded-2xl border border-amber-200 bg-amber-50 ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`}>
+      <div className="flex items-start gap-2.5">
+        <Shield size={16} color="#B45309" className="mt-0.5 flex-shrink-0" />
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-amber-900">Cancellation policy</p>
+          {compact ? (
+            <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+              Free cancellation before a partner accepts. A cancellation fee may apply after acceptance or check-in.
+            </p>
+          ) : (
+            <div className="text-[11px] text-amber-800 mt-1 leading-relaxed space-y-0.5">
+              <p>Free cancellation before a partner accepts.</p>
+              <p>
+                After acceptance: {bookingConfig.cancellationFeeAfterAcceptancePercent}%,
+                minimum ₹{bookingConfig.cancellationFeeAfterAcceptanceMinAmount},
+                maximum ₹{bookingConfig.cancellationFeeAfterAcceptanceMaxAmount}.
+              </p>
+              <p>
+                After check-in: {bookingConfig.cancellationFeeAfterCheckinPercent}%,
+                minimum ₹{bookingConfig.cancellationFeeAfterCheckinMinAmount},
+                maximum ₹{bookingConfig.cancellationFeeAfterCheckinMaxAmount}.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function buildSlotScheduledAt(dateLabel: string, slotTotalMinutes: number): string {
   const base = new Date();
@@ -2159,6 +2305,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
                   </span>
                 </div>
               </div>
+               <CancellationPolicyNotice bookingConfig={bookingCfg} />
               {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
               <button
                 onClick={handleConfirm}
@@ -2184,6 +2331,7 @@ function CheckoutFlow({ cart, onClose, onChange, onPaymentComplete }: {
               <p className="text-xs text-gray-500 text-center mb-4">
                 {tx("Your booking is placed. We're finding the best available service provider near you.")}
               </p>
+               <CancellationPolicyNotice bookingConfig={bookingCfg} compact />
 
               {/* Status timeline */}
               <div className="w-full bg-gray-50 rounded-2xl p-4 mb-4 text-left">
@@ -2473,9 +2621,27 @@ function PaymentModal({ booking, onClose, onPaid }: {
   );
 }
 
-function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
+function calculateCancellationFee(
+  rateValue: unknown,
+  minValue: unknown,
+  maxValue: unknown,
+  applicableAmount: number,
+  fallbackRate: number,
+) {
+  const rate = Number(rateValue);
+  const configuredMin = Number(minValue);
+  const configuredMax = Number(maxValue);
+  const min = Number.isFinite(configuredMin) ? Math.max(0, Math.round(configuredMin)) : 0;
+  const max = Number.isFinite(configuredMax) ? Math.max(min, Math.round(configuredMax)) : Number.MAX_SAFE_INTEGER;
+  const percentage = Number.isFinite(rate) ? Math.max(0, Math.min(100, rate)) : fallbackRate;
+  const calculated = Math.round(Math.max(0, Number(applicableAmount) || 0) * percentage / 100);
+  return Math.max(min, Math.min(max, calculated));
+}
+
+function CustBookings({ bookings, orders, bookingConfig, onCancel, onRefresh, onRebook }: {
   bookings: ApiBooking[];
   orders: ApiOrder[];
+  bookingConfig: Pick<CheckoutBookingConfig, "cancellationFeeAfterAcceptancePercent" | "cancellationFeeAfterAcceptanceMinAmount" | "cancellationFeeAfterAcceptanceMaxAmount" | "cancellationFeeAfterCheckinPercent" | "cancellationFeeAfterCheckinMinAmount" | "cancellationFeeAfterCheckinMaxAmount">;
   onCancel: (id: string) => void;
   onRefresh: () => void;
   onRebook: (categoryId: string) => void;
@@ -2491,9 +2657,17 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
   const [reviewErr, setReviewErr] = useState("");
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [orderAction, setOrderAction] = useState<string | null>(null);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [payItemTarget, setPayItemTarget] = useState<{ orderId: string; item: ApiOrder["items"][number] } | null>(null);
   const [qrTarget, setQrTarget] = useState<{ orderId: string; itemId: string; token: string } | null>(null);
   const [qrLoading, setQrLoading] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ orderId: string; itemId: string; status: string; fee: number } | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const searchingBookings = bookings.filter((b) => b.status === "pending");
   const upcomingBookings  = bookings.filter((b) => ["upcoming", "in_progress"].includes(b.status));
@@ -2510,6 +2684,18 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
     }
   }
 
+  async function handleLegacyContinue(id: string) {
+    setOrderAction(`legacy:${id}`);
+    try {
+      await bookingsApi.continueSearching(id);
+      onRefresh();
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message ?? e?.message ?? "Could not continue searching.");
+    } finally {
+      setOrderAction(null);
+    }
+  }
+
   async function handleItemQr(orderId: string, itemId: string) {
     setQrLoading(itemId);
     try {
@@ -2522,15 +2708,9 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
     }
   }
 
-  async function handleItemCancel(orderId: string, itemId: string, status: string) {
-    const reason = window.prompt(
-      status === "partner_accepted"
-        ? "Optional cancellation reason (a 25% fee may apply):"
-        : ["partner_arrived", "payment_pending", "payment_completed"].includes(status)
-          ? "Optional cancellation reason (a 50% fee may apply):"
-          : "Optional cancellation reason:",
-    ) ?? undefined;
-    await handleOrderAction("cancel", orderId, itemId, reason);
+  function handleItemCancel(orderId: string, itemId: string, status: string, cancellationFee: number) {
+    setCancelReason("");
+    setCancelTarget({ orderId, itemId, status, fee: cancellationFee });
   }
 
   async function handleReviewSubmit() {
@@ -2544,11 +2724,11 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
     finally { setReviewLoading(false); }
   }
 
-  async function handleOrderAction(action: "cancel" | "continue" | "pay", orderId: string, itemId: string) {
+  async function handleOrderAction(action: "cancel" | "continue" | "pay", orderId: string, itemId: string, reason?: string) {
     const key = `${action}:${itemId}`;
     setOrderAction(key);
     try {
-      if (action === "cancel") await ordersApi.cancelItem(orderId, itemId);
+      if (action === "cancel") await ordersApi.cancelItem(orderId, itemId, reason);
       if (action === "continue") await ordersApi.continueSearching(orderId, itemId);
       if (action === "pay") {
         const order = orders.find((candidate) => candidate.id === orderId);
@@ -2607,7 +2787,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
         <div className="px-5 mt-4 flex flex-col gap-3">
           {orders
              .filter((order) => tab === "searching"
-               ? order.items.some((item) => ["searching_partner", "assigned"].includes(item.status))
+               ? order.items.some((item) => ["searching_partner", "waiting_operation", "assigned"].includes(item.status))
                : tab === "upcoming"
                  ? order.items.some((item) => ["partner_accepted", "partner_arrived", "payment_pending", "payment_completed", "service_started"].includes(item.status))
                  : order.items.some((item) => ["service_completed", "cancelled"].includes(item.status)))
@@ -2625,15 +2805,39 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                 <div className="flex flex-col gap-2">
                   {order.items.map((item) => {
                     const canCancel = !["cancelled", "service_started", "service_completed"].includes(item.status);
-                    const canContinue = !item.partnerId && item.status !== "cancelled";
+                    const fallbackSearchDeadline = item.updatedAt || item.createdAt;
+                    const searchDeadline = item.dispatchDeadline
+                      || (fallbackSearchDeadline ? new Date(new Date(fallbackSearchDeadline).getTime() + 10 * 60_000).toISOString() : null);
+                    const searchSecondsRemaining = searchDeadline
+                      ? Math.max(0, Math.ceil((new Date(searchDeadline).getTime() - clockNow) / 1000))
+                      : null;
+                    const searchExpired = item.status === "waiting_operation"
+                      || (item.status === "searching_partner" && searchSecondsRemaining !== null && searchSecondsRemaining <= 0);
+                    const activelySearching = item.status === "searching_partner" && !searchExpired;
+                    const canContinue = !item.partnerId && searchExpired && item.status !== "cancelled";
                     const needsPayment = ["partner_arrived", "payment_pending"].includes(item.status)
                       && item.payment?.status !== "paid";
                     const cashReported = item.payment?.method === "cash"
                       && !!item.payment.cashReportedAt
                       && item.payment.status !== "paid";
                     const canShowQr = ["partner_accepted", "partner_arrived", "payment_pending", "payment_completed", "service_started"].includes(item.status);
-                    const cancellationFeeRate = item.status === "partner_accepted" ? 25
-                      : ["partner_arrived", "payment_pending", "payment_completed"].includes(item.status) ? 50 : 0;
+                     const cancellationFeeAmount = item.status === "partner_accepted"
+                       ? calculateCancellationFee(
+                         bookingConfig.cancellationFeeAfterAcceptancePercent,
+                         bookingConfig.cancellationFeeAfterAcceptanceMinAmount,
+                         bookingConfig.cancellationFeeAfterAcceptanceMaxAmount,
+                         item.customerPrice,
+                         20,
+                       )
+                       : ["partner_arrived", "payment_pending", "payment_completed"].includes(item.status)
+                         ? calculateCancellationFee(
+                           bookingConfig.cancellationFeeAfterCheckinPercent,
+                           bookingConfig.cancellationFeeAfterCheckinMinAmount,
+                           bookingConfig.cancellationFeeAfterCheckinMaxAmount,
+                           item.customerPrice,
+                           20,
+                         )
+                         : 0;
                     return (
                       <div key={item.id} className="rounded-xl bg-white border border-black/[0.06] p-3">
                         <div className="flex items-start justify-between gap-3">
@@ -2647,14 +2851,23 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                             </p>
                           </div>
                           <span className="text-[10px] font-bold rounded-full px-2 py-1 bg-gray-100 text-gray-600 whitespace-nowrap">
-                            {tx(item.status.replaceAll("_", " "))}
+                            {tx(activelySearching ? "Searching" : searchExpired ? "Search paused" : item.status.replaceAll("_", " "))}
                           </span>
                         </div>
-                        {cancellationFeeRate > 0 && canCancel && (
+                        {activelySearching && (
+                          <p className="text-[11px] font-semibold text-violet-700 bg-violet-50 rounded-lg px-3 py-2 mt-3">
+                            Searching for a partner · {Math.floor((searchSecondsRemaining ?? 0) / 60)}:{String((searchSecondsRemaining ?? 0) % 60).padStart(2, "0")} remaining
+                          </p>
+                        )}
+                        {searchExpired && !item.partnerId && (
+                          <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-3">
+                            Search paused. Continue searching when you’re ready.
+                          </p>
+                        )}
+                        {cancellationFeeAmount > 0 && canCancel && (
                           <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-3">
-                            {tx("Cancelling now may incur a {rate}% fee (approximately ₹{amount}).")
-                              .replace("{rate}", String(cancellationFeeRate))
-                              .replace("{amount}", String(Math.round(item.customerPrice * cancellationFeeRate / 100)))}
+                            {tx("Cancelling now may incur a cancellation fee of ₹{amount}.")
+                              .replace("{amount}", String(Math.min(item.customerPrice, cancellationFeeAmount)))}
                           </p>
                         )}
                         <div className="flex gap-2 mt-3">
@@ -2692,7 +2905,7 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
                           )}
                           {canCancel && (
                             <button
-                              onClick={() => handleItemCancel(order.id, item.id, item.status)}
+                                onClick={() => handleItemCancel(order.id, item.id, item.status, Math.min(item.customerPrice, cancellationFeeAmount))}
                               disabled={orderAction === `cancel:${item.id}`}
                               className="flex-1 py-2 rounded-lg text-[11px] font-bold border border-red-200 text-red-500 disabled:opacity-50"
                             >
@@ -2712,23 +2925,53 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
       <div className="px-5 mt-4 flex flex-col gap-4">
         {filtered.map((b) => {
           const sc = statusColors(b.status);
+          const legacySearchDeadline = b.dispatchDeadline
+            || (b.createdAt ? new Date(new Date(b.createdAt).getTime() + 10 * 60_000).toISOString() : null);
+          const legacySearchSeconds = legacySearchDeadline
+            ? Math.max(0, Math.ceil((new Date(legacySearchDeadline).getTime() - clockNow) / 1000))
+            : null;
+          const legacySearchExpired = b.status === "pending"
+            && (b.dispatchStatus === "waiting_operation" || legacySearchSeconds === 0);
+          const legacyActivelySearching = b.status === "pending" && !legacySearchExpired;
           return (
             <div key={b.id} className="bg-white rounded-2xl border border-black/[0.08] p-4 shadow-sm">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h4 className="text-sm font-bold">{b.serviceName}</h4>
-                  {b.status === "pending" ? (
-                    <p className="text-xs mt-0.5 italic font-medium" style={{ color: "#7C3AED" }}>Matching a service provider…</p>
+                  {legacyActivelySearching ? (
+                    <p className="text-xs mt-0.5 italic font-medium" style={{ color: "#7C3AED" }}>Searching for a professional…</p>
+                  ) : legacySearchExpired ? (
+                    <p className="text-xs mt-0.5 italic font-medium" style={{ color: "#92400E" }}>Search paused</p>
                   ) : (
                     <p className="text-xs text-gray-400 mt-0.5">{b.proName}</p>
                   )}
                 </div>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: sc.bg, color: sc.color }}>{statusLabel(b.status)}</span>
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: legacyActivelySearching ? "#EDE9FE" : legacySearchExpired ? "#FEF3C7" : sc.bg, color: legacyActivelySearching ? "#7C3AED" : legacySearchExpired ? "#92400E" : sc.color }}>
+                  {legacyActivelySearching ? "Searching" : legacySearchExpired ? "Search paused" : statusLabel(b.status)}
+                </span>
               </div>
+              {legacyActivelySearching && legacySearchSeconds !== null && (
+                <p className="text-[11px] font-semibold text-violet-700 bg-violet-50 rounded-lg px-3 py-2 mb-3">
+                  Searching for a professional · {Math.floor(legacySearchSeconds / 60)}:{String(legacySearchSeconds % 60).padStart(2, "0")} remaining
+                </p>
+              )}
+              {legacySearchExpired && (
+                <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mb-3">
+                  Search paused. Continue searching when you’re ready.
+                </p>
+              )}
               <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1"><Calendar size={13} /><span>{formatScheduledAt(b.scheduledAt)}</span></div>
               <div className="text-xs font-semibold text-gray-600 mb-3">₹{b.price}</div>
               {b.notes && <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 mb-3">{b.notes}</p>}
               <div className="flex gap-2">
+                {legacySearchExpired && (
+                  <button
+                    onClick={() => handleLegacyContinue(b.id)}
+                    disabled={orderAction === `legacy:${b.id}`}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold border border-violet-200 text-violet-600 disabled:opacity-50">
+                    {orderAction === `legacy:${b.id}` ? "Searching…" : "Continue Searching"}
+                  </button>
+                )}
                 {["pending", "upcoming"].includes(b.status) && (
                   <button
                     onClick={() => handleCancel(b.id)}
@@ -2816,6 +3059,46 @@ function CustBookings({ bookings, orders, onCancel, onRefresh, onRebook }: {
         onClose={() => setPayBooking(null)}
         onPaid={() => { setPayBooking(null); onRefresh(); }}
       />
+    )}
+
+    {cancelTarget && (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4" onClick={() => setCancelTarget(null)}>
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-base font-bold">Cancel this service?</h3>
+            <button onClick={() => setCancelTarget(null)} className="text-gray-400"><X size={18} /></button>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed mb-4">
+            {cancelTarget.fee > 0
+              ? `The partner has ${cancelTarget.status === "partner_accepted" ? "accepted this service" : "checked in"}. An estimated cancellation fee of ₹${cancelTarget.fee} may apply.`
+              : "There is no cancellation fee before a partner accepts this service."}
+          </p>
+          <textarea
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+            placeholder="Cancellation reason (optional)"
+            rows={3}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm resize-none outline-none focus:border-violet-400 mb-3"
+          />
+          <div className="flex gap-2">
+            <button onClick={() => setCancelTarget(null)} className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600">
+              Keep service
+            </button>
+            <button
+              onClick={() => {
+                const target = cancelTarget;
+                setCancelTarget(null);
+                void handleOrderAction("cancel", target.orderId, target.itemId, cancelReason);
+                setCancelReason("");
+              }}
+              disabled={orderAction === `cancel:${cancelTarget.itemId}`}
+              className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {orderAction === `cancel:${cancelTarget.itemId}` ? "Cancelling…" : "Cancel service"}
+            </button>
+          </div>
+        </div>
+      </div>
     )}
 
     {/* Review Modal */}
@@ -2961,6 +3244,11 @@ function OrderItemPaymentModal({ orderId, item, onClose, onPaid }: {
                 </button>
               ))}
             </div>
+            {config && !config.methods.includes("upi_manual") && (
+              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                {tx("UPI is not configured. Choose another payment method or ask Admin to add a UPI ID.")}
+              </p>
+            )}
             {selected === "upi_manual" && <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={tx("Optional UPI reference")} className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />}
             <button onClick={pay} disabled={busy || !config} className="mt-4 w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white disabled:opacity-50">{busy ? tx("Processing…") : `${tx("Pay")} ₹${item.customerPrice}`}</button>
           </>
@@ -3464,9 +3752,20 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
 
   // Profile update
   const [fullName, setFullName] = useState(user.fullName ?? "");
+  const [username, setUsername] = useState(user.username ?? "");
+  const [email, setEmail] = useState(user.email ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [identityFlow, setIdentityFlow] = useState<{
+    field: "email" | "phone" | null;
+    target: string;
+    devCode?: string;
+    code: string;
+    loading: boolean;
+    step: "idle" | "requested" | "verifying";
+    msg: string | null;
+  }>({ field: null, target: "", code: "", loading: false, step: "idle", msg: null });
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState("");
@@ -3479,11 +3778,45 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
     if (!fullName.trim()) { setProfileMsg({ text: "Full name is required.", ok: false }); return; }
     setProfileLoading(true); setProfileMsg(null);
     try {
-      const updated = await profileApi.update({ fullName: fullName.trim(), ...(phone.trim() ? { phone: phone.trim() } : {}) });
+      const updated = await profileApi.update({ fullName: fullName.trim() });
       onUserUpdate(updated);
       setProfileMsg({ text: "Profile updated successfully.", ok: true });
     } catch (e: any) { setProfileMsg({ text: e.message ?? "Update failed.", ok: false }); }
     finally { setProfileLoading(false); }
+  }
+
+  async function startIdentityChange(field: "email" | "phone", value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setIdentityFlow({ field: null, target: "", code: "", loading: false, step: "idle", msg: `${field === "email" ? "Email" : "Phone"} is required.` });
+      return;
+    }
+    setIdentityFlow({ field, target: trimmed, code: "", loading: true, step: "idle", msg: null });
+    try {
+      const res = await profileApi.requestIdentityChange(field, trimmed);
+      setIdentityFlow({ field, target: trimmed, devCode: res.devCode, code: "", loading: false, step: "requested", msg: res.devCode ? `OTP requested. Dev code: ${res.devCode}` : "OTP requested. Enter the code sent to your contact." });
+    } catch (e: any) {
+      setIdentityFlow({ field: null, target: "", code: "", loading: false, step: "idle", msg: e.message ?? "Failed to request verification." });
+    }
+  }
+
+  async function verifyIdentityChange() {
+    if (!identityFlow.field) return;
+    if (!identityFlow.code.trim()) {
+      setIdentityFlow((s) => ({ ...s, msg: "Enter the OTP to continue." }));
+      return;
+    }
+    setIdentityFlow((s) => ({ ...s, loading: true, step: "verifying", msg: null }));
+    try {
+      const updated = await profileApi.verifyIdentityChange(identityFlow.field, identityFlow.target, identityFlow.code.trim());
+      onUserUpdate(updated);
+      setEmail(updated.email);
+      setPhone(updated.phone ?? "");
+      setIdentityFlow({ field: null, target: "", code: "", loading: false, step: "idle", msg: null });
+      setProfileMsg({ text: `${identityFlow.field === "email" ? "Email" : "Phone"} updated successfully.`, ok: true });
+    } catch (e: any) {
+      setIdentityFlow((s) => ({ ...s, loading: false, step: "requested", msg: e.message ?? "Verification failed." }));
+    }
   }
 
   async function handlePasswordChange() {
@@ -3529,15 +3862,75 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
           </div>
           <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Username")}</label>
+            <input value={username} readOnly
+              className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-400 cursor-not-allowed" />
+          </div>
+          <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Phone (optional)")}</label>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel"
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
+            <p className="text-[11px] text-gray-400 mt-1">Verification is required before this contact value is saved.</p>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">{tx("Email")}</label>
-            <input value={user.email} readOnly
-              className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-400 cursor-not-allowed" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" />
+            <p className="text-[11px] text-gray-400 mt-1">Verification is required before this login value is saved.</p>
           </div>
+          {(email.trim() !== user.email || phone.trim() !== (user.phone ?? "")) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Only one contact change can be verified at a time. Submit the changed email or phone to start OTP verification.
+            </div>
+          )}
+          {identityFlow.msg && (
+            <p className={`text-xs font-medium ${identityFlow.field ? "text-amber-700" : "text-red-500"}`}>{identityFlow.msg}</p>
+          )}
+          {identityFlow.field && (
+            <div className="rounded-xl border border-gray-200 bg-white p-3 flex flex-col gap-3">
+              <div className="text-xs font-semibold text-gray-600">
+                {identityFlow.step === "requested"
+                  ? `Verify ${identityFlow.field === "email" ? "email" : "phone"}`
+                  : "Request verification"}
+              </div>
+              {identityFlow.devCode && (
+                <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                  Dev OTP: <span className="font-bold">{identityFlow.devCode}</span>
+                </div>
+              )}
+              <input
+                value={identityFlow.code}
+                onChange={(e) => setIdentityFlow((s) => ({ ...s, code: e.target.value }))}
+                placeholder="Enter OTP"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
+              />
+              <button
+                onClick={verifyIdentityChange}
+                disabled={identityFlow.loading || identityFlow.step !== "requested"}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}
+              >
+                {identityFlow.loading && identityFlow.step === "verifying" ? "Verifying…" : "Verify and Save"}
+              </button>
+            </div>
+          )}
+          {!identityFlow.field && (email.trim() !== user.email || phone.trim() !== (user.phone ?? "")) && (
+            <button
+              onClick={() => {
+                if (email.trim() !== user.email && phone.trim() !== (user.phone ?? "")) {
+                  setProfileMsg({ text: "Please verify one contact change at a time.", ok: false });
+                  return;
+                }
+                if (email.trim() !== user.email) void startIdentityChange("email", email);
+                else if (phone.trim() !== (user.phone ?? "")) void startIdentityChange("phone", phone);
+              }}
+              disabled={identityFlow.loading}
+              className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg,#5B3EF5,#7C5BF8)" }}
+            >
+              {identityFlow.loading ? "Sending OTP…" : "Request Verification"}
+            </button>
+          )}
           {profileMsg && (
             <p className={`text-xs font-medium ${profileMsg.ok ? "text-green-600" : "text-red-500"}`}>{profileMsg.text}</p>
           )}
@@ -3579,10 +3972,11 @@ function PrivacySecurityScreen({ user, onBack, onUserUpdate }: { user: ApiUser; 
 
 // ── Service Detail Page ─────────────────────────────────────────────────────
 function ServiceDetailPage({
-  serviceId, isLoggedIn, onBack, onAddToCart,
+  serviceId, isLoggedIn, bookingConfig, onBack, onAddToCart,
 }: {
   serviceId: string;
   isLoggedIn: boolean;
+  bookingConfig: CancellationPolicyConfig;
   onBack: () => void;
   onAddToCart: (serviceId: string, serviceName?: string) => void;
 }) {
@@ -3591,6 +3985,7 @@ function ServiceDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [added, setAdded] = useState(false);
+  const [showCancellationPolicy, setShowCancellationPolicy] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -3700,6 +4095,21 @@ function ServiceDetailPage({
           )}
         </div>
 
+         <button
+           onClick={() => setShowCancellationPolicy((open) => !open)}
+           className="w-full flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 mb-5 text-left"
+         >
+           <span className="flex items-center gap-2 text-xs font-bold text-amber-900">
+             <Shield size={15} color="#B45309" /> View cancellation policy
+           </span>
+           <ChevronDown size={16} color="#B45309" className={showCancellationPolicy ? "rotate-180" : ""} />
+         </button>
+         {showCancellationPolicy && (
+           <div className="mb-5">
+             <CancellationPolicyNotice bookingConfig={bookingConfig} />
+           </div>
+         )}
+
         {/* Sections */}
         {renderSection(tx("What's included"), (service as any).whatIncluded)}
         {renderSection(tx("What to expect"), (service as any).serviceProcess)}
@@ -3754,6 +4164,7 @@ export default function CustomerApp() {
   const [reels, setReels]                     = useState<ApiReel[]>([]);
   const [addresses, setAddresses]             = useState<ApiAddress[]>([]);
   const [cart, setCart]                       = useState<ApiCart>({ id: "", items: [], total: 0 });
+  const [bookingConfig, setBookingConfig] = useState<CheckoutBookingConfig>(DEFAULT_CHECKOUT_CFG);
 
   // Cart (global)
   const [cartGlobalOpen, setCartGlobalOpen] = useState(false);
@@ -3770,6 +4181,10 @@ export default function CustomerApp() {
     servicesApi.featured().then((data) => setFeaturedServices(data.services)).catch(console.error);
     offersApi.list().then(setOffers).catch(console.error);
     reelsApi.listActive().then(setReels).catch(console.error);
+    fetch('/api/booking-config')
+      .then(r => r.json())
+      .then(json => { if (json?.data) setBookingConfig(prev => ({ ...prev, ...json.data })); })
+      .catch(console.error);
   }, []);
 
   // Load auth-required data when logged in
@@ -3846,6 +4261,24 @@ export default function CustomerApp() {
     ordersApi.list().then(setOrders).catch(console.error);
   }, [isLoggedIn]);
 
+  // Keep customer booking/order state current when a partner or Admin changes
+  // it in another session. Poll only while the tab is visible and refresh
+  // immediately when the customer returns to the tab.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') refreshBookings();
+    };
+    const interval = window.setInterval(refreshIfVisible, 10_000);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    window.addEventListener('focus', refreshIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+      window.removeEventListener('focus', refreshIfVisible);
+    };
+  }, [isLoggedIn, refreshBookings]);
+
   const handleSelectLocation = useCallback((loc: string) => {
     setLocation(loc);
     localStorage.setItem(LOC_KEY, loc);
@@ -3905,6 +4338,7 @@ export default function CustomerApp() {
         <ServiceDetailPage
           serviceId={selectedServiceId}
           isLoggedIn={isLoggedIn}
+           bookingConfig={bookingConfig}
           onBack={() => setSelectedServiceId(null)}
           onAddToCart={addToCart}
         />
@@ -4013,6 +4447,7 @@ export default function CustomerApp() {
         <CustBookings
           bookings={bookings}
           orders={orders}
+          bookingConfig={bookingConfig}
           onCancel={handleCancelBooking}
           onRefresh={refreshBookings}
           onRebook={handleRebook}

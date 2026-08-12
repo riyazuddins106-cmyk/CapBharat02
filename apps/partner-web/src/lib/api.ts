@@ -1,6 +1,15 @@
-// Use relative URLs so the API works in both dev (vite proxy → :8000)
-// and production (Express serves everything on one port).
-const API_BASE = '';
+// Use the Vite proxy for local development and the API's public port when the
+// app is opened through a Replit preview host. A relative /api request on the
+// preview host is routed to the wrong artifact and returns 502.
+function getApiOrigin(): string {
+  if (typeof window === 'undefined') return '';
+  const { hostname, protocol, port } = window.location;
+  const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1' || port === '4000';
+  const isReplitPreview = hostname.endsWith('.replit.dev') || hostname.endsWith('.repl.co');
+  return !isLocalDev && isReplitPreview ? `${protocol}//${hostname}:8000` : '';
+}
+
+const API_BASE = getApiOrigin();
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -51,7 +60,7 @@ async function request<T>(
 
 // ── Types ──────────────────────────────────────────────────
 export interface User {
-  id: string; email: string; fullName: string;
+  id: string; username: string; email: string; fullName: string;
   phone: string | null; avatarUrl: string | null; role: string;
 }
 export interface AuthTokens { accessToken: string; refreshToken: string; user: User; }
@@ -118,7 +127,7 @@ export interface Earnings {
 export interface PartnerScheduleJob {
   id: string; jobType: 'booking' | 'order_item'; serviceName: string; scheduledAt: string; endTime: string;
   status: string; customerName: string | null; customerPhone: string | null; payout: number;
-  durationMinutes: number; address: Job['address'];
+  durationMinutes: number; address: Job['address']; handoffPending?: boolean;
 }
 export interface PartnerPerformance {
   rating: number; reviewCount: number; jobsCompleted: number; totalJobs: number;
@@ -209,25 +218,31 @@ export interface PartnerDocumentHistory {
   archived_at: string;
 }
 
-export interface RegisterPartnerResponse { userId: string; email: string; devCode?: string; }
+export interface RegisterPartnerResponse {
+  userId: string;
+  email: string;
+  devCode?: string;
+  expiresInSeconds?: number;
+  resendAfterSeconds?: number;
+}
 
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
     request<AuthTokens>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  registerPartner: (data: { fullName: string; email: string; phone?: string; password: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) =>
+  registerPartner: (data: { fullName: string; email: string; phone?: string; password: string; categoryId: string; subCategoryId: string; title: string; city: string; area?: string; pincode?: string }) =>
     request<RegisterPartnerResponse>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
   verifyOtp: (email: string, code: string, purpose: 'signup' | 'login' | 'password_reset') =>
     request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, code, purpose }) }),
   resendOtp: (email: string, purpose: 'signup' | 'login' | 'password_reset') =>
-    request<{ message: string }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email, purpose }) }),
+    request<{ message: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify({ email, purpose }) }),
   refresh: (refreshToken: string) =>
     request<AuthTokens>('/api/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
   // Server expects { refreshToken } in body, not a Bearer header
   logout: (refreshToken: string) =>
     request<void>('/api/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
   forgotPassword: (email: string) =>
-    request<{ message: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    request<{ message: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (email: string, code: string, newPassword: string) =>
     request<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, code, newPassword }) }),
 };
@@ -237,8 +252,16 @@ export const partnerApi = {
   getProfile: (token: string) => request<PartnerProfile>('/api/partner/profile', { token }),
   updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge' | 'categoryId' | 'subCategoryId' | 'payoutUpiId'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
-  updateAccount: (data: { fullName?: string; phone?: string }, token: string) =>
+  updateAccount: (data: { fullName?: string }, token: string) =>
     request<{ message: string }>('/api/partner/account', { method: 'PATCH', body: JSON.stringify(data), token }),
+  requestIdentityChange: (field: 'email' | 'phone', value: string, token: string) =>
+    request<{ field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string }>('/api/profile/me/identity/request', {
+      method: 'POST', body: JSON.stringify({ field, value }), token,
+    }),
+  verifyIdentityChange: (field: 'email' | 'phone', value: string, code: string, token: string) =>
+    request<User>('/api/profile/me/identity/verify', {
+      method: 'POST', body: JSON.stringify({ field, value, code }), token,
+    }),
   changePassword: (currentPassword: string, newPassword: string, token: string) =>
     request<{ message: string }>('/api/profile/me/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }), token }),
   listJobs: (token: string) => request<Job[]>('/api/partner/jobs', { token }),
@@ -248,6 +271,12 @@ export const partnerApi = {
     request<OrderItemJob>(`/api/partner/order-item-jobs/${requestId}/accept`, { method: 'PATCH', token }),
   rejectOrderItemJob: (requestId: string, token: string) =>
     request<{ message: string }>(`/api/partner/order-item-jobs/${requestId}/reject`, { method: 'PATCH', token }),
+  passOrderItemJob: (itemId: string, reason: string, token: string) =>
+    request<{ offeredCount: number; remainsAssigned: boolean; message: string }>(`/api/partner/order-item-jobs/${itemId}/pass`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+      token,
+    }),
   checkInOrderItem: (itemId: string, qrToken: string, token: string) =>
     request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/checkin`, {
       method: 'PATCH',

@@ -124,75 +124,61 @@ if [[ -n "$REPLIT_EXPO_DEV_DOMAIN" ]]; then
   # regenerate QR PNG + scanner.html.  Called once per successful tunnel start.
   regenerate_qr() {
     local url="$1"
-    node -e "
+    # Keep both the API-hosted /qr page and the standalone QR Codes workflow in
+    # sync with Replit-native tunnel sessions. The standalone page is a static
+    # file, so it must be rewritten from the sibling app's live cache rather
+    # than patched from whatever stale URL happened to be on disk.
+    echo "$url" > "/tmp/expo-tunnel-${PORT}.url"
+    QR_EXPO_URL="$url" QR_PNG="$QR_PNG" QR_KEY="$QR_KEY" QR_DIR="$QR_DIR" node <<'NODE'
 const QRCode = require('qrcode');
 const fs = require('fs');
-const qrPng = '$QR_PNG';
-const expoUrl = '$url';
-const qrKey = '$QR_KEY';
-const htmlPath = '${QR_DIR}/scanner.html';
 
-// Always write the full scanner page so both QR codes are fresh and
-// the HTML structure is guaranteed to match the update regex.
-const writeFullPage = (custUrl, partUrl) => {
-  return QRCode.toDataURL(custUrl, { width: 320, margin: 2 }).then(cd =>
-    QRCode.toDataURL(partUrl, { width: 320, margin: 2 }).then(pd => {
-      const now = new Date().toISOString();
-      const html = \`<!DOCTYPE html>
-<html><head><meta charset=\"utf-8\"><title>ServeNow QR Codes</title>
+const expoUrl = process.env.QR_EXPO_URL;
+const qrPng = process.env.QR_PNG;
+const qrKey = process.env.QR_KEY;
+const qrDir = process.env.QR_DIR;
+const htmlPath = `${qrDir}/scanner.html`;
+const siblingPort = qrKey === 'customer' ? 8099 : 8081;
+const siblingUrl = (() => {
+  try {
+    return fs.readFileSync(`/tmp/expo-tunnel-${siblingPort}.url`, 'utf8').trim();
+  } catch {
+    return qrKey === 'customer' ? 'exp://partner-pending' : 'exp://customer-pending';
+  }
+})();
+const customerUrl = qrKey === 'customer' ? expoUrl : siblingUrl;
+const partnerUrl = qrKey === 'partner' ? expoUrl : siblingUrl;
+
+const html = (customerQr, partnerQr) => `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>ServeNow QR Codes</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
- body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:32px 20px;}
- .wrap{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;padding:0;}
- .card{background:#fff;border-radius:20px;padding:32px 28px 26px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.10);width:348px;}
- .badge.customer{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;margin-bottom:18px;letter-spacing:.6px;text-transform:uppercase;background:#ebf5ff;color:#0066cc;}
- .badge.partner{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;margin-bottom:18px;letter-spacing:.6px;text-transform:uppercase;background:#fff3eb;color:#cc4400;}
- h2{font-size:22px;font-weight:700;color:#111;margin-bottom:6px;}
- .sub{font-size:14px;color:#999;margin-bottom:22px;}
- img{border-radius:12px;border:1.5px solid #eee;width:294px;height:294px;}
- .url{margin-top:14px;font-size:11px;color:#999;word-break:break-all;font-family:monospace;}
- .ts{margin-top:8px;font-size:10px;color:#aaa;}
-</style></head>
-<body><div class=\"wrap\">
-<div class=\"card\">
-  <div class=\"badge customer\">📱 Customer App</div>
-  <h2>Customer</h2><p class=\"sub\">Open Expo Go and scan this QR code</p>
-   <img src=\"/customer-qr.png\" width=\"294\" height=\"294\" alt=\"Current Customer Expo QR code\"/>
-  <div class=\"url\">\${custUrl}</div>
-  <div class=\"ts\">The image is loaded from the current QR file.</div>
-</div>
-<div class=\"card\">
-  <div class=\"badge partner\">🔧 Partner App</div>
-  <h2>Partner</h2><p class=\"sub\">Open Expo Go and scan this QR code</p>
-   <img src=\"/partner-qr.png\" width=\"294\" height=\"294\" alt=\"Current Partner Expo QR code\"/>
-  <div class=\"url\">\${partUrl}</div>
-  <div class=\"ts\">The image is loaded from the current QR file.</div>
-</div>
-</div></body></html>\`;
-      fs.writeFileSync(htmlPath, html);
-      console.log('[qr] scanner.html fully rewritten (' + custUrl + ' / ' + partUrl + ')');
-    })
-  );
-};
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:32px 20px}
+.wrap{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;padding:0}
+.card{background:#fff;border-radius:20px;padding:32px 28px 26px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.10);width:348px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;margin-bottom:18px;letter-spacing:.6px;text-transform:uppercase}
+.badge.customer{background:#ebf5ff;color:#0066cc}.badge.partner{background:#fff3eb;color:#cc4400}
+h2{font-size:22px;font-weight:700;color:#111;margin-bottom:6px}.sub{font-size:14px;color:#999;margin-bottom:22px}
+img{border-radius:12px;border:1.5px solid #eee;width:294px;height:294px}
+.url{margin-top:14px;font-size:11px;color:#999;word-break:break-all;font-family:monospace}.ts{margin-top:8px;font-size:10px;color:#aaa}
+</style></head><body><div class="wrap">
+<div class="card"><div class="badge customer">📱 Customer App</div><h2>Customer</h2><p class="sub">Open Expo Go and scan this QR code</p><img src="${customerQr}" width="294" height="294" alt="Current Customer Expo QR code"/><div class="url">${customerUrl}</div><div class="ts">Generated from the live tunnel cache.</div></div>
+<div class="card"><div class="badge partner">🔧 Partner App</div><h2>Partner</h2><p class="sub">Open Expo Go and scan this QR code</p><img src="${partnerQr}" width="294" height="294" alt="Current Partner Expo QR code"/><div class="url">${partnerUrl}</div><div class="ts">Generated from the live tunnel cache.</div></div>
+</div></body></html>`;
 
-QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
-  if (err) { console.error('[qr] Failed:', err.message); return; }
-  console.log('[qr] QR PNG written for ' + expoUrl);
-
-  // Read the sibling QR URL from the other app's PNG data-url or fall back to a placeholder.
-  let existingHtml = '';
-  try { existingHtml = fs.readFileSync(htmlPath, 'utf8'); } catch {}
-
-  // Extract the OTHER key's URL from the existing page.
-  const otherKey = qrKey === 'customer' ? 'partner' : 'customer';
-  const otherMatch = existingHtml.match(new RegExp('<div class=\"badge ' + otherKey + '\">.*?<div class=\"url\">([^<]*)</div>', 's'));
-  const otherUrl = (otherMatch && otherMatch[1].trim()) || (qrKey === 'customer' ? 'exp://partner-pending' : 'exp://customer-pending');
-
-  const custUrl = qrKey === 'customer' ? expoUrl : otherUrl;
-  const partUrl = qrKey === 'partner'  ? expoUrl : otherUrl;
-  writeFullPage(custUrl, partUrl).catch(e => console.warn('[qr] full page write failed:', e.message));
+Promise.all([
+  QRCode.toDataURL(customerUrl, { width: 320, margin: 2 }),
+  QRCode.toDataURL(partnerUrl, { width: 320, margin: 2 }),
+  QRCode.toBuffer(expoUrl, { width: 400, margin: 2 }),
+]).then(([customerQr, partnerQr, png]) => {
+  fs.writeFileSync(qrPng, png);
+  fs.writeFileSync(htmlPath, html(customerQr, partnerQr));
+  console.log(`[qr] scanner refreshed: ${customerUrl} / ${partnerUrl}`);
+}).catch((error) => {
+  console.error('[qr] refresh failed:', error.message);
+  process.exitCode = 1;
 });
-" 2>/dev/null || true
+NODE
   }
 
   NATIVE_MAX_RETRIES=5

@@ -36,6 +36,8 @@
 - [Master Prompt Status](master-prompt-status.md) — full audit of Urban Company-style marketplace requirements: 14 done, 11 partial, 24 not built; includes recommended build order.
 - [Project Handoff](HANDOFF.md) — READ THIS FIRST in any new session: full project state, secrets, setup commands, what's done/partial/missing, 8-step build order, gotchas index.
 - [Admin service operations](admin-service-operations.md) — detail endpoints and safe distinction between stopping partner search and cancelling a booking.
+- [Service-order operations controls](service-order-operations-controls.md) — itemized Admin dispatch parity uses qualified assignment, waiting_operation, and paid-item refund protection.
+- [E2E partner fixture cleanup](e2e-partner-fixture-cleanup.md) — dispatch tests must delete professionals before users because user deletion nulls the profile link.
 - [Partner payout accounting](partner-payout-accounting.md) — partner earnings use completed paid work and stored partner payout, not customer price.
 - [Partner payout control centre](payout-control-center.md) — aggregate earnings and payout requests independently, paginate partners, and lazy-load individual payout history.
 - [Scheduled partner payouts](scheduled-partner-payouts.md) — automatic runs require explicit approval, caps, locking, recovery, and RazorpayX configuration.
@@ -45,7 +47,19 @@
 - [Expo QR scanner styling](expo-qr-scanner-styling.md) — keep the reference layout in expo-tunnel.sh and load current customer/partner PNG files so tunnel refreshes preserve design and freshness.
 - [Admin history data model](admin-history-data-model.md) — customer and professional histories must combine legacy bookings with newer service-order jobs and keep payment/payout fields distinct.
 - [Partner Schedule date bounds](partner-schedule-date-bounds.md) — cast ISO day bounds to timestamptz when filtering timestamp columns through raw Drizzle SQL.
+- [Booking confirmation details](booking-confirmation-details.md) — format persisted schedule data; never display internal slot minutes in customer-facing confirmation.
+- [Customer tab bar safe area](customer-tab-bar-safe-area.md) — let Expo Router calculate native tab-bar height and Android bottom inset; avoid fixed overrides.
+- [Partner future-job handoff](partner-job-handoff.md) — passing is an offer; retain the original assignment until an eligible replacement accepts.
 - [Partner payout filter parity](partner-payout-filter-parity.md) — Partner Web and Mobile must share the same inclusive date-range and payout-status filters; no All time payout-history option.
 - [Customer Expo port ownership](customer-expo-port-ownership.md) — Customer Expo must use its declared free Metro port; stale starter services on that port make Expo exit before QR downloads work.
 - [Admin catalog upload routing](admin-catalog-upload-routing.md) — multipart uploads must share the API base; category partner counts include service-linked partners.
 - [Admin initial-load concurrency](admin-initial-load-concurrency.md) — keep the startup request set small; duplicate concurrent Supabase queries can leave the global Admin spinner pending.
+- [Replit preview API port](replit-preview-api-port.md) — web preview root `/api` can route to the wrong artifact; use public API port 8000 on preview hosts and allow cross-port CORP.
+- [QA workbook generation](qa-workbook-generation.md) — XlsxWriter tables already provide filters; don't add a second overlapping autofilter range.
+- [Account identity settings](account-identity-settings.md) — usernames are immutable/global; email and phone updates require target-bound authenticated OTP verification.
+- [Partner document eligibility and live refresh](partner-document-eligibility-live-refresh.md) — dispatch requires approved documents; web/mobile surfaces refresh cross-session state.
+- [OTP delivery and resend cooldown](otp-delivery-cooldown.md) — enforce 60-second resend and expiry server-side; Ethereal does not deliver to real inboxes.
+- [Partner search timer](partner-search-timer.md) — search windows must be persisted server-side and enforced again before partner acceptance.
+- [Partner Web/Mobile identity debugging](partner-web-mobile-identity.md) — compare authenticated partner, eligibility, and deadline before changing job-feed code; different partner accounts must not share requests.
+- [Cancellation fee settings](cancellation-fee-settings.md) — customer warnings and server cancellation charges must both read the configured Booking Settings percentages.
+- [Payment method availability](payment-method-availability.md) — Test Mode may simulate only configured methods; unconfigured UPI must never become a paid item.

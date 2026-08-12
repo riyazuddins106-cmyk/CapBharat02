@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,10 @@ export default function AuthScreen() {
 
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresInSeconds, setOtpExpiresInSeconds] = useState(600);
+  const [devCode, setDevCode] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
 
   // Fields
@@ -28,6 +32,18 @@ export default function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const applyOtpTiming = (result?: { devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }) => {
+    setDevCode(result?.devCode ?? '');
+    setOtpExpiresInSeconds(result?.expiresInSeconds ?? 600);
+    setResendCooldown(result?.resendAfterSeconds ?? 60);
+  };
 
   const doLogin = async () => {
     if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
@@ -52,8 +68,9 @@ export default function AuthScreen() {
     if (!/[0-9]/.test(password)) return Alert.alert('Error', 'Password must contain a number');
     setLoading(true);
     try {
-      await register({ fullName: fullName.trim(), email: email.trim(), password, phone: phone.trim() || undefined });
+      const result = await register({ fullName: fullName.trim(), email: email.trim(), password, phone: phone.trim() || undefined });
       setPendingEmail(email.trim());
+      applyOtpTiming(result);
       setMode('verify-otp');
     } catch (e: any) {
       Alert.alert('Registration Failed', e.message);
@@ -81,13 +98,28 @@ export default function AuthScreen() {
     if (!email) return Alert.alert('Error', 'Enter your email address');
     setLoading(true);
     try {
-      await forgotPassword(email.trim());
+      const result = await forgotPassword(email.trim());
       setPendingEmail(email.trim());
+      applyOtpTiming(result);
       setMode('reset');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const doResendOtp = async () => {
+    if (resendCooldown > 0 || resendLoading) return;
+    setResendLoading(true);
+    try {
+      const result = await resendOtp(pendingEmail, mode === 'reset' ? 'password_reset' : 'signup');
+      applyOtpTiming(result);
+      Alert.alert('Code sent', 'A new verification code was sent. Check your email.');
+    } catch (e: any) {
+      Alert.alert('Could not resend code', e?.message ?? 'Please try again later.');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -228,8 +260,22 @@ export default function AuthScreen() {
                 textAlign="center"
                 style={[styles.otpInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: colors.radius, borderColor: otp.length === 6 ? colors.primary : colors.border, letterSpacing: 8 }]}
               />
-              <TouchableOpacity style={styles.resendRow} onPress={() => resendOtp(pendingEmail, mode === 'reset' ? 'password_reset' : 'signup')}>
-                <Text style={[styles.resendText, { color: colors.primary }]}>Resend code</Text>
+              <Text style={[styles.otpExpiry, { color: colors.mutedForeground }]}>
+                Code expires in {Math.ceil(otpExpiresInSeconds / 60)} minutes.
+              </Text>
+              {devCode ? (
+                <Text style={[styles.devCode, { color: colors.mutedForeground }]}>
+                  Development code: <Text style={{ fontWeight: '800', color: colors.foreground }}>{devCode}</Text>
+                </Text>
+              ) : null}
+              <TouchableOpacity
+                style={styles.resendRow}
+                onPress={doResendOtp}
+                disabled={resendCooldown > 0 || resendLoading}
+              >
+                <Text style={[styles.resendText, { color: colors.primary, opacity: resendCooldown > 0 || resendLoading ? 0.5 : 1 }]}>
+                  {resendLoading ? 'Sending…' : resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -320,6 +366,8 @@ const styles = StyleSheet.create({
   otpInput: { padding: 16, fontSize: 22, fontWeight: '700', borderWidth: 2 },
   resendRow: { alignItems: 'flex-end', marginTop: 8 },
   resendText: { fontSize: 13, fontWeight: '600' },
+  otpExpiry: { fontSize: 12, marginTop: 8, textAlign: 'center' },
+  devCode: { fontSize: 12, marginTop: 8, textAlign: 'center' },
   forgotRow: { alignItems: 'flex-end', marginTop: -8 },
   forgotText: { fontSize: 13, fontWeight: '600' },
   actionBtn: { paddingVertical: 16, alignItems: 'center', marginTop: 8 },

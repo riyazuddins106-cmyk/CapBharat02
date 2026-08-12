@@ -10,7 +10,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { servicesApi, cartApi } from '@/lib/api';
+import { servicesApi, cartApi, bookingConfigApi } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 // Renders a section only when content exists
@@ -43,6 +43,7 @@ export default function ServiceDetailScreen() {
   const insets = useSafeAreaInsets();
   const { accessToken } = useAuth();
   const [addedFeedback, setAddedFeedback] = useState(false);
+  const [showCancellationPolicy, setShowCancellationPolicy] = useState(false);
 
   const { data: service, isLoading, isError } = useQuery({
     queryKey: ['/api/services', id],
@@ -54,6 +55,11 @@ export default function ServiceDetailScreen() {
     queryKey: ['/api/cart', accessToken],
     queryFn: () => cartApi.get(accessToken!),
     enabled: !!accessToken,
+  });
+
+  const { data: bookingConfig } = useQuery({
+    queryKey: ['/api/booking-config'],
+    queryFn: bookingConfigApi.get,
   });
 
   const cartMutation = useMutation({
@@ -168,6 +174,28 @@ export default function ServiceDetailScreen() {
             )}
           </View>
 
+          <TouchableOpacity
+            onPress={() => setShowCancellationPolicy((open) => !open)}
+            style={[styles.policyLink, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Ionicons name="shield-checkmark-outline" size={16} color="#B45309" />
+              <Text style={{ color: '#78350F', fontSize: 12, fontWeight: '800' }}>View cancellation policy</Text>
+            </View>
+            <Ionicons name={showCancellationPolicy ? 'chevron-up' : 'chevron-down'} size={16} color="#B45309" />
+          </TouchableOpacity>
+          {showCancellationPolicy && (
+            <View style={[styles.policyBox, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+              <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16 }}>Free cancellation before a partner accepts.</Text>
+              <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16 }}>
+                After acceptance: {bookingConfig?.cancellationFeeAfterAcceptancePercent ?? 20}% · min ₹{bookingConfig?.cancellationFeeAfterAcceptanceMinAmount ?? 50} · max ₹{bookingConfig?.cancellationFeeAfterAcceptanceMaxAmount ?? 500}
+              </Text>
+              <Text style={{ color: '#92400E', fontSize: 11, lineHeight: 16 }}>
+                After check-in: {bookingConfig?.cancellationFeeAfterCheckinPercent ?? 20}% · min ₹{bookingConfig?.cancellationFeeAfterCheckinMinAmount ?? 50} · max ₹{bookingConfig?.cancellationFeeAfterCheckinMaxAmount ?? 500}
+              </Text>
+            </View>
+          )}
+
           {/* ── Short description ─────────────────────────────────────────── */}
           {service.description?.trim() ? (
             <Text style={[styles.description, { color: colors.mutedForeground }]}>{service.description}</Text>
@@ -245,6 +273,8 @@ const styles = StyleSheet.create({
   metaValue:        { fontSize: 16, fontWeight: '800' },
   metaLabel:        { fontSize: 11, marginTop: 2 },
   metaDivider:      { width: 1 },
+  policyLink:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  policyBox:        { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 16, gap: 2 },
   description:      { fontSize: 14, lineHeight: 22 },
   section:          { borderWidth: 1, borderRadius: 14, padding: 16, gap: 10 },
   sectionHeader:    { flexDirection: 'row', alignItems: 'center', gap: 10 },

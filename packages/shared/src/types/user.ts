@@ -2,6 +2,7 @@ export type UserRole = 'customer' | 'partner' | 'admin';
 
 export interface PublicUser {
   id: string;
+  username: string;
   email: string;
   phone: string | null;
   fullName: string;

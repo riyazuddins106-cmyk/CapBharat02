@@ -10,7 +10,7 @@ import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { queryClient } from '@/lib/queryClient';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, useRootNavigationState } from 'expo-router';
 
 // SplashScreen is native-only — calling it on web shows a white overlay
 // that never gets removed, leaving a permanently blank page.
@@ -77,16 +77,20 @@ function AuthGate() {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    if (isLoading) return;
+    // Expo Go can throw "Attempted to navigate before mounting the Root
+    // Layout" when a restored auth session redirects during the first render.
+    // Wait for the navigator key and an actual route segment before replacing.
+    if (isLoading || !rootNavigationState?.key || !segments[0]) return;
     const inAuth = segments[0] === 'auth';
     if (!isAuthenticated && !inAuth) {
       router.replace('/auth');
     } else if (isAuthenticated && inAuth) {
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, rootNavigationState?.key, segments]);
 
   return null;
 }
@@ -121,11 +125,11 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
               <AuthProvider>
-                <AuthGate />
                 <StatusBar style="dark" />
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
                 </Stack>
+                <AuthGate />
               </AuthProvider>
           </QueryClientProvider>
         </SafeAreaProvider>

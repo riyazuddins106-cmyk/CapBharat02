@@ -16,6 +16,25 @@ export const profileController = {
     sendSuccess(res, profile);
   }),
 
+  requestIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const result = await userService.requestIdentityChange(
+      req.user!.userId,
+      req.body.field,
+      req.body.value,
+    );
+    sendSuccess(res, result);
+  }),
+
+  verifyIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const profile = await userService.verifyIdentityChange(
+      req.user!.userId,
+      req.body.field,
+      req.body.value,
+      req.body.code,
+    );
+    sendSuccess(res, profile);
+  }),
+
   uploadAvatar: asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) {
       throw AppError.badRequest('No file uploaded. Use the "avatar" field.');

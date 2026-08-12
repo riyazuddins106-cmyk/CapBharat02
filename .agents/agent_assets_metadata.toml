@@ -11,15 +11,15 @@ title = "ServeNow — Complete Technical Documentation"
 id = "z3ReHYQpJ6Q9XbRTPxCuk"
 uri = "file://tmp-qr/customer-qr.png"
 type = "image"
-title = "Customer App — Current Expo Go QR"
-description = "Fresh QR for the currently running Customer Expo session. Open Expo Go and scan this image."
+title = "Latest Customer Expo QR"
+description = "Scan with Expo Go to open the current ServeNow Customer App tunnel."
 
 [[outputs]]
 id = "CnN3LIYRidf200aumm0xt"
 uri = "file://tmp-qr/partner-qr.png"
 type = "image"
-title = "Partner App — Current Expo Go QR"
-description = "Fresh QR for the currently running Partner Expo session. Open Expo Go and scan this image."
+title = "Latest Partner Expo QR"
+description = "Scan with Expo Go to open the current ServeNow Partner App tunnel."
 
 [[outputs]]
 id = "M4aNKMl2fOqdxUhEEjeEo"
@@ -27,3 +27,10 @@ uri = "file://screenshots/servenow-qr-scanner.jpg"
 type = "image"
 title = "ServeNow Expo Go QR Scanner"
 description = "Both current Expo Go QR codes, verified after restarting the tunnels."
+
+[[outputs]]
+id = "VrAGjK2NK3xZX0fYVz_Wk"
+uri = "file://qa/servenow-qa-report-2026-08-12.xlsx"
+type = "table"
+title = "ServeNow QA Report — 2026-08-12"
+description = "Detailed Excel QA workbook covering Customer, Partner, Admin, API, web, mobile, dispatch, payment, itemized service orders, fixes applied, and remaining provider/test gaps."

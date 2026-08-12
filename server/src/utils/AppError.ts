@@ -31,8 +31,12 @@ export class AppError extends Error {
     return new AppError(message, 409);
   }
 
-  static tooManyRequests(message = 'Too many requests') {
-    return new AppError(message, 429);
+  static tooManyRequests(message = 'Too many requests', details?: unknown) {
+    return new AppError(message, 429, details);
+  }
+
+  static serviceUnavailable(message = 'Service temporarily unavailable', details?: unknown) {
+    return new AppError(message, 503, details);
   }
 
   static internal(message = 'Internal server error') {

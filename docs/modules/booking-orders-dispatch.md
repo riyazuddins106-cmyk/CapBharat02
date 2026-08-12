@@ -29,7 +29,13 @@ acceptance, arrival, payment, and completion.
 
 The legacy booking model remains in use alongside the newer itemized order
 model. The order model stores a separate status and financial amount per
-service item.
+service item. Admin operational monitoring reads both models so a partner-visible
+order-item request is not mistaken for a missing legacy booking dispatch row.
+
+Itemized cancellation fees are configured in `booking_config` as a percentage
+rate with minimum and maximum rupee bounds. After acceptance or check-in, the
+fee is `MAX(minimum, MIN(rate × service amount, maximum))`, rounded to rupees and
+capped at the service amount. No fee applies before partner acceptance.
 
 ## Important Source Files
 

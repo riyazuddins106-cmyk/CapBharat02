@@ -31,6 +31,32 @@ async function api(method, path, body, token) {
   return { status: r.status, data };
 }
 
+async function clearCart(token) {
+  const cartRes = await api('GET', '/cart', null, token);
+  const items = cartRes.data?.data?.items ?? cartRes.data?.data ?? [];
+  for (const item of items) {
+    await api('DELETE', `/cart/items/${item.id}`, null, token);
+  }
+}
+
+async function clearActiveBookings(token) {
+  const bookingsRes = await api('GET', '/bookings', null, token);
+  const bookings = bookingsRes.data?.data?.bookings ?? bookingsRes.data?.data ?? [];
+  for (const booking of bookings) {
+    if (['pending', 'upcoming'].includes(booking.status)) {
+      await api('PATCH', `/bookings/${booking.id}/cancel`, { reason: 'E2E fixture reset' }, token);
+    }
+  }
+}
+
+function safeScheduledAt() {
+  const IST_OFFSET_MS = 5.5 * 3600_000;
+  const target = new Date(Date.now() + IST_OFFSET_MS);
+  target.setUTCDate(target.getUTCDate() + 1);
+  target.setUTCHours(12, 0, 0, 0);
+  return new Date(target.getTime() - IST_OFFSET_MS).toISOString();
+}
+
 // ─── 1. LOGIN ─────────────────────────────────────────────────────────────────
 console.log('\n─── 1. Authentication ───');
 const cRes = await api('POST', '/auth/login', { email: 'customer@servenow.in', password: 'Customer@1234' });
@@ -46,6 +72,11 @@ if (PT) ok('Partner login', partName); else { err('Partner login', pRes.data); p
 const aRes = await api('POST', '/auth/login', { email: 'admin@servenow.in', password: 'Admin@1234' });
 const AT = aRes.data?.data?.accessToken;
 if (AT) ok('Admin login', aRes.data?.data?.user?.name); else err('Admin login (non-fatal)', aRes.status);
+await clearActiveBookings(CT);
+await clearCart(CT);
+const availabilityRes = await api('PATCH', '/partner/availability', { availabilityStatus: 'available' }, PT);
+if (availabilityRes.data?.success || availabilityRes.status === 200) ok('Partner fixture available', 'available');
+else err('Partner fixture availability', availabilityRes.data);
 
 // ─── 2. PICK A SERVICE ────────────────────────────────────────────────────────
 console.log('\n─── 2. Pick a service ───');
@@ -53,15 +84,15 @@ const svcRes = await api('GET', '/services?limit=5', null, CT);
 const services = svcRes.data?.data?.services ?? svcRes.data?.data ?? [];
 const svc = services[0];
 if (!svc?.id) { err('Fetch services', svcRes.data); process.exit(1); }
-ok('Service', `${svc.name} | ₹${svc.price} | id:${svc.id.slice(0,8)}`);
+ok('Service', `${svc.name} | ₹${svc.customerPrice} | id:${svc.id.slice(0,8)}`);
 
 // ─── 3. CART + CHECKOUT ───────────────────────────────────────────────────────
 console.log('\n─── 3. Cart & Checkout ───');
 
 // Clear any existing cart first
-await api('DELETE', '/cart', null, CT);
+await clearCart(CT);
 
-const addRes = await api('POST', '/cart', { serviceId: svc.id, quantity: 1 }, CT);
+const addRes = await api('POST', '/cart/items', { serviceId: svc.id, quantity: 1 }, CT);
 if (addRes.data?.success || addRes.status === 200 || addRes.status === 201) {
   ok('Add to cart', `status ${addRes.status}`);
 } else {
@@ -73,7 +104,7 @@ const cartViewRes = await api('GET', '/cart', null, CT);
 const cartItems = cartViewRes.data?.data?.items ?? cartViewRes.data?.data ?? [];
 ok('Cart contents', `${cartItems.length} item(s)`);
 
-const scheduledAt = new Date(Date.now() + 2 * 3600_000).toISOString();
+const scheduledAt = safeScheduledAt();
 const coRes = await api('POST', '/bookings/checkout', {
   addressText: '42 Marine Drive, Mumbai 400001',
   scheduledAt,
@@ -87,52 +118,30 @@ ok('Booking created', `id:${BID.slice(0,8)} | status:${booking.status} | price:�
 
 // ─── 4. VERIFY IN CUSTOMER BOOKING LIST (status check) ───────────────────────
 console.log('\n─── 4. Customer booking list ───');
-const listRes = await api('GET', '/bookings/my', null, CT);
+const listRes = await api('GET', '/bookings', null, CT);
 const myBookings = listRes.data?.data?.bookings ?? listRes.data?.data ?? [];
 const found = myBookings.find(b => b.id === BID);
 if (found) ok('Booking visible to customer', `status:${found.status} paymentStatus:${found.paymentStatus ?? 'null'}`);
 else err('Booking not found in list', `got ${myBookings.length} bookings`);
 
-// ─── 5. ADMIN ASSIGNS PARTNER (or direct dispatch) ────────────────────────────
-console.log('\n─── 5. Assign partner to booking ───');
-let assigned = false;
-
-// Try dispatch endpoint first
-const dispatchRes = await api('POST', `/admin/bookings/${BID}/dispatch`, {}, AT);
-if (dispatchRes.data?.success || dispatchRes.status === 200) {
-  ok('Auto-dispatch', `status ${dispatchRes.status}`);
-  assigned = true;
-} else {
-  // Manual assignment
-  const prosRes = await api('GET', '/admin/professionals?limit=5', null, AT);
-  const proList = prosRes.data?.data?.professionals ?? prosRes.data?.data ?? [];
-  const pro = proList[0];
-  if (!pro?.id) { err('Get professionals for assignment', prosRes.data); }
-  else {
-    const assignRes = await api('POST', `/admin/bookings/${BID}/assign`, { professionalId: pro.id }, AT);
-    if (assignRes.data?.success || assignRes.status === 200) {
-      ok('Manual assignment', `partner: ${pro.id.slice(0,8)}`);
-      assigned = true;
-    } else {
-      err('Assignment', assignRes.data);
-    }
-  }
-}
-
-// Small delay for dispatch to settle
+// ─── 5. VERIFY AUTO-DISPATCH ──────────────────────────────────────────────────
+console.log('\n─── 5. Verify auto-dispatch ───');
 await new Promise(r => setTimeout(r, 800));
+const dispatchRes = await api('GET', '/operations/dispatch', null, AT);
+if (dispatchRes.data?.success || dispatchRes.status === 200) ok('Admin dispatch queue loaded', `status ${dispatchRes.status}`);
+else err('Admin dispatch queue', dispatchRes.data);
 
 // ─── 6. PARTNER ACCEPTS JOB ───────────────────────────────────────────────────
 console.log('\n─── 6. Partner accepts job ───');
-const jobsRes = await api('GET', '/partner/jobs?status=upcoming', null, PT);
+const jobsRes = await api('GET', '/partner/jobs', null, PT);
 const jobs = jobsRes.data?.data?.jobs ?? jobsRes.data?.data ?? [];
 console.log(`  Partner sees ${jobs.length} upcoming job(s)`);
-const job = jobs.find(j => j.id === BID) ?? jobs[0];
+const job = jobs.find(j => j.id === BID);
 
 if (!job?.id) {
   err('Partner cannot see job', `jobs list: ${JSON.stringify(jobs.slice(0,2))}`);
 } else {
-  const acceptRes = await api('POST', `/partner/jobs/${job.id}/accept`, {}, PT);
+  const acceptRes = await api('PATCH', `/partner/jobs/${job.id}/accept`, {}, PT);
   if (acceptRes.data?.success || acceptRes.status === 200) ok('Partner accepted job', job.id.slice(0,8));
   else err('Accept job', acceptRes.data);
 }
@@ -142,19 +151,19 @@ const JID = job?.id ?? BID;
 // ─── 7. CUSTOMER GETS QR TOKEN ────────────────────────────────────────────────
 console.log('\n─── 7. QR Token ───');
 const qrRes = await api('GET', `/bookings/${JID}/qr`, null, CT);
-const qrToken = qrRes.data?.data?.token ?? qrRes.data?.token;
+const qrToken = qrRes.data?.data?.qrToken ?? qrRes.data?.qrToken;
 if (qrToken) ok('QR token generated', qrToken.slice(0,20) + '...');
 else err('QR token', qrRes.data);
 
 // ─── 8. PARTNER CHECK-IN ──────────────────────────────────────────────────────
 console.log('\n─── 8. Partner check-in ───');
-const ciRes = await api('POST', `/partner/jobs/${JID}/checkin`, { qrToken }, PT);
+const ciRes = await api('PATCH', `/partner/jobs/${JID}/checkin`, { qrToken }, PT);
 if (ciRes.data?.success || ciRes.status === 200) ok('Partner checked in', `booking now in_progress`);
 else err('Check-in', ciRes.data);
 
 // ─── 9. PARTNER COMPLETES JOB ─────────────────────────────────────────────────
 console.log('\n─── 9. Partner completes job ───');
-const completeRes = await api('POST', `/partner/jobs/${JID}/complete`, {
+const completeRes = await api('PATCH', `/partner/jobs/${JID}/complete`, {
   completionNotes: 'Service done, all good',
 }, PT);
 if (completeRes.data?.success || completeRes.status === 200) ok('Partner marked job complete', '');
@@ -163,7 +172,7 @@ else err('Complete job', completeRes.data);
 // ─── 10. VERIFY CUSTOMER SEES "AWAITING PAYMENT" ─────────────────────────────
 console.log('\n─── 10. Customer booking list — post-completion ───');
 await new Promise(r => setTimeout(r, 300));
-const list2Res = await api('GET', '/bookings/my', null, CT);
+const list2Res = await api('GET', '/bookings', null, CT);
 const myBookings2 = list2Res.data?.data?.bookings ?? list2Res.data?.data ?? [];
 const completedBk = myBookings2.find(b => b.id === JID);
 if (completedBk) {
@@ -181,13 +190,11 @@ if (completedBk) {
 
 // ─── 11. CUSTOMER SUBMITS PAYMENT (cash) ─────────────────────────────────────
 console.log('\n─── 11. Customer submits payment ───');
-const payRes = await api('POST', `/payments/submit`, {
-  bookingId: JID,
+const payRes = await api('POST', `/bookings/${JID}/payment`, {
   method: 'cash',
-  amount: booking?.price ?? svc.price,
 }, CT);
 if (payRes.data?.success || payRes.status === 200 || payRes.status === 201) {
-  ok('Payment submitted', `method:cash | amount:₹${booking?.price ?? svc.price}`);
+   ok('Payment submitted', `method:cash | amount:₹${booking?.price ?? svc.customerPrice}`);
 } else {
   err('Payment submit', payRes.data);
 }
@@ -196,7 +203,7 @@ await new Promise(r => setTimeout(r, 400));
 
 // ─── 12. VERIFY PAYMENT STATUS CHANGED ───────────────────────────────────────
 console.log('\n─── 12. Verify payment recorded ───');
-const list3Res = await api('GET', '/bookings/my', null, CT);
+const list3Res = await api('GET', '/bookings', null, CT);
 const myBookings3 = list3Res.data?.data?.bookings ?? list3Res.data?.data ?? [];
 const paidBk = myBookings3.find(b => b.id === JID);
 if (paidBk) {
@@ -210,7 +217,7 @@ if (paidBk) {
 }
 
 // Directly check payment record
-const payListRes = await api('GET', `/payments/booking/${JID}`, null, CT);
+const payListRes = await api('GET', `/bookings/${JID}/payment`, null, CT);
 const payRecord = payListRes.data?.data;
 if (payRecord) ok('Payment record found', `status:${payRecord.status} | method:${payRecord.method}`);
 else console.log('  ℹ️  /payments/booking/:id not available — checking via admin...');

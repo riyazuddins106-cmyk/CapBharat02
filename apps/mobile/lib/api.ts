@@ -84,6 +84,7 @@ async function request<T>(
 // ── Types ──────────────────────────────────────────────────
 export interface User {
   id: string;
+  username: string;
   email: string;
   fullName: string;
   phone: string | null;
@@ -91,6 +92,27 @@ export interface User {
   role: string;
   emailVerified: boolean;
 }
+
+export interface BookingConfig {
+  minAdvanceMinutes: number;
+  sameDayBooking: boolean;
+  maxAdvanceDays: number;
+  is24Hours: boolean;
+  openingHour: number;
+  closingHour: number;
+  slotIntervalMinutes: number;
+  searchDurationMinutes: number;
+  cancellationFeeAfterAcceptancePercent: number;
+  cancellationFeeAfterAcceptanceMinAmount: number;
+  cancellationFeeAfterAcceptanceMaxAmount: number;
+  cancellationFeeAfterCheckinPercent: number;
+  cancellationFeeAfterCheckinMinAmount: number;
+  cancellationFeeAfterCheckinMaxAmount: number;
+}
+
+export const bookingConfigApi = {
+  get: () => request<BookingConfig>('/api/booking-config'),
+};
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -153,12 +175,15 @@ export interface Booking {
   reviewed?: boolean;
   serviceId?: string | null;
   createdAt: string;
+  dispatchStatus?: 'searching_partner' | 'waiting_operation' | 'assigned' | 'no_partner_found' | null;
+  dispatchDeadline?: string | null;
   /** Latest payment status from the payments table (null = no payment record yet) */
   paymentStatus?: 'created' | 'paid' | 'failed' | 'refunded' | null;
 }
 
 export type OrderItemStatus =
   | 'searching_partner'
+  | 'waiting_operation'
   | 'assigned'
   | 'partner_accepted'
   | 'partner_arrived'
@@ -177,6 +202,9 @@ export interface OrderItem {
   partnerName: string | null;
   status: OrderItemStatus;
   scheduledAt: string;
+  dispatchDeadline?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   startTime: string;
   endTime: string;
   durationMinutes: number;
@@ -282,13 +310,13 @@ async function uploadFile<T>(
 // ── Auth ───────────────────────────────────────────────────
 export const authApi = {
   register: (data: { fullName: string; email: string; password: string; phone?: string }) =>
-    request<{ userId: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ userId: string; email: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
 
   verifyOtp: (data: { email: string; code: string; purpose: string }) =>
     request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
 
   resendOtp: (data: { email: string; purpose: string }) =>
-    request<void>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
 
   login: (data: { email: string; password: string }) =>
     request<AuthTokens>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
@@ -297,7 +325,7 @@ export const authApi = {
     request<void>('/api/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }), token }),
 
   forgotPassword: (email: string) =>
-    request<void>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    request<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
 
   resetPassword: (data: { email: string; code: string; newPassword: string }) =>
     request<void>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
@@ -313,6 +341,14 @@ export const profileApi = {
   me: (token: string) => request<User>('/api/profile/me', { token }),
   update: (data: Partial<Pick<User, 'fullName' | 'phone'>>, token: string) =>
     request<User>('/api/profile/me', { method: 'PATCH', body: JSON.stringify(data), token }),
+  requestIdentityChange: (field: 'email' | 'phone', value: string, token: string) =>
+    request<{ field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string }>('/api/profile/me/identity/request', {
+      method: 'POST', body: JSON.stringify({ field, value }), token,
+    }),
+  verifyIdentityChange: (field: 'email' | 'phone', value: string, code: string, token: string) =>
+    request<User>('/api/profile/me/identity/verify', {
+      method: 'POST', body: JSON.stringify({ field, value, code }), token,
+    }),
   uploadAvatar: (uri: string, token: string) =>
     uploadFile<User>('/api/profile/me/avatar', 'avatar', uri, token),
   changePassword: (currentPassword: string, newPassword: string, token: string) =>
@@ -469,6 +505,8 @@ export const bookingsApi = {
   get: (id: string, token: string) => request<Booking>(`/api/bookings/${id}`, { token }),
   cancel: (id: string, token: string) =>
     request<Booking>(`/api/bookings/${id}/cancel`, { method: 'PATCH', token }),
+  continueSearching: (id: string, token: string) =>
+    request<Booking>(`/api/bookings/${id}/continue-searching`, { method: 'PATCH', token }),
   reschedule: (id: string, scheduledAt: string, token: string) =>
     request<Booking>(`/api/bookings/${id}/reschedule`, { method: 'PATCH', body: JSON.stringify({ scheduledAt }), token }),
   getQrToken: (id: string, token: string) =>

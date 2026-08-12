@@ -155,6 +155,13 @@ function getDefaults(key: string): object {
       openingHour:         9,
       closingHour:         20,
       slotIntervalMinutes: 30,
+       searchDurationMinutes: 10,
+        cancellationFeeAfterAcceptancePercent: 20,
+        cancellationFeeAfterAcceptanceMinAmount: 50,
+        cancellationFeeAfterAcceptanceMaxAmount: 500,
+        cancellationFeeAfterCheckinPercent: 20,
+        cancellationFeeAfterCheckinMinAmount: 50,
+        cancellationFeeAfterCheckinMaxAmount: 500,
     };
   }
   if (key === 'payout_config') {

@@ -67,10 +67,23 @@ HTTP → middleware → controller/service → Drizzle/external provider → res
 ## Current Behavior
 
 Startup runs migrations and starts the payout scheduler before normal operation.
+Users receive an immutable globally unique username at creation; startup
+backfills missing usernames for existing records. Authenticated profile identity
+changes use `POST /api/profile/me/identity/request` followed by
+`POST /api/profile/me/identity/verify`. The OTP is bound to the proposed email
+or phone target, and direct contact-field profile updates are rejected.
+Partner job eligibility is server-enforced: active required document types must
+be approved, and when no required type is configured, at least one current
+upload must exist with all current uploads approved. The same check runs for
+automatic dispatch, Admin eligible-partner lookup, manual assignment, and
+partner acceptance.
 
 ## Known Issues
 
-Exact test-runner and deployment observability are `UNKNOWN — REQUIRES VERIFICATION`.
+Individual regression and E2E commands are verified in
+[`../08-TESTING.md`](../08-TESTING.md), but no unified root test runner or lint
+automation is configured. Production deployment observability and external
+provider configuration remain `UNKNOWN — REQUIRES VERIFICATION`.
 
 ## Important Constraints
 

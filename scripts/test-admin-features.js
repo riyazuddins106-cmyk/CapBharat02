@@ -2,9 +2,13 @@
  * Automated test for Admin Panel — verifies all 8 implemented features.
  * Run: node scripts/test-admin-features.js
  */
+import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const require = createRequire(import.meta.url);
 const { chromium } = require('playwright-chromium');
-const fs = require('fs');
-const path = require('path');
 
 const BASE = 'http://localhost:5001/admin-panel/';
 const OUT  = '/tmp/admin-test-screenshots';
@@ -25,7 +29,9 @@ async function navigate(page, section) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--no-sandbox'] });
+  const executablePath = process.env.CHROMIUM_PATH
+    ?? execFileSync('which', ['chromium'], { encoding: 'utf8' }).trim();
+  const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
   const ctx    = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page   = await ctx.newPage();
 

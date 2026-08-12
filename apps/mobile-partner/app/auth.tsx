@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { categoriesApi } from '@/lib/api';
+import { categoriesApi, type SubCategory } from '@/lib/api';
 
 type Mode = 'login' | 'forgot' | 'reset' | 'register' | 'verify';
 
@@ -22,6 +22,10 @@ export default function AuthScreen() {
 
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresInSeconds, setOtpExpiresInSeconds] = useState(600);
+  const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
@@ -40,17 +44,32 @@ export default function AuthScreen() {
   const [regPassword, setRegPassword] = useState('');
   const [regTitle, setRegTitle] = useState('');
   const [regCategoryId, setRegCategoryId] = useState('');
+  const [regSubCategoryId, setRegSubCategoryId] = useState('');
   const [regCity, setRegCity] = useState('');
   const [regArea, setRegArea] = useState('');
   const [regPincode, setRegPincode] = useState('');
   const [showRegPass, setShowRegPass] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [catsLoading, setCatsLoading] = useState(false);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
 
   // Verify OTP (after register)
   const [verifyOtp, setVerifyOtp] = useState('');
 
   const clearMessages = () => { setError(''); setSuccessMsg(''); };
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const applyOtpTiming = (result?: { devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }) => {
+    setDevCode(result?.devCode ?? '');
+    setOtpExpiresInSeconds(result?.expiresInSeconds ?? 600);
+    setResendCooldown(result?.resendAfterSeconds ?? 60);
+  };
 
   // Load categories when entering register mode
   useEffect(() => {
@@ -62,6 +81,17 @@ export default function AuthScreen() {
         .finally(() => setCatsLoading(false));
     }
   }, [mode]);
+
+  useEffect(() => {
+    setRegSubCategoryId('');
+    setSubCategories([]);
+    if (!regCategoryId) return;
+    setSubCatsLoading(true);
+    categoriesApi.getSubcategories(regCategoryId)
+      .then(data => setSubCategories(data.filter((c: SubCategory) => c.isActive)))
+      .catch(() => setSubCategories([]))
+      .finally(() => setSubCatsLoading(false));
+  }, [regCategoryId]);
 
   const doLogin = async () => {
     clearMessages();
@@ -82,8 +112,9 @@ export default function AuthScreen() {
     if (!email) return setError(tx('Enter your email address'));
     setLoading(true);
     try {
-      await forgotPassword(email.trim());
+      const result = await forgotPassword(email.trim());
       setPendingEmail(email.trim());
+      applyOtpTiming(result);
       setSuccessMsg(tx('Reset code sent — check your email.'));
       setMode('reset');
     } catch (e: any) {
@@ -110,7 +141,7 @@ export default function AuthScreen() {
 
   const doRegister = async () => {
     clearMessages();
-    if (!regName || !regEmail || !regPassword || !regCategoryId || !regTitle || !regCity) {
+    if (!regName || !regEmail || !regPassword || !regCategoryId || !regSubCategoryId || !regTitle || !regCity) {
       return setError(tx('Please fill in all required fields'));
     }
     setLoading(true);
@@ -121,12 +152,14 @@ export default function AuthScreen() {
         password: regPassword,
         phone: regPhone.trim() || undefined,
         categoryId: regCategoryId,
+        subCategoryId: regSubCategoryId,
         title: regTitle.trim(),
         city: regCity.trim(),
         area: regArea.trim() || undefined,
         pincode: regPincode.trim() || undefined,
       });
       setPendingEmail(result.email);
+      applyOtpTiming(result);
       setSuccessMsg(tx('Account created! Enter the 6-digit code sent to your email.'));
       setMode('verify');
     } catch (e: any) {
@@ -149,6 +182,22 @@ export default function AuthScreen() {
       setLoading(false);
     }
   };
+
+  const doResendOtp = async (purpose: 'signup' | 'password_reset') => {
+    if (resendCooldown > 0 || resendLoading) return;
+    clearMessages();
+    setResendLoading(true);
+    try {
+      const result = await resendOtp(pendingEmail, purpose);
+      applyOtpTiming(result);
+      setSuccessMsg(tx('Code resent — check your email.'));
+    } catch (e: any) {
+      setError(e?.message ?? tx('Could not resend code.'));
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
 
   const subtitles: Record<Mode, string> = {
     login: tx('Sign in to manage your jobs'),
@@ -268,7 +317,12 @@ export default function AuthScreen() {
                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>
                  {tx('Enter the 6-digit code sent to')} {pendingEmail}
               </Text>
-              <View style={styles.field}>
+               {devCode ? (
+                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                   {tx('Development code')}: <Text style={{ fontWeight: '800', color: colors.foreground }}>{devCode}</Text>
+                 </Text>
+               ) : null}
+               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>OTP Code</Text>
                 <TextInput
                   value={otp} onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
@@ -300,17 +354,14 @@ export default function AuthScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={async () => {
-                  clearMessages();
-                  try {
-                    await resendOtp(pendingEmail, 'password_reset');
-                     setSuccessMsg(tx('Code resent — check your email.'));
-                  } catch (e: any) {
-                     setError(e?.message ?? tx('Could not resend code.'));
-                  }
+                  await doResendOtp('password_reset');
                 }}
-                style={styles.forgotLink}
+                disabled={resendCooldown > 0 || resendLoading}
+                style={[styles.forgotLink, { opacity: resendCooldown > 0 || resendLoading ? 0.5 : 1 }]}
               >
-                <Text style={[styles.forgotText, { color: colors.primary }]}>{tx('Resend code')}</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>
+                  {resendLoading ? tx('Sending…') : resendCooldown > 0 ? `${tx('Resend code in')} ${resendCooldown}s` : tx('Resend code')}
+                </Text>
               </TouchableOpacity>
             </>
           )}
@@ -388,6 +439,40 @@ export default function AuthScreen() {
                 )}
               </View>
               <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Service Sub-category *')}</Text>
+                {!regCategoryId || subCatsLoading ? (
+                  <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: 'left' }]}>
+                    {!regCategoryId ? tx('Select a category first') : tx('Loading sub-categories…')}
+                  </Text>
+                ) : subCategories.length === 0 ? (
+                  <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: 'left' }]}>
+                    {tx('No active sub-categories are configured for this category.')}
+                  </Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+                    <View style={styles.chipRow}>
+                      {subCategories.map(sc => (
+                        <TouchableOpacity
+                          key={sc.id}
+                          onPress={() => setRegSubCategoryId(sc.id)}
+                          style={[
+                            styles.chip,
+                            {
+                              backgroundColor: regSubCategoryId === sc.id ? colors.primary : colors.muted,
+                              borderColor: regSubCategoryId === sc.id ? colors.primary : colors.border,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.chipText, { color: regSubCategoryId === sc.id ? '#fff' : colors.foreground }]}>
+                            {sc.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+              </View>
+              <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Professional Title *')}</Text>
                 <TextInput
                   value={regTitle} onChangeText={setRegTitle}
@@ -450,6 +535,14 @@ export default function AuthScreen() {
                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>
                  {tx('Enter the 6-digit code sent to')} {pendingEmail}
               </Text>
+               <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                 {tx('Code expires in')} {Math.ceil(otpExpiresInSeconds / 60)} {tx('minutes')}.
+               </Text>
+               {devCode ? (
+                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                   {tx('Development code')}: <Text style={{ fontWeight: '800', color: colors.foreground }}>{devCode}</Text>
+                 </Text>
+               ) : null}
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>{tx('Verification Code')}</Text>
                 <TextInput
@@ -466,19 +559,14 @@ export default function AuthScreen() {
               >
                 <Text style={styles.btnText}>{loading ? tx('Verifying…') : tx('Verify & Sign In')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={async () => {
-                  clearMessages();
-                  try {
-                    await resendOtp(pendingEmail, 'signup');
-                     setSuccessMsg(tx('Code resent — check your email.'));
-                  } catch (e: any) {
-                     setError(e?.message ?? tx('Could not resend code.'));
-                  }
-                }}
-                style={styles.forgotLink}
+               <TouchableOpacity
+                 onPress={() => doResendOtp('signup')}
+                 disabled={resendCooldown > 0 || resendLoading}
+                 style={[styles.forgotLink, { opacity: resendCooldown > 0 || resendLoading ? 0.5 : 1 }]}
               >
-                <Text style={[styles.forgotText, { color: colors.primary }]}>{tx('Resend code')}</Text>
+                 <Text style={[styles.forgotText, { color: colors.primary }]}>
+                   {resendLoading ? tx('Sending…') : resendCooldown > 0 ? `${tx('Resend code in')} ${resendCooldown}s` : tx('Resend code')}
+                 </Text>
               </TouchableOpacity>
             </>
           )}

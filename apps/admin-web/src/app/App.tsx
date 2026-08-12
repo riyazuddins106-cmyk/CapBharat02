@@ -19,7 +19,7 @@ import type {
   AdminAccount,
   Category, SubCategory, ReelRow, ReviewRow, DashboardStats, AuditLogRow, SupportTicketRow,
   PlatformPolicyRow, OfferRow, OfferInput, NotificationRow, ServiceRow, ServiceInput,
-  DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow, AdminOrderDetail,
+  DispatchRequestRow, EligiblePartner, TimeseriesPoint, AdminOrderRow, AdminOrderItemRow, AdminOrderDetail,
   AdminBookingDetail,
   AdminCustomerDetail, AdminProfessionalDetail,
   PayoutPartnerRow, PayoutPartnerDetail,
@@ -275,8 +275,8 @@ function Field({
   );
 }
 
-function TextInput({ value, onChange, type = "text", placeholder }: {
-  value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+function TextInput({ value, onChange, type = "text", placeholder, autoComplete }: {
+  value: string; onChange: (v: string) => void; type?: string; placeholder?: string; autoComplete?: string;
 }) {
   return (
     <input
@@ -284,6 +284,7 @@ function TextInput({ value, onChange, type = "text", placeholder }: {
       // Prevent accidental scroll-wheel changes on number inputs
       onWheel={type === "number" ? e => (e.target as HTMLInputElement).blur() : undefined}
       placeholder={placeholder}
+      autoComplete={autoComplete}
       className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors"
       style={INPUT_STYLE}
     />
@@ -539,55 +540,25 @@ const ROWS_OPTIONS = [10, 25, 50, 100, 250] as const;
 function RowsBar({ total, pageSize, onPageSizeChange }: {
   total: number; pageSize: number; onPageSizeChange: (n: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-  const label = pageSize === -1 ? "All" : pageSize;
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.05]"
       style={{ background: "rgba(255,255,255,0.015)" }}>
       <span className="text-white/30 text-xs tabular-nums">
         {total.toLocaleString("en-IN")} record{total !== 1 ? "s" : ""}
       </span>
-      <div className="flex items-center gap-2.5" ref={ref}>
+      <label className="flex items-center gap-2.5">
         <span className="text-white/30 text-xs select-none">Rows per page</span>
-        <div className="relative">
-          <button
-            onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.12] text-white/70 hover:text-white hover:border-violet-500/40 transition-all select-none"
-            style={{ background: "rgba(255,255,255,0.06)", minWidth: 60 }}
-          >
-            <span className="flex-1 text-center tabular-nums">{label}</span>
-            <ChevronDown size={11} className={`flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
-          </button>
-          {open && (
-            <div
-              className="absolute right-0 top-full mt-1.5 rounded-xl border border-white/[0.12] py-1 z-50 min-w-[80px] overflow-hidden"
-              style={{ background: "#1c2133", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
-            >
-              {ROWS_OPTIONS.map(n => (
-                <button key={n}
-                  onClick={() => { onPageSizeChange(n); setOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/[0.07] ${pageSize === n ? "text-violet-400 font-bold" : "text-white/65"}`}
-                >{n}</button>
-              ))}
-              <div className="border-t border-white/[0.06] mt-1 pt-1">
-                <button
-                  onClick={() => { onPageSizeChange(-1); setOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/[0.07] ${pageSize === -1 ? "text-violet-400 font-bold" : "text-white/65"}`}
-                >All</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+        <select
+          aria-label="Rows per page"
+          value={pageSize === -1 ? "all" : String(pageSize)}
+          onChange={e => onPageSizeChange(e.target.value === "all" ? -1 : Number(e.target.value))}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/[0.12] text-white/70 hover:text-white transition-all"
+          style={{ background: "#1c2133", minWidth: 76 }}
+        >
+          {ROWS_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+          <option value="all">All</option>
+        </select>
+      </label>
     </div>
   );
 }
@@ -832,10 +803,10 @@ function LoginPage({ onLogin, initialError = "" }: { onLogin: (user: AdminUser, 
           )}
           <div className="space-y-4">
             <Field label="Email">
-              <TextInput type="email" value={email} onChange={setEmail} placeholder="admin@servenow.in" />
+              <TextInput type="email" value={email} onChange={setEmail} placeholder="admin@servenow.in" autoComplete="email" />
             </Field>
             <Field label="Password">
-              <TextInput type="password" value={password} onChange={setPassword} placeholder="••••••••" />
+              <TextInput type="password" value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
             </Field>
           </div>
           <button
@@ -903,9 +874,10 @@ function adminShowError(msg: string) {
   else console.error("[AdminError]", msg);
 }
 
-const VALID_SECTIONS = ["dashboard","bookings","booking-history","pros","create-pro","users","categories","dispatch","orders",
-  "services","reels","offers","reviews","analytics","audit-logs","privacy","support",
-  "payment-config","email-config","sms-config","otp-settings","documents","payouts","admin-management"] as const;
+const VALID_SECTIONS: readonly string[] = [
+  ...ADMIN_SIDEBAR.map(section => section.id),
+  "create-pro",
+];
 
 // Sections that only role === 'admin' may access
 const ADMIN_ONLY_SECTIONS = new Set(
@@ -976,7 +948,9 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   const [reelList,     setReelList]     = useState<ReelRow[]>([]);
   const [serviceList,  setServiceList]  = useState<ServiceRow[]>([]);
   const [dispatchList, setDispatchList] = useState<DispatchRequestRow[]>([]);
+  const [dispatchLoading, setDispatchLoading] = useState(false);
   const [orderList,    setOrderList]    = useState<AdminOrderRow[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [loading,      setLoading]      = useState(true);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -984,6 +958,64 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
     setActionMsg({ text, type });
     setTimeout(() => setActionMsg(null), 3000);
   };
+
+  const navigateToSection = useCallback((section: string) => {
+    if (!VALID_SECTIONS.includes(section)) return;
+    if (ADMIN_ONLY_SECTIONS.has(section) && localUser.role !== "admin") {
+      setActiveSection("dashboard");
+      window.history.replaceState(null, "", "#dashboard");
+      return;
+    }
+    setActiveSection(section);
+    window.history.pushState(null, "", `#${section}`);
+  }, [localUser.role]);
+
+  useEffect(() => {
+    const syncSectionFromUrl = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (!VALID_SECTIONS.includes(hash)) return;
+      if (ADMIN_ONLY_SECTIONS.has(hash) && localUser.role !== "admin") {
+        setActiveSection("dashboard");
+        window.history.replaceState(null, "", "#dashboard");
+        return;
+      }
+      setActiveSection(hash);
+    };
+    window.addEventListener("hashchange", syncSectionFromUrl);
+    window.addEventListener("popstate", syncSectionFromUrl);
+    return () => {
+      window.removeEventListener("hashchange", syncSectionFromUrl);
+      window.removeEventListener("popstate", syncSectionFromUrl);
+    };
+  }, [localUser.role]);
+
+  const loadDispatch = useCallback(async () => {
+    setDispatchLoading(true);
+    try {
+      setDispatchList(await withInitialRequestTimeout(adminApi.getDispatch(accessToken), "Dispatch"));
+    } catch (err: any) {
+      setActionMsg({ text: err?.message ?? "Failed to load dispatch bookings", type: "error" });
+      setTimeout(() => setActionMsg(null), 3000);
+    } finally {
+      setDispatchLoading(false);
+    }
+  }, [accessToken]);
+
+  const loadOrders = useCallback(async () => {
+    setOrdersLoading(true);
+    try {
+      setOrderList(await withInitialRequestTimeout(adminApi.getOrders(accessToken), "Service orders"));
+    } catch (err: any) {
+      setActionMsg({ text: err?.message ?? "Failed to load service orders", type: "error" });
+      setTimeout(() => setActionMsg(null), 3000);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [accessToken]);
+
+  const loadOperations = useCallback(async () => {
+    await Promise.all([loadDispatch(), loadOrders()]);
+  }, [loadDispatch, loadOrders]);
 
   const loadServices = useCallback(async () => {
     try {
@@ -1025,8 +1057,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
       ["Audit logs", async () => setAuditLogs((await withInitialRequestTimeout(adminApi.getAuditLogs(accessToken), "Audit logs")).logs)],
       ["Offers", async () => setOfferList((await withInitialRequestTimeout(adminApi.getOffers(accessToken), "Offers")).offers)],
       ["Reels", async () => setReelList((await withInitialRequestTimeout(adminApi.getReels(accessToken), "Reels")).reels)],
-      ["Dispatch", async () => setDispatchList(await withInitialRequestTimeout(adminApi.getDispatch(accessToken), "Dispatch"))],
-      ["Orders", async () => setOrderList(await withInitialRequestTimeout(adminApi.getOrders(accessToken), "Orders"))],
+      ["Orders", loadOrders],
     ];
     for (const [label, loadSecondary] of secondaryLoads) {
       try {
@@ -1038,6 +1069,13 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (activeSection !== "dispatch") return;
+    void loadOperations();
+    const interval = setInterval(() => void loadOperations(), 30000);
+    return () => clearInterval(interval);
+  }, [activeSection, loadOperations]);
 
   useEffect(() => {
     adminApi.getUsers(accessToken, userPage, userPageSize, userSearch)
@@ -1147,7 +1185,32 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
 
   /* ── User handlers ── */
   const editUser = async (u: CustomerUser, patch: { fullName: string; email: string; phone: string; role: string }) => {
-    await adminApi.updateUser(u.id, patch, accessToken);
+    const email = patch.email.trim().toLowerCase();
+    const phone = patch.phone.trim();
+    const emailChanged = email !== u.email;
+    const phoneChanged = phone !== (u.phone ?? "");
+    let latest = await adminApi.updateUser(u.id, {
+      fullName: patch.fullName,
+      role: patch.role,
+    }, accessToken);
+    if (emailChanged) {
+      const requested = await adminApi.requestUserIdentityChange(u.id, "email", email, accessToken);
+      const code = window.prompt(
+        `Enter the OTP sent to ${requested.target}${requested.devCode ? `\nDev code: ${requested.devCode}` : ""}`,
+        requested.devCode ?? "",
+      );
+      if (!code) throw new Error("OTP verification is required to update email.");
+      latest = await adminApi.verifyUserIdentityChange(u.id, "email", email, code.trim(), accessToken);
+    }
+    if (phoneChanged) {
+      const requested = await adminApi.requestUserIdentityChange(u.id, "phone", phone, accessToken);
+      const code = window.prompt(
+        `Enter the OTP sent to ${requested.target}${requested.devCode ? `\nDev code: ${requested.devCode}` : ""}`,
+        requested.devCode ?? "",
+      );
+      if (!code) throw new Error("OTP verification is required to update phone.");
+      latest = await adminApi.verifyUserIdentityChange(u.id, "phone", phone, code.trim(), accessToken);
+    }
     showMsg("User updated"); load();
   };
   const deleteUser = async (id: string) => {
@@ -1259,11 +1322,11 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
         </div>
 
         <div className="flex-1 py-3 flex flex-col gap-1 px-2 overflow-y-auto">
-          {ADMIN_SIDEBAR.filter(item => !item.adminOnly || localUser.role === 'admin').map((item) => {
+           {ADMIN_SIDEBAR.filter(item => !item.adminOnly || localUser.role === 'admin').map((item) => {
             const Icon = item.icon;
             const active = activeSection === item.id;
             return (
-              <button key={item.id} onClick={() => setActiveSection(item.id)}
+              <button key={item.id} onClick={() => navigateToSection(item.id)} aria-current={active ? "page" : undefined}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left w-full"
                 style={{ background: active ? "rgba(91,62,245,0.15)" : "transparent", color: active ? "#7C5BF8" : "rgba(255,255,255,0.45)" }}>
                 <Icon size={18} className="flex-shrink-0" />
@@ -1304,8 +1367,8 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
             <p className="text-white/30 text-xs">ServeNow Admin Panel</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={load} className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors" title="Refresh">
-              <RefreshCw size={14} color="rgba(255,255,255,0.5)" />
+             <button onClick={() => void (activeSection === "dispatch" ? loadOperations() : load())} className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 hover:bg-white/5 transition-colors" title="Refresh">
+               <RefreshCw size={14} color="rgba(255,255,255,0.5)" className={activeSection === "dispatch" && (dispatchLoading || ordersLoading) ? "animate-spin" : undefined} />
             </button>
             <div className="relative" ref={notifRef}>
               <button
@@ -1390,7 +1453,7 @@ function AdminPanel({ user, accessToken, onLogout }: { user: AdminUser; accessTo
           ) : activeSection === "categories" ? (
             <CategoriesView categories={categoryList} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "dispatch" ? (
-            <DispatchView requests={dispatchList} accessToken={accessToken} onAssigned={load} />
+            <DispatchView requests={dispatchList} orders={orderList} accessToken={accessToken} loading={dispatchLoading || ordersLoading} onRefresh={loadOperations} />
           ) : activeSection === "orders" ? (
             <OrderHierarchyView orders={orderList} accessToken={accessToken} onRefresh={load} />
           ) : activeSection === "services" ? (
@@ -1565,6 +1628,21 @@ function PartnerStatusBadge({ status }: { status: string }) {
   );
 }
 
+type PartnerAssignmentTarget = {
+  id: string;
+  serviceName: string | null;
+  customerName: string;
+  scheduledAt: string;
+  source?: "booking" | "order_item";
+  orderId?: string;
+  itemId?: string;
+};
+
+type OrderItemAssignmentTarget = PartnerAssignmentTarget & {
+  orderId: string;
+  itemId: string;
+};
+
 function EligiblePartnersModal({
   booking,
   partners,
@@ -1573,7 +1651,7 @@ function EligiblePartnersModal({
   onAssign,
   onClose,
 }: {
-  booking: DispatchRequestRow;
+  booking: PartnerAssignmentTarget;
   partners: EligiblePartner[] | null;
   loading: boolean;
   assigning: string | null;
@@ -1597,7 +1675,7 @@ function EligiblePartnersModal({
         <div className="flex items-center gap-3 px-5 pt-4 pb-2">
           <span className="text-white/30 text-xs">Partner status:</span>
           {["available", "busy", "offline"].map((s) => <PartnerStatusBadge key={s} status={s} />)}
-          <span className="text-white/25 text-xs ml-auto">All active partners shown</span>
+           <span className="text-white/25 text-xs ml-auto">Service-linked partners shown</span>
         </div>
 
         {/* Partner list */}
@@ -1609,8 +1687,8 @@ function EligiblePartnersModal({
           )}
           {!loading && partners && partners.length === 0 && (
             <div className="text-center py-10">
-              <p className="text-white/40 text-sm">No active partners found for this service.</p>
-              <p className="text-white/25 text-xs mt-1">Make sure partners have this service added to their profile.</p>
+               <p className="text-white/40 text-sm">No eligible active partners found for this service.</p>
+               <p className="text-white/25 text-xs mt-1">Make sure an active partner has this service added to their profile.</p>
             </div>
           )}
           {!loading && partners && partners.map((partner) => (
@@ -1663,6 +1741,10 @@ function OrderHierarchyView({
   const [busy, setBusy] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [assignmentTarget, setAssignmentTarget] = useState<OrderItemAssignmentTarget | null>(null);
+  const [partners, setPartners] = useState<EligiblePartner[] | null>(null);
+  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [assigning, setAssigning] = useState<string | null>(null);
 
   const openDetail = async (orderId: string) => {
     setDetailLoading(true);
@@ -1675,12 +1757,59 @@ function OrderHierarchyView({
     }
   };
 
-  const runAction = async (action: "dispatch" | "refund", orderId: string, itemId: string) => {
+  const openEligiblePartners = async (order: AdminOrderRow, item: AdminOrderItemRow) => {
+    setAssignmentTarget({
+      id: item.id,
+      itemId: item.id,
+      orderId: order.id,
+      serviceName: item.serviceName,
+      customerName: order.customerName,
+      scheduledAt: item.scheduledAt,
+    });
+    setPartners(null);
+    setLoadingPartners(true);
+    try {
+      setPartners(await adminApi.getOrderItemEligiblePartners(order.id, item.id, accessToken));
+    } catch (err: any) {
+      setPartners([]);
+      adminShowError(err?.message ?? "Could not load eligible partners.");
+    } finally {
+      setLoadingPartners(false);
+    }
+  };
+
+  const closeAssignment = () => {
+    setAssignmentTarget(null);
+    setPartners(null);
+    setAssigning(null);
+  };
+
+  const assignOrderItem = async (partnerId: string) => {
+    if (!assignmentTarget) return;
+    setAssigning(partnerId);
+    try {
+      await adminApi.assignOrderItemPartner(assignmentTarget.orderId, assignmentTarget.itemId, partnerId, accessToken);
+      closeAssignment();
+      onRefresh();
+    } catch (err: any) {
+      adminShowError(err?.message ?? "Could not assign partner.");
+    } finally {
+      setAssigning(null);
+    }
+  };
+
+  const runAction = async (action: "dispatch" | "refund" | "stop" | "cancel", orderId: string, itemId: string) => {
     const key = `${action}:${itemId}`;
+    if (action === "stop" && !window.confirm("Stop searching for a partner for this service?")) return;
+    if (action === "cancel" && !window.confirm("Cancel this service from the order?")) return;
     setBusy(key);
     try {
       if (action === "dispatch") {
         await adminApi.continueOrderItemDispatch(orderId, itemId, accessToken);
+      } else if (action === "stop") {
+        await adminApi.stopOrderItemSearching(orderId, itemId, accessToken);
+      } else if (action === "cancel") {
+        await adminApi.cancelOrderItem(orderId, itemId, accessToken);
       } else {
         await adminApi.refundOrderItem(orderId, itemId, accessToken);
       }
@@ -1735,6 +1864,9 @@ function OrderHierarchyView({
                   <div className="border-t border-white/[0.07] p-3 flex flex-col gap-2">
                     {order.items.map((item) => {
                       const canDispatch = !["cancelled", "service_completed"].includes(item.status);
+                      const canAssign = !["cancelled", "service_completed"].includes(item.status);
+                      const canStop = !item.partnerId && ["searching_partner", "waiting_operation"].includes(item.status);
+                      const canCancel = !["cancelled", "service_completed"].includes(item.status) && item.payment?.status !== "paid";
                       const canRefund = item.payment?.status === "paid";
                       return (
                         <div key={item.id} className="rounded-xl border border-white/[0.07] p-3">
@@ -1765,6 +1897,32 @@ function OrderHierarchyView({
                             </div>
                           </div>
                           <div className="flex gap-2 mt-3">
+                            {canAssign && (
+                              <ActionBtn
+                                variant="purple"
+                                onClick={() => void openEligiblePartners(order, item)}
+                              >
+                                Eligible Partners
+                              </ActionBtn>
+                            )}
+                            {canStop && (
+                              <ActionBtn
+                                variant="warn"
+                                disabled={busy === `stop:${item.id}`}
+                                onClick={() => void runAction("stop", order.id, item.id)}
+                              >
+                                {busy === `stop:${item.id}` ? "Stopping…" : "Stop searching"}
+                              </ActionBtn>
+                            )}
+                            {canCancel && (
+                              <ActionBtn
+                                variant="danger"
+                                disabled={busy === `cancel:${item.id}`}
+                                onClick={() => void runAction("cancel", order.id, item.id)}
+                              >
+                                {busy === `cancel:${item.id}` ? "Cancelling…" : "Cancel service"}
+                              </ActionBtn>
+                            )}
                             {canDispatch && (
                               <ActionBtn
                                 variant="edit"
@@ -1799,6 +1957,16 @@ function OrderHierarchyView({
           detail={detail}
           loading={detailLoading}
           onClose={() => { setDetail(null); setDetailLoading(false); }}
+        />
+      )}
+      {assignmentTarget && (
+        <EligiblePartnersModal
+          booking={assignmentTarget}
+          partners={partners}
+          loading={loadingPartners}
+          assigning={assigning}
+          onAssign={assignOrderItem}
+          onClose={closeAssignment}
         />
       )}
     </div>
@@ -1970,16 +2138,22 @@ function BookingDetailModal({
 
 function DispatchView({
   requests,
+  orders,
   accessToken,
-  onAssigned,
+  loading,
+  onRefresh,
 }: {
   requests: DispatchRequestRow[];
+  orders: AdminOrderRow[];
   accessToken: string;
-  onAssigned: () => void;
+  loading: boolean;
+  onRefresh: () => Promise<void>;
 }) {
-  const DV_COLS = ["Customer", "Service", "Scheduled", "Dispatch Status", "Partner"] as const;
+  const DV_COLS = ["Source", "Customer", "Service", "Scheduled", "Dispatch Status", "Partner"] as const;
   const [modalBooking, setModalBooking] = useState<DispatchRequestRow | null>(null);
   const [detail, setDetail] = useState<AdminBookingDetail | null>(null);
+  const [orderDetail, setOrderDetail] = useState<AdminOrderDetail | null>(null);
+  const [detailTarget, setDetailTarget] = useState<"booking" | "order" | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [partners, setPartners] = useState<EligiblePartner[] | null>(null);
   const [loadingPartners, setLoadingPartners] = useState(false);
@@ -2000,7 +2174,9 @@ function DispatchView({
     setPartners(null);
     setLoadingPartners(true);
     try {
-      const list = await adminApi.getEligiblePartners(request.id, accessToken);
+      const list = request.source === "order_item" && request.orderId && request.itemId
+        ? await adminApi.getOrderItemEligiblePartners(request.orderId, request.itemId, accessToken)
+        : await adminApi.getEligiblePartners(request.id, accessToken);
       setPartners(list);
     } catch {
       setPartners([]);
@@ -2016,9 +2192,18 @@ function DispatchView({
   };
 
   const openDetails = async (bookingId: string) => {
+    const request = allRequests.find(row => row.id === bookingId);
+    const isOrderItem = request?.source === "order_item" && Boolean(request.orderId);
+    setDetailTarget(isOrderItem ? "order" : "booking");
+    setDetail(null);
+    setOrderDetail(null);
     setDetailLoading(true);
     try {
-      setDetail(await adminApi.getBooking(bookingId, accessToken));
+      if (isOrderItem && request?.orderId) {
+        setOrderDetail(await adminApi.getOrder(request.orderId, accessToken));
+      } else {
+        setDetail(await adminApi.getBooking(bookingId, accessToken));
+      }
     } catch (e: any) {
       setToast(e?.message ?? "Could not load booking details.");
       setTimeout(() => setToast(null), 3000);
@@ -2028,18 +2213,28 @@ function DispatchView({
   };
 
   const runBookingAction = async (action: "stop" | "cancel", booking: DispatchRequestRow) => {
-    const label = action === "stop" ? "stop partner searching" : "cancel this booking";
+    const label = action === "stop"
+      ? "stop partner searching"
+      : booking.source === "order_item" ? "cancel this service" : "cancel this booking";
     if (!window.confirm(`Are you sure you want to ${label}?`)) return;
     const key = `${action}:${booking.id}`;
     setActionKey(key);
     try {
       if (action === "stop") {
-        await adminApi.stopSearching(booking.id, accessToken);
+        if (booking.source === "order_item" && booking.orderId && booking.itemId) {
+          await adminApi.stopOrderItemSearching(booking.orderId, booking.itemId, accessToken);
+        } else {
+          await adminApi.stopSearching(booking.id, accessToken);
+        }
+      } else if (booking.source === "order_item" && booking.orderId && booking.itemId) {
+        await adminApi.cancelOrderItem(booking.orderId, booking.itemId, accessToken);
       } else {
         await adminApi.cancelBooking(booking.id, accessToken);
       }
-      setToast(action === "stop" ? "Partner searching stopped." : "Booking cancelled.");
-      onAssigned();
+      setToast(action === "stop"
+        ? "Partner searching stopped."
+        : booking.source === "order_item" ? "Service cancelled." : "Booking cancelled.");
+      await onRefresh();
       setTimeout(() => setToast(null), 3000);
     } catch (e: any) {
       setToast(e?.message ?? `Could not ${action} booking.`);
@@ -2053,10 +2248,14 @@ function DispatchView({
     if (!modalBooking) return;
     setAssigning(partnerId);
     try {
-      await adminApi.assignPartner(modalBooking.id, partnerId, accessToken);
+      if (modalBooking.source === "order_item" && modalBooking.orderId && modalBooking.itemId) {
+        await adminApi.assignOrderItemPartner(modalBooking.orderId, modalBooking.itemId, partnerId, accessToken);
+      } else {
+        await adminApi.assignPartner(modalBooking.id, partnerId, accessToken);
+      }
       setToast("Partner assigned successfully!");
       closeModal();
-      onAssigned();
+      await onRefresh();
       setTimeout(() => setToast(null), 3000);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Assignment failed";
@@ -2067,25 +2266,58 @@ function DispatchView({
     }
   };
 
-  const dispatchStatusColor = (s: string) =>
-    s === "assigned" ? "#16A34A"
-      : s === "waiting_operation" ? "#ef4444"
-      : s === "cancelled" ? "#EF4444"
-      : "#F59E0B";
+   const effectiveDispatchStatus = (request: DispatchRequestRow) => {
+     if (request.source === "order_item") {
+       if (request.status === "cancelled" || request.status === "service_completed") return request.status === "service_completed" ? "completed" : "cancelled";
+       if (["assigned", "partner_accepted"].includes(request.status)) return "assigned";
+       if (["partner_arrived", "payment_pending", "payment_completed", "service_started"].includes(request.status)) return "in_progress";
+     }
+     return request.status === "cancelled" || request.status === "completed"
+       ? request.status
+       : request.dispatchStatus;
+   };
 
-  const q = search.toLowerCase();
-  const filtered = requests.filter((r) => {
+   const dispatchStatusColor = (s: string) =>
+     s === "assigned" ? "#16A34A"
+       : s === "completed" ? "#16A34A"
+       : s === "waiting_operation" ? "#ef4444"
+       : s === "cancelled" ? "#EF4444"
+       : "#F59E0B";
+
+   const orderItemRows: DispatchRequestRow[] = orders.flatMap(order =>
+     order.items.map(item => ({
+       id: item.id,
+       source: "order_item" as const,
+       orderId: order.id,
+       itemId: item.id,
+       status: item.status,
+       dispatchStatus: item.status,
+       assignmentType: item.partnerId ? "partner" : "auto",
+       serviceName: item.serviceName ?? "Service",
+       proName: null,
+       partnerId: item.partnerId,
+        paymentStatus: item.payment?.status ?? null,
+       price: item.customerPrice,
+       scheduledAt: item.scheduledAt,
+       createdAt: item.createdAt,
+       customerName: order.customerName,
+       requests: [],
+     })),
+   );
+   const allRequests = [...requests, ...orderItemRows];
+   const q = search.toLowerCase();
+   const filtered = allRequests.filter((r) => {
     const matchesSearch = !q ||
       r.customerName?.toLowerCase().includes(q) ||
       r.serviceName?.toLowerCase().includes(q) ||
       (r.proName ?? "").toLowerCase().includes(q);
-    const matchesStatus = statusFilter === "all" || r.dispatchStatus === statusFilter;
-    const rDate = r.createdAt ? new Date(r.createdAt) : null;
+     const matchesStatus = statusFilter === "all" || effectiveDispatchStatus(r) === statusFilter;
+     const rDate = r.scheduledAt ? new Date(r.scheduledAt) : null;
     const matchesFrom = !dateFrom || (rDate && rDate >= new Date(dateFrom));
     const matchesTo   = !dateTo   || (rDate && rDate <= new Date(dateTo + "T23:59:59"));
     return matchesSearch && matchesStatus && matchesFrom && matchesTo;
   });
-  const dvSorted = sortDv(filtered as Record<string, unknown>[]) as typeof filtered;
+   const dvSorted = sortDv(filtered as Record<string, unknown>[]) as typeof filtered;
   const dvEff    = dvPageSize === -1 ? dvSorted.length : dvPageSize;
   const dvPaged  = dvSorted.slice((dvPage - 1) * dvEff, dvPage * dvEff);
 
@@ -2093,36 +2325,51 @@ function DispatchView({
 
   const exportDispatch = () => exportToExcel(
     dvSorted.map(r => ({
+       ...(dvColVis.isVisible("Source")          && { Source: r.source === "order_item" ? "Service order" : "Legacy booking" }),
       ...(dvColVis.isVisible("Customer")        && { Customer: r.customerName }),
       ...(dvColVis.isVisible("Service")         && { Service: r.serviceName }),
       ...(dvColVis.isVisible("Scheduled")       && { Scheduled: new Date(r.scheduledAt).toLocaleString("en-IN") }),
-      ...(dvColVis.isVisible("Dispatch Status") && { "Dispatch Status": r.dispatchStatus.replace(/_/g, " ") }),
+       ...(dvColVis.isVisible("Dispatch Status") && { "Dispatch Status": effectiveDispatchStatus(r).replace(/_/g, " ") }),
       ...(dvColVis.isVisible("Partner")         && { Partner: r.proName ?? "—" }),
     })),
     `Dispatch_${new Date().toISOString().slice(0, 10)}.xlsx`
   );
 
-  const STATUS_OPTIONS = [
+   const STATUS_OPTIONS = [
     { value: "all",               label: "All" },
     { value: "searching_partner", label: "Searching" },
     { value: "waiting_operation", label: "Waiting" },
     { value: "assigned",          label: "Assigned" },
+     { value: "in_progress",       label: "In progress" },
     { value: "cancelled",         label: "Cancelled" },
+    { value: "completed",         label: "Completed" },
   ];
 
   return (
     <div className="flex flex-col gap-5 flex-1 overflow-y-auto min-h-0 pb-6">
       <div>
-        <h2 className="text-white font-bold text-xl">Customer Booking Operations Control Centre</h2>
-        <p className="text-white/40 text-sm mt-1">Monitor customer bookings and coordinate partner assignment.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-white font-bold text-xl">Booking Operations Control Centre</h2>
+            <p className="text-white/40 text-sm mt-1">Monitor legacy bookings and service-order dispatch jobs in one queue.</p>
+          </div>
+          <button
+            onClick={() => void onRefresh()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : undefined} />
+            {loading ? "Refreshing…" : "Refresh queue"}
+          </button>
+        </div>
       </div>
 
       {/* Stats — clickable to filter */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {([
-          ["Searching",             "searching_partner", requests.filter((r) => r.dispatchStatus === "searching_partner").length],
-          ["Waiting for operations","waiting_operation", requests.filter((r) => r.dispatchStatus === "waiting_operation").length],
-          ["Assigned",              "assigned",          requests.filter((r) => r.dispatchStatus === "assigned").length],
+           ["Searching",             "searching_partner", allRequests.filter((r) => effectiveDispatchStatus(r) === "searching_partner").length],
+           ["Waiting for operations","waiting_operation", allRequests.filter((r) => effectiveDispatchStatus(r) === "waiting_operation").length],
+           ["Assigned",              "assigned",          allRequests.filter((r) => effectiveDispatchStatus(r) === "assigned").length],
         ] as [string, string, number][]).map(([label, val, count]) => (
           <button
             key={label}
@@ -2184,15 +2431,15 @@ function DispatchView({
         {(search || statusFilter !== "all" || dateFrom || dateTo) && (
           <button onClick={() => { setSearch(""); setStatusFilter("all"); setDateFrom(""); setDateTo(""); }} className="text-xs text-white/40 hover:text-white/70 transition-colors px-2">Clear all</button>
         )}
-        <ColumnVisibilityMenu columns={DV_COLS} labels={{ Customer: "Customer", Service: "Service", Scheduled: "Scheduled", "Dispatch Status": "Dispatch Status", Partner: "Partner" }} hidden={dvColVis.hidden} onToggle={dvColVis.toggle as (col: string) => void} />
+        <ColumnVisibilityMenu columns={DV_COLS} labels={{ Source: "Source", Customer: "Customer", Service: "Service", Scheduled: "Scheduled", "Dispatch Status": "Dispatch Status", Partner: "Partner" }} hidden={dvColVis.hidden} onToggle={dvColVis.toggle as (col: string) => void} />
         <ExportBtn onClick={exportDispatch} />
       </div>
 
       {/* Result count */}
       <p className="text-white/25 text-xs -mt-1">
-        Showing {filtered.length} of {requests.length} bookings
+        Showing {filtered.length} of {allRequests.length} dispatch jobs
         {search && <span> matching "<span className="text-white/40">{search}</span>"</span>}
-        {(dateFrom || dateTo) && <span className="text-white/30"> · date filtered</span>}
+        {(dateFrom || dateTo) && <span className="text-white/30"> · scheduled date filtered</span>}
       </p>
 
       {/* Table */}
@@ -2200,8 +2447,9 @@ function DispatchView({
         <RowsBar total={dvSorted.length} pageSize={dvPageSize} onPageSizeChange={n => { setDvPageSize(n); setDvPage(1); }} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={{ background: "#161B27" }}>
               <tr className="border-b border-white/[0.07]">
+                {dvColVis.isVisible("Source")           && <SortTh label="Source"           field="source"          sort={dvSort} onSort={toggleDvSort} />}
                 {dvColVis.isVisible("Customer")         && <SortTh label="Customer"         field="customerName"    sort={dvSort} onSort={toggleDvSort} />}
                 {dvColVis.isVisible("Service")          && <SortTh label="Service"          field="serviceName"     sort={dvSort} onSort={toggleDvSort} />}
                 {dvColVis.isVisible("Scheduled")        && <SortTh label="Scheduled"        field="scheduledAt"     sort={dvSort} onSort={toggleDvSort} />}
@@ -2211,23 +2459,30 @@ function DispatchView({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
-              {dvPaged.map((request) => (
+              {loading && allRequests.length === 0 ? (
+                <EmptyRow cols={7} text="Loading dispatch jobs…" />
+              ) : dvPaged.map((request) => (
                 <tr key={request.id} className="hover:bg-white/[0.02] transition-colors">
+                  {dvColVis.isVisible("Source") && (
+                    <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">
+                      {request.source === "order_item" ? "Service order" : "Legacy booking"}
+                    </td>
+                  )}
                   {dvColVis.isVisible("Customer")        && <td className="px-4 py-3 text-white font-medium">{request.customerName}</td>}
                   {dvColVis.isVisible("Service")         && <td className="px-4 py-3 text-white/70">{request.serviceName}</td>}
                   {dvColVis.isVisible("Scheduled")       && <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(request.scheduledAt).toLocaleString("en-IN")}</td>}
                   {dvColVis.isVisible("Dispatch Status") && (
                     <td className="px-4 py-3">
                       <Badge
-                        label={request.dispatchStatus.replace(/_/g, " ")}
-                        color={dispatchStatusColor(request.dispatchStatus)}
+                         label={effectiveDispatchStatus(request).replace(/_/g, " ")}
+                         color={dispatchStatusColor(effectiveDispatchStatus(request))}
                       />
                     </td>
                   )}
                   {dvColVis.isVisible("Partner") && (
                     <td className="px-4 py-3 text-white/70">
-                      {request.dispatchStatus === "assigned" && request.proName
-                        ? request.proName
+                       {effectiveDispatchStatus(request) === "assigned" && (request.proName || request.partnerId)
+                         ? request.proName ?? "Partner assigned"
                         : <span className="text-white/25 italic">—</span>}
                     </td>
                   )}
@@ -2239,13 +2494,25 @@ function DispatchView({
                        >
                          Service details
                        </button>
-                       <button
-                         onClick={() => openModal(request)}
-                         className="rounded-lg bg-violet-500/15 px-2.5 py-2 text-[11px] font-bold text-violet-300 hover:bg-violet-500/25 transition-colors whitespace-nowrap"
-                       >
-                         {request.dispatchStatus === "assigned" ? "Reassign Partner" : "Eligible Partners"}
-                       </button>
-                       {["searching_partner", "waiting_operation"].includes(request.dispatchStatus) && (
+                        {request.source !== "order_item" && (
+                         <button
+                           onClick={() => void openModal(request)}
+                           className="rounded-lg bg-violet-500/15 px-2.5 py-2 text-[11px] font-bold text-violet-300 hover:bg-violet-500/25 transition-colors whitespace-nowrap"
+                         >
+                           {effectiveDispatchStatus(request) === "assigned" ? "Reassign Partner" : "Eligible Partners"}
+                         </button>
+                       )}
+                       {request.source === "order_item" && !["cancelled", "completed"].includes(effectiveDispatchStatus(request)) && (
+                          <button
+                            onClick={() => openModal(request)}
+                            className="rounded-lg bg-violet-500/15 px-2.5 py-2 text-[11px] font-bold text-violet-300 hover:bg-violet-500/25 transition-colors whitespace-nowrap"
+                          >
+                            {effectiveDispatchStatus(request) === "assigned" ? "Reassign Partner" : "Eligible Partners"}
+                          </button>
+                         )}
+                          {["searching_partner", "waiting_operation"].includes(effectiveDispatchStatus(request))
+                            && !request.partnerId
+                            && !["cancelled", "completed"].includes(effectiveDispatchStatus(request)) && (
                          <button
                            onClick={() => void runBookingAction("stop", request)}
                            disabled={actionKey === `stop:${request.id}`}
@@ -2254,21 +2521,22 @@ function DispatchView({
                            {actionKey === `stop:${request.id}` ? "Stopping…" : "Stop searching"}
                          </button>
                        )}
-                       {!["cancelled", "completed"].includes(request.status) && (
+                        {!["cancelled", "completed"].includes(effectiveDispatchStatus(request))
+                          && (request.source !== "order_item" || request.paymentStatus !== "paid") && (
                          <button
                            onClick={() => void runBookingAction("cancel", request)}
                            disabled={actionKey === `cancel:${request.id}`}
                            className="rounded-lg border border-red-400/25 bg-red-400/10 px-2.5 py-2 text-[11px] font-bold text-red-300 hover:bg-red-400/20 disabled:opacity-50 whitespace-nowrap"
                          >
-                           {actionKey === `cancel:${request.id}` ? "Cancelling…" : "Cancel booking"}
+                            {actionKey === `cancel:${request.id}` ? "Cancelling…" : request.source === "order_item" ? "Cancel service" : "Cancel booking"}
                          </button>
                        )}
                      </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <EmptyRow cols={6} text={search || statusFilter !== "all" ? "No bookings match your filter" : "No active dispatch bookings"} />
+              {!loading && filtered.length === 0 && (
+                <EmptyRow cols={7} text={search || statusFilter !== "all" ? "No dispatch jobs match your filter" : "No active dispatch jobs"} />
               )}
             </tbody>
           </table>
@@ -2287,11 +2555,18 @@ function DispatchView({
           onClose={closeModal}
         />
       )}
-      {(detailLoading || detail) && (
+      {detailTarget === "booking" && (
         <BookingDetailModal
           detail={detail}
           loading={detailLoading}
-          onClose={() => { setDetail(null); setDetailLoading(false); }}
+          onClose={() => { setDetail(null); setDetailTarget(null); setDetailLoading(false); }}
+        />
+      )}
+      {detailTarget === "order" && (
+        <OrderDetailModal
+          detail={orderDetail}
+          loading={detailLoading}
+          onClose={() => { setOrderDetail(null); setDetailTarget(null); setDetailLoading(false); }}
         />
       )}
 
@@ -2460,7 +2735,7 @@ function BookingsView({
         <RowsBar total={bvSorted.length} pageSize={bvPageSize} onPageSizeChange={n => { setBvPageSize(n); setBvPage(1); }} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={{ background: "#161B27" }}>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Service"      field="serviceName"  sort={bvSort} onSort={toggleBvSort} />
                 <SortTh label="Customer"     field="customerName" sort={bvSort} onSort={toggleBvSort} />
@@ -2697,6 +2972,21 @@ function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; o
   return (
     <div className="flex flex-col gap-4 flex-1 overflow-y-auto min-h-0 pb-6">
 
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-white font-bold text-xl">Booking History</h2>
+          <p className="text-white/40 text-sm mt-1">Search, review, and audit the complete legacy booking record.</p>
+        </div>
+        <button
+          onClick={() => fetchData()}
+          disabled={fetching}
+          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/[0.08] disabled:opacity-50"
+        >
+          <RefreshCw size={13} className={fetching ? "animate-spin" : undefined} />
+          {fetching ? "Refreshing…" : "Refresh history"}
+        </button>
+      </div>
+
       {/* ── Date range card ── */}
       <div className="flex-shrink-0 rounded-2xl border border-white/[0.07] p-4 space-y-3" style={CARD}>
         <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
@@ -2785,7 +3075,7 @@ function BookingHistoryView({ accessToken, onRefresh }: { accessToken: string; o
         <RowsBar total={serverTotal} pageSize={pageSize} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={{ background: "#161B27" }}>
               <tr className="border-b border-white/[0.07]">
                 <th className="px-4 py-3 text-left text-white/40 text-xs font-semibold whitespace-nowrap">#</th>
                 <SortTh label="Service"      field="serviceName"  sort={bhSort} onSort={toggleBhSort} />
@@ -5572,7 +5862,7 @@ function ReviewsView({ reviews, onDelete, onRestore, accessToken }: { reviews: R
         <RowsBar total={rvSorted.length} pageSize={rvPageSize} onPageSizeChange={n => { setRvPageSize(n); setRvPage(1); }} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10" style={{ background: "#161B27" }}>
               <tr className="border-b border-white/[0.07]">
                 <SortTh label="Customer"     field="customerName" sort={rvSort} onSort={toggleRvSort} />
                 <SortTh label="Professional" field="proName"      sort={rvSort} onSort={toggleRvSort} />
@@ -7520,6 +7810,13 @@ type BookingCfg = {
   openingHour: number;
   closingHour: number;
   slotIntervalMinutes: number;
+  searchDurationMinutes: number;
+  cancellationFeeAfterAcceptancePercent: number;
+  cancellationFeeAfterAcceptanceMinAmount: number;
+  cancellationFeeAfterAcceptanceMaxAmount: number;
+  cancellationFeeAfterCheckinPercent: number;
+  cancellationFeeAfterCheckinMinAmount: number;
+  cancellationFeeAfterCheckinMaxAmount: number;
 };
 const DEFAULT_BOOKING_CFG: BookingCfg = {
   minAdvanceMinutes: 30,
@@ -7529,6 +7826,13 @@ const DEFAULT_BOOKING_CFG: BookingCfg = {
   openingHour: 8,
   closingHour: 20,
   slotIntervalMinutes: 30,
+  searchDurationMinutes: 10,
+  cancellationFeeAfterAcceptancePercent: 20,
+  cancellationFeeAfterAcceptanceMinAmount: 50,
+  cancellationFeeAfterAcceptanceMaxAmount: 500,
+  cancellationFeeAfterCheckinPercent: 20,
+  cancellationFeeAfterCheckinMinAmount: 50,
+  cancellationFeeAfterCheckinMaxAmount: 500,
 };
 
 function BookingSettingsView({ accessToken }: { accessToken: string }) {
@@ -7553,6 +7857,20 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
   const save = async () => {
     if (!cfg.is24Hours && cfg.openingHour >= cfg.closingHour) {
       showMsg("Opening hour must be before closing hour.", "error"); return;
+    }
+    if (
+      cfg.cancellationFeeAfterAcceptanceMinAmount > cfg.cancellationFeeAfterAcceptanceMaxAmount
+      || cfg.cancellationFeeAfterCheckinMinAmount > cfg.cancellationFeeAfterCheckinMaxAmount
+    ) {
+      showMsg("Each cancellation fee minimum must be at or below its maximum.", "error"); return;
+    }
+    if (
+      cfg.cancellationFeeAfterAcceptancePercent < 0
+      || cfg.cancellationFeeAfterAcceptancePercent > 100
+      || cfg.cancellationFeeAfterCheckinPercent < 0
+      || cfg.cancellationFeeAfterCheckinPercent > 100
+    ) {
+      showMsg("Penalty rates must be between 0% and 100%.", "error"); return;
     }
     setSaving(true);
     try {
@@ -7719,6 +8037,119 @@ function BookingSettingsView({ accessToken }: { accessToken: string }) {
         </div>
       </div>
 
+      {/* ── Partner Search Window ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold flex items-center gap-2">
+          <Search size={15} className="text-violet-400" /> Partner Search Window
+        </h3>
+        <p className="text-white/40 text-xs -mt-2">
+          How long ServeNow will search for a partner before pausing the search and asking the customer whether to continue.
+        </p>
+        <Field label="Search Duration (minutes)">
+          <div className="flex items-center gap-3">
+            <input
+              type="range" min={1} max={60} step={1}
+              value={cfg.searchDurationMinutes}
+              onChange={e => setCfg(c => ({ ...c, searchDurationMinutes: Number(e.target.value) }))}
+              className="flex-1 accent-violet-500"
+            />
+            <span className="text-white font-bold text-sm w-20 text-right">
+              {cfg.searchDurationMinutes} min
+            </span>
+          </div>
+        </Field>
+        <p className="text-white/30 text-xs">
+          Default: 10 minutes. Customers see a live countdown while partners are being searched.
+        </p>
+      </div>
+
+      {/* ── Cancellation Fees ── */}
+      <div className="rounded-2xl border border-white/[0.07] p-5 space-y-4" style={CARD}>
+        <h3 className="text-white text-sm font-semibold flex items-center gap-2">
+          <AlertCircle size={15} className="text-violet-400" /> Cancellation Fees
+        </h3>
+        <p className="text-white/40 text-xs -mt-2">
+           Calculate a percentage of the applicable service amount, constrained between the minimum and maximum rupee fees.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-white/[0.07] p-4 space-y-3">
+             <p className="text-white text-sm font-semibold">After partner accepts</p>
+             <Field label="Penalty rate (%)">
+               <div className="flex items-center gap-3">
+                 <input
+                   type="range" min={0} max={100} step={1}
+                   value={cfg.cancellationFeeAfterAcceptancePercent}
+                   onChange={e => setCfg(c => ({ ...c, cancellationFeeAfterAcceptancePercent: Number(e.target.value) }))}
+                   className="flex-1 accent-violet-500"
+                 />
+                 <span className="text-white font-bold text-sm w-12 text-right">
+                   {cfg.cancellationFeeAfterAcceptancePercent}%
+                 </span>
+               </div>
+             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Minimum fee (₹)">
+                <input
+                  type="number" min={0} step={1}
+                  value={cfg.cancellationFeeAfterAcceptanceMinAmount}
+                  onChange={e => setCfg(c => ({ ...c, cancellationFeeAfterAcceptanceMinAmount: Number(e.target.value) }))}
+                  className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
+                  style={INPUT_STYLE}
+                />
+              </Field>
+              <Field label="Maximum fee (₹)">
+                <input
+                  type="number" min={0} step={1}
+                  value={cfg.cancellationFeeAfterAcceptanceMaxAmount}
+                  onChange={e => setCfg(c => ({ ...c, cancellationFeeAfterAcceptanceMaxAmount: Number(e.target.value) }))}
+                  className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
+                  style={INPUT_STYLE}
+                />
+              </Field>
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/[0.07] p-4 space-y-3">
+             <p className="text-white text-sm font-semibold">After partner checks in</p>
+             <Field label="Penalty rate (%)">
+               <div className="flex items-center gap-3">
+                 <input
+                   type="range" min={0} max={100} step={1}
+                   value={cfg.cancellationFeeAfterCheckinPercent}
+                   onChange={e => setCfg(c => ({ ...c, cancellationFeeAfterCheckinPercent: Number(e.target.value) }))}
+                   className="flex-1 accent-violet-500"
+                 />
+                 <span className="text-white font-bold text-sm w-12 text-right">
+                   {cfg.cancellationFeeAfterCheckinPercent}%
+                 </span>
+               </div>
+             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Minimum fee (₹)">
+                <input
+                  type="number" min={0} step={1}
+                  value={cfg.cancellationFeeAfterCheckinMinAmount}
+                  onChange={e => setCfg(c => ({ ...c, cancellationFeeAfterCheckinMinAmount: Number(e.target.value) }))}
+                  className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
+                  style={INPUT_STYLE}
+                />
+              </Field>
+              <Field label="Maximum fee (₹)">
+                <input
+                  type="number" min={0} step={1}
+                  value={cfg.cancellationFeeAfterCheckinMaxAmount}
+                  onChange={e => setCfg(c => ({ ...c, cancellationFeeAfterCheckinMaxAmount: Number(e.target.value) }))}
+                  className="w-full rounded-xl px-3 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60"
+                  style={INPUT_STYLE}
+                />
+              </Field>
+            </div>
+          </div>
+        </div>
+        <p className="text-white/30 text-xs">
+           Final penalty = max(minimum fee, min({`{rate}`}% of the service amount, maximum fee)). The customer warning and server-calculated fee use the same bounded calculation. A 0% rate with a positive minimum still applies the minimum fee.
+        </p>
+      </div>
+
       {/* Info */}
       <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 text-xs text-violet-300 space-y-1">
         <p className="font-semibold text-violet-400">How it works</p>
@@ -7751,34 +8182,97 @@ function SettingsView({
   const [fullName, setFullName] = useState(user.fullName ?? "");
   const [email, setEmail] = useState(user.email ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
-  const [saving, setSaving] = useState(false);
+  const [savingFullName, setSavingFullName] = useState(false);
+  const [savingContactField, setSavingContactField] = useState<"email" | "phone" | null>(null);
+  const [otpField, setOtpField] = useState<"email" | "phone" | null>(null);
+  const [otpValue, setOtpValue] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpTarget, setOtpTarget] = useState("");
+  const [otpExpiresInMinutes, setOtpExpiresInMinutes] = useState<number | null>(null);
+  const [requestingOtp, setRequestingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     setFullName(user.fullName ?? "");
     setEmail(user.email ?? "");
     setPhone(user.phone ?? "");
-  }, [user.id, user.fullName, user.phone]);
+  }, [user.id, user.fullName, user.email, user.phone]);
 
-  const save = async () => {
+  const saveFullName = async () => {
     if (fullName.trim().length < 2) {
       setMessage({ text: "Full name must be at least 2 characters.", type: "error" });
       return;
     }
-    setSaving(true);
+    setSavingFullName(true);
     setMessage(null);
     try {
-      const updated = await adminApi.updateAdminProfile(
-        { fullName: fullName.trim(), email: email.trim(), phone: phone.trim() || undefined },
-        accessToken,
-      );
+      const updated = await adminApi.updateAdminProfile({ fullName: fullName.trim() }, accessToken);
       adminAuth.patchUser(updated);
       onUserUpdate(updated);
       setMessage({ text: "Account details updated successfully.", type: "success" });
     } catch (e: any) {
       setMessage({ text: e.message ?? "Could not update account details.", type: "error" });
     } finally {
-      setSaving(false);
+      setSavingFullName(false);
+    }
+  };
+
+  const beginContactChange = async (field: "email" | "phone") => {
+    const value = (field === "email" ? email : phone).trim();
+    const currentValue = (user[field] ?? "").trim();
+    if (!value) {
+      setMessage({ text: `Please enter a ${field} address before requesting verification.`, type: "error" });
+      return;
+    }
+    if (value === currentValue) {
+      setMessage({ text: `Your ${field} is already set to that value.`, type: "error" });
+      return;
+    }
+    setRequestingOtp(true);
+    setMessage(null);
+    try {
+      const result = await adminApi.requestOwnIdentityChange(field, value, accessToken);
+      setOtpField(field);
+      setOtpValue(value);
+      setOtpCode(result.devCode ?? "");
+      setOtpTarget(result.target);
+      setOtpExpiresInMinutes(result.expiresInMinutes);
+      setMessage({
+        text: `Verification code sent for ${field}. ${result.devCode ? "Use the development code shown below to complete verification." : `Enter the one-time code sent to ${result.target}.`}`,
+        type: "success",
+      });
+    } catch (e: any) {
+      setMessage({ text: e.message ?? `Could not request ${field} verification.`, type: "error" });
+    } finally {
+      setRequestingOtp(false);
+    }
+  };
+
+  const verifyContactChange = async () => {
+    if (!otpField) return;
+    if (!otpCode.trim()) {
+      setMessage({ text: "Enter the verification code to continue.", type: "error" });
+      return;
+    }
+    setVerifyingOtp(true);
+    setMessage(null);
+    try {
+      const updated = await adminApi.verifyOwnIdentityChange(otpField, otpValue, otpCode.trim(), accessToken);
+      adminAuth.patchUser(updated);
+      onUserUpdate(updated);
+      if (otpField === "email") setEmail(updated.email ?? "");
+      if (otpField === "phone") setPhone(updated.phone ?? "");
+      setOtpField(null);
+      setOtpValue("");
+      setOtpCode("");
+      setOtpTarget("");
+      setOtpExpiresInMinutes(null);
+      setMessage({ text: `${otpField[0].toUpperCase() + otpField.slice(1)} updated successfully.`, type: "success" });
+    } catch (e: any) {
+      setMessage({ text: e.message ?? `Could not verify ${otpField} change.`, type: "error" });
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -7804,6 +8298,15 @@ function SettingsView({
         )}
         <div className="space-y-3">
           <label className="block">
+            <span className="text-white/40 text-xs mb-1 block">Username</span>
+            <input
+              value={user.username}
+              readOnly
+              className="w-full px-3 py-2 rounded-xl text-sm text-white/70 outline-none border border-white/10 cursor-not-allowed"
+              style={{ ...INPUT_STYLE, background: "rgba(255,255,255,0.03)" }}
+            />
+          </label>
+          <label className="block">
             <span className="text-white/40 text-xs mb-1 block">Full Name</span>
             <input
               value={fullName}
@@ -7822,6 +8325,14 @@ function SettingsView({
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
               style={INPUT_STYLE}
             />
+            <button
+              onClick={() => void beginContactChange("phone")}
+              disabled={requestingOtp || verifyingOtp || savingFullName}
+              className="mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50"
+              style={{ background: "rgba(91,62,245,0.9)" }}
+            >
+              {requestingOtp && otpField === "phone" ? "Requesting…" : "Verify phone change"}
+            </button>
           </label>
           <label className="block">
             <span className="text-white/40 text-xs mb-1 block">Email</span>
@@ -7832,20 +8343,67 @@ function SettingsView({
               className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors"
               style={INPUT_STYLE}
             />
-            <p className="text-white/25 text-[10px] mt-1">Use an email address you control. It becomes the login email immediately.</p>
+            <p className="text-white/25 text-[10px] mt-1">Use an email address you control. It requires verification before the login email changes.</p>
+            <button
+              onClick={() => void beginContactChange("email")}
+              disabled={requestingOtp || verifyingOtp || savingFullName}
+              className="mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50"
+              style={{ background: "rgba(91,62,245,0.9)" }}
+            >
+              {requestingOtp && otpField === "email" ? "Requesting…" : "Verify email change"}
+            </button>
           </label>
+          {otpField && (
+            <div className="rounded-xl border border-violet-500/30 p-4" style={{ background: "rgba(91,62,245,0.08)" }}>
+              <p className="text-white text-sm font-semibold mb-1">Confirm {otpField} change</p>
+              <p className="text-white/55 text-xs mb-3">
+                Enter the one-time code sent to {otpTarget || `your ${otpField}`}. {otpExpiresInMinutes ? `The code expires in ${otpExpiresInMinutes} minutes.` : ""}
+                {otpCode ? " Use the development code below if you are testing locally." : ""}
+              </p>
+              {otpCode && (
+                <div className="mb-3 rounded-lg border border-white/10 px-3 py-2 text-sm font-mono text-violet-200" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  Dev code: {otpCode}
+                </div>
+              )}
+              <input
+                value={otpCode}
+                onChange={e => setOtpCode(e.target.value)}
+                placeholder="Enter verification code"
+                className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none border border-white/10 focus:border-violet-500 transition-colors mb-3"
+                style={INPUT_STYLE}
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => void verifyContactChange()}
+                  disabled={verifyingOtp || requestingOtp}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
+                >
+                  {verifyingOtp ? "Verifying…" : "Confirm change"}
+                </button>
+                <button
+                  onClick={() => { setOtpField(null); setOtpValue(""); setOtpCode(""); setOtpTarget(""); setOtpExpiresInMinutes(null); }}
+                  disabled={verifyingOtp}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white/70 border border-white/10 transition-colors disabled:opacity-50"
+                  style={{ background: "rgba(255,255,255,0.03)" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           <div>
             <p className="text-white/40 text-xs mb-1">Role</p>
             <Badge label={user.role?.toUpperCase()} color="#5B3EF5" />
           </div>
           <button
-            onClick={() => void save()}
-            disabled={saving}
+            onClick={() => void saveFullName()}
+            disabled={savingFullName}
             className="flex items-center gap-2 mt-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
             style={{ background: "linear-gradient(135deg,#5b3ef5,#7c5bf8)" }}
           >
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            {saving ? "Saving…" : "Save changes"}
+            {savingFullName && <Loader2 size={14} className="animate-spin" />}
+            {savingFullName ? "Saving…" : "Save full name"}
           </button>
         </div>
       </div>
@@ -7926,14 +8484,32 @@ function AdminManagementView({
     setEditSaving(true);
     setMessage(null);
     try {
-      const updated = await adminApi.updateAdmin(editing.id, {
+      let updated = await adminApi.updateAdmin(editing.id, {
         fullName: editForm.fullName.trim(),
-        email: editForm.email.trim(),
-        phone: editForm.phone.trim(),
         role: editForm.role,
         isActive: editForm.isActive,
         ...(editForm.password ? { password: editForm.password } : {}),
       }, accessToken);
+      const emailChanged = editForm.email.trim().toLowerCase() !== editing.email;
+      const phoneChanged = editForm.phone.trim() !== (editing.phone ?? "");
+      if (emailChanged) {
+        const requested = await adminApi.requestAdminIdentityChange(editing.id, "email", editForm.email.trim(), accessToken);
+        const code = window.prompt(
+          `Enter the OTP sent to ${requested.target}${requested.devCode ? `\nDev code: ${requested.devCode}` : ""}`,
+          requested.devCode ?? "",
+        );
+        if (!code) throw new Error("OTP verification is required to update email.");
+        updated = await adminApi.verifyAdminIdentityChange(editing.id, "email", editForm.email.trim(), code.trim(), accessToken);
+      }
+      if (phoneChanged) {
+        const requested = await adminApi.requestAdminIdentityChange(editing.id, "phone", editForm.phone.trim(), accessToken);
+        const code = window.prompt(
+          `Enter the OTP sent to ${requested.target}${requested.devCode ? `\nDev code: ${requested.devCode}` : ""}`,
+          requested.devCode ?? "",
+        );
+        if (!code) throw new Error("OTP verification is required to update phone.");
+        updated = await adminApi.verifyAdminIdentityChange(editing.id, "phone", editForm.phone.trim(), code.trim(), accessToken);
+      }
       setAdmins(prev => prev.map(admin => admin.id === updated.id ? updated : admin));
       setEditing(null);
       setMessage({ text: `${updated.fullName}'s account was updated successfully.`, type: "success" });

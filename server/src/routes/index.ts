@@ -42,11 +42,33 @@ router.get('/booking-config', async (_req, res) => {
       openingHour: 8,
       closingHour: 20,
       slotIntervalMinutes: 30,
+      searchDurationMinutes: 10,
+       cancellationFeeAfterAcceptancePercent: 20,
+       cancellationFeeAfterAcceptanceMinAmount: 50,
+       cancellationFeeAfterAcceptanceMaxAmount: 500,
+       cancellationFeeAfterCheckinPercent: 20,
+       cancellationFeeAfterCheckinMinAmount: 50,
+       cancellationFeeAfterCheckinMaxAmount: 500,
     };
     const config = row ? { ...defaults, ...JSON.parse(row.value) } : defaults;
     res.json({ success: true, data: config });
   } catch {
-    res.json({ success: true, data: { minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 30, is24Hours: false, openingHour: 8, closingHour: 20, slotIntervalMinutes: 30 } });
+    res.json({ success: true, data: {
+      minAdvanceMinutes: 30,
+      sameDayBooking: true,
+      maxAdvanceDays: 30,
+      is24Hours: false,
+      openingHour: 8,
+      closingHour: 20,
+      slotIntervalMinutes: 30,
+      searchDurationMinutes: 10,
+       cancellationFeeAfterAcceptancePercent: 20,
+       cancellationFeeAfterAcceptanceMinAmount: 50,
+       cancellationFeeAfterAcceptanceMaxAmount: 500,
+       cancellationFeeAfterCheckinPercent: 20,
+       cancellationFeeAfterCheckinMinAmount: 50,
+       cancellationFeeAfterCheckinMaxAmount: 500,
+    } });
   }
 });
 

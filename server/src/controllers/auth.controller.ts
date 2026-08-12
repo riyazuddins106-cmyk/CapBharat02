@@ -5,9 +5,9 @@ import { authService } from '../services/auth.service.js';
 import { isProduction } from '../config/env.js';
 
 // Strip devCode before sending in production so OTPs are never leaked to clients.
-function sanitize<T extends { devCode?: string }>(data: T): Omit<T, 'devCode'> | T {
+function sanitize<T extends object>(data: T): Omit<T, 'devCode'> | T {
   if (isProduction) {
-    const { devCode: _drop, ...rest } = data;
+    const { devCode: _drop, ...rest } = data as T & { devCode?: string };
     return rest as Omit<T, 'devCode'>;
   }
   return data;

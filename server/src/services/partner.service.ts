@@ -64,14 +64,17 @@ export const partnerService = {
   },
 
   async updateAccount(userId: string, data: { fullName?: string; phone?: string }) {
+    if (data.phone !== undefined) {
+      throw AppError.badRequest('Phone changes require OTP verification.');
+    }
     const { userRepository } = await import('../repositories/user.repository.js');
     const updated = await userRepository.update(userId, {
       ...(data.fullName !== undefined && { fullName: data.fullName }),
-      ...(data.phone    !== undefined && { phone: data.phone }),
     });
     if (!updated) throw AppError.notFound('User not found.');
     return {
       id: updated.id,
+      username: updated.username,
       email: updated.email,
       phone: updated.phone,
       fullName: updated.fullName,
@@ -92,13 +95,13 @@ export const partnerService = {
   async listJobs(userId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
-    return partnerRepository.listJobs(pro.id);
+    return partnerRepository.listJobs(pro.id, pro.categoryId, pro.subCategoryId);
   },
 
   async getJob(userId: string, bookingId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
-    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id, pro.categoryId, pro.subCategoryId);
     if (!job) throw AppError.notFound('Job not found.');
 
     // Fetch individual booking items so the partner can see all services
@@ -123,7 +126,7 @@ export const partnerService = {
   async acceptJob(userId: string, bookingId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
-    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id, pro.categoryId, pro.subCategoryId);
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'pending') throw AppError.badRequest(`Cannot accept a booking with status "${job.status}".`);
     const { dispatchService } = await import('./dispatch.service.js');
@@ -141,12 +144,12 @@ export const partnerService = {
   async rejectJob(userId: string, bookingId: string) {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
-    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id, pro.categoryId, pro.subCategoryId);
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'pending') throw AppError.badRequest(`Cannot reject a booking with status "${job.status}".`);
     const { dispatchService } = await import('./dispatch.service.js');
     await dispatchService.reject(bookingId, pro.id);
-    const updated = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    const updated = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id, pro.categoryId, pro.subCategoryId);
     if (job.customerId) {
       const title = 'Booking declined';
       const body = `Your ${job.serviceName} booking was declined by the partner. Please book another professional.`;
@@ -162,7 +165,7 @@ export const partnerService = {
     if (!pro) throw AppError.notFound('Partner profile not found.');
     if (!['available', 'busy', 'offline'].includes(status)) throw AppError.badRequest('Invalid availability status.');
 
-    // Block going "available" unless all mandatory documents are approved
+    // Block going "available" unless all mandatory documents are approved.
     if (status === 'available') {
       const { db } = await import('../config/database.js');
       const { sql } = await import('drizzle-orm');
@@ -199,9 +202,9 @@ export const partnerService = {
       void (async () => {
         try {
           const { db } = await import('../config/database.js');
-          const { bookings, bookingItems, partnerServices, bookingPartnerRequests, bookingAssignmentLogs } =
+          const { bookings, bookingItems, partnerServices, bookingPartnerRequests, bookingAssignmentLogs, services } =
             await import('../database/schema/index.js');
-          const { eq, and, isNull, inArray } = await import('drizzle-orm');
+          const { eq, and, isNull, inArray, or } = await import('drizzle-orm');
 
           // Which services does this partner offer?
           const myServices = await db
@@ -222,6 +225,7 @@ export const partnerService = {
             })
             .from(bookings)
             .innerJoin(bookingItems, eq(bookingItems.bookingId, bookings.id))
+            .innerJoin(services, eq(bookingItems.serviceId, services.id))
             .leftJoin(
               bookingPartnerRequests,
               and(
@@ -235,6 +239,13 @@ export const partnerService = {
                 eq(bookings.dispatchStatus, 'searching_partner'),
                 isNull(bookings.deletedAt),
                 inArray(bookingItems.serviceId, myServiceIds),
+                eq(bookings.categoryId, pro.categoryId),
+                pro.subCategoryId
+                  ? or(
+                      isNull(services.subCategoryId),
+                      eq(services.subCategoryId, pro.subCategoryId),
+                    )
+                  : undefined,
                 isNull(bookingPartnerRequests.id), // not already dispatched to me
               ),
             );
@@ -289,7 +300,7 @@ export const partnerService = {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
-    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id, pro.categoryId, pro.subCategoryId);
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'upcoming' && job.status !== 'pending') {
       throw AppError.badRequest(`Cannot check in a booking with status "${job.status}".`);
@@ -324,7 +335,7 @@ export const partnerService = {
     const pro = await partnerRepository.findProfessionalByUserId(userId);
     if (!pro) throw AppError.notFound('Partner profile not found.');
 
-    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id);
+    const job = await partnerRepository.findJobByIdAndProfessional(bookingId, pro.id, pro.categoryId, pro.subCategoryId);
     if (!job) throw AppError.notFound('Job not found or not assigned to you.');
     if (job.status !== 'in_progress') {
       throw AppError.badRequest(`Cannot complete a booking with status "${job.status}". Check in first.`);

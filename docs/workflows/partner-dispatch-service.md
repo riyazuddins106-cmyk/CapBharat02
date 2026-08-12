@@ -11,8 +11,10 @@ the required service capability/availability.
 
 ## Step-by-step flow
 
-1. Dispatch identifies eligible partners using service capability and
-   operational data.
+1. Dispatch identifies eligible partners using an explicit service capability
+   link and operational data. The partner profile sub-category is not an
+   additional hard filter after the service link has matched; otherwise a
+   valid service request can be created but hidden from the partner.
 2. The backend creates/broadcasts a partner request.
 3. Partner accepts or rejects.
 4. On acceptance, the item/booking stores assignment.

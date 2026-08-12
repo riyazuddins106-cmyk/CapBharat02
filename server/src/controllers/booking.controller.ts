@@ -12,6 +12,7 @@ import { notificationDbService } from '../services/notificationDb.service.js';
 
 export const bookingController = {
   list: asyncHandler(async (req: Request, res: Response) => {
+    await dispatchService.expireTimedOutForCustomer(req.user!.userId);
     const bookings = await bookingService.list(req.user!.userId);
     sendSuccess(res, bookings);
   }),
@@ -38,6 +39,7 @@ export const bookingController = {
     const { platformSettings } = await import('../database/schema/index.js');
     const [cfgRow] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
     const bookingCfg = cfgRow ? JSON.parse(cfgRow.value) : {};
+    const searchDurationMinutes = Math.max(1, Math.min(60, Number(bookingCfg.searchDurationMinutes) || 10));
     const globalMinAdvance: number  = bookingCfg.minAdvanceMinutes ?? 30;
     const sameDayBooking: boolean   = bookingCfg.sameDayBooking !== false; // default true
     const maxAdvanceDays: number    = bookingCfg.maxAdvanceDays ?? 30;
@@ -131,7 +133,7 @@ export const bookingController = {
         notes: notes ?? null,
         price: total,
         dispatchStatus: 'searching_partner',
-        dispatchDeadline: new Date(Date.now() + 10 * 60 * 1000),
+        dispatchDeadline: new Date(Date.now() + searchDurationMinutes * 60 * 1000),
       }).returning();
       await tx.insert(bookingItems).values(rows.map(({ item, service }) => ({
         bookingId: created.id,
@@ -165,6 +167,15 @@ export const bookingController = {
 
   cancel: asyncHandler(async (req: Request, res: Response) => {
     const booking = await bookingService.cancel(req.user!.userId, req.params.id);
+    sendSuccess(res, booking);
+  }),
+
+  continueSearching: asyncHandler(async (req: Request, res: Response) => {
+    const { platformSettings } = await import('../database/schema/index.js');
+    const [cfgRow] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
+    const cfg = cfgRow ? JSON.parse(cfgRow.value) : {};
+    const durationMinutes = Math.max(1, Math.min(60, Number(cfg.searchDurationMinutes) || 10));
+    const booking = await dispatchService.continueSearching(req.params.id, req.user!.userId, durationMinutes);
     sendSuccess(res, booking);
   }),
 

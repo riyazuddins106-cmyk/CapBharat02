@@ -23,7 +23,21 @@ export const auth = {
 };
 
 // ─── Axios instance ─────────────────────────────────────────────────────────
-const client = axios.create({ baseURL: '/api' });
+// In a Replit preview, the web app and API are exposed on separate public
+// ports. Relative /api requests hit the preview app router instead of the
+// ServeNow API (502). Keep relative requests for local Vite proxy and
+// single-port production.
+function getApiOrigin(): string {
+  if (typeof window === 'undefined') return '';
+  const { hostname, protocol, port } = window.location;
+  const isLocalDev = hostname === 'localhost' || hostname === '127.0.0.1' || port === '5000';
+  const isReplitPreview = hostname.endsWith('.replit.dev') || hostname.endsWith('.repl.co');
+  return !isLocalDev && isReplitPreview ? `${protocol}//${hostname}:8000` : '';
+}
+
+const API_ORIGIN = getApiOrigin();
+const API_PREFIX = `${API_ORIGIN}/api`;
+const client = axios.create({ baseURL: API_PREFIX });
 
 client.interceptors.request.use((config) => {
   const token = auth.getToken();
@@ -40,7 +54,7 @@ client.interceptors.response.use(
       const refreshToken = auth.getRefreshToken();
       if (refreshToken) {
         try {
-          const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+          const { data } = await axios.post(`${API_PREFIX}/auth/refresh`, { refreshToken });
           auth.store(data.data.accessToken, data.data.refreshToken, data.data.user);
           original.headers.Authorization = `Bearer ${data.data.accessToken}`;
           return client(original);
@@ -57,6 +71,7 @@ client.interceptors.response.use(
 // ─── API types ───────────────────────────────────────────────────────────────
 export interface ApiUser {
   id: string;
+  username: string;
   email: string;
   phone: string | null;
   fullName: string;
@@ -81,11 +96,13 @@ export interface ApiBooking {
   proName: string | null;
   scheduledAt: string;
   status: 'pending' | 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
-  dispatchStatus: 'searching_partner' | 'assigned' | 'no_partner_found' | null;
+  dispatchStatus: 'searching_partner' | 'waiting_operation' | 'assigned' | 'no_partner_found' | null;
+  dispatchDeadline?: string | null;
   price: number;
   notes: string | null;
   professionalId: string | null;
   categoryId: string;
+  createdAt?: string;
 }
 
 export interface ApiService {
@@ -124,6 +141,7 @@ export interface ApiCart {
 
 export type ApiOrderItemStatus =
   | "searching_partner"
+  | "waiting_operation"
   | "assigned"
   | "partner_accepted"
   | "partner_arrived"
@@ -142,6 +160,9 @@ export interface ApiOrderItem {
   partnerName: string | null;
   status: ApiOrderItemStatus;
   scheduledAt: string;
+  dispatchDeadline?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   startTime: string;
   endTime: string;
   durationMinutes: number;
@@ -197,7 +218,7 @@ export interface ApiAddress {
 export const authApi = {
   async register(fullName: string, email: string, password: string, phone?: string) {
     const { data } = await client.post('/auth/register', { fullName, email, password, phone });
-    return data.data as { userId: string; email: string; devCode?: string };
+    return data.data as { userId: string; email: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number };
   },
 
   async verifyOtp(email: string, code: string, purpose: 'signup' | 'login' | 'password_reset') {
@@ -207,7 +228,7 @@ export const authApi = {
 
   async resendOtp(email: string, purpose: 'signup' | 'login' | 'password_reset') {
     const { data } = await client.post('/auth/resend-otp', { email, purpose });
-    return data.data as { devCode?: string };
+    return data.data as { devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number };
   },
 
   async login(email: string, password: string) {
@@ -221,7 +242,7 @@ export const authApi = {
 
   async forgotPassword(email: string) {
     const { data } = await client.post('/auth/forgot-password', { email });
-    return data.data as { devCode?: string };
+    return data.data as { devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number };
   },
 
   async resetPassword(email: string, code: string, newPassword: string) {
@@ -236,8 +257,16 @@ export const profileApi = {
     return data.data as ApiUser;
   },
 
-  async update(payload: { fullName?: string; phone?: string }) {
+  async update(payload: { fullName?: string }) {
     const { data } = await client.patch('/profile/me', payload);
+    return data.data as ApiUser;
+  },
+  async requestIdentityChange(field: 'email' | 'phone', value: string) {
+    const { data } = await client.post('/profile/me/identity/request', { field, value });
+    return data.data as { field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string };
+  },
+  async verifyIdentityChange(field: 'email' | 'phone', value: string, code: string) {
+    const { data } = await client.post('/profile/me/identity/verify', { field, value, code });
     return data.data as ApiUser;
   },
 
@@ -280,6 +309,10 @@ export const bookingsApi = {
   async list() {
     const { data } = await client.get('/bookings');
     return data.data as ApiBooking[];
+  },
+  async continueSearching(id: string) {
+    const { data } = await client.patch(`/bookings/${id}/continue-searching`);
+    return data.data as ApiBooking;
   },
 
   async create(scheduledAt: string, notes?: string, addressId?: string) {

@@ -11,6 +11,7 @@ description: DB schema, server API, admin UI, and mobile home screen additions f
 - **Public route**: `GET /api/reels` → lists active reels.
 - **Admin panel** (`apps/admin-web/src/app/App.tsx`): Sidebar entry "Reels" (Film icon), `ReelRow`/`SubCategory` types imported from `api.ts`, `SubCategoriesView` and `ReelsView` components added, `CategoriesView` updated with image upload and "Sub-cats" drill-down button, `ImageUploadButton` helper component added.
 - **Mobile customer app**: `reelsApi.listActive` added to `lib/api.ts`, reels horizontal scroll section added to home screen above trust badges.
+- **Partner onboarding and dispatch**: Partner Web and Mobile signup require an active sub-category under the selected category; the server persists it, links matching active catalog services, and dispatch filters new profiles by sub-category.
 
 ## Why
 Category images and sub-categories allow richer service browsing. Reels are short admin-uploaded videos shown on the customer home screen.
@@ -18,3 +19,7 @@ Category images and sub-categories allow richer service browsing. Reels are shor
 ## Key constraint
 - Supabase `fileSizeLimit` for bucket creation: use `'5MB'` string format or omit; large byte strings like `'104857600'` cause plan-limit errors.
 - `storageService.uploadCategoryImage` handles both category and subcategory image uploads (key prefix differentiates them).
+
+## Partner matching rule
+- A selected partner sub-category is matched against the service sub-category for new profiles.
+- Legacy profiles with no sub-category remain category-broad for compatibility.

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Platform, RefreshControl, ScrollView, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Platform, RefreshControl, ScrollView, ActivityIndicator, Linking, AppState } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { WebView } from 'react-native-webview';
 import type { WebViewNavigation } from 'react-native-webview';
@@ -10,10 +10,27 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { bookingsApi, ordersApi, reviewsApi, getPaymentConfig, testPay, API_BASE, type Booking, type Order, type OrderItem, type Payment, type PaymentConfig } from '@/lib/api';
+import { bookingConfigApi, bookingsApi, ordersApi, reviewsApi, getPaymentConfig, testPay, API_BASE, type Booking, type BookingConfig, type Order, type OrderItem, type Payment, type PaymentConfig } from '@/lib/api';
 import { consumePendingPayId } from '@/lib/pendingPayment';
 import { BookingCard } from '@/components/BookingCard';
 import { queryClient } from '@/lib/queryClient';
+
+function calculateCancellationFee(
+  rateValue: unknown,
+  minValue: unknown,
+  maxValue: unknown,
+  applicableAmount: number,
+  fallbackRate: number,
+) {
+  const rate = Number(rateValue);
+  const configuredMin = Number(minValue);
+  const configuredMax = Number(maxValue);
+  const min = Number.isFinite(configuredMin) ? Math.max(0, Math.round(configuredMin)) : 0;
+  const max = Number.isFinite(configuredMax) ? Math.max(min, Math.round(configuredMax)) : Number.MAX_SAFE_INTEGER;
+  const percentage = Number.isFinite(rate) ? Math.max(0, Math.min(100, rate)) : fallbackRate;
+  const calculated = Math.round(Math.max(0, Number(applicableAmount) || 0) * percentage / 100);
+  return Math.max(min, Math.min(max, calculated));
+}
 
 /* ── Payment bottom-sheet ─────────────────────────────────────────── */
 function PaymentSheet({ booking, token, onClose, onPaid }: {
@@ -237,7 +254,7 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
         {config?.testMode && (
           <View style={styles.testBanner}>
             <Text style={styles.testBannerTitle}>🧪 Test Mode Active</Text>
-            <Text style={styles.testBannerSub}>All methods shown · tapping any one simulates payment instantly. No real charge.</Text>
+            <Text style={styles.testBannerSub}>Configured methods are simulated · no real charge is made.</Text>
           </View>
         )}
 
@@ -274,6 +291,11 @@ function PaymentSheet({ booking, token, onClose, onPaid }: {
             })}
           </View>
         )}
+         {config && !config.methods.includes('upi_manual') && (
+           <Text style={{ color: '#92400E', backgroundColor: '#FFFBEB', borderRadius: 10, padding: 10, marginTop: 10, fontSize: 11, lineHeight: 16 }}>
+             UPI is not configured. Choose another payment method or ask Admin to add a UPI ID.
+           </Text>
+         )}
 
         {/* UPI Payment — QR + VPA */}
         {selected === 'upi_manual' && config?.upiVpa && (
@@ -459,16 +481,27 @@ function OrderItemPaymentSheet({ order, item, token, onClose, onPaid }: {
   </View>;
 }
 
-function OrderServiceCard({ order, item, onAction, busy }: {
+function OrderServiceCard({ order, item, bookingConfig, onAction, busy, now }: {
   order: Order;
   item: OrderItem;
+  bookingConfig?: BookingConfig;
   onAction: (action: 'cancel' | 'continue' | 'pay', orderId: string, itemId: string, reason?: string) => void;
   busy: string | null;
+  now: number;
 }) {
   const colors = useColors();
   const { accessToken } = useAuth();
   const canCancel = !['cancelled', 'service_started', 'service_completed'].includes(item.status);
-  const canContinue = !item.partnerId && item.status !== 'cancelled';
+  const fallbackSearchStart = item.updatedAt ?? item.createdAt;
+  const searchDeadline = item.dispatchDeadline
+    ?? (fallbackSearchStart ? new Date(new Date(fallbackSearchStart).getTime() + 10 * 60_000).toISOString() : null);
+  const searchSecondsRemaining = searchDeadline
+    ? Math.max(0, Math.ceil((new Date(searchDeadline).getTime() - now) / 1000))
+    : null;
+  const searchExpired = item.status === 'waiting_operation'
+    || (item.status === 'searching_partner' && searchSecondsRemaining !== null && searchSecondsRemaining <= 0);
+  const activelySearching = item.status === 'searching_partner' && !searchExpired;
+  const canContinue = !item.partnerId && searchExpired && item.status !== 'cancelled';
   const cashReported = item.payment?.method === 'cash' && !!item.payment.cashReportedAt && item.payment.status !== 'paid';
   // Cash is a two-step flow: the customer reports the cash, then the partner
   // confirms receipt. Once reported, it must not remain in "Pay Now" or look
@@ -483,19 +516,38 @@ function OrderServiceCard({ order, item, onAction, busy }: {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const canShowQr = ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status);
-  const penaltyRate = item.status === 'partner_accepted' ? 25
-    : ['partner_arrived', 'payment_pending', 'payment_completed'].includes(item.status) ? 50 : 0;
-  const estimatedFee = Math.ceil(item.customerPrice * penaltyRate / 100);
+  const cancellationFeeAmount = item.status === 'partner_accepted'
+    ? calculateCancellationFee(
+      bookingConfig?.cancellationFeeAfterAcceptancePercent,
+      bookingConfig?.cancellationFeeAfterAcceptanceMinAmount,
+      bookingConfig?.cancellationFeeAfterAcceptanceMaxAmount,
+      item.customerPrice,
+      20,
+    )
+    : ['partner_arrived', 'payment_pending', 'payment_completed'].includes(item.status)
+      ? calculateCancellationFee(
+        bookingConfig?.cancellationFeeAfterCheckinPercent,
+        bookingConfig?.cancellationFeeAfterCheckinMinAmount,
+        bookingConfig?.cancellationFeeAfterCheckinMaxAmount,
+        item.customerPrice,
+        20,
+      )
+      : 0;
+  const estimatedFee = Math.min(item.customerPrice, cancellationFeeAmount);
+  const paymentConfirmed = item.payment?.status === 'paid';
+  const paymentMissingBeforeCompletion = ['service_started', 'service_completed'].includes(item.status) && !paymentConfirmed;
   const statusSteps = [
     { key: 'searching_partner', label: 'Finding a partner' },
     { key: 'partner_accepted', label: 'Partner accepted' },
     { key: 'partner_arrived', label: 'Partner checked in' },
-    { key: 'payment_completed', label: 'Payment confirmed' },
+    { key: 'payment_completed', label: paymentMissingBeforeCompletion ? 'Payment pending' : 'Payment confirmed' },
     { key: 'service_started', label: 'Service in progress' },
     { key: 'service_completed', label: 'Service completed' },
   ];
   const currentStep = item.status === 'cancelled'
     ? -1
+    : paymentMissingBeforeCompletion
+      ? 2
     : Math.max(0, statusSteps.findIndex((step) => step.key === item.status));
 
   const openQr = async () => {
@@ -534,8 +586,25 @@ function OrderServiceCard({ order, item, onAction, busy }: {
             {formatOrderTime(item.startTime)} – {formatOrderTime(item.endTime)}
           </Text>
         </View>
-        <Text style={[styles.orderItemStatus, { color: colors.foreground }]}>{item.status.replaceAll('_', ' ')}</Text>
+        <Text style={[styles.orderItemStatus, { color: colors.foreground }]}>
+          {activelySearching ? 'Searching' : searchExpired ? 'Search paused' : item.status.replaceAll('_', ' ')}
+        </Text>
       </View>
+      {activelySearching && (
+        <Text style={[styles.searchTimer, { color: colors.primary, backgroundColor: colors.muted }]}>
+          Searching for a partner · {Math.floor((searchSecondsRemaining ?? 0) / 60)}:{String((searchSecondsRemaining ?? 0) % 60).padStart(2, '0')} remaining
+        </Text>
+      )}
+      {searchExpired && !item.partnerId && (
+        <Text style={[styles.searchPaused, { color: '#92400E', backgroundColor: '#FEF3C7' }]}>
+          Search paused. Continue searching when you’re ready.
+        </Text>
+      )}
+      {cancellationFeeAmount > 0 && canCancel && (
+        <Text style={[styles.cancellationNotice, { color: '#92400E', backgroundColor: '#FFFBEB' }]}>
+          Cancelling now may incur a cancellation fee of ₹{estimatedFee}.
+        </Text>
+      )}
        <TouchableOpacity onPress={() => setShowDetails(true)} style={styles.detailsLink}>
          <Ionicons name="information-circle-outline" size={15} color={colors.primary} />
          <Text style={[styles.detailsLinkText, { color: colors.primary }]}>View service details & tracking</Text>
@@ -605,8 +674,8 @@ function OrderServiceCard({ order, item, onAction, busy }: {
            <Text style={[styles.timelineTitle, { color: colors.foreground }]}>Booking tracking</Text>
            <View style={styles.timeline}>
              {statusSteps.map((step, index) => {
-               const done = currentStep >= index;
-               const active = item.status === step.key;
+                const done = currentStep >= index;
+                const active = item.status === step.key || (paymentMissingBeforeCompletion && step.key === 'payment_completed');
                return (
                  <View key={step.key} style={styles.timelineRow}>
                    <View style={[styles.timelineDot, { backgroundColor: done ? colors.primary : colors.border }]}>
@@ -641,8 +710,8 @@ function OrderServiceCard({ order, item, onAction, busy }: {
          <View style={[styles.cancelSheet, { backgroundColor: colors.card, borderRadius: colors.radius * 2 }]}>
            <Text style={[styles.reviewTitle, { color: colors.foreground }]}>Cancel this service?</Text>
            <Text style={[styles.orderDetail, { color: colors.mutedForeground }]}>
-             {penaltyRate > 0
-               ? `A ${penaltyRate}% cancellation fee of approximately ₹${estimatedFee} may apply because the partner has ${item.status === 'partner_accepted' ? 'accepted this service' : 'checked in'}.`
+             {cancellationFeeAmount > 0
+               ? `A cancellation fee of ₹${estimatedFee} may apply because the partner has ${item.status === 'partner_accepted' ? 'accepted this service' : 'checked in'}.`
                : 'There is no cancellation fee before a partner accepts this service.'}
            </Text>
            <TextInput
@@ -680,18 +749,43 @@ export default function BookingsScreen() {
   const [comment, setComment] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [orderActionBusy, setOrderActionBusy] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [itemPayment, setItemPayment] = useState<{ order: Order; item: OrderItem } | null>(null);
+  const { data: bookingConfig } = useQuery<BookingConfig>({
+    queryKey: ['/api/booking-config'],
+    queryFn: bookingConfigApi.get,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const { data: bookings, isLoading: bookingsLoading, refetch } = useQuery({
     queryKey: ['/api/bookings', accessToken],
     queryFn: () => bookingsApi.list(accessToken!),
     enabled: !!accessToken,
+    refetchInterval: 10_000,
   });
   const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['/api/orders', accessToken],
     queryFn: () => ordersApi.list(accessToken!),
     enabled: !!accessToken,
+    refetchInterval: 10_000,
   });
+
+  // Rehydrate immediately when the app returns from the background so a
+  // partner acceptance, cancellation, or payment change is visible at once.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && accessToken) {
+        void refetch();
+        void refetchOrders();
+      }
+    });
+    return () => subscription.remove();
+  }, [accessToken, refetch, refetchOrders]);
 
   // When arriving from checkout with a payId, force-refresh bookings (cache may be stale)
   // and switch to the searching tab so the pending booking is visible.
@@ -766,6 +860,19 @@ export default function BookingsScreen() {
     }
   };
 
+  const handleLegacyContinue = async (bookingId: string) => {
+    setOrderActionBusy(`legacy:${bookingId}`);
+    try {
+      await bookingsApi.continueSearching(bookingId, accessToken!);
+      await refetch();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Could not continue searching', e?.message ?? 'Please try again.');
+    } finally {
+      setOrderActionBusy(null);
+    }
+  };
+
   const topPadding = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const allBookings = bookings ?? [];
   const searchingBookings       = allBookings.filter((b) => b.status === 'pending');
@@ -784,7 +891,7 @@ export default function BookingsScreen() {
   const allOrderRows: OrderRow[] = orders.flatMap((order) =>
     order.items.map((item) => ({ kind: 'order' as const, order, item })),
   );
-  const searchingOrderRows = allOrderRows.filter(({ item }) => ['searching_partner', 'assigned'].includes(item.status));
+  const searchingOrderRows = allOrderRows.filter(({ item }) => ['searching_partner', 'waiting_operation', 'assigned'].includes(item.status));
   const activeOrderRows = allOrderRows.filter(({ item }) =>
     ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'].includes(item.status),
   );
@@ -940,12 +1047,16 @@ export default function BookingsScreen() {
           <OrderServiceCard
             order={row.order}
             item={row.item}
+            bookingConfig={bookingConfig}
             busy={orderActionBusy}
+            now={now}
             onAction={handleOrderAction}
           />
         ) : (
           <BookingCard
             booking={row.booking}
+            now={now}
+            onContinue={handleLegacyContinue}
             onCancel={(id) => Alert.alert('Cancel Booking', 'Are you sure you want to cancel?', [
               { text: 'Keep', style: 'cancel' },
               { text: 'Cancel Booking', style: 'destructive', onPress: () => cancelMutation.mutate(id) },
@@ -1046,6 +1157,9 @@ const styles = StyleSheet.create({
   orderItem: { flexDirection: 'row', alignItems: 'flex-start', padding: 10, borderRadius: 10 },
   orderServiceName: { fontSize: 14, fontWeight: '700' },
   orderDetail: { fontSize: 11, marginTop: 4 },
+  searchTimer: { fontSize: 11, fontWeight: '700', marginTop: 9, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+  searchPaused: { fontSize: 11, fontWeight: '700', marginTop: 9, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+  cancellationNotice: { fontSize: 11, fontWeight: '600', marginTop: 9, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
   detailsLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   detailsLinkText: { fontSize: 12, fontWeight: '700' },
   orderDetailSheet: { width: '100%', maxWidth: 390, padding: 20, gap: 14, maxHeight: '90%' },

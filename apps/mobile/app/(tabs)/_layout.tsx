@@ -1,6 +1,4 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { NativeIcon } from '@/components/NativeIcon';
 
@@ -18,39 +16,36 @@ export default function TabLayout() {
             backgroundColor: colors.card,
             borderTopColor: colors.border,
             borderTopWidth: 1,
-            height: Platform.OS === 'ios' ? 84 : 60,
-            paddingBottom: Platform.OS === 'ios' ? 28 : 8,
-            paddingTop: 8,
           },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
         }}
       >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <NativeIcon name="home" size={22} color={color} />,
+          tabBarIcon: ({ color, size }) => <NativeIcon name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="services"
         options={{
           title: 'Services',
-          tabBarIcon: ({ color }) => <NativeIcon name="search" size={22} color={color} />,
+          tabBarIcon: ({ color, size }) => <NativeIcon name="search" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
           title: 'Bookings',
-          tabBarIcon: ({ color }) => <NativeIcon name="calendar" size={22} color={color} />,
+          tabBarIcon: ({ color, size }) => <NativeIcon name="calendar" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <NativeIcon name="person" size={22} color={color} />,
+          tabBarIcon: ({ color, size }) => <NativeIcon name="person" size={size} color={color} />,
         }}
       />
       </Tabs>

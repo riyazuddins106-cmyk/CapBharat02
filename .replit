@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "bash", "web", "python-base-3.13"]
+modules = ["nodejs-20", "bash", "web", "python-base-3.13", "postgresql-16"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -84,8 +84,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile-partner && ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
-waitForPort = 8099
+args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && cd apps/mobile-partner && ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
 
 [[workflows.workflow]]
 name = "Partner Web"

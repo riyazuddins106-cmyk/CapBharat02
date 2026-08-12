@@ -61,7 +61,9 @@ Role enforcement is implemented by
 - The repository contains both legacy booking tables/routes and the newer order
   model. Do not assume they are interchangeable.
 - The server runs migrations during startup before listening.
-- No configured test runner command or lint command was verified.
+- Individual CRUD, E2E, payment, Admin browser, build, and mobile type-check
+  commands are verified in [`08-TESTING.md`](08-TESTING.md), but no unified root
+  test runner or lint command is configured.
 
 ## Current status
 

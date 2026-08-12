@@ -28,6 +28,7 @@ export const adminAuth = {
 // ── Types ────────────────────────────────────────────────────────────────────
 export interface AdminUser {
   id: string;
+  username: string;
   email: string;
   phone?: string | null;
   fullName: string;
@@ -189,6 +190,7 @@ export interface AdminOrderItemRow {
   serviceName: string | null;
   status: string;
   scheduledAt: string;
+  createdAt: string;
   durationMinutes: number;
   partnerId: string | null;
   customerPrice: number;
@@ -237,6 +239,7 @@ export interface ProfessionalRow {
 export interface CustomerUser {
   id: string;
   fullName: string;
+  username: string;
   email: string;
   phone?: string | null;
   role: string;
@@ -514,11 +517,16 @@ export interface ServiceRow {
 
 export interface DispatchRequestRow {
   id: string;
+  source?: 'booking' | 'order_item';
+  orderId?: string;
+  itemId?: string;
   status: string;
   dispatchStatus: string;
   assignmentType: string;
   serviceName: string;
   proName: string | null;
+  partnerId?: string | null;
+  paymentStatus?: string | null;
   price: number;
   scheduledAt: string;
   createdAt: string;
@@ -795,14 +803,30 @@ export const adminApi = {
   },
 
   // Users
-  updateAdminProfile: (data: { fullName?: string; email?: string; phone?: string }, token: string) =>
+  updateAdminProfile: (data: { fullName?: string }, token: string) =>
     request<AdminUser>('/admin/me', { method: 'PATCH', token, body: JSON.stringify(data) }),
+  requestOwnIdentityChange: (field: 'email' | 'phone', value: string, token: string) =>
+    request<{ field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string }>('/admin/me/identity/request', {
+      method: 'POST', token, body: JSON.stringify({ field, value }),
+    }),
+  verifyOwnIdentityChange: (field: 'email' | 'phone', value: string, code: string, token: string) =>
+    request<AdminUser>('/admin/me/identity/verify', {
+      method: 'POST', token, body: JSON.stringify({ field, value, code }),
+    }),
   getAdmins: (token: string) =>
     request<{ admins: AdminAccount[]; total: number }>('/admin/admins', { token }),
   createAdmin: (data: { fullName: string; email: string; password: string; phone?: string; role: 'admin' | 'operations_manager' }, token: string) =>
     request<AdminAccount>('/admin/admins', { method: 'POST', token, body: JSON.stringify(data) }),
   updateAdmin: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: 'admin' | 'operations_manager'; isActive?: boolean; password?: string }, token: string) =>
     request<AdminAccount>(`/admin/admins/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  requestAdminIdentityChange: (id: string, field: 'email' | 'phone', value: string, token: string) =>
+    request<{ field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string }>(`/admin/admins/${id}/identity/request`, {
+      method: 'POST', token, body: JSON.stringify({ field, value }),
+    }),
+  verifyAdminIdentityChange: (id: string, field: 'email' | 'phone', value: string, code: string, token: string) =>
+    request<AdminAccount>(`/admin/admins/${id}/identity/verify`, {
+      method: 'POST', token, body: JSON.stringify({ field, value, code }),
+    }),
   getUsers: (token: string, page = 1, limit = 25, search = '') => {
     const query = new URLSearchParams({
       offset: String((page - 1) * limit),
@@ -815,6 +839,14 @@ export const adminApi = {
     request<AdminCustomerDetail>(`/admin/users/${id}/detail`, { token }),
   updateUser: (id: string, data: { fullName?: string; email?: string; phone?: string; role?: string }, token: string) =>
     request<CustomerUser>(`/admin/users/${id}`, { method: 'PATCH', token, body: JSON.stringify(data) }),
+  requestUserIdentityChange: (id: string, field: 'email' | 'phone', value: string, token: string) =>
+    request<{ field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string }>(`/admin/users/${id}/identity/request`, {
+      method: 'POST', token, body: JSON.stringify({ field, value }),
+    }),
+  verifyUserIdentityChange: (id: string, field: 'email' | 'phone', value: string, code: string, token: string) =>
+    request<CustomerUser>(`/admin/users/${id}/identity/verify`, {
+      method: 'POST', token, body: JSON.stringify({ field, value, code }),
+    }),
   deleteUser: (id: string, token: string) =>
     request<{ id: string }>(`/admin/users/${id}`, { method: 'DELETE', token }),
   suspendUser: (id: string, token: string) =>
@@ -1010,6 +1042,18 @@ export const adminApi = {
   getOrders: (token: string) => request<AdminOrderRow[]>('/admin/orders', { token }),
   getOrder: (orderId: string, token: string) =>
     request<AdminOrderDetail>(`/admin/orders/${orderId}`, { token }),
+  getOrderItemEligiblePartners: (orderId: string, itemId: string, token: string) =>
+    request<EligiblePartner[]>(`/admin/orders/${orderId}/items/${itemId}/eligible-partners`, { token }),
+  assignOrderItemPartner: (orderId: string, itemId: string, partnerId: string, token: string) =>
+    request<AdminOrderItemRow>(`/admin/orders/${orderId}/items/${itemId}/assign`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ partnerId }),
+    }),
+  stopOrderItemSearching: (orderId: string, itemId: string, token: string) =>
+    request<AdminOrderItemRow>(`/admin/orders/${orderId}/items/${itemId}/stop-searching`, { method: 'PATCH', token }),
+  cancelOrderItem: (orderId: string, itemId: string, token: string) =>
+    request<AdminOrderItemRow>(`/admin/orders/${orderId}/items/${itemId}/cancel`, { method: 'PATCH', token }),
   continueOrderItemDispatch: (orderId: string, itemId: string, token: string) =>
     request<{ message: string }>(`/admin/orders/${orderId}/items/${itemId}/dispatch`, { method: 'PATCH', token }),
   refundOrderItem: (orderId: string, itemId: string, token: string) =>

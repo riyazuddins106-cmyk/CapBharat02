@@ -18,7 +18,44 @@ import { signOrderItemQrToken } from '../utils/bookingQr.js';
 
 async function getBookingCfg() {
   const [cfgRow] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
-  return cfgRow ? JSON.parse(cfgRow.value) : {};
+  return cfgRow
+    ? {
+      searchDurationMinutes: 10,
+      cancellationFeeAfterAcceptancePercent: 20,
+      cancellationFeeAfterAcceptanceMinAmount: 50,
+      cancellationFeeAfterAcceptanceMaxAmount: 500,
+      cancellationFeeAfterCheckinPercent: 20,
+      cancellationFeeAfterCheckinMinAmount: 50,
+      cancellationFeeAfterCheckinMaxAmount: 500,
+      ...JSON.parse(cfgRow.value),
+    }
+    : {
+      searchDurationMinutes: 10,
+      cancellationFeeAfterAcceptancePercent: 20,
+      cancellationFeeAfterAcceptanceMinAmount: 50,
+      cancellationFeeAfterAcceptanceMaxAmount: 500,
+      cancellationFeeAfterCheckinPercent: 20,
+      cancellationFeeAfterCheckinMinAmount: 50,
+      cancellationFeeAfterCheckinMaxAmount: 500,
+    };
+}
+
+function configuredFeeAmount(
+  rateValue: unknown,
+  fallbackRate: number,
+  minValue: unknown,
+  maxValue: unknown,
+  applicableAmount: unknown,
+) {
+  const parsedRate = Number(rateValue);
+  const configuredMin = Number(minValue);
+  const configuredMax = Number(maxValue);
+  const min = Number.isFinite(configuredMin) ? Math.max(0, Math.round(configuredMin)) : 0;
+  const max = Number.isFinite(configuredMax) ? Math.max(min, Math.round(configuredMax)) : Number.MAX_SAFE_INTEGER;
+  const percentage = Number.isFinite(parsedRate) ? Math.max(0, Math.min(100, parsedRate)) : fallbackRate;
+  const baseAmount = Math.max(0, Number(applicableAmount) || 0);
+  const calculatedAmount = Math.round(baseAmount * percentage / 100);
+  return Math.max(min, Math.min(max, calculatedAmount));
 }
 
 async function enrichOrderItems(orderId: string) {
@@ -50,6 +87,10 @@ async function enrichOrderItems(orderId: string) {
   }));
 }
 
+async function pauseExpiredOrderItems(orderIds: string[]) {
+  await orderDispatchService.expireTimedOutItems(orderIds);
+}
+
 // ── controller ───────────────────────────────────────────────────────────────
 
 export const ordersController = {
@@ -64,6 +105,7 @@ export const ordersController = {
     if (when <= new Date()) throw AppError.badRequest('The selected time slot is in the past. Please choose a future slot.');
 
     const bookingCfg = await getBookingCfg();
+    const searchDurationMinutes = Math.max(1, Math.min(60, Number(bookingCfg.searchDurationMinutes) || 10));
     const globalMinAdvance: number = bookingCfg.minAdvanceMinutes ?? 30;
     const sameDayBooking: boolean  = bookingCfg.sameDayBooking !== false;
     const maxAdvanceDays: number   = bookingCfg.maxAdvanceDays ?? 30;
@@ -139,6 +181,7 @@ export const ordersController = {
         orderId: createdOrder.id,
         serviceId: service.id,
         status: 'searching_partner' as const,
+        dispatchDeadline: new Date(Date.now() + searchDurationMinutes * 60_000),
         scheduledAt: when,
         durationMinutes: service.duration ?? 60,
         customerPrice: service.customerPrice,
@@ -180,6 +223,8 @@ export const ordersController = {
       .from(orders)
       .where(eq(orders.customerId, req.user!.userId))
       .orderBy(desc(orders.createdAt));
+
+    await pauseExpiredOrderItems(customerOrders.map((order) => order.id));
 
     const result = await Promise.all(customerOrders.map(async (order) => {
       const enriched = await enrichOrderItems(order.id);
@@ -248,12 +293,25 @@ export const ordersController = {
       throw AppError.badRequest('This service cannot be cancelled.');
     }
 
-    const cancellationRate = item.status === 'partner_accepted'
-      ? 25
+    const bookingCfg = await getBookingCfg();
+    const configuredCancellationFee = item.status === 'partner_accepted'
+      ? configuredFeeAmount(
+        bookingCfg.cancellationFeeAfterAcceptancePercent,
+        20,
+        bookingCfg.cancellationFeeAfterAcceptanceMinAmount,
+        bookingCfg.cancellationFeeAfterAcceptanceMaxAmount,
+        item.customerPrice,
+      )
       : ['partner_arrived', 'payment_pending', 'payment_completed'].includes(item.status)
-        ? 50
+        ? configuredFeeAmount(
+          bookingCfg.cancellationFeeAfterCheckinPercent,
+          20,
+          bookingCfg.cancellationFeeAfterCheckinMinAmount,
+          bookingCfg.cancellationFeeAfterCheckinMaxAmount,
+          item.customerPrice,
+        )
         : 0;
-    const cancellationFee = Math.ceil(item.customerPrice * cancellationRate / 100);
+    const cancellationFee = Math.min(Math.max(0, Number(item.customerPrice) || 0), configuredCancellationFee);
 
     // Cancel pending partner requests for this item
     await db.update(orderItemRequests)
@@ -300,13 +358,28 @@ export const ordersController = {
     if (item.partnerId) throw AppError.badRequest('This service already has an assigned partner.');
     if (item.status === 'cancelled') throw AppError.badRequest('Cannot search for a cancelled service.');
 
+    const bookingCfg = await getBookingCfg();
+    const searchDurationMinutes = Math.max(1, Math.min(60, Number(bookingCfg.searchDurationMinutes) || 10));
+
+    await db.update(orderItemRequests)
+      .set({ status: 'expired', respondedAt: new Date() })
+      .where(and(
+        eq(orderItemRequests.orderItemId, itemId),
+        eq(orderItemRequests.status, 'pending'),
+      ));
+
     // Reset to searching
-    await db.update(orderItems).set({ status: 'searching_partner', updatedAt: new Date() })
+    await db.update(orderItems).set({
+      status: 'searching_partner',
+      dispatchDeadline: new Date(Date.now() + searchDurationMinutes * 60_000),
+      updatedAt: new Date(),
+    })
       .where(eq(orderItems.id, itemId));
 
     // Re-broadcast
     const [freshItem] = await db.select().from(orderItems).where(eq(orderItems.id, itemId)).limit(1);
     await orderDispatchService.broadcastForItem(freshItem!, order);
+    await recomputeOrderStatus(orderId);
 
     sendSuccess(res, { message: 'Searching for a partner...' });
   }),
@@ -337,6 +410,12 @@ export const ordersController = {
     const paymentCfg = cfgRow ? JSON.parse(cfgRow.value) : {};
     if (!paymentCfg?.testMode?.enabled) {
       throw AppError.badRequest('Test mode is not enabled. Enable it in Admin → Payment Config.');
+    }
+    if (!['cash', 'upi_manual', 'razorpay', 'stripe'].includes(method)) {
+      throw AppError.badRequest('Unsupported payment method.');
+    }
+    if (method === 'upi_manual' && !(paymentCfg?.upi?.enabled === true && paymentCfg.upi.vpa?.trim())) {
+      throw AppError.badRequest('UPI is not configured. Enable UPI and add a VPA in Admin → Payment Config, or choose another payment method.');
     }
 
     const [order] = await db.select()
@@ -414,6 +493,14 @@ export const ordersController = {
 
     if (!method || !['cash', 'upi_manual'].includes(method)) {
       throw AppError.badRequest('Valid payment method (cash / upi_manual) is required.');
+    }
+    if (method === 'upi_manual') {
+      const [paymentCfgRow] = await db.select().from(platformSettings)
+        .where(eq(platformSettings.key, 'payment_config'));
+      const paymentCfg = paymentCfgRow ? JSON.parse(paymentCfgRow.value) : {};
+      if (!(paymentCfg?.upi?.enabled === true && paymentCfg.upi.vpa?.trim())) {
+        throw AppError.badRequest('UPI is not configured. Enable UPI and add a VPA in Admin → Payment Config, or choose another payment method.');
+      }
     }
 
     const [order] = await db.select()

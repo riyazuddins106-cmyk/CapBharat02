@@ -64,12 +64,14 @@ export default function DocumentsScreen() {
     queryKey: ['doc-types', accessToken],
     queryFn: () => documentsApi.listTypes(accessToken!),
     enabled: !!accessToken,
+    refetchOnMount: 'always',
   });
 
   const { data: docs = [], isLoading: docsLoading, refetch } = useQuery({
     queryKey: ['docs', accessToken],
     queryFn: () => documentsApi.list(accessToken!),
     enabled: !!accessToken,
+    refetchOnMount: 'always',
   });
 
   const deleteMutation = useMutation({

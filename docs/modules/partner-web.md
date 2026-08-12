@@ -57,7 +57,12 @@ Partner UI → API → job/availability state → UI refresh.
 
 ## Current Behavior
 
-Supports partner job and availability operations.
+Partner account settings display the immutable username. Full name remains
+directly editable; email and phone changes require OTP request/verification
+and refresh the local authenticated account state after success.
+
+Supports partner job and availability operations. Visible job feeds refresh
+every 10 seconds and refetch on browser focus/visibility return.
 
 ## Known Issues
 

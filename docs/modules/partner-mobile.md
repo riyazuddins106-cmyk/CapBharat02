@@ -39,12 +39,19 @@ payout, notification, and support-related APIs.
 ## Current Behavior
 
 Supports partner job acceptance/check-in/completion, documents, schedule,
-earnings, profile, and notifications.
+earnings, profile, and notifications. Profile settings display the immutable
+username; full name saves directly, while changed email or phone values require
+OTP verification and update the authenticated user state after success.
 
 ## Known Issues
 
-Exact mobile navigation guards and per-item job rendering are
-`UNKNOWN — REQUIRES VERIFICATION`.
+Exact mobile navigation guards are `UNKNOWN — REQUIRES VERIFICATION`.
+Order-item requests are returned when the partner has the exact
+`partner_services` link and matching category; profile sub-category labels do
+not hide a valid linked request.
+
+Partner job feeds refresh every 10 seconds and refetch on foreground. Job
+delivery remains blocked server-side until the document approval gate passes.
 
 ## Important Constraints
 

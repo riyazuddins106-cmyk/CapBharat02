@@ -9,10 +9,14 @@ import type { RegisterInput, RegisterPartnerInput, LoginInput, ResetPasswordInpu
 import { professionalRepository } from '../repositories/professional.repository.js';
 import { categoryRepository } from '../repositories/category.repository.js';
 import type { User } from '../database/schema/users.js';
+import { db } from '../config/database.js';
+import { and, eq, isNull } from 'drizzle-orm';
+import { partnerServices, services, subServiceCategories } from '../database/schema/index.js';
 
 function toPublicUser(user: User) {
   return {
     id: user.id,
+    username: user.username,
     email: user.email,
     phone: user.phone,
     fullName: user.fullName,
@@ -56,9 +60,28 @@ export const authService = {
     if (!category) {
       throw AppError.notFound('Selected category not found.');
     }
+    if (!category.isActive) {
+      throw AppError.badRequest('Selected category is not active.');
+    }
+
+    const [subCategory] = await db.select({
+      id: subServiceCategories.id,
+      categoryId: subServiceCategories.categoryId,
+      isActive: subServiceCategories.isActive,
+    })
+      .from(subServiceCategories)
+      .where(eq(subServiceCategories.id, input.subCategoryId))
+      .limit(1);
+    if (!subCategory || !subCategory.isActive) {
+      throw AppError.badRequest('Selected sub-category is not active.');
+    }
+    if (subCategory.categoryId !== input.categoryId) {
+      throw AppError.badRequest('Selected sub-category does not belong to the selected category.');
+    }
 
     const passwordHash = await hashPassword(input.password);
     const user = await userRepository.create({
+      username: await userRepository.generateUsername(input.fullName, input.email),
       email: input.email,
       phone: input.phone,
       fullName: input.fullName,
@@ -67,10 +90,11 @@ export const authService = {
     });
 
     // Create a linked professional record so the partner can log in immediately
-    await professionalRepository.create({
+    const professional = await professionalRepository.create({
       userId: user.id,
       name: input.fullName,
       categoryId: input.categoryId,
+      subCategoryId: input.subCategoryId,
       title: input.title,
       basePrice: 0,
       priceUnit: '/visit',
@@ -79,18 +103,68 @@ export const authService = {
       pincode: input.pincode || null,
     });
 
+    // A partner's selected sub-category is their initial service expertise.
+    // Link all active catalog services in that sub-category so new partners
+    // can receive matching jobs without creating or pricing catalog items.
+    const matchingServices = await db.select({ id: services.id })
+      .from(services)
+      .where(and(
+        eq(services.categoryId, input.categoryId),
+        eq(services.subCategoryId, input.subCategoryId),
+        eq(services.isActive, true),
+        isNull(services.deletedAt),
+      ));
+    if (matchingServices.length) {
+      await db.insert(partnerServices)
+        .values(matchingServices.map((service) => ({
+          partnerId: professional.id,
+          serviceId: service.id,
+        })))
+        .onConflictDoNothing();
+    }
+
     const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
-    return { userId: user.id, email: user.email, devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
+    return {
+      userId: user.id,
+      email: user.email,
+      devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+      ...(await otpService.timing()),
+    };
   },
 
   async register(input: RegisterInput) {
     const existing = await userRepository.findByEmail(input.email);
     if (existing) {
+      // A user row is created before signup OTP verification. If the client
+      // was closed on the verification screen, allow the owner to resume the
+      // pending signup instead of treating it as a permanent duplicate.
+      if (!existing.emailVerifiedAt && existing.isActive) {
+        const code = await otpService.resend(
+          existing.email,
+          'signup',
+          existing.id,
+          input.phone ?? existing.phone ?? undefined,
+        );
+        await userRepository.update(existing.id, {
+          fullName: input.fullName,
+          phone: input.phone ?? existing.phone,
+          passwordHash: await hashPassword(input.password),
+        });
+
+        return {
+          userId: existing.id,
+          email: existing.email,
+          resumed: true,
+          devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+          ...(await otpService.timing()),
+        };
+      }
       throw AppError.conflict('An account with this email already exists.');
     }
 
     const passwordHash = await hashPassword(input.password);
     const user = await userRepository.create({
+      username: await userRepository.generateUsername(input.fullName, input.email),
       email: input.email,
       phone: input.phone,
       fullName: input.fullName,
@@ -99,7 +173,12 @@ export const authService = {
 
     const code = await otpService.issue(user.email, 'signup', user.id, user.phone ?? undefined);
 
-    return { userId: user.id, email: user.email, devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
+    return {
+      userId: user.id,
+      email: user.email,
+      devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+      ...(await otpService.timing()),
+    };
   },
 
   async verifySignupOtp(email: string, code: string) {
@@ -122,8 +201,11 @@ export const authService = {
     if (!user) {
       throw AppError.notFound('Account not found.');
     }
-    const code = await otpService.issue(email, purpose, user.id, user.phone ?? undefined);
-    return { devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
+    const code = await otpService.resend(email, purpose, user.id, user.phone ?? undefined);
+    return {
+      devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+      ...(await otpService.timing()),
+    };
   },
 
   async login(input: LoginInput) {
@@ -202,7 +284,10 @@ export const authService = {
       return {};
     }
     const code = await otpService.issue(email, 'password_reset', user.id, user.phone ?? undefined);
-    return { devCode: process.env.NODE_ENV !== 'production' ? code : undefined };
+    return {
+      devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+      ...(await otpService.timing()),
+    };
   },
 
   async resetPassword(input: ResetPasswordInput) {

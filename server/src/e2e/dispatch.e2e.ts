@@ -20,15 +20,11 @@ import { db } from '../config/database.js';
 import {
   bookings, partnerServices, professionals,
   bookingPartnerRequests, bookingAssignmentLogs,
-  addresses, users, carts, cartItems,
+  addresses, users, carts, cartItems, serviceCategories, services,
 } from '../database/schema/index.js';
 import { eq, inArray } from 'drizzle-orm';
 
 const BASE = 'http://localhost:8000/api';
-
-// ── IDs from live DB ─────────────────────────────────────────────────────────
-const CLEANING_CAT   = 'aac8f0d9-f174-40f8-92d6-efcb68592d8c';
-const BATHROOM_SVC   = 'ca82fb93-f14a-43b9-ab96-05f606a21c49'; // Bathroom Cleaning, ₹599
 
 // ── Assertion helpers ────────────────────────────────────────────────────────
 let passed = 0;
@@ -102,6 +98,19 @@ async function testApiCycle() {
   const nearEmail   = `e2e.near.${run}@test.invalid`;
   const farEmail    = `e2e.far.${run}@test.invalid`;
   const pw          = 'TestPass1';
+  const [cleaningCategory] = await db.select({ id: serviceCategories.id })
+    .from(serviceCategories)
+    .where(eq(serviceCategories.name, 'Cleaning'))
+    .limit(1);
+  const [bathroomService] = await db.select({ id: services.id })
+    .from(services)
+    .where(eq(services.name, 'Bathroom Cleaning'))
+    .limit(1);
+  if (!cleaningCategory || !bathroomService) {
+    throw new Error('Fresh catalog is missing Cleaning or Bathroom Cleaning.');
+  }
+  const CLEANING_CAT = cleaningCategory.id;
+  const BATHROOM_SVC = bathroomService.id;
 
   // ── Register & verify customer ───────────────────────────────────────────
   console.log('\n── 2. Register users ────────────────────────────────────────');
@@ -124,7 +133,7 @@ async function testApiCycle() {
   // ── Register & verify near partner ──────────────────────────────────────
   const regNear = await api('POST', '/auth/register-partner', {
     fullName: 'E2E NearPro', email: nearEmail, password: pw,
-    categoryId: CLEANING_CAT, title: 'Cleaner',
+    categoryId: CLEANING_CAT, title: 'Cleaner', city: 'Bengaluru',
   });
   ok('near-partner register → 201', regNear.status, 201);
   const nearOtp    = (regNear.data as Record<string, unknown>)?.devCode as string;
@@ -139,7 +148,7 @@ async function testApiCycle() {
   // ── Register & verify far partner ───────────────────────────────────────
   const regFar = await api('POST', '/auth/register-partner', {
     fullName: 'E2E FarPro', email: farEmail, password: pw,
-    categoryId: CLEANING_CAT, title: 'Cleaner Far',
+    categoryId: CLEANING_CAT, title: 'Cleaner Far', city: 'Bengaluru',
   });
   ok('far-partner register → 201', regFar.status, 201);
   const farOtp    = (regFar.data as Record<string, unknown>)?.devCode as string;
@@ -369,7 +378,16 @@ async function cleanup() {
     if (validBookings.length)  await db.delete(bookings).where(inArray(bookings.id, validBookings));
     if (validAddresses.length) await db.delete(addresses).where(inArray(addresses.id, validAddresses));
     if (validUsers.length) {
-      // cascade: professionals → partnerServices, bookingPartnerRequests (via userId cascade)
+      // professionals.user_id is ON DELETE SET NULL, so delete test profiles
+      // explicitly or every interrupted run leaves an orphan in Admin.
+      const testProfessionals = await db.select({ id: professionals.id })
+        .from(professionals)
+        .where(inArray(professionals.userId, validUsers));
+      const professionalIds = testProfessionals.map(({ id }) => id);
+      if (professionalIds.length) {
+        await db.delete(bookings).where(inArray(bookings.professionalId, professionalIds));
+        await db.delete(professionals).where(inArray(professionals.id, professionalIds));
+      }
       await db.delete(users).where(inArray(users.id, validUsers));
     }
     // Also clean up any orphan carts (customer was deleted, carts cascade)

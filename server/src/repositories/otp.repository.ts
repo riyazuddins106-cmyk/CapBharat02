@@ -18,6 +18,42 @@ export const otpRepository = {
     return otp;
   },
 
+  async findLatest(email: string, purpose: OtpCode['purpose']): Promise<OtpCode | undefined> {
+    const [otp] = await db
+      .select()
+      .from(otpCodes)
+      .where(and(eq(otpCodes.email, email), eq(otpCodes.purpose, purpose)))
+      .orderBy(desc(otpCodes.createdAt))
+      .limit(1);
+    return otp;
+  },
+
+  async consumeActive(email: string, purpose: OtpCode['purpose']): Promise<void> {
+    await db
+      .update(otpCodes)
+      .set({ consumedAt: new Date() })
+      .where(and(
+        eq(otpCodes.email, email),
+        eq(otpCodes.purpose, purpose),
+        isNull(otpCodes.consumedAt),
+      ));
+  },
+
+  async findLatestActiveForTarget(userId: string, target: string, purpose: OtpCode['purpose']): Promise<OtpCode | undefined> {
+    const [otp] = await db
+      .select()
+      .from(otpCodes)
+      .where(and(
+        eq(otpCodes.userId, userId),
+        eq(otpCodes.target, target),
+        eq(otpCodes.purpose, purpose),
+        isNull(otpCodes.consumedAt),
+      ))
+      .orderBy(desc(otpCodes.createdAt))
+      .limit(1);
+    return otp;
+  },
+
   async consume(id: string): Promise<void> {
     await db.update(otpCodes).set({ consumedAt: new Date() }).where(eq(otpCodes.id, id));
   },

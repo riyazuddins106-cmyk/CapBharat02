@@ -18,7 +18,7 @@ router.get('/config', asyncHandler(async (_req, res) => {
   const { eq } = await import('drizzle-orm');
   const [row] = await db.select().from(platformSettings).where(eq(platformSettings.key, 'booking_config'));
   const cfg = row ? JSON.parse(row.value) : {
-    minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 7, openingHour: 9, closingHour: 20,
+    minAdvanceMinutes: 30, sameDayBooking: true, maxAdvanceDays: 7, openingHour: 9, closingHour: 20, searchDurationMinutes: 10,
   };
   res.json({ success: true, data: cfg });
 }));
@@ -30,6 +30,7 @@ router.post('/', validate({ body: createBookingSchema }), bookingController.crea
 router.post('/checkout', bookingController.checkout);
 router.get('/:id', validate({ params: bookingIdParamSchema }), bookingController.getById);
 router.patch('/:id/cancel', validate({ params: bookingIdParamSchema }), bookingController.cancel);
+router.patch('/:id/continue-searching', validate({ params: bookingIdParamSchema }), bookingController.continueSearching);
 router.patch('/:id/reschedule', validate({ params: bookingIdParamSchema, body: rescheduleBookingSchema }), bookingController.reschedule);
 
 // Payment endpoints

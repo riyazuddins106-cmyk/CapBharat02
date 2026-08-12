@@ -165,9 +165,9 @@ Your job: Search for information specifically about [focus area]. Run at least 4
 - [specific search term 3]
 - [specific search term 4]
 
-IMPORTANT - Local language searches: If this topic is specific to a non-English-speaking country or region, run at least 1-2 searches in the local language (e.g., Spanish for Latin America, Portuguese for Brazil, French for Francophone Africa). Primary government data, local media, and industry reports are often only available in the local language.
+Local language searches: If this topic is specific to a non-English-speaking country or region, run at least 1-2 searches in the local language (e.g., Spanish for Latin America, Portuguese for Brazil, French for Francophone Africa). Primary government data, local media, and industry reports are often only available in the local language.
 
-IMPORTANT - Source freshness: Note the publication date of every source. Flag any source older than 18 months on a fast-moving topic.
+Source freshness: Note the publication date of every source. Flag any source older than 18 months on a fast-moving topic.
 
 For the most promising results, use webFetch to read the full article. If webFetch returns empty content, try an alternative URL from the search results or run a more specific search query.
 

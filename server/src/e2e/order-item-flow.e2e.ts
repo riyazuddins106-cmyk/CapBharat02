@@ -111,7 +111,12 @@ async function main() {
   if (config.data?.testMode && order.items.length > 1) {
     const secondItem = order.items[1];
     const payment = await request('POST', `/orders/${order.id}/items/${secondItem.id}/test-pay`, { method: 'cash' }, token);
-    check('test-mode per-service payment completes', payment.response.ok, payment.error);
+    check(
+      'itemized payment is blocked before partner check-in',
+      payment.response.status === 400
+        && payment.error?.toLowerCase().includes('after the partner checks in') === true,
+      payment.error,
+    );
   } else {
     console.log('– test-mode payment check skipped because payment test mode is disabled');
   }

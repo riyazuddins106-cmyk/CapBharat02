@@ -4,7 +4,7 @@ import { db } from '../config/database.js';
 import {
   bookings, users, professionals, serviceCategories, reviews, payoutRequests, payoutRuns,
   orders, orderItems, orderItemPayments, services, addresses,
-  bookingItems, bookingPartnerRequests, bookingAssignmentLogs,
+  bookingItems, bookingPartnerRequests, bookingAssignmentLogs, orderItemRequests,
   subServiceCategories, partnerServices,
 } from '../database/schema/index.js';
 import { payments } from '../database/schema/payments.js';
@@ -29,6 +29,9 @@ import { hashPassword, comparePassword } from '../utils/password.js';
 import { refundOrderItemPayment } from './payment.controller.js';
 import { createRazorpayUpiPayout } from '../services/razorpayPayout.service.js';
 import { runPayouts } from '../services/payoutScheduler.service.js';
+import { orderDispatchService, recomputeOrderStatus } from '../services/orderDispatch.service.js';
+import { userRepository } from '../repositories/user.repository.js';
+import { userService } from '../services/user.service.js';
 
 export const adminController = {
   updateOwnAdminProfile: asyncHandler(async (req: Request, res: Response) => {
@@ -41,33 +44,20 @@ export const adminController = {
     if (fullName !== undefined && fullName.trim().length < 2) {
       throw AppError.badRequest('Full name must be at least 2 characters.');
     }
-    if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      throw AppError.badRequest('A valid email is required.');
-    }
-
-    const normalizedEmail = email?.trim().toLowerCase();
-    if (normalizedEmail) {
-      const [existing] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, normalizedEmail))
-        .limit(1);
-      if (existing && existing.id !== req.user!.userId) {
-        throw AppError.conflict('A user with this email already exists.');
-      }
+    if (email !== undefined || phone !== undefined) {
+      throw AppError.badRequest('Email and phone changes require OTP verification.');
     }
 
     const [updated] = await db
       .update(users)
       .set({
         ...(fullName !== undefined ? { fullName: fullName.trim() } : {}),
-        ...(normalizedEmail ? { email: normalizedEmail, emailVerifiedAt: new Date() } : {}),
-        ...(phone !== undefined ? { phone: phone.trim() || null } : {}),
         updatedAt: new Date(),
       })
       .where(eq(users.id, req.user!.userId))
       .returning({
         id: users.id,
+        username: users.username,
         email: users.email,
         phone: users.phone,
         fullName: users.fullName,
@@ -82,8 +72,77 @@ export const adminController = {
     res.json({ success: true, data: updated });
   }),
 
+  requestOwnIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const result = await userService.requestIdentityChange(req.user!.userId, req.body.field, req.body.value);
+    res.json({ success: true, data: result });
+  }),
+
+  verifyOwnIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const result = await userService.verifyIdentityChange(
+      req.user!.userId,
+      req.body.field,
+      req.body.value,
+      req.body.code,
+    );
+    res.json({ success: true, data: result });
+  }),
+
+  requestAdminIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const [target] = await db.select({ id: users.id, role: users.role, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.id, req.params.id)).limit(1);
+    if (!target || target.deletedAt || !['admin', 'operations_manager'].includes(target.role)) {
+      throw AppError.notFound('Admin account not found.');
+    }
+    const result = await userService.requestIdentityChange(req.params.id, req.body.field, req.body.value);
+    res.json({ success: true, data: result });
+  }),
+
+  verifyAdminIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const [target] = await db.select({ id: users.id, role: users.role, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.id, req.params.id)).limit(1);
+    if (!target || target.deletedAt || !['admin', 'operations_manager'].includes(target.role)) {
+      throw AppError.notFound('Admin account not found.');
+    }
+    const result = await userService.verifyIdentityChange(
+      req.params.id,
+      req.body.field,
+      req.body.value,
+      req.body.code,
+    );
+    res.json({ success: true, data: result });
+  }),
+
+  requestUserIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const [target] = await db.select({ id: users.id, role: users.role, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.id, req.params.id)).limit(1);
+    if (!target || target.deletedAt || !['customer', 'partner'].includes(target.role)) {
+      throw AppError.notFound('User not found.');
+    }
+    const result = await userService.requestIdentityChange(req.params.id, req.body.field, req.body.value);
+    res.json({ success: true, data: result });
+  }),
+
+  verifyUserIdentityChange: asyncHandler(async (req: Request, res: Response) => {
+    const [target] = await db.select({ id: users.id, role: users.role, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.id, req.params.id)).limit(1);
+    if (!target || target.deletedAt || !['customer', 'partner'].includes(target.role)) {
+      throw AppError.notFound('User not found.');
+    }
+    const result = await userService.verifyIdentityChange(
+      req.params.id,
+      req.body.field,
+      req.body.value,
+      req.body.code,
+    );
+    res.json({ success: true, data: result });
+  }),
+
   /** Master orders with per-service status, dispatch, earnings and payment state. */
   listOrders: asyncHandler(async (req: Request, res: Response) => {
+    // Reconcile timed-out item searches before Admin sees the operations queue.
+    // Without this, only a customer's /api/orders request would move an item
+    // from Searching Partner to Waiting Operation.
+    await orderDispatchService.expireTimedOutItems();
     const limit = Math.min(Number(req.query.limit ?? 100), 500);
     const rows = await db.select({
       order: orders,
@@ -212,6 +271,77 @@ export const adminController = {
     const { orderDispatchService } = await import('../services/orderDispatch.service.js');
     await orderDispatchService.broadcastForItem({ ...item, status: 'searching_partner', partnerId: null }, order);
     res.json({ success: true, data: { message: 'Dispatch restarted.' } });
+  }),
+
+  /** List eligible partners for manual assignment of one service-order item. */
+  getOrderItemEligiblePartners: asyncHandler(async (req: Request, res: Response) => {
+    const data = await orderDispatchService.eligiblePartnersForItem(req.params.itemId);
+    res.json({ success: true, data });
+  }),
+
+  /** Manually assign a service-order item to an eligible partner. */
+  assignOrderItemPartner: asyncHandler(async (req: Request, res: Response) => {
+    const partnerId = typeof req.body?.partnerId === 'string' ? req.body.partnerId : '';
+    if (!partnerId) throw AppError.badRequest('A partner is required.');
+    const [item] = await db.select({ id: orderItems.id })
+      .from(orderItems)
+      .where(and(eq(orderItems.id, req.params.itemId), eq(orderItems.orderId, req.params.orderId)))
+      .limit(1);
+    if (!item) throw AppError.notFound('Order service not found.');
+    const data = await orderDispatchService.assignItem(item.id, partnerId);
+    res.json({ success: true, data });
+  }),
+
+  /** Pause partner search for one unassigned service-order item. */
+  stopOrderItemSearching: asyncHandler(async (req: Request, res: Response) => {
+    const [item] = await db.select({ id: orderItems.id })
+      .from(orderItems)
+      .where(and(eq(orderItems.id, req.params.itemId), eq(orderItems.orderId, req.params.orderId)))
+      .limit(1);
+    if (!item) throw AppError.notFound('Order service not found.');
+    const data = await orderDispatchService.stopSearchingItem(item.id);
+    res.json({ success: true, data });
+  }),
+
+  /** Cancel an unpaid service-order item from operations. Paid items must use refund. */
+  cancelOrderItem: asyncHandler(async (req: Request, res: Response) => {
+    const [item] = await db.select().from(orderItems)
+      .where(and(eq(orderItems.id, req.params.itemId), eq(orderItems.orderId, req.params.orderId)))
+      .limit(1);
+    if (!item) throw AppError.notFound('Order service not found.');
+    if (['cancelled', 'service_completed'].includes(item.status)) {
+      throw AppError.badRequest('This service is already finished.');
+    }
+
+    const [payment] = await db.select({ status: orderItemPayments.status })
+      .from(orderItemPayments)
+      .where(eq(orderItemPayments.orderItemId, item.id))
+      .limit(1);
+    if (payment?.status === 'paid') {
+      throw AppError.badRequest('This service has been paid. Use Refund Service instead.');
+    }
+
+    await db.update(orderItemRequests)
+      .set({ status: 'expired', respondedAt: new Date() })
+      .where(and(
+        eq(orderItemRequests.orderItemId, item.id),
+        eq(orderItemRequests.status, 'pending'),
+      ));
+    if (item.partnerId) {
+      await db.update(professionals)
+        .set({ availabilityStatus: 'available', updatedAt: new Date() })
+        .where(eq(professionals.id, item.partnerId));
+    }
+
+    const [updated] = await db.update(orderItems).set({
+      status: 'cancelled',
+      cancellationReason: 'Cancelled by operations',
+      cancellationFee: 0,
+      cancelledAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(orderItems.id, item.id)).returning();
+    await recomputeOrderStatus(item.orderId);
+    res.json({ success: true, data: updated });
   }),
 
   /** Refund a per-service payment and cancel the service item. */
@@ -658,6 +788,7 @@ export const adminController = {
     const customerId = req.params.id;
     const [customer] = await db.select({
       id: users.id,
+      username: users.username,
       fullName: users.fullName,
       email: users.email,
       phone: users.phone,
@@ -932,6 +1063,7 @@ export const adminController = {
     const [newUser] = await db.insert(users).values({
       fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
+      username: await userRepository.generateUsername(fullName, email),
       passwordHash,
       phone: phone?.trim() || null,
       role: 'partner',
@@ -1096,6 +1228,7 @@ export const adminController = {
       .select({
         id: users.id,
         fullName: users.fullName,
+        username: users.username,
         email: users.email,
         phone: users.phone,
         role: users.role,
@@ -1122,6 +1255,7 @@ export const adminController = {
       .select({
         id: users.id,
         fullName: users.fullName,
+        username: users.username,
         email: users.email,
         phone: users.phone,
         role: users.role,
@@ -1173,6 +1307,7 @@ export const adminController = {
       .values({
         fullName: fullName.trim(),
         email: normalizedEmail,
+        username: await userRepository.generateUsername(fullName, normalizedEmail),
         phone: phone?.trim() || null,
         passwordHash,
         role: role as 'admin' | 'operations_manager',
@@ -1181,6 +1316,7 @@ export const adminController = {
       })
       .returning({
         id: users.id,
+        username: users.username,
         fullName: users.fullName,
         email: users.email,
         phone: users.phone,
@@ -1217,6 +1353,9 @@ export const adminController = {
     if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       throw AppError.badRequest('A valid email is required.');
     }
+    if (email !== undefined || phone !== undefined) {
+      throw AppError.badRequest('Email and phone changes require OTP verification.');
+    }
     if (role !== undefined && role !== 'admin' && role !== 'operations_manager') {
       throw AppError.badRequest('Role must be admin or operations_manager.');
     }
@@ -1239,25 +1378,8 @@ export const adminController = {
       throw AppError.notFound('Admin account not found.');
     }
 
-    const normalizedEmail = email?.trim().toLowerCase();
-    if (normalizedEmail) {
-      const [existing] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, normalizedEmail))
-        .limit(1);
-      if (existing && existing.id !== id) {
-        throw AppError.conflict('A user with this email already exists.');
-      }
-    }
-
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (fullName !== undefined) patch.fullName = fullName.trim();
-    if (normalizedEmail) {
-      patch.email = normalizedEmail;
-      patch.emailVerifiedAt = new Date();
-    }
-    if (phone !== undefined) patch.phone = phone.trim() || null;
     if (role !== undefined) patch.role = role;
     if (isActive !== undefined) patch.isActive = isActive;
     if (password !== undefined) patch.passwordHash = await hashPassword(password);
@@ -1268,6 +1390,7 @@ export const adminController = {
       .where(eq(users.id, id))
       .returning({
         id: users.id,
+        username: users.username,
         fullName: users.fullName,
         email: users.email,
         phone: users.phone,
@@ -1297,6 +1420,8 @@ export const adminController = {
       throw AppError.badRequest('fullName cannot be empty');
     if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       throw AppError.badRequest('Invalid email address');
+    if (email !== undefined || phone !== undefined)
+      throw AppError.badRequest('Email and phone changes require OTP verification');
 
     const [target] = await db
       .select({ role: users.role, deletedAt: users.deletedAt })
@@ -1309,8 +1434,6 @@ export const adminController = {
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (fullName !== undefined) patch.fullName = fullName.trim();
-    if (email    !== undefined) patch.email    = email.trim().toLowerCase();
-    if (phone    !== undefined) patch.phone    = phone.trim() || null;
     if (role     !== undefined) patch.role     = role;
 
     const [row] = await db
@@ -1318,7 +1441,7 @@ export const adminController = {
       .set(patch as any)
       .where(eq(users.id, id))
       .returning({
-        id: users.id, fullName: users.fullName, email: users.email,
+        id: users.id, username: users.username, fullName: users.fullName, email: users.email,
         phone: users.phone, role: users.role, isActive: users.isActive,
         avatarUrl: users.avatarUrl, createdAt: users.createdAt,
       });

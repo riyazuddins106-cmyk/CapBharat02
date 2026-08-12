@@ -348,23 +348,22 @@ export async function refundOrderItemPayment(paymentId: string) {
 export const getPaymentConfig = asyncHandler(async (_req: Request, res: Response) => {
   const cfg = await getPaymentCfg();
   const testMode = cfg?.testMode?.enabled ?? false;
+  const upiConfigured = cfg?.upi?.enabled === true && !!cfg.upi.vpa?.trim();
 
   const methods: string[] = [];
-  if (testMode) {
-    // In test mode expose ALL methods regardless of enabled flags / missing keys
-    methods.push('cash', 'upi_manual', 'razorpay', 'stripe');
-  } else {
-    if (cfg?.cod?.enabled)      methods.push('cash');
-    if (cfg?.upi?.enabled)      methods.push('upi_manual');
-    if (cfg?.razorpay?.enabled) methods.push('razorpay');
-    if (cfg?.stripe?.enabled)   methods.push('stripe');
-    if (!methods.length) methods.push('cash');
-  }
+  // Test mode simulates configured methods, but it must not make an
+  // unconfigured method look payable. In particular, manual UPI requires both
+  // the Admin toggle and a real VPA so the customer can see where to pay.
+  if (cfg?.cod?.enabled !== false) methods.push('cash');
+  if (upiConfigured)             methods.push('upi_manual');
+  if (cfg?.razorpay?.enabled)    methods.push('razorpay');
+  if (cfg?.stripe?.enabled)      methods.push('stripe');
+  if (!methods.length) methods.push('cash');
 
   sendSuccess(res, {
     testMode,
     methods,
-    upiVpa:               testMode ? 'test@upi'  : (cfg?.upi?.enabled  ? (cfg.upi.vpa ?? '')               : null),
+    upiVpa:               upiConfigured ? cfg.upi!.vpa.trim() : null,
     razorpayKeyId:        testMode ? 'test_key'  : (cfg?.razorpay?.enabled ? (cfg.razorpay.keyId ?? '')    : null),
     stripePublishableKey: testMode ? 'test_pk'   : (cfg?.stripe?.enabled   ? (cfg.stripe.publishableKey ?? '') : null),
   });

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   authApi, partnerApi, notificationsApi, categoriesApi, payoutsApi, documentsApi, setRefreshHandler,
-  type Job, type JobStatus, type Earnings, type PartnerProfile, type Category,
+  type Job, type JobStatus, type Earnings, type PartnerProfile, type Category, type SubCategory,
   type OrderItemJob,
   type AppNotification, type AuthTokens, type Payout, type PartnerDocument,
   type DocumentTypeConfig, type PartnerDocumentHistory,
@@ -29,6 +29,117 @@ function fmtDate(s: string) {
     day: 'numeric', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+type DashboardNoticeKind = 'danger' | 'warning' | 'neutral' | 'success';
+
+interface DashboardNotice {
+  label: string;
+  message: string;
+  kind: DashboardNoticeKind;
+  action?: string;
+}
+
+function getDashboardNotice(
+  profile: PartnerProfile,
+  documentTypes: DocumentTypeConfig[],
+  documents: PartnerDocument[],
+): DashboardNotice {
+  const required = documentTypes.filter(type => type.is_active && type.is_mandatory);
+  const docByType = Object.fromEntries(documents.map(document => [document.document_type, document]));
+  const missing = required.filter(type => !docByType[type.type_key]);
+  const attention = required.filter(type => {
+    const document = docByType[type.type_key];
+    return Boolean(document && ['rejected', 're_upload_required', 'expired'].includes(document.status));
+  });
+  const pending = required.filter(type => {
+    const document = docByType[type.type_key];
+    return Boolean(document && ['pending', 'under_review'].includes(document.status));
+  });
+
+  if (missing.length > 0) {
+    return {
+      label: 'Documents Required',
+      message: 'Upload the required documents to become eligible for jobs.',
+      kind: 'danger',
+      action: 'Upload Documents',
+    };
+  }
+  if (attention.length > 0) {
+    return {
+      label: 'Documents Need Attention',
+      message: 'Update your rejected or expired documents to start receiving job requests.',
+      kind: 'danger',
+      action: 'Update Documents',
+    };
+  }
+  if (pending.length > 0) {
+    return {
+      label: 'Documents Under Review',
+      message: 'Your documents are being reviewed. You will be eligible to receive jobs after approval.',
+      kind: 'warning',
+      action: 'View Documents',
+    };
+  }
+
+  const availability = profile.availabilityStatus ?? (profile.isActive ? 'available' : 'offline');
+  if (availability === 'offline') {
+    return {
+      label: 'Offline',
+      message: 'You are offline and will not receive new job requests. Go online when you are ready.',
+      kind: 'neutral',
+    };
+  }
+  if (availability === 'busy') {
+    return {
+      label: 'Busy',
+      message: 'You are marked as busy and will not receive new job requests. Set yourself to Available when ready.',
+      kind: 'warning',
+    };
+  }
+  return {
+    label: 'Available',
+    message: 'You are available and eligible to receive new job requests.',
+    kind: 'success',
+  };
+}
+
+function DashboardStatusBanner({ notice, onOpenDocuments }: {
+  notice: DashboardNotice;
+  onOpenDocuments: () => void;
+}) {
+  const tone = {
+    danger: { background: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', color: '#FCA5A5' },
+    warning: { background: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', color: '#FCD34D' },
+    neutral: { background: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.22)', color: '#CBD5E1' },
+    success: { background: 'rgba(22,163,74,0.08)', border: 'rgba(22,163,74,0.25)', color: '#86EFAC' },
+  }[notice.kind];
+  const icon = notice.kind === 'success'
+    ? <CheckCircle size={19}/>
+    : notice.kind === 'neutral'
+      ? <CircleDot size={19}/>
+      : notice.kind === 'warning'
+        ? <Clock size={19}/>
+        : <AlertCircle size={19}/>;
+
+  return (
+    <div className="rounded-2xl border p-4 mb-6 flex items-start gap-3" style={{ background: tone.background, borderColor: tone.border }}>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${tone.color}18`, color: tone.color }}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm" style={{ color: tone.color }}>{notice.label}</p>
+        <p className="text-white/70 text-xs leading-relaxed mt-1">{notice.message}</p>
+      </div>
+      {notice.action && (
+        <button onClick={onOpenDocuments}
+          className="flex-shrink-0 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors hover:bg-white/10"
+          style={{ borderColor: tone.color, color: tone.color }}>
+          {notice.action}
+        </button>
+      )}
+    </div>
+  );
 }
 
 type PayoutStatusFilter = 'all' | 'pending' | 'processing' | 'paid' | 'rejected';
@@ -82,7 +193,7 @@ function Schedule({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
 
   const dateKey = (date: Date) => date.toISOString().slice(0, 10);
-  const dateOptions = Array.from({ length: 7 }, (_, index) => {
+  const dateOptions = Array.from({ length: 30 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() + index);
     return { key: dateKey(date), date };
@@ -93,7 +204,7 @@ function Schedule({ token }: { token: string }) {
     try {
       const from = dateKey(new Date());
       const end = new Date();
-      end.setDate(end.getDate() + 6);
+      end.setDate(end.getDate() + 29);
       const [schedule, stats] = await Promise.all([
         partnerApi.getSchedule(from, dateKey(end), token),
         partnerApi.getPerformance(token),
@@ -109,6 +220,35 @@ function Schedule({ token }: { token: string }) {
   useEffect(() => { load(); }, [load]);
 
   const selectedJobs = days.filter(job => dateKey(new Date(job.scheduledAt)) === selectedDate);
+  const jobCountsByDate = days.reduce<Record<string, number>>((counts, job) => {
+    const key = dateKey(new Date(job.scheduledAt));
+    counts[key] = (counts[key] ?? 0) + 1;
+    return counts;
+  }, {});
+  const [handoffJob, setHandoffJob] = useState<PartnerScheduleJob | null>(null);
+  const [handoffReason, setHandoffReason] = useState('');
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoffError, setHandoffError] = useState('');
+  const openHandoff = (job: PartnerScheduleJob) => {
+    setHandoffJob(job);
+    setHandoffReason('');
+    setHandoffError('');
+  };
+  const passJob = async () => {
+    if (!handoffJob || handoffReason.trim().length < 3) return;
+    setHandoffBusy(true);
+    setHandoffError('');
+    try {
+      const result = await partnerApi.passOrderItemJob(handoffJob.id, handoffReason.trim(), token);
+      setHandoffJob(null);
+      await load();
+      window.alert(result.message);
+    } catch (error) {
+      setHandoffError(error instanceof Error ? error.message : 'Could not offer this job.');
+    } finally {
+      setHandoffBusy(false);
+    }
+  };
   const openMaps = (job: PartnerScheduleJob) => {
     if (!job.address) return;
     const address = `${job.address.line1}, ${job.address.city}, ${job.address.state} ${job.address.postalCode}`;
@@ -146,6 +286,9 @@ function Schedule({ token }: { token: string }) {
             style={key === selectedDate ? { background: 'rgba(91,62,245,0.2)', borderColor: '#5B3EF5' } : { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
             <p className="text-white/40 text-[11px]">{date.toLocaleDateString('en-IN', { weekday: 'short' })}</p>
             <p className="text-white font-bold text-lg">{date.getDate()}</p>
+            <p className={jobCountsByDate[key] ? 'text-emerald-300 text-[10px] font-bold' : 'text-white/25 text-[10px]'}>
+              {jobCountsByDate[key] ? `${jobCountsByDate[key]} ${jobCountsByDate[key] === 1 ? 'job' : 'jobs'}` : 'No jobs'}
+            </p>
           </button>
         ))}
       </div>
@@ -162,16 +305,62 @@ function Schedule({ token }: { token: string }) {
                     <p className="text-white/40 text-[10px] mt-1">{job.durationMinutes} min</p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-bold text-sm">{job.serviceName}</p>
+                   <div className="flex items-center gap-2">
+                     <p className="text-white font-bold text-sm">{job.serviceName}</p>
+                     <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold text-violet-300">
+                        {job.status === 'partner_accepted' || job.status === 'upcoming' ? 'Scheduled' : (job.status ?? 'Scheduled').replace('_', ' ')}
+                     </span>
+                   </div>
                     <p className="text-white/50 text-xs mt-1">{job.customerName ?? 'Customer'} · <span className="text-emerald-400 font-semibold">₹{job.payout} payout</span></p>
                     {address && <p className="text-white/35 text-xs mt-2 flex items-start gap-1"><MapPin size={12} className="mt-0.5 flex-shrink-0"/>{address}</p>}
                   </div>
                   {job.customerPhone && <a href={`tel:${job.customerPhone}`} className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"><Phone size={15}/></a>}
                 </div>
                 {address && <button onClick={() => openMaps(job)} className="mt-3 text-xs font-bold text-violet-300 flex items-center gap-1 hover:text-violet-200"><Navigation size={12}/> Open in Maps</button>}
+                 {job.jobType === 'order_item' && job.status === 'partner_accepted' && new Date(job.scheduledAt).getTime() > Date.now() && (
+                   <button
+                     onClick={() => openHandoff(job)}
+                     disabled={job.handoffPending}
+                     className="mt-3 w-full rounded-xl border border-white/10 py-2 text-xs font-bold text-violet-300 hover:bg-white/5 disabled:opacity-50"
+                   >
+                     {job.handoffPending ? 'Offered to other partners' : 'Pass to another partner'}
+                   </button>
+                 )}
               </div>;
             })}
       </div>
+      {handoffJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 p-5 shadow-2xl" style={MODAL_BG}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-white font-bold">Pass this scheduled job?</h3>
+                <p className="text-white/45 text-sm mt-1">{handoffJob.serviceName}</p>
+              </div>
+              <button onClick={() => !handoffBusy && setHandoffJob(null)} className="text-white/40 hover:text-white"><X size={17}/></button>
+            </div>
+            <p className="text-white/55 text-sm leading-6 mt-4">
+              We’ll show it to other eligible partners. You stay assigned unless another partner accepts it.
+            </p>
+            <textarea
+              value={handoffReason}
+              onChange={event => setHandoffReason(event.target.value)}
+              maxLength={500}
+              rows={4}
+              placeholder="Why can’t you take this job?"
+              className="w-full mt-4 rounded-xl border border-white/10 px-3 py-2.5 text-white placeholder:text-white/25 outline-none resize-none"
+              style={INPUT_STY}
+            />
+            {handoffError && <p className="text-red-300 text-xs mt-2">{handoffError}</p>}
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setHandoffJob(null)} disabled={handoffBusy} className="flex-1 rounded-xl border border-white/10 py-2.5 text-white/60 text-sm font-bold disabled:opacity-50">Keep job</button>
+              <button onClick={passJob} disabled={handoffBusy || handoffReason.trim().length < 3} className="flex-1 rounded-xl py-2.5 text-white text-sm font-bold disabled:opacity-40" style={{ background: ACCENT }}>
+                {handoffBusy ? 'Offering…' : 'Offer to partners'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -221,13 +410,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function TextInput({ value, onChange, type = 'text', placeholder, disabled }: {
+function TextInput({ value, onChange, type = 'text', placeholder, disabled, autoComplete }: {
   value: string; onChange: (v: string) => void; type?: string;
-  placeholder?: string; disabled?: boolean;
+  placeholder?: string; disabled?: boolean; autoComplete?: string;
 }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)}
-      placeholder={placeholder} disabled={disabled}
+      placeholder={placeholder} disabled={disabled} autoComplete={autoComplete}
       className="w-full rounded-xl px-4 py-2.5 text-white text-sm outline-none border border-white/10 focus:border-violet-500/60 transition-colors disabled:opacity-40"
       style={INPUT_STY}/>
   );
@@ -436,18 +625,34 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
 
   // ── Register step 2
   const [regCatId,   setRegCatId]   = useState('');
+  const [regSubCatId, setRegSubCatId] = useState('');
   const [regTitle,   setRegTitle]   = useState('');
   const [regCity,    setRegCity]    = useState('');
   const [regArea,    setRegArea]    = useState('');
   const [regPincode, setRegPincode] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
   useEffect(() => { categoriesApi.list().then(c => setCategories(c.filter((x: Category) => x.isActive))).catch(() => {}); }, []);
+  useEffect(() => {
+    setRegSubCatId('');
+    setSubCategories([]);
+    if (!regCatId) return;
+    setSubCatsLoading(true);
+    categoriesApi.getSubcategories(regCatId)
+      .then(rows => setSubCategories(rows.filter((x: SubCategory) => x.isActive)))
+      .catch(() => setSubCategories([]))
+      .finally(() => setSubCatsLoading(false));
+  }, [regCatId]);
 
   // ── OTP state
   const [otpEmail,   setOtpEmail]   = useState('');
   const [otpCode,    setOtpCode]    = useState('');
   const [otpPurpose, setOtpPurpose] = useState<'signup' | 'login' | 'password_reset'>('signup');
   const [resending,  setResending]  = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresInSeconds, setOtpExpiresInSeconds] = useState(600);
+  const [devCode, setDevCode] = useState('');
 
   // ── Forgot / reset password state
   const [forgotEmail,  setForgotEmail]  = useState('');
@@ -457,6 +662,18 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   // ── Shared
   const [err,     setErr]     = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
+
+  function applyOtpTiming(result?: { devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }) {
+    setDevCode(result?.devCode ?? '');
+    setOtpExpiresInSeconds(result?.expiresInSeconds ?? 600);
+    setResendCooldown(result?.resendAfterSeconds ?? 60);
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault(); setErr(''); setLoading(true);
@@ -479,8 +696,10 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
     e.preventDefault(); setErr(''); setLoading(true);
     try {
       if (!regCatId) { setErr('Please select a service category.'); return; }
-      await authApi.registerPartner({ fullName: regName, email: regEmail, phone: regPhone || undefined, password: regPwd, categoryId: regCatId, title: regTitle, city: regCity, area: regArea || undefined, pincode: regPincode || undefined });
+      if (!regSubCatId) { setErr('Please select a service sub-category.'); return; }
+      const result = await authApi.registerPartner({ fullName: regName, email: regEmail, phone: regPhone || undefined, password: regPwd, categoryId: regCatId, subCategoryId: regSubCatId, title: regTitle, city: regCity, area: regArea || undefined, pincode: regPincode || undefined });
       setOtpEmail(regEmail); setOtpPurpose('signup');
+      applyOtpTiming(result);
       setMode('otp');
     } catch (e: any) { setErr(e.message ?? 'Registration failed'); }
     finally { setLoading(false); }
@@ -497,16 +716,22 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
   }
 
   async function resendOtp() {
+    if (resendCooldown > 0 || resending) return;
     setResending(true); setErr('');
-    try { await authApi.resendOtp(otpEmail, otpPurpose); } catch (e: any) { setErr(e.message); }
+    try {
+      const result = await authApi.resendOtp(otpEmail, otpPurpose);
+      applyOtpTiming(result);
+    } catch (e: any) { setErr(e.message); }
     finally { setResending(false); }
   }
 
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault(); setErr(''); setLoading(true);
     try {
-      await authApi.forgotPassword(forgotEmail);
+      const result = await authApi.forgotPassword(forgotEmail);
       setOtpEmail(forgotEmail);
+      setOtpPurpose('password_reset');
+      applyOtpTiming(result);
       setMode('reset');
     } catch (e: any) { setErr(e.message ?? 'Failed to send reset code'); }
     finally { setLoading(false); }
@@ -537,6 +762,8 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
             <p className="text-white/40 text-sm">We sent a 6-digit code to<br/>
               <span className="text-white/70 font-semibold">{otpEmail}</span>
             </p>
+            <p className="text-white/35 text-xs mt-2">Code expires in {Math.ceil(otpExpiresInSeconds / 60)} minutes.</p>
+            {devCode && <p className="text-white/45 text-xs mt-1">Development code: <strong className="text-white/80">{devCode}</strong></p>}
           </div>
           <ErrBanner err={err}/>
           <form onSubmit={handleOtp} className="space-y-4">
@@ -548,9 +775,9 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
           </form>
           <div className="flex items-center justify-center gap-2 mt-4">
             <span className="text-white/30 text-xs">Didn't receive it?</span>
-            <button onClick={resendOtp} disabled={resending}
+            <button onClick={resendOtp} disabled={resending || resendCooldown > 0}
               className="text-violet-400 text-xs font-bold hover:text-violet-300 transition-colors disabled:opacity-50">
-              {resending ? 'Sending…' : 'Resend code'}
+              {resending ? 'Sending…' : resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
             </button>
           </div>
         </AuthCard>
@@ -645,6 +872,17 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </SelectInput>
                 </Field>
+                <Field label="Service Sub-category">
+                  <SelectInput value={regSubCatId} onChange={setRegSubCatId} disabled={!regCatId || subCatsLoading}>
+                    <option value="">
+                      {!regCatId ? '— Select a category first —' : subCatsLoading ? 'Loading sub-categories…' : '— Select your sub-category —'}
+                    </option>
+                    {subCategories.map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+                  </SelectInput>
+                  {regCatId && !subCatsLoading && subCategories.length === 0 && (
+                    <p className="text-xs text-amber-300/80 mt-1">No active sub-categories are configured for this category.</p>
+                  )}
+                </Field>
                 <Field label="Your Title / Specialisation">
                   <TextInput value={regTitle} onChange={setRegTitle} placeholder="e.g. Expert Plumber, Senior Electrician"/>
                 </Field>
@@ -716,6 +954,8 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
           </button>
           <h2 className="text-white font-bold text-lg mb-1">Enter new password</h2>
           <p className="text-white/40 text-sm mb-5">We sent a code to <span className="text-white/70">{forgotEmail}</span></p>
+          <p className="text-white/35 text-xs mb-2">Code expires in {Math.ceil(otpExpiresInSeconds / 60)} minutes.</p>
+          {devCode && <p className="text-white/45 text-xs mb-4">Development code: <strong className="text-white/80">{devCode}</strong></p>}
           <ErrBanner err={err}/>
           <form onSubmit={handleReset} className="space-y-4">
             <Field label="Reset Code">
@@ -726,6 +966,10 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
             </Field>
             <SubmitBtn label="Reset password" loadingLabel="Resetting…" loading={loading}/>
           </form>
+          <button type="button" onClick={resendOtp} disabled={resending || resendCooldown > 0}
+            className="w-full mt-4 text-violet-400 text-xs font-bold disabled:opacity-50">
+            {resending ? 'Sending…' : resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+          </button>
         </AuthCard>
       </div>
     </div>
@@ -742,10 +986,10 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
           <ErrBanner err={err}/>
           <form onSubmit={handleLogin} className="space-y-4">
             <Field label="Email">
-              <TextInput type="email" value={loginEmail} onChange={setLoginEmail} placeholder="partner@servenow.in"/>
+              <TextInput type="email" value={loginEmail} onChange={setLoginEmail} placeholder="partner@servenow.in" autoComplete="email"/>
             </Field>
             <Field label="Password">
-              <TextInput type="password" value={loginPwd} onChange={setLoginPwd} placeholder="••••••••"/>
+              <TextInput type="password" value={loginPwd} onChange={setLoginPwd} placeholder="••••••••" autoComplete="current-password"/>
             </Field>
             <SubmitBtn label="Sign in" loadingLabel="Signing in…" loading={loading}/>
           </form>
@@ -769,11 +1013,18 @@ function AuthScreen({ onLogin }: { onLogin: (t: AuthTokens) => void }) {
 }
 
 /* ─── Dashboard ───────────────────────────────────────────────────── */
-function Dashboard({ token, profile }: { token: string; profile: PartnerProfile | null }) {
+function Dashboard({ token, profile, onOpenDocuments }: {
+  token: string;
+  profile: PartnerProfile | null;
+  onOpenDocuments: () => void;
+}) {
   const tx = (source: string) => source;
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [jobs,     setJobs]     = useState<Job[]>([]);
   const [serviceJobs, setServiceJobs] = useState<{ pendingRequests: OrderItemJob[]; activeJobs: OrderItemJob[]; completedJobs: OrderItemJob[] }>({ pendingRequests: [], activeJobs: [], completedJobs: [] });
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeConfig[]>([]);
+  const [documents, setDocuments] = useState<PartnerDocument[]>([]);
+  const [documentsError, setDocumentsError] = useState(false);
   const [loading,  setLoading]  = useState(true);
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [serviceCheckinItem, setServiceCheckinItem] = useState<OrderItemJob | null>(null);
@@ -792,7 +1043,25 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setDocumentsError(false);
+    Promise.all([documentsApi.listTypes(token), documentsApi.list(token)])
+      .then(([types, userDocuments]) => {
+        if (cancelled) return;
+        setDocumentTypes(types);
+        setDocuments(userDocuments);
+      })
+      .catch(() => {
+        if (!cancelled) setDocumentsError(true);
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
   const upcoming = jobs.filter(j => j.status === 'upcoming' || j.status === 'in_progress').slice(0, 8);
+  const dashboardNotice = profile
+    ? getDashboardNotice(profile, documentsError ? [] : documentTypes, documentsError ? [] : documents)
+    : null;
 
   async function updateRequest(action: 'accept' | 'reject', item: OrderItemJob) {
     if (!item.requestId) return;
@@ -844,6 +1113,9 @@ function Dashboard({ token, profile }: { token: string; profile: PartnerProfile 
 
   return (
     <div>
+      {dashboardNotice && (
+        <DashboardStatusBanner notice={dashboardNotice} onOpenDocuments={onOpenDocuments}/>
+      )}
       {serviceJobs.pendingRequests.length > 0 && (
         <div className="rounded-2xl border border-amber-400/20 p-5 mb-6" style={{ background: 'rgba(245,158,11,0.05)' }}>
           <div className="flex items-center justify-between mb-3">
@@ -1008,6 +1280,20 @@ function Jobs({ token }: { token: string }) {
   }, [token]);
   useEffect(() => { load(); }, [load]);
 
+  const refresh = useCallback(async () => {
+    try {
+      const [legacy, service] = await Promise.all([
+        partnerApi.listJobs(token),
+        partnerApi.listOrderItemJobs(token),
+      ]);
+      setJobs(legacy);
+      setServiceJobs(service);
+      setSelected((current) => current
+        ? legacy.find((job) => job.id === current.id) ?? current
+        : current);
+    } catch { /* retain the last successful snapshot during transient failures */ }
+  }, [token]);
+
   useEffect(() => {
     if (!selected) {
       setEvidence([]);
@@ -1022,15 +1308,21 @@ function Jobs({ token }: { token: string }) {
     return () => { active = false; };
   }, [selected, token]);
 
-  // Auto-refresh every 30 s so new dispatched jobs appear without manual reload
+  // Keep partner jobs current when the customer/Admin changes the job in
+  // another session. Poll only while visible and refresh on tab focus.
   useEffect(() => {
-    const t = setInterval(() => {
-      Promise.all([partnerApi.listJobs(token), partnerApi.listOrderItemJobs(token)])
-        .then(([legacy, service]) => { setJobs(legacy); setServiceJobs(service); })
-        .catch(() => {});
-    }, 30_000);
-    return () => clearInterval(t);
-  }, [token]);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const t = window.setInterval(refreshIfVisible, 10_000);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    window.addEventListener('focus', refreshIfVisible);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+      window.removeEventListener('focus', refreshIfVisible);
+    };
+  }, [refresh]);
 
   async function complete(id: string) {
     setCompleting(true);
@@ -1546,8 +1838,9 @@ function Earnings({ token }: { token: string }) {
 /* ─── Profile ─────────────────────────────────────────────────────── */
 type SubCategory = { id: string; name: string; isActive: boolean };
 
-function Profile({ token, profile, setProfile }: {
+function Profile({ token, profile, setProfile, user, onUserUpdate }: {
   token: string; profile: PartnerProfile | null; setProfile: (p: PartnerProfile) => void;
+  user: User; onUserUpdate: (user: User) => void;
 }) {
   const [editProf,     setEditProf]     = useState(false);
   const [editPwd,      setEditPwd]      = useState(false);
@@ -1574,8 +1867,9 @@ function Profile({ token, profile, setProfile }: {
   const [editSubCatId, setEditSubCatId]= useState(profile?.subCategoryId ?? '');
   const [curPwd,       setCurPwd]      = useState('');
   const [newPwd,       setNewPwd]      = useState('');
-  const [accName,      setAccName]     = useState(profile?.name ?? '');
-  const [accPhone,     setAccPhone]    = useState('');
+  const [accName,      setAccName]     = useState(user.fullName);
+  const [accEmail,     setAccEmail]    = useState(user.email);
+  const [accPhone,     setAccPhone]    = useState(user.phone ?? '');
 
   const loadSubCats = async (catId: string) => {
     if (!catId) { setSubCats([]); return; }
@@ -1614,9 +1908,36 @@ function Profile({ token, profile, setProfile }: {
   async function saveAccount() {
     setSaving(true); setMsg('');
     try {
-      await partnerApi.updateAccount({ fullName: accName, phone: accPhone || undefined }, token);
+      let nextUser = user;
+      if (accName.trim() && accName.trim() !== user.fullName) {
+        await partnerApi.updateAccount({ fullName: accName.trim() }, token);
+        nextUser = { ...nextUser, fullName: accName.trim() };
+      }
+      const emailChanged = accEmail.trim().toLowerCase() !== user.email;
+      const phoneChanged = accPhone.trim() !== (user.phone ?? '');
+      if (emailChanged && phoneChanged) {
+        throw new Error('Verify one contact change at a time.');
+      }
+      if (emailChanged) {
+        const requested = await partnerApi.requestIdentityChange('email', accEmail.trim(), token);
+        const code = window.prompt(
+          `Enter the OTP sent to ${requested.target}${requested.devCode ? `\nDev code: ${requested.devCode}` : ''}`,
+          requested.devCode ?? '',
+        );
+        if (!code) throw new Error('OTP verification is required to update email.');
+        nextUser = await partnerApi.verifyIdentityChange('email', accEmail.trim(), code.trim(), token);
+      }
+      if (phoneChanged) {
+        const requested = await partnerApi.requestIdentityChange('phone', accPhone.trim(), token);
+        const code = window.prompt(
+          `Enter the OTP sent to ${requested.target}${requested.devCode ? `\nDev code: ${requested.devCode}` : ''}`,
+          requested.devCode ?? '',
+        );
+        if (!code) throw new Error('OTP verification is required to update phone.');
+        nextUser = await partnerApi.verifyIdentityChange('phone', accPhone.trim(), code.trim(), token);
+      }
+      onUserUpdate(nextUser);
       setMsgOk(true); setMsg('Account info updated'); setEditAcc(false);
-      // refresh profile to show new name
       const updated = await partnerApi.getProfile(token);
       setProfile(updated);
     } catch (e: any) { setMsgOk(false); setMsg(e.message); }
@@ -1730,7 +2051,7 @@ function Profile({ token, profile, setProfile }: {
               style={{ background: ACCENT }}>
               <Pencil size={13}/> Edit Profile
             </button>
-            <button onClick={() => { setAccName(profile.name ?? ''); setAccPhone(''); setEditAcc(true); }}
+            <button onClick={() => { setAccName(user.fullName); setAccEmail(user.email); setAccPhone(user.phone ?? ''); setEditAcc(true); }}
               className="w-full py-2.5 rounded-xl font-bold text-sm border border-white/10 text-white/60 hover:bg-white/5 flex items-center justify-center gap-2 transition-colors">
               <User size={13}/> Edit Account Info
             </button>
@@ -1856,11 +2177,17 @@ function Profile({ token, profile, setProfile }: {
       {editAcc && (
         <Modal title="Edit Account Info" onClose={() => setEditAcc(false)}>
           <div className="space-y-4">
+              <Field label="Username">
+                <TextInput value={user.username} onChange={() => {}} disabled placeholder="Username" />
+              </Field>
             <Field label="Full Name">
               <TextInput value={accName} onChange={setAccName} placeholder="Your full name"/>
             </Field>
-            <Field label="Phone Number">
-              <TextInput value={accPhone} onChange={setAccPhone} type="tel" placeholder="+91 99999 99999"/>
+              <Field label="Email">
+                <TextInput value={accEmail} onChange={setAccEmail} type="email" placeholder="name@example.com"/>
+              </Field>
+              <Field label="Phone Number">
+                <TextInput value={accPhone} onChange={setAccPhone} type="tel" placeholder="+91 99999 99999"/>
             </Field>
             <div className="flex gap-3 mt-6">
               <button onClick={saveAccount} disabled={saving}
@@ -2856,14 +3183,18 @@ export default function App() {
 
         {/* ── Scrollable content ── */}
         <div className="flex-1 overflow-y-auto p-6">
-          {page === 'dashboard'     && <Dashboard     key={refreshKey} token={auth.accessToken} profile={profile}/>}
+          {page === 'dashboard'     && <Dashboard     key={refreshKey} token={auth.accessToken} profile={profile} onOpenDocuments={() => navigate('documents')}/>}
           {page === 'schedule'      && <Schedule      key={refreshKey} token={auth.accessToken}/>}
           {page === 'jobs'          && <Jobs          key={refreshKey} token={auth.accessToken}/>}
           {page === 'earnings'      && <Earnings      key={refreshKey} token={auth.accessToken}/>}
           {page === 'payouts'       && <Payouts       key={refreshKey} token={auth.accessToken}/>}
           {page === 'documents'     && <Documents     key={refreshKey} token={auth.accessToken}/>}
           {page === 'notifications' && <Notifications key={refreshKey} token={auth.accessToken}/>}
-          {page === 'profile'       && <Profile       key={refreshKey} token={auth.accessToken} profile={profile} setProfile={setProfile}/>}
+          {page === 'profile'       && <Profile       key={refreshKey} token={auth.accessToken} profile={profile} setProfile={setProfile} user={auth.user} onUserUpdate={(user) => {
+            const next = { ...auth, user };
+            setAuth(next);
+            localStorage.setItem('partner_auth', JSON.stringify(next));
+          }}/>}
         </div>
 
         {/* Mobile bottom nav */}

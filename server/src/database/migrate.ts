@@ -41,6 +41,7 @@ export async function runMigrations() {
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       email VARCHAR(255) NOT NULL UNIQUE,
+      username VARCHAR(32) NOT NULL UNIQUE,
       phone VARCHAR(32),
       password_hash VARCHAR(255) NOT NULL,
       full_name VARCHAR(255) NOT NULL,
@@ -69,6 +70,7 @@ export async function runMigrations() {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID REFERENCES users(id) ON DELETE CASCADE,
       email VARCHAR(255) NOT NULL,
+      target VARCHAR(255),
       code_hash VARCHAR(255) NOT NULL,
       purpose VARCHAR(32) NOT NULL,
       attempts INTEGER NOT NULL DEFAULT 0,
@@ -76,6 +78,16 @@ export async function runMigrations() {
       consumed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+  await run('enum: otp_purpose identity changes', `
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'otp_purpose') THEN
+        ALTER TYPE otp_purpose ADD VALUE IF NOT EXISTS 'change_email';
+        ALTER TYPE otp_purpose ADD VALUE IF NOT EXISTS 'change_phone';
+      END IF;
+    END $$`);
+  await run('column: otp_codes.target',
+    `ALTER TABLE otp_codes ADD COLUMN IF NOT EXISTS target VARCHAR(255)`);
 
   await run('table: addresses', `
     CREATE TABLE IF NOT EXISTS addresses (
@@ -179,6 +191,20 @@ export async function runMigrations() {
 
   await run('column: users.push_token',
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token VARCHAR(255)`);
+
+  await run('column: users.username',
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(32)`);
+  await run('data: users.username backfill', `
+    UPDATE users
+    SET username = LEFT(
+      COALESCE(NULLIF(regexp_replace(lower(split_part(email, '@', 1)), '[^a-z0-9]+', '_', 'g'), ''), 'user'),
+      24
+    ) || '_' || LEFT(REPLACE(id::text, '-', ''), 6)
+    WHERE username IS NULL OR username = ''`);
+  await run('constraint: users.username unique',
+    `ALTER TABLE users ADD CONSTRAINT users_username_unique UNIQUE (username)`);
+  await run('column: users.username required',
+    `ALTER TABLE users ALTER COLUMN username SET NOT NULL`);
 
   await run('table: audit_logs', `
     CREATE TABLE IF NOT EXISTS audit_logs (
@@ -599,14 +625,6 @@ export async function runMigrations() {
        SET availability_status = 'available', updated_at = NOW()
        WHERE availability_status = 'offline' AND deleted_at IS NULL`);
 
-  // Ensure mandatory document verification is disabled so the dispatch gate
-  // does not silently filter out partners who haven't uploaded documents yet.
-  // This was the original intent of fix-mandatory-docs.ts.
-  await run('ensure: document_type_configs not mandatory',
-    `UPDATE document_type_configs
-       SET is_mandatory = false
-       WHERE is_mandatory = true`);
-
   // ── Booking config: per-service minimum advance time ──────────────────────
   await run('column: services.min_advance_minutes',
     `ALTER TABLE services ADD COLUMN IF NOT EXISTS min_advance_minutes INTEGER`);
@@ -620,9 +638,11 @@ export async function runMigrations() {
 
   await run('enum: order_item_status',
     `CREATE TYPE order_item_status AS ENUM (
-      'searching_partner', 'assigned', 'partner_accepted', 'partner_arrived',
+      'searching_partner', 'waiting_operation', 'assigned', 'partner_accepted', 'partner_arrived',
       'payment_pending', 'payment_completed', 'service_started', 'service_completed', 'cancelled'
     )`);
+  await run('enum value: order_item_status.waiting_operation',
+    `ALTER TYPE order_item_status ADD VALUE IF NOT EXISTS 'waiting_operation'`);
 
   await run('table: orders', `
     CREATE TABLE IF NOT EXISTS orders (
@@ -649,6 +669,7 @@ export async function runMigrations() {
       partner_id       UUID REFERENCES professionals(id) ON DELETE SET NULL,
       status           order_item_status NOT NULL DEFAULT 'searching_partner',
       scheduled_at     TIMESTAMPTZ NOT NULL,
+       dispatch_deadline TIMESTAMPTZ,
       duration_minutes INTEGER NOT NULL DEFAULT 60,
       customer_price   INTEGER NOT NULL,
       partner_payout   INTEGER NOT NULL,
@@ -662,6 +683,8 @@ export async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_order_items_partner ON order_items(partner_id)`);
   await run('index: order_items_service',
     `CREATE INDEX IF NOT EXISTS idx_order_items_service ON order_items(service_id)`);
+  await run('column: order_items.dispatch_deadline',
+    `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS dispatch_deadline TIMESTAMPTZ`);
   await run('column: order_items.cancellation_reason',
     `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`);
   await run('column: order_items.cancellation_fee',
@@ -670,6 +693,8 @@ export async function runMigrations() {
     `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`);
   await run('column: order_items.completed_at',
     `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
+  await run('column: order_items.partner_handoff_reason',
+    `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS partner_handoff_reason TEXT`);
 
   await run('table: partner_job_evidence', `
     CREATE TABLE IF NOT EXISTS partner_job_evidence (

@@ -12,12 +12,13 @@ interface AuthContextValue {
   accessToken: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  updateUser: (user: User) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
-  resendOtp: (email: string, purpose: string) => Promise<void>;
-  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) => Promise<{ email: string; devCode?: string }>;
+  resendOtp: (email: string, purpose: string) => Promise<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>;
+  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; subCategoryId: string; title: string; city: string; area?: string; pincode?: string }) => Promise<{ email: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>;
   verifySignupOtp: (email: string, code: string) => Promise<void>;
 }
 
@@ -129,6 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     registerPushToken(data.accessToken);
   }, [registerPushToken, setupRefreshHandler]);
 
+  const updateUser = useCallback((nextUser: User) => {
+    setUser(nextUser);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       const refresh = await storage.getItem(REFRESH_KEY);
@@ -145,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [accessToken]);
 
   const forgotPassword = useCallback(async (email: string) => {
-    await authApi.forgotPassword(email);
+    return authApi.forgotPassword(email);
   }, []);
 
   const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
@@ -153,12 +158,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resendOtp = useCallback(async (email: string, purpose: string) => {
-    await authApi.resendOtp({ email, purpose });
+    return authApi.resendOtp({ email, purpose });
   }, []);
 
-  const registerPartner = useCallback(async (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) => {
+  const registerPartner = useCallback(async (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; subCategoryId: string; title: string; city: string; area?: string; pincode?: string }) => {
     const result = await authApi.registerPartner(data);
-    return { email: result.email, devCode: result.devCode };
+    return {
+      email: result.email,
+      devCode: result.devCode,
+      expiresInSeconds: result.expiresInSeconds,
+      resendAfterSeconds: result.resendAfterSeconds,
+    };
   }, []);
 
   const verifySignupOtp = useCallback(async (email: string, code: string) => {
@@ -178,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       user, accessToken, isLoading,
       isAuthenticated: !!accessToken,
-      login, logout, forgotPassword, resetPassword, resendOtp, registerPartner, verifySignupOtp,
+      updateUser, login, logout, forgotPassword, resetPassword, resendOtp, registerPartner, verifySignupOtp,
     }}>
       {children}
     </AuthContext.Provider>

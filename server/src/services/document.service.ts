@@ -8,6 +8,73 @@ export const VALID_STATUSES = [
 ] as const;
 export type DocumentStatus = (typeof VALID_STATUSES)[number];
 
+/**
+ * Return professionals whose active mandatory document types all have a
+ * current approved document. If Admin has not marked a type as mandatory yet,
+ * a partner still needs at least one uploaded document and every current
+ * upload must be approved; partners with no documents must never receive jobs.
+ *
+ * Keep this check server-side and reuse it for automatic dispatch, Admin
+ * eligibility lists, and every manual/partner acceptance path.
+ */
+export async function getProfessionalsWithApprovedMandatoryDocuments(
+  professionalIds: string[],
+): Promise<Set<string>> {
+  if (!professionalIds.length) return new Set();
+
+  const { db, sql } = await getDb();
+  const mandatoryRows = await db.execute(sql`
+    SELECT type_key
+    FROM document_type_configs
+    WHERE is_mandatory = true AND is_active = true
+  `);
+  const mandatoryKeys: string[] = ((mandatoryRows as any).rows ?? (mandatoryRows as any))
+    .map((row: any) => row.type_key);
+
+  const professionalIdList = sql.join(
+    professionalIds.map((professionalId) => sql`${professionalId}::uuid`),
+    sql`, `,
+  );
+  const documentRows = await db.execute(sql`
+    SELECT professional_id, document_type, status
+    FROM partner_documents
+    WHERE professional_id IN (${professionalIdList})
+  `);
+  const approvedByProfessional = new Map<string, Set<string>>();
+  const documentCounts = new Map<string, { total: number; approved: number }>();
+  for (const row of ((documentRows as any).rows ?? (documentRows as any)) as any[]) {
+    const counts = documentCounts.get(row.professional_id) ?? { total: 0, approved: 0 };
+    counts.total += 1;
+    if (row.status === 'approved') counts.approved += 1;
+    documentCounts.set(row.professional_id, counts);
+    if (row.status !== 'approved') continue;
+    if (!approvedByProfessional.has(row.professional_id)) {
+      approvedByProfessional.set(row.professional_id, new Set());
+    }
+    approvedByProfessional.get(row.professional_id)!.add(row.document_type);
+  }
+
+  if (!mandatoryKeys.length) {
+    return new Set(
+      professionalIds.filter((professionalId) => {
+        const approved = approvedByProfessional.get(professionalId);
+        const counts = documentCounts.get(professionalId);
+        return Boolean(
+          counts && counts.total > 0 && counts.total === counts.approved &&
+          approved && approved.size > 0,
+        );
+      }),
+    );
+  }
+
+  return new Set(
+    professionalIds.filter((professionalId) => {
+      const approved = approvedByProfessional.get(professionalId) ?? new Set<string>();
+      return mandatoryKeys.every((key) => approved.has(key));
+    }),
+  );
+}
+
 async function getDb() {
   const { db } = await import('../config/database.js');
   const { sql } = await import('drizzle-orm');
@@ -60,7 +127,13 @@ function _computeOverallStatus(r: {
   if (uploaded === 0)                        return 'no_documents';
   if (rejected > 0)                          return 'rejected';
   if (reUpload > 0)                          return 'action_required';
-  if (required > 0 && approved >= required)  return 'approved';
+  // When no document types are mandatory, approval is complete once every
+  // uploaded document is approved. The old required > 0 guard made partners
+  // with fully approved optional documents appear as "pending" forever.
+  if (
+    (required > 0 && approved >= required) ||
+    (required === 0 && approved === uploaded)
+  ) return 'approved';
   if (underReview > 0 || pending > 0)        return 'pending';
   return 'pending';
 }

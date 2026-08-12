@@ -24,6 +24,11 @@ export function createApp() {
   // Helmet's default `img-src 'self' data:` policy silently blocks those
   // production assets, leaving the UI with broken-image icons and alt text.
   app.use(helmet({
+    // The web clients use separate public preview ports in Replit, so their
+    // browser requests to the API are cross-origin by port. CORS below
+    // authorizes those requests; CORP must not block the already-authorized
+    // responses.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: {
       directives: {
         imgSrc: ["'self'", "data:", "https:"],
@@ -97,7 +102,9 @@ export function createApp() {
       // fallback: temp file written by tunnel script
       try { return fs.readFileSync(`/tmp/expo-tunnel-${port}.url`, 'utf8').trim(); } catch { return ''; }
     };
-    const customerUrl = getUrl('mobile', 8080);
+    // Customer Expo workflow owns port 8081. Keep this aligned with the
+    // workflow so /qr does not show "Tunnel starting" while Metro is healthy.
+    const customerUrl = getUrl('mobile', 8081);
     const partnerUrl  = getUrl('mobile-partner', 8099);
 
     const makeQr = async (url: string) => {

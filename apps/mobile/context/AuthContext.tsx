@@ -16,12 +16,12 @@ interface AuthState {
 
 interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { fullName: string; email: string; password: string; phone?: string }) => Promise<{ userId: string }>;
+  register: (data: { fullName: string; email: string; password: string; phone?: string }) => Promise<{ userId: string; email: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>;
   verifyOtp: (email: string, code: string, purpose: string) => Promise<void>;
   logout: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>;
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
-  resendOtp: (email: string, purpose: string) => Promise<void>;
+  resendOtp: (email: string, purpose: string) => Promise<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>;
   updateUser: (user: User) => void;
 }
 
@@ -31,12 +31,12 @@ const AuthContext = createContext<AuthState & AuthActions>({
   isLoading: true,
   isAuthenticated: false,
   login: async () => {},
-  register: async () => ({ userId: '' }),
+  register: async () => ({ userId: '', email: '' }),
   verifyOtp: async () => {},
   logout: async () => {},
-  forgotPassword: async () => {},
+  forgotPassword: async () => ({}),
   resetPassword: async () => {},
-  resendOtp: async () => {},
+  resendOtp: async () => ({}),
   updateUser: () => {},
 });
 
@@ -179,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [accessToken]);
 
   const forgotPassword = useCallback(async (email: string) => {
-    await authApi.forgotPassword(email);
+    return authApi.forgotPassword(email);
   }, []);
 
   const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resendOtp = useCallback(async (email: string, purpose: string) => {
-    await authApi.resendOtp({ email, purpose });
+    return authApi.resendOtp({ email, purpose });
   }, []);
 
   const updateUser = useCallback((updatedUser: User) => {

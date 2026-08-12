@@ -93,8 +93,18 @@ async function clearCart(token: string) {
   }
 }
 
+async function clearActiveTestBookings(token: string) {
+  const r = await GET('/bookings', token);
+  const bookings = Array.isArray(r.data) ? r.data : (r.data?.bookings ?? []);
+  for (const booking of bookings) {
+    if (['pending', 'upcoming'].includes(booking.status)) {
+      await PATCH(`/bookings/${booking.id}/cancel`, { reason: 'E2E fixture reset' }, token);
+    }
+  }
+}
+
 async function addToCart(serviceId: string, qty: number, token: string) {
-  return POST('/cart', { serviceId, quantity: qty }, token);
+  return POST('/cart/items', { serviceId, quantity: qty }, token);
 }
 
 async function checkout(token: string, scheduledAt: string, notes?: string) {
@@ -119,7 +129,17 @@ async function findJobForBooking(bookingId: string, token: string) {
 }
 
 function futureDate(offsetMinutes = 120) {
-  return new Date(Date.now() + offsetMinutes * 60 * 1000).toISOString();
+  // Checkout validates business hours in IST and also validates the service
+  // duration against closing time. Use a future IST date at a safe midday slot
+  // instead of depending on the machine's current UTC hour.
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+  const dayOffset = 1 + Math.floor(offsetMinutes / 240);
+  const minuteOffset = offsetMinutes % 240;
+  const targetIST = new Date(nowIST);
+  targetIST.setUTCDate(targetIST.getUTCDate() + dayOffset);
+  targetIST.setUTCHours(10 + Math.floor(minuteOffset / 60), minuteOffset % 60, 0, 0);
+  return new Date(targetIST.getTime() - IST_OFFSET_MS).toISOString();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -137,6 +157,8 @@ async function run() {
       login('partner@servenow.in',  'Partner@1234'),
       login('admin@servenow.in',    'Admin@1234'),
     ]);
+    await clearActiveTestBookings(customerToken);
+    await clearCart(customerToken);
     console.log(`${c.green}✓${c.reset} Logged in as customer, partner, admin`);
   } catch (e: any) {
     console.log(`${c.red}✗ Login failed: ${e.message}${c.reset}`);
@@ -175,7 +197,7 @@ async function run() {
     else {
       // 1c. Partner gets the job
       const jobs = await getPartnerJobs(partnerToken);
-      const job1 = jobs.find((j: any) => j.id === booking1.id) ?? jobs[0];
+      const job1 = jobs.find((j: any) => j.id === booking1.id);
       assert(flow, 'Partner can see pending jobs', jobs.length > 0, jobs);
 
       if (job1) {
@@ -274,7 +296,7 @@ async function run() {
 
     if (booking3?.id) {
       const jobs = await getPartnerJobs(partnerToken);
-      const job3 = jobs.find((j: any) => j.id === booking3.id) ?? jobs[jobs.length - 1];
+      const job3 = jobs.find((j: any) => j.id === booking3.id);
 
       if (job3) {
         const rejectR = await PATCH(`/partner/jobs/${job3.id}/reject`, {}, partnerToken);
@@ -284,8 +306,12 @@ async function run() {
         const bR = await GET(`/bookings/${booking3.id}`, customerToken);
         const validStatuses = ['pending', 'searching_partner', 'upcoming', 'cancelled'];
         assert(flow, `Booking status after reject is valid (got: ${bR.data?.status})`, validStatuses.includes(bR.data?.status), bR.data?.status);
+        if (['pending', 'searching_partner', 'upcoming'].includes(bR.data?.status)) {
+          await PATCH(`/bookings/${booking3.id}/cancel`, {}, customerToken);
+        }
       } else {
         skip(flow, 'No job visible to partner for this booking');
+        await PATCH(`/bookings/${booking3.id}/cancel`, { reason: 'E2E fixture cleanup' }, customerToken);
       }
     } else {
       fail(flow, 'Booking not created', bookR.error);
@@ -337,7 +363,7 @@ async function run() {
 
     if (booking5?.id) {
       const jobs = await getPartnerJobs(partnerToken);
-      const job5 = jobs.find((j: any) => j.id === booking5.id) ?? jobs[jobs.length - 1];
+      const job5 = jobs.find((j: any) => j.id === booking5.id);
 
       if (job5) {
         // Partner accepts
@@ -397,7 +423,7 @@ async function run() {
 
       // Partner accepts rescheduled booking
       const jobs = await getPartnerJobs(partnerToken);
-      const job6 = jobs.find((j: any) => j.id === booking6.id) ?? jobs[jobs.length - 1];
+      const job6 = jobs.find((j: any) => j.id === booking6.id);
 
       if (job6) {
         await PATCH(`/partner/jobs/${job6.id}/accept`, {}, partnerToken);
@@ -412,6 +438,7 @@ async function run() {
         }
       } else {
         skip(flow, 'Job not visible to partner after reschedule');
+        await PATCH(`/bookings/${booking6.id}/cancel`, { reason: 'E2E fixture cleanup' }, customerToken);
       }
     } else {
       fail(flow, 'Booking not created', bookR.error);
@@ -442,7 +469,7 @@ async function run() {
       assert(flow, 'Booking has services list', Array.isArray(bR.data?.services) || !!bR.data?.serviceName, bR.data);
 
       const jobs = await getPartnerJobs(partnerToken);
-      const job7 = jobs.find((j: any) => j.id === booking7.id) ?? jobs[jobs.length - 1];
+      const job7 = jobs.find((j: any) => j.id === booking7.id);
 
       if (job7) {
         await PATCH(`/partner/jobs/${job7.id}/accept`, {}, partnerToken);
@@ -461,6 +488,7 @@ async function run() {
         }
       } else {
         skip(flow, 'Job not visible to partner');
+        await PATCH(`/bookings/${booking7.id}/cancel`, { reason: 'E2E fixture cleanup' }, customerToken);
       }
     } else {
       fail(flow, 'Multi-service checkout failed', bookR.error);
@@ -481,7 +509,7 @@ async function run() {
 
     if (booking8?.id) {
       const jobs = await getPartnerJobs(partnerToken);
-      const job8 = jobs.find((j: any) => j.id === booking8.id) ?? jobs[jobs.length - 1];
+      const job8 = jobs.find((j: any) => j.id === booking8.id);
 
       if (job8) {
         await PATCH(`/partner/jobs/${job8.id}/accept`, {}, partnerToken);
@@ -566,7 +594,7 @@ async function run() {
 
     if (bk?.id) {
       const jobs = await getPartnerJobs(partnerToken);
-      const job = jobs.find((j: any) => j.id === bk.id) ?? jobs[jobs.length - 1];
+      const job = jobs.find((j: any) => j.id === bk.id);
 
       if (job) {
         await PATCH(`/partner/jobs/${job.id}/accept`, {}, partnerToken);

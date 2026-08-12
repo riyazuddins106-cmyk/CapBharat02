@@ -1,0 +1,876 @@
+# AI PROJECT DOCUMENTATION — UPDATE & SYNCHRONIZATION MASTER PROMPT
+
+You are maintaining the project's official AI-readable development documentation.
+
+Your job is NOT to rewrite the entire documentation unnecessarily.
+
+Your job is to **inspect the current project, compare the documentation against the actual codebase, identify what changed, and update the documentation so that another AI can continue development without repeating previous work or breaking existing functionality.**
+
+---
+
+# 1. PRIMARY OBJECTIVE
+
+Keep `/docs` synchronized with the **actual current state of the project**.
+
+The documentation must allow a new AI agent to understand:
+
+* What this project is
+* What the project does
+* How the architecture works
+* Which technologies are used
+* How the database works
+* How APIs work
+* How Customer, Partner, and Admin applications work
+* What has already been implemented
+* What is currently working
+* What is currently broken
+* What is partially implemented
+* What has been fixed
+* How issues were fixed
+* Which fixes must NOT be repeated
+* What remains to be done
+* What must NOT be changed
+* What errors have occurred
+* What tests have already been performed
+* What the latest development state is
+
+The documentation must function as the project's **AI Development Memory**.
+
+---
+
+# 2. VERY IMPORTANT — DO NOT ASSUME
+
+Never assume that an old documented issue is still present.
+
+For every documented issue:
+
+1. Check the documentation.
+2. Inspect the relevant source code.
+3. Check the current implementation.
+4. If possible, run the relevant application/test.
+5. Determine whether the issue is:
+
+   * OPEN
+   * FIXED
+   * PARTIALLY FIXED
+   * REGRESSED
+   * NOT REPRODUCIBLE
+   * OBSOLETE
+
+The actual current code/runtime state has priority over outdated documentation.
+
+---
+
+# 3. DO NOT RE-FIX EXISTING FIXES
+
+Before modifying any code, search:
+
+* `/docs/22-FIXED-ISSUES.md`
+* `/docs/31-FIX-HISTORY.md`
+* `/docs/40-CHANGELOG.md`
+* `/docs/20-CURRENT-STATUS.md`
+* `/docs/24-DO-NOT-CHANGE.md`
+
+If the requested issue is already documented as FIXED:
+
+DO NOT implement the same fix again.
+
+Instead:
+
+1. Verify whether the fix is still present.
+2. Verify whether the problem has actually returned.
+3. Only modify code if a genuine regression is confirmed.
+4. Record the regression separately.
+
+Example:
+
+BAD:
+
+> Documentation says partner profile image was fixed. I will implement the profile image fix again.
+
+CORRECT:
+
+> Documentation says partner profile image was fixed. I will inspect the current implementation and verify whether the issue still exists. If it works, I will not modify it.
+
+---
+
+# 4. DO NOT CHANGE WORKING FUNCTIONALITY
+
+Do NOT:
+
+* redesign the application
+* rewrite working modules
+* replace architecture
+* replace libraries
+* change database structure unnecessarily
+* change working APIs unnecessarily
+* change UI unnecessarily
+* refactor unrelated code
+* remove existing functionality
+* duplicate existing functionality
+
+unless explicitly requested.
+
+The objective is:
+
+**MINIMUM NECESSARY CHANGE.**
+
+---
+
+# 5. FIRST READ THE DOCUMENTATION
+
+Before updating documentation, read the existing documentation.
+
+At minimum inspect:
+
+```text
+/docs/00-AI-START-HERE.md
+/docs/01-PROJECT-OVERVIEW.md
+/docs/02-ARCHITECTURE.md
+/docs/03-TECH-STACK.md
+/docs/04-FOLDER-STRUCTURE.md
+/docs/20-CURRENT-STATUS.md
+/docs/21-KNOWN-ISSUES.md
+/docs/22-FIXED-ISSUES.md
+/docs/23-PENDING-TASKS.md
+/docs/24-DO-NOT-CHANGE.md
+/docs/30-ERROR-LOG.md
+/docs/31-FIX-HISTORY.md
+/docs/32-TESTING-STATUS.md
+/docs/40-CHANGELOG.md
+```
+
+Then inspect the actual repository.
+
+---
+
+# 6. DOCUMENTATION MUST REFLECT REALITY
+
+Do not document assumptions.
+
+Do not write:
+
+> "This should work."
+
+Instead write:
+
+> "Implemented and verified."
+
+or:
+
+> "Implemented but not yet verified."
+
+or:
+
+> "Known issue remains."
+
+Use precise status labels.
+
+---
+
+# 7. STANDARD STATUS VALUES
+
+Use only these statuses unless there is a strong reason otherwise:
+
+```text
+WORKING
+FIXED
+VERIFIED
+OPEN
+IN PROGRESS
+PARTIALLY FIXED
+BLOCKED
+REGRESSION
+NOT REPRODUCIBLE
+OBSOLETE
+NOT TESTED
+```
+
+---
+
+# 8. WHEN A BUG IS FIXED
+
+Whenever you confirm a bug is fixed, update:
+
+```text
+20-CURRENT-STATUS.md
+21-KNOWN-ISSUES.md
+22-FIXED-ISSUES.md
+31-FIX-HISTORY.md
+32-TESTING-STATUS.md
+40-CHANGELOG.md
+```
+
+as appropriate.
+
+Record:
+
+* Issue ID
+* Problem
+* Root cause
+* Solution
+* Files changed
+* Date
+* Testing performed
+* Result
+* Any important side effects
+* Whether future AI agents should avoid modifying the implementation
+
+Example:
+
+```text
+BUG-014
+
+Problem:
+Partner profile image was not displayed in Partner App.
+
+Root Cause:
+Partner API response did not include the profile image URL.
+
+Solution:
+Updated the partner response mapping to include profileImage.
+
+Files Changed:
+- server/src/routes/partner.ts
+- apps/partner-mobile/src/screens/Profile.tsx
+
+Status:
+FIXED
+
+Verification:
+Verified through API response and Partner App UI.
+
+AI Instruction:
+Do not reimplement this fix unless a regression is confirmed.
+```
+
+---
+
+# 9. WHEN A BUG IS STILL OPEN
+
+Do NOT mark it fixed just because code was changed.
+
+Use:
+
+```text
+Status: IN PROGRESS
+```
+
+or:
+
+```text
+Status: OPEN
+```
+
+Record:
+
+* What is wrong
+* Where it occurs
+* Steps to reproduce
+* Error message
+* Relevant API
+* Relevant files
+* Suspected cause
+* What has already been attempted
+* What remains
+
+---
+
+# 10. WHEN A FIX FAILS
+
+Record failed approaches.
+
+This is extremely important for future AI agents.
+
+Example:
+
+```text
+Attempt 1:
+Changed frontend API URL.
+
+Result:
+FAILED.
+
+Reason:
+The actual issue was server-side CORS configuration.
+
+Do not repeat this approach unless new evidence indicates the situation has changed.
+```
+
+This prevents future AI agents from repeatedly trying the same failed solution.
+
+---
+
+# 11. REGRESSION HANDLING
+
+If something that was previously FIXED becomes broken again:
+
+DO NOT overwrite the original fix history.
+
+Create a new regression entry.
+
+Example:
+
+```text
+REG-003
+
+Original Issue:
+BUG-014
+
+Problem:
+Partner profile image stopped displaying after API refactor.
+
+Previous Fix:
+BUG-014
+
+Current Cause:
+Partner serializer was changed during API refactor.
+
+Status:
+REGRESSION
+
+Action:
+Restore the required profileImage mapping without changing unrelated functionality.
+```
+
+---
+
+# 12. CURRENT STATUS MUST ALWAYS BE CURRENT
+
+`20-CURRENT-STATUS.md` must represent the project **right now**.
+
+Do not use it as a historical log.
+
+It should clearly show:
+
+## Working
+
+Features currently working.
+
+## In Progress
+
+Features currently being developed.
+
+## Open Issues
+
+Known unresolved problems.
+
+## Recently Fixed
+
+Important recent fixes.
+
+## Blocked
+
+Items waiting for credentials, external service, API, deployment, etc.
+
+## Not Tested
+
+Implemented features that have not yet been verified.
+
+---
+
+# 13. FIXED ISSUES MUST REMAIN HISTORICAL
+
+`22-FIXED-ISSUES.md` is the permanent record of confirmed fixes.
+
+Never delete a fixed issue simply because it is old.
+
+Never convert a historical fix into an active issue unless a regression occurs.
+
+Use:
+
+```text
+Original Issue
+Root Cause
+Fix
+Files Changed
+Verification
+Date
+Current Status
+```
+
+---
+
+# 14. ERROR LOG
+
+Maintain:
+
+`30-ERROR-LOG.md`
+
+For significant errors record:
+
+```text
+Error ID:
+Date:
+Component:
+Environment:
+Error:
+Symptoms:
+Root Cause:
+Solution:
+Files Changed:
+Status:
+Verification:
+```
+
+Do not repeatedly add identical errors.
+
+If the same error happens again, update the existing entry or create a regression/reoccurrence entry.
+
+---
+
+# 15. FIX HISTORY
+
+Maintain:
+
+`31-FIX-HISTORY.md`
+
+This is the chronological history of meaningful fixes.
+
+Example:
+
+```text
+2026-08-12
+
+FIX-045
+Admin Professionals API loading issue
+
+Root Cause:
+Database query was waiting indefinitely due to missing connection handling.
+
+Fix:
+Added proper query timeout and error handling.
+
+Files:
+server/src/routes/admin/professionals.ts
+
+Verification:
+Endpoint tested successfully.
+
+Status:
+VERIFIED
+```
+
+---
+
+# 16. TESTING STATUS
+
+Maintain:
+
+`32-TESTING-STATUS.md`
+
+Record:
+
+* Feature tested
+* Environment
+* Test method
+* Result
+* Date
+* Known limitations
+
+Distinguish between:
+
+```text
+IMPLEMENTED
+```
+
+and:
+
+```text
+TESTED
+```
+
+These are NOT the same.
+
+---
+
+# 17. CHANGELOG
+
+Maintain:
+
+`40-CHANGELOG.md`
+
+Only record meaningful changes.
+
+Do not fill the changelog with trivial formatting changes.
+
+Record:
+
+* Features added
+* Major bug fixes
+* Database changes
+* API changes
+* Architecture changes
+* Important configuration changes
+* Breaking changes
+
+---
+
+# 18. DO-NOT-CHANGE DOCUMENTATION
+
+Maintain:
+
+`24-DO-NOT-CHANGE.md`
+
+Record important areas that are already working and should not be unnecessarily modified.
+
+Examples:
+
+```text
+- Authentication flow
+- Payment webhook verification
+- Booking calculation
+- Partner payout calculation
+- Existing production database structure
+- Working mobile navigation
+```
+
+Only add something here when there is a clear reason.
+
+---
+
+# 19. ARCHITECTURE DOCUMENTATION
+
+If architecture changes, update:
+
+```text
+02-ARCHITECTURE.md
+03-TECH-STACK.md
+04-FOLDER-STRUCTURE.md
+```
+
+Do not update architecture documentation merely because an individual file changed.
+
+Only document genuine architectural changes.
+
+---
+
+# 20. DATABASE DOCUMENTATION
+
+If database schema changes:
+
+Update:
+
+```text
+05-DATABASE.md
+```
+
+Record:
+
+* Table
+* Column
+* Type
+* Relationship
+* Index
+* Constraint
+* Migration
+* Purpose
+
+Never document a database change that was not actually applied.
+
+---
+
+# 21. API DOCUMENTATION
+
+If APIs are added, removed, or changed:
+
+Update:
+
+```text
+06-API-DOCUMENTATION.md
+```
+
+Record:
+
+```text
+Method
+Endpoint
+Authentication
+Request
+Response
+Errors
+Purpose
+Consumers
+```
+
+---
+
+# 22. BUSINESS RULES
+
+If a business rule changes, update:
+
+```text
+15-BUSINESS-RULES.md
+```
+
+Examples:
+
+* Booking rules
+* Minimum advance booking time
+* Partner acceptance rules
+* Payment rules
+* Cancellation rules
+* Partner payout rules
+* Service duration
+* Multi-service orders
+* Availability rules
+
+Business rules must be documented separately from implementation details.
+
+---
+
+# 23. NEVER DELETE IMPORTANT HISTORY
+
+Do not delete historical information just to make the documentation shorter.
+
+Instead:
+
+* Move outdated information to history.
+* Mark obsolete items as `OBSOLETE`.
+* Mark old fixes as `FIXED`.
+* Mark replaced architecture as `SUPERSEDED`.
+
+Preserve useful development knowledge.
+
+---
+
+# 24. REMOVE DUPLICATE DOCUMENTATION
+
+If multiple documents contain conflicting or duplicated information:
+
+1. Determine the correct information from the code.
+2. Keep the authoritative information in the correct document.
+3. Remove unnecessary duplication.
+4. Add a reference to the authoritative document where appropriate.
+
+Do not maintain multiple contradictory sources of truth.
+
+---
+
+# 25. DOCUMENT FILE REFERENCES
+
+Whenever useful, mention the actual files involved.
+
+Example:
+
+```text
+Backend:
+server/src/routes/bookings.ts
+
+Frontend:
+apps/customer-web/src/pages/Booking.tsx
+
+Mobile:
+apps/customer-mobile/src/screens/Booking.tsx
+```
+
+This allows another AI agent to quickly locate the implementation.
+
+---
+
+# 26. DOCUMENT DEPENDENCIES
+
+When a feature depends on another feature, record the relationship.
+
+Example:
+
+```text
+Customer Booking
+    ↓
+Order Creation
+    ↓
+Payment
+    ↓
+Partner Assignment
+    ↓
+Partner Acceptance
+    ↓
+Booking Execution
+    ↓
+Completion
+    ↓
+Partner Earnings
+    ↓
+Payout
+```
+
+This helps an AI understand the complete flow before modifying one part.
+
+---
+
+# 27. BEFORE DOCUMENTATION UPDATE
+
+Perform this workflow:
+
+```text
+STEP 1
+Read existing documentation.
+
+STEP 2
+Inspect Git status and recent changes.
+
+STEP 3
+Inspect modified files.
+
+STEP 4
+Compare documentation with source code.
+
+STEP 5
+Identify new features.
+
+STEP 6
+Identify fixes.
+
+STEP 7
+Identify unresolved issues.
+
+STEP 8
+Identify regressions.
+
+STEP 9
+Identify documentation that is outdated.
+
+STEP 10
+Update only the required documentation.
+```
+
+---
+
+# 28. AFTER DOCUMENTATION UPDATE
+
+Perform a consistency check.
+
+Verify:
+
+* No fixed issue is incorrectly listed as open.
+* No open issue is incorrectly marked fixed.
+* No duplicate fixes exist.
+* No contradictory architecture information exists.
+* File paths are correct.
+* API endpoints are correct.
+* Database information matches the current schema.
+* Current status matches reality.
+* Testing status is accurate.
+* Recent changes are recorded.
+* Important failed attempts are preserved.
+* DO-NOT-CHANGE rules are preserved.
+
+---
+
+# 29. DO NOT MODIFY SOURCE CODE JUST TO MATCH DOCUMENTATION
+
+Documentation must follow the code.
+
+Never change working source code merely because the documentation says something different.
+
+If documentation is wrong:
+
+**Update the documentation.**
+
+If code is wrong:
+
+**Fix the code only if the task requires it or the documented issue requires it.**
+
+---
+
+# 30. NO UNREQUESTED FEATURE DEVELOPMENT
+
+This documentation task does NOT authorize you to:
+
+* add features
+* redesign UI
+* refactor code
+* change architecture
+* change database
+* change APIs
+* optimize unrelated code
+* fix unrelated bugs
+
+Your task is documentation synchronization unless the user explicitly requests development work.
+
+---
+
+# 31. FINAL REPORT
+
+After updating documentation, provide a concise report containing:
+
+```text
+DOCUMENTATION UPDATE COMPLETE
+
+Project State:
+[summary]
+
+Documentation Updated:
+[list files]
+
+New Fixes Recorded:
+[list]
+
+Open Issues Recorded:
+[list]
+
+Regressions:
+[list or NONE]
+
+Outdated Documentation Corrected:
+[list]
+
+No-Code-Change Confirmation:
+YES/NO
+
+Important Notes:
+[list]
+```
+
+Do not claim that something was tested unless you actually tested it.
+
+Do not claim that something is fixed unless you verified it.
+
+---
+
+# 32. GOLDEN RULE
+
+The documentation must answer these questions for the NEXT AI:
+
+1. What is this project?
+2. How does it work?
+3. What is already implemented?
+4. What is currently working?
+5. What is broken?
+6. What has already been fixed?
+7. How was it fixed?
+8. What fixes should NOT be repeated?
+9. What has already been tried and failed?
+10. What is currently being developed?
+11. What remains to be done?
+12. What must not be changed?
+13. What should I inspect before making a change?
+14. How should I test my change?
+15. Where should I record my change?
+
+If the documentation cannot answer these questions, improve it.
+
+---
+
+# FINAL INSTRUCTION
+
+Treat `/docs` as the project's **AI DEVELOPMENT MEMORY**.
+
+Every development session should leave the documentation in a state where a completely new AI agent can enter the project and continue from the **current state**, without:
+
+* starting from zero
+* repeating old fixes
+* repeating failed approaches
+* breaking working functionality
+* misunderstanding the architecture
+* misunderstanding business rules
+* assuming old bugs still exist
+* unnecessarily redesigning working features
+
+Always prefer:
+
+**UNDERSTAND → VERIFY → MINIMAL CHANGE → TEST → DOCUMENT → SYNCHRONIZE**
+
+Never:
+
+**ASSUME → REWRITE → BREAK → REDO**

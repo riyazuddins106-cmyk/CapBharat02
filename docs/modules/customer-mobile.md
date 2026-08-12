@@ -48,8 +48,18 @@ Indirect through the API.
 
 ## Current Behavior
 
+Customer profile settings display the immutable username. Full name saves
+directly, while changed email or phone values require OTP verification before
+they are persisted.
+
 The mobile app contains customer auth, catalog, booking/checkout, account,
-notification, rewards, and support surfaces.
+notification, rewards, and support surfaces. Booking and order queries refresh
+every 10 seconds and refetch when the app returns to the foreground.
+
+Eligible itemized service-order cards show the configured cancellation warning.
+The amount is calculated from the service price using the Booking Settings
+percentage, minimum, and maximum rupee bounds; the cancellation confirmation
+uses the same value.
 
 ## Known Issues
 

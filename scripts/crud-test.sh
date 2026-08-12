@@ -48,10 +48,10 @@ R=$(curl -sf -X POST "$BASE/auth/register" \
 check "POST /auth/register" '"success":true' "$R"
 
 sleep 1
-# OTP format: "[otp] Verification code for <email> (signup): <6digits>"
 sleep 1
-# OTP is written to /tmp/otp-dev.log in non-production (format: "<email> <purpose> <code>")
-OTP=$(grep "^$EMAIL signup " /tmp/otp-dev.log 2>/dev/null | tail -1 | awk '{print $3}')
+# OTP is written to /tmp/otp-dev.log in development:
+# "<timestamp> | <email> | <purpose> | code=<digits> ..."
+OTP=$(grep "| $EMAIL | signup |" /tmp/otp-dev.log 2>/dev/null | tail -1 | sed -E 's/.*code=([0-9]+).*/\1/')
 
 if [ -n "$OTP" ]; then
   R=$(curl -sf -X POST "$BASE/auth/verify-otp" \
@@ -195,38 +195,27 @@ if [ -n "$CAT_ID" ]; then
   check "GET /categories/:id" '"success":true' "$R"
 fi
 
-# ── PROFESSIONALS ─────────────────────────────
+# ── SERVICES ──────────────────────────────────
 echo ""
-echo "▶ Professionals"
-R=$(curl -sf "$BASE/professionals" 2>&1 || echo '{}')
-check "GET /professionals" '"success":true' "$R"
-PROF_ID=$(get_uuid "$R")
+echo "▶ Service catalog and wishlist"
+R=$(curl -sf "$BASE/services" 2>&1 || echo '{}')
+check "GET /services" '"success":true' "$R"
+SERVICE_ID=$(get_uuid "$R")
 
-if [ -n "$PROF_ID" ]; then
-  R=$(curl -sf "$BASE/professionals/$PROF_ID" 2>&1 || echo '{}')
-  check "GET /professionals/:id" '"success":true' "$R"
+if [ -n "$SERVICE_ID" ]; then
+  R=$(curl -sf "$BASE/services/$SERVICE_ID" 2>&1 || echo '{}')
+  check "GET /services/:id" '"success":true' "$R"
 
-  R=$(curl -sf "$BASE/professionals/$PROF_ID/reviews" 2>&1 || echo '{}')
-  check "GET /professionals/:id/reviews" '"success":true' "$R"
-else
-  fail "GET /professionals/:id — no professional UUID found"
-  fail "GET /professionals/:id/reviews — no professional UUID found"
-fi
+  R=$(curl -sf "$BASE/service-wishlist" -H "Authorization: Bearer $CUST_TOKEN" 2>&1 || echo '{}')
+  check "GET /service-wishlist" '"success":true' "$R"
 
-# ── FAVORITES ────────────────────────────────
-echo ""
-echo "▶ Favorites"
-R=$(curl -sf "$BASE/favorites" -H "Authorization: Bearer $CUST_TOKEN" 2>&1 || echo '{}')
-check "GET /favorites" '"success":true' "$R"
-
-if [ -n "$PROF_ID" ]; then
-  R=$(curl -sf -X POST "$BASE/favorites/$PROF_ID" \
+  R=$(curl -sf -X POST "$BASE/service-wishlist/$SERVICE_ID" \
     -H "Authorization: Bearer $CUST_TOKEN" 2>&1 || echo '{}')
-  check "POST /favorites/:professionalId" '"success":true' "$R"
+  check "POST /service-wishlist/:serviceId (add)" '"success":true' "$R"
 
-  R=$(curl -sf -X DELETE "$BASE/favorites/$PROF_ID" \
+  R=$(curl -sf -X POST "$BASE/service-wishlist/$SERVICE_ID" \
     -H "Authorization: Bearer $CUST_TOKEN" 2>&1 || echo '{}')
-  check "DELETE /favorites/:professionalId" '"success":true' "$R"
+  check "POST /service-wishlist/:serviceId (remove)" '"success":true' "$R"
 fi
 
 # ── BOOKINGS ─────────────────────────────────
@@ -235,15 +224,21 @@ echo "▶ Bookings"
 R=$(curl -sf "$BASE/bookings" -H "Authorization: Bearer $CUST_TOKEN" 2>&1 || echo '{}')
 check "GET /bookings" '"success":true' "$R"
 
-FUTURE1="2027-03-15T10:00:00Z"
-FUTURE2="2027-03-16T11:00:00Z"
+FUTURE1=$(date -u -d '+2 days 10:00:00' '+%Y-%m-%dT%H:%M:%SZ')
+FUTURE2=$(date -u -d '+3 days 11:00:00' '+%Y-%m-%dT%H:%M:%SZ')
 
-if [ -n "$PROF_ID" ]; then
-  R=$(curl -sf -X POST "$BASE/bookings" \
+if [ -n "$SERVICE_ID" ]; then
+  R=$(curl -sf -X POST "$BASE/cart/items" \
     -H "Authorization: Bearer $CUST_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"professionalId\":\"$PROF_ID\",\"scheduledAt\":\"$FUTURE1\",\"notes\":\"CRUD test booking\"}" 2>&1 || echo '{}')
-  check "POST /bookings" '"success":true' "$R"
+    -d "{\"serviceId\":\"$SERVICE_ID\",\"quantity\":1}" 2>&1 || echo '{}')
+  check "POST /cart/items" '"success":true' "$R"
+
+  R=$(curl -sf -X POST "$BASE/bookings/checkout" \
+    -H "Authorization: Bearer $CUST_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"scheduledAt\":\"$FUTURE1\",\"notes\":\"CRUD test booking\"}" 2>&1 || echo '{}')
+  check "POST /bookings/checkout" '"success":true' "$R"
   BOOK_ID=$(get_uuid "$R")
 
   if [ -n "$BOOK_ID" ]; then
@@ -271,7 +266,7 @@ if [ -n "$PROF_ID" ]; then
     fail "PATCH /bookings/:id/cancel — no booking UUID"
   fi
 else
-  fail "POST /bookings — no professional found"
+  fail "POST /bookings/checkout — no service found"
 fi
 
 # ── POINTS ───────────────────────────────────
@@ -449,15 +444,15 @@ check "GET /admin/audit-logs" '"success":true' "$R"; pace
 R=$(curl -sf "$BASE/admin/payouts" -H "Authorization: Bearer $ADMIN_TOKEN" 2>&1 || echo '{}')
 check "GET /admin/payouts" '"success":true' "$R"
 # Pick a pending payout (not already paid/rejected)
-PAYOUT_ID=$(echo "$R" | grep -o '"id":"[^"]*","professionalId[^}]*"status":"pending"' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4); pace
+PAYOUT_ID=$(echo "$R" | jq -r '.data.payouts[]? | select(.status=="pending") | .id' | head -1); pace
 if [ -n "$PAYOUT_ID" ]; then
   R=$(curl -sf -X PATCH "$BASE/admin/payouts/$PAYOUT_ID" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
-    -d '{"status":"paid"}' 2>&1 || echo '{}')
-  check "PATCH /admin/payouts/:id" '"success":true' "$R"; pace
+    -d '{"status":"approved"}' 2>&1 || echo '{}')
+  check "PATCH /admin/payouts/:id (approve)" '"success":true' "$R"; pace
 else
-  ok "PATCH /admin/payouts/:id — skipped (no pending payouts)"
+  ok "PATCH /admin/payouts/:id (approve) — skipped (no pending payouts)"
 fi
 
 R=$(curl -sf "$BASE/support-tickets" -H "Authorization: Bearer $ADMIN_TOKEN" 2>&1 || echo '{}')

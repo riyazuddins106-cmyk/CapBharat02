@@ -90,7 +90,10 @@ async function buildTransporter(): Promise<BuiltTransporter> {
   // --- DB config: SMTP ---
   if (cfg?.smtp?.host && cfg.smtp.user) {
     const smtpPort = cfg.smtp.port ?? 587;
-    const smtpSecure = smtpPort === 465 ? true : (cfg.smtp.secure ?? false);
+    // Port 587 uses STARTTLS after the initial plain SMTP handshake.
+    // Port 465 starts inside TLS. Respecting secure=true on 587 causes
+    // OpenSSL's "wrong version number" error against Gmail.
+    const smtpSecure = smtpPort === 465;
     const from = cfg.from?.email
       ? `"${cfg.from.name ?? 'ServeNow'}" <${cfg.from.email}>`
       : `ServeNow <${cfg.smtp.user}>`;

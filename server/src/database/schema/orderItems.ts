@@ -5,6 +5,7 @@ import { professionals } from './professionals.js';
 
 export const orderItemStatusEnum = pgEnum('order_item_status', [
   'searching_partner',
+  'waiting_operation',
   'assigned',
   'partner_accepted',
   'partner_arrived',
@@ -22,10 +23,12 @@ export const orderItems = pgTable('order_items', {
   partnerId: uuid('partner_id').references(() => professionals.id, { onDelete: 'set null' }),
   status: orderItemStatusEnum('status').notNull().default('searching_partner'),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+  dispatchDeadline: timestamp('dispatch_deadline', { withTimezone: true }),
   durationMinutes: integer('duration_minutes').notNull().default(60),
   customerPrice: integer('customer_price').notNull(),
   partnerPayout: integer('partner_payout').notNull(),
   quantity: integer('quantity').notNull().default(1),
+  partnerHandoffReason: text('partner_handoff_reason'),
   cancellationReason: text('cancellation_reason'),
   cancellationFee: integer('cancellation_fee').notNull().default(0),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),

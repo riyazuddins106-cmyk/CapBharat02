@@ -7,16 +7,339 @@
 ---
 
 ## ▶ Current Task
-**Task:** Correct documentation source-of-truth handling after duplicate memory updates
-**Started:** 2026-08-09
-**Status:** IN PROGRESS — Step 1 of 4 complete
+**Task:** Align Customer Mobile bottom navigation with Partner Mobile
+**Started:** 2026-08-12
+**Status:** COMPLETE — safe-area-aware tab bar and native icon sizing applied
+
+## 🔄 Active Task — Customer Mobile bottom navigation — 2026-08-12
+
+- [x] Read the uploaded Customer and Partner references and compare both tab layouts.
+- [x] Remove the Customer tab bar's fixed Android height and bottom padding that overlapped the system navigation controls.
+- [x] Match Partner Mobile's safe-area-aware tab bar behavior, label spacing, and native icon sizing.
+- [x] Type-check Customer Mobile, run `git diff --check`, restart Customer Expo, inspect fresh Metro output, and update continuity documentation.
+
+## ✅ Completed Task — Customer Mobile bottom navigation — 2026-08-12
+
+- [x] Customer Mobile now lets Expo Router calculate the native tab-bar height including Android safe-area insets.
+- [x] The Android system back/home/recents bar is no longer forced into the app tab-bar area by a fixed height override.
+- [x] Customer navigation now follows the same layout behavior as the working Partner App.
+
+## 🔄 Active Task — Customer Mobile booking confirmation details — 2026-08-12
+
+- [x] Read the uploaded booking-confirmation reference and trace the Customer Mobile checkout state.
+- [x] Replace the raw minutes-since-midnight value with the created order's persisted schedule.
+- [x] Show the booked service, formatted date/time window, duration, full address, and pending status.
+- [x] Build/type-check Customer Mobile, run `git diff --check`, restart Expo Customer, inspect fresh Metro logs, and update continuity documentation.
+
+## ✅ Completed Task — Customer Mobile booking confirmation details — 2026-08-12
+
+- [x] The confirmation card no longer displays malformed values such as `Tomorrow · 570`.
+- [x] The card now formats the saved order timestamp and derives the service window from the persisted order duration.
+- [x] Customer Mobile validation passed and the refreshed Expo workflow started without new runtime errors.
+
+## 🔄 Active Task — Schedule job counts and partner handoff — 2026-08-12
+
+- [x] Show the number of scheduled jobs on each Partner Web and Partner Mobile date selector.
+- [x] Add a reason-based “Pass to another partner” action for future accepted service-order jobs.
+- [x] Offer passed jobs only to eligible, approved, available partners while retaining the original assignment.
+- [x] Transfer the assignment atomically when another partner accepts; otherwise keep the original partner responsible.
+- [x] Persist the pass reason, apply the migration, build/type-check both clients and server, restart workflows, preview Partner Web, and inspect logs.
+
+## ✅ Completed Task — Schedule job counts and partner handoff — 2026-08-12
+
+- [x] Schedule dates now show `No jobs` or the exact job count, such as `1 job` or `6 jobs`.
+- [x] Partners can pass future accepted service-order work with a required reason.
+- [x] The original partner remains assigned until another eligible partner accepts; the original assignment and service/payment state are preserved if nobody accepts.
+- [x] Server, Partner Web, Partner Mobile validation passed; the handoff migration and workflows completed cleanly.
+
+## 🔄 Active Task — Partner Expo blue error screen — 2026-08-12
+
+- [x] Inspect the uploaded screenshot and distinguish Expo Go’s generic error screen from the Partner App theme.
+- [x] Inspect Partner Expo logs and identify the first ngrok attempt failure rather than a Partner App JavaScript exception.
+- [x] Restart the configured Partner Expo workflow, confirm tunnel connection, and refresh the scanner/QR URL.
+- [x] Confirm current logs have no JavaScript runtime error and update continuity documentation.
+
+## ✅ Completed Task — Partner Expo blue error screen — 2026-08-12
+
+- [x] The blue screen was Expo Go’s fallback after the tunnel failed to load the project bundle.
+- [x] Partner Expo recovered on retry with a fresh `exp://...exp.direct` URL; users must scan the refreshed QR instead of a stale QR.
+
+## 🔄 Active Task — Future partner bookings and Schedule — 2026-08-12
+
+- [x] Keep accepted future service-order items out of the active/in-progress partner feed until check-in or payment/service work begins.
+- [x] Make Schedule include assigned future legacy and service-order jobs while excluding cancelled/completed work.
+- [x] Extend Partner Web and Partner Mobile Schedule from 7 days to 30 days so bookings 15 days away remain visible.
+- [x] Build/type-check affected apps, restart API/Partner Web/Partner Expo workflows, inspect fresh logs, and update continuity documentation.
+
+## ✅ Completed Task — Future partner bookings and Schedule — 2026-08-12
+
+- [x] The Scheduled page is now the planning surface for accepted future work; active jobs represent work that is operationally underway.
+- [x] Schedule cards show the scheduled status and support the next 30 calendar days.
+- [x] Server, Partner Web, and Partner Mobile validation passed and workflows restarted cleanly.
+
+## 🔄 Active Task — Payment method configuration and partner earnings — 2026-08-12
+
+- [x] Prevent unconfigured UPI from appearing as a payable method, and return an explicit configuration error for stale selections.
+- [x] Stop itemized test payments from marking unconfigured UPI as paid and moving the service to `service_started`.
+- [x] Make booking tracking derive “Payment confirmed” from the paid payment record, not only the service status.
+- [x] Block partner completion while item payment is unresolved and refresh Partner Mobile earnings after completion.
+- [x] Build/type-check affected apps, verify the public payment config, restart workflows, inspect logs, preview the app, and update continuity documentation.
+
+## ✅ Completed Task — Payment method configuration and partner earnings — 2026-08-12
+
+- [x] Current payment config now exposes only `cash`; unconfigured UPI is clearly explained in customer payment sheets.
+- [x] Test-mode and live item-payment endpoints reject unconfigured UPI with an actionable Admin message.
+- [x] Payment tracking and partner earnings refresh now reflect persisted payment/completion state.
+- [x] Server, Customer Web, Customer Mobile, and Partner Mobile validation passed.
+
+## 🔄 Active Task — Customer cancellation-policy placement — 2026-08-12
+
+- [x] Kept product listings free of prominent cancellation-fee labels.
+- [x] Added a short cancellation-policy disclosure to Customer Web and Customer Mobile service detail.
+- [x] Added the full policy before Customer Web and Customer Mobile checkout confirmation plus compact booking-confirmation reminders.
+- [x] Kept exact contextual fees after partner acceptance/check-in and show the exact fee in both cancellation confirmation modals.
+- [x] Built/type-checked, previewed, restarted affected workflows, and updated documentation.
+
+## ✅ Completed Task — Customer cancellation-policy placement — 2026-08-12
+
+- [x] Customer Web and Customer Mobile detail pages use compact expandable policy disclosures.
+- [x] Both checkout and confirmation flows disclose the live percentage/minimum/maximum policy at the appropriate level.
+- [x] Customer Web cancellation now uses an in-app modal with the exact estimated fee; listings remain uncluttered.
+- [x] Builds, type-checks, workflow restarts, fresh logs, preview, and continuity documentation passed.
+
+## 🔄 Active Task — Use bounded percentage cancellation penalties — 2026-08-12
+
+- [x] Replaced fixed-rupee partner-accepted and partner-check-in fields with percentage rate plus minimum and maximum rupee bounds across the API contract and client types.
+- [x] Applied `MAX(minimum, MIN(rate calculation, maximum))` on the server, capped at the service price.
+- [x] Updated Admin controls, Customer Web, and Customer Mobile to use the shared calculation.
+- [x] Built/type-checked the affected packages, restarted affected workflows, verified the public booking config, and updated project documentation and continuity notes.
+
+## ✅ Completed Task — Use bounded percentage cancellation penalties — 2026-08-12
+
+- [x] Admin now configures a percentage rate plus minimum and maximum rupee fees for cancellation after acceptance and after check-in.
+- [x] Server, Customer Web, and Customer Mobile calculate `MAX(minimum, MIN(rate calculation, maximum))`, round to rupees, and cap the fee at the service price.
+- [x] Defaults are 20%, ₹50 minimum, and ₹500 maximum for both stages.
+- [x] Server/Web/Admin builds, Customer Mobile TypeScript check, live config verification, workflow restarts, preview checks, and `git diff --check` passed.
+
+## ✅ Completed Task — Investigate Partner Web vs Partner Mobile job discrepancy — 2026-08-12
+
+- [x] Compared the Web and Mobile clients: both call `/api/partner/order-item-jobs` and both render `pendingRequests`.
+- [x] Correlated server response sizes: the two `621`-byte responses were populated immediately after checkout; later `81`-byte responses were empty after expiry.
+- [x] Queried Supabase: the Full Home Deep Cleaning request was assigned to `Partner1` (`riyazuddins107@gmail.com`), expired after the configured one-minute window, and moved to `waiting_operation`.
+- [x] Verified the documented Mobile test login is `Test Partner` (`partner@servenow.in`), currently busy and assigned to the AC category, so it is not eligible for that Home Cleaning request.
+- [x] Kept server dispatch/category/sub-category/availability enforcement unchanged; no UI or backend patch was justified.
+
+## ✅ Completed Task — Refresh Partner Expo tunnel with latest workspace code — 2026-08-12
+
+- [x] Restarted the Partner Expo workflow from the current workspace.
+- [x] Confirmed Metro rebuilt the Partner app and the tunnel connected successfully.
+- [x] Confirmed the live tunnel URL is `exp://mqrmf3k-anonymous-8099.exp.direct`.
+- [x] Restarted the QR Codes workflow and confirmed the scanner cache refreshed.
+
+## ✅ Completed Task — Reconcile timed-out partner searches in Admin and Partner feeds — 2026-08-12
+
+- [x] Traced the stuck `Searching Partner` service-order row to expiry running only from the customer orders feed.
+- [x] Centralized itemized-order expiry using the persisted dispatch deadline, with a bounded fallback for older rows.
+- [x] Applied expiry reconciliation to Admin orders, Admin legacy dispatch, Partner jobs, and customer order reads.
+- [x] Expired pending partner requests and moved timed-out items/bookings to `waiting_operation`.
+- [x] Passed the server TypeScript build, API health check, and `git diff --check`.
+- [x] Restarted the main application workflow and confirmed no application errors in fresh logs.
+
+## ✅ Completed Task — Partner dashboard eligibility status messaging — 2026-08-12
+
+- [x] Added document and availability status evaluation to Partner Mobile dashboard.
+- [x] Added the same eligibility-priority banner to Partner Web dashboard.
+- [x] Applied the agreed order: missing/attention-needed documents, pending review, offline, busy, then available.
+- [x] Added document navigation actions for missing, rejected, expired, and pending document states.
+- [x] Passed Partner Web production build, Partner Mobile TypeScript check, and `git diff --check`.
+- [x] Restarted Partner Web and Partner Expo workflows; both are running cleanly.
+
+## ✅ Completed Task — Fix stale Mobile document eligibility banner — 2026-08-12
+
+- [x] Compared the uploaded Web and Mobile screenshots and traced the discrepancy to separate Mobile document query caches.
+- [x] Aligned the Mobile dashboard with the Documents screen's `doc-types` and `docs` query keys.
+- [x] Forced fresh document reads when the dashboard/documents screen mounts.
+- [x] Added document-type and document refetches to Mobile dashboard pull-to-refresh.
+- [x] Passed Partner Mobile TypeScript check and `git diff --check`.
+- [x] Restarted Partner Expo and confirmed Metro, tunnel, and QR regeneration are healthy.
+
+## ✅ Completed Task — Refresh Partner Expo tunnel after Expo Go error screen — 2026-08-12
+
+- [x] Read the uploaded Expo Go error screenshot and identified the generic project-loading failure state.
+- [x] Restarted the Partner Expo workflow and confirmed Metro and the HTTPS tunnel connected.
+- [x] Regenerated the Partner QR PNG and scanner page from the live tunnel.
+- [x] Restarted the QR Codes workflow and verified the page displays the current Partner tunnel URL.
+- [x] Confirmed `bash -n scripts/expo-tunnel.sh` and `git diff --check` pass.
+
+## ⏸️ Blocked Diagnostic — Partner Expo Go generic error screen — 2026-08-12
+
+- [x] Read the uploaded device screenshot from `attached_assets`.
+- [x] Confirmed the Partner Expo workflow is running with a fresh native `exp.direct` URL.
+- [x] Confirmed the Android manifest and exact Android launch bundle return HTTP 200.
+- [x] Confirmed no Metro resolution or transform error is present in the Partner workflow log.
+- [ ] Obtain the device-side Expo Go “View error log” text; the user declined to provide it.
+
+## ✅ Completed Task — Repair stale Partner Expo QR scanner — 2026-08-12
+
+- [x] Read both uploaded device/scanner images from the workspace.
+- [x] Confirmed the device error was `java.io.IOException: Failed to download remote update`.
+- [x] Traced the QR payload to the stale `arose-unframed-eclipse.ngrok-free.dev` Partner tunnel.
+- [x] Updated the tunnel QR generator to rebuild the standalone scanner and PNGs from live tunnel caches.
+- [x] Restarted Partner Expo and verified the current `exp.direct` QR PNG payload and QR Codes page.
+- [x] Confirmed `git diff --check` and `bash -n scripts/expo-tunnel.sh` pass.
+
+## ✅ Completed Task — Partner OTP delivery diagnosis and reset fallback — 2026-08-12
+
+- [x] Confirmed signup and password-reset requests reached the API.
+- [x] Confirmed the actual Supabase `email_config` uses Gmail SMTP with credentials present.
+- [x] Verified Gmail SMTP negotiation and delivery acceptance (`250 2.0.0 OK`, recipient accepted).
+- [x] Added the development OTP display to the Partner mobile password-reset screen; signup already had it.
+- [x] Passed Partner mobile TypeScript validation and `git diff --check`.
+- [x] Restarted Partner Expo and confirmed the tunnel/QR regeneration is healthy.
+
+## ✅ Completed Task — Category and sub-category partner eligibility — 2026-08-12
+
+- [x] Applied category and sub-category matching to legacy automatic booking dispatch.
+- [x] Updated Booking Operations Centre eligible-partner results and manual assignment validation.
+- [x] Rechecked legacy partner job visibility, acceptance, and redispatch when returning online.
+- [x] Kept legacy partners without a saved sub-category broadly matched within their category.
+- [x] Passed server build, Partner Web build, Partner Mobile TypeScript check, `git diff --check`, API readiness smoke test, and affected workflow restarts.
+
+## ✅ Completed Task — Resume customer signup after closing OTP screen — 2026-08-12
+
+- [x] Identified that the user row is created before signup OTP verification, so closing the screen leaves an active unverified account.
+- [x] Updated customer registration to resume active unverified accounts, resend the OTP with the normal cooldown, and update the newly entered password/details.
+- [x] Kept verified accounts protected by the existing duplicate-email conflict.
+- [x] Passed the server build, `git diff --check`, and API workflow restart.
+
+## ✅ Completed Task — Configurable partner search timer — 2026-08-12
+
+- [x] Added the Admin Booking Settings search-duration control with a 10-minute default and public config response.
+- [x] Persisted search deadlines for modern order items and legacy bookings, including migration-safe startup columns.
+- [x] Reset deadlines on Continue Searching and blocked partner acceptance after expiry.
+- [x] Added live countdowns, paused states, and expiry-only Continue Searching actions to Customer Web and Customer Mobile.
+- [x] Preserved old records with a 10-minute fallback based on their last update/creation time.
+- [x] Passed server build, Customer Web build, Customer Mobile TypeScript check, `git diff --check`, API config smoke test, workflow restarts, and Customer Web preview verification.
+
+## ✅ Completed Task — Refresh QR Codes Website assets — 2026-08-12
+
+- [x] Regenerated the canonical Customer and Partner QR PNGs from the active Expo tunnel URLs.
+- [x] Updated the canonical scanner page URL labels and restarted the QR Codes Website workflow.
+- [x] Verified the rendered page shows both QR cards and the correct active URLs.
+
+## ✅ Completed Task — Investigate Partner Expo blue screen after QR scan — 2026-08-12
+
+- [x] Restarted the Partner Expo workflow and confirmed the current Partner QR was regenerated for the active tunnel.
+- [x] Verified the Partner Expo manifest, Metro status endpoint, and Android bundle all return successfully through the current tunnel.
+- [x] Confirmed the Partner web route renders normally; no native client crash or scan-time error was emitted by the available workflow logs.
+- [x] Identified the visible blue/teal screen as most consistent with Expo Go splash/loading state; current QR must be scanned from Expo Go rather than an old QR image or the phone camera.
+
+## ✅ Completed Task — Repair Partner Expo Go runtime screen — 2026-08-12
+
+- [x] Diagnosed the uploaded screenshot as Expo Go's generic project/runtime error screen rather than the Partner App error boundary.
+- [x] Guarded the Partner auth redirect until Expo Router's root navigator is mounted and the first route segment is available.
+- [x] Switched the Partner workflow to Replit's native HTTPS Expo tunnel and synchronized `/qr` with the active `exp.direct` URL.
+- [x] Passed Partner Mobile TypeScript validation and `git diff --check`; verified the new manifest and Android bundle resolve successfully.
+
+## ✅ Completed Task — OTP resend cooldown, expiry, and delivery feedback — 2026-08-12
+
+- [x] Enforced a 60-second resend cooldown server-side per email and OTP purpose, with countdowns on Customer Web, Partner Web, Customer Mobile, and Partner Mobile.
+- [x] Invalidated older active codes when a new code is issued and retained server-side expiry validation with expiry messaging on the OTP screens.
+- [x] Returned development-only OTP codes/timing metadata to the clients so Ethereal fallback delivery is not mistaken for Gmail delivery.
+- [x] Passed server build, both web builds, both mobile TypeScript checks, `git diff --check`, workflow restarts, and a clean customer preview screenshot.
+
+## ✅ Completed Task — Approved-partner dispatch and live refresh — 2026-08-12
+
+- [x] Centralized document approval eligibility across automatic dispatch, Admin eligible-partner lists, manual assignment, and partner acceptance for legacy and itemized jobs.
+- [x] Blocked partners with no documents, incomplete required documents, pending documents, rejected documents, or non-approved current uploads from receiving jobs.
+- [x] Added Customer Web and Partner Web visible polling/focus refresh plus Customer Mobile and Partner Mobile foreground/refetch polling.
+- [x] Passed server/web builds, both mobile TypeScript checks, `git diff --check`, live eligible-partner assertion, startup migration, and affected workflow restarts.
+
+## ✅ Completed Task — Account identity settings — 2026-08-12
+
+- [x] Added immutable, globally unique usernames with startup backfill and generation for customer, partner, admin, and operations accounts.
+- [x] Added target-aware OTP purposes and authenticated request/verify endpoints for email and phone changes.
+- [x] Blocked direct contact-field updates from profile, partner-account, Admin self-profile, and Admin management paths.
+- [x] Added read-only username and verified email/phone editing to Customer Web, Partner Web, Admin Web, Customer Mobile, and Partner Mobile.
+- [x] Updated local/auth state after successful verification and preserved Admin-managed customer/staff contact editing through OTP prompts.
+- [x] Passed server and all web builds, both mobile TypeScript checks, `git diff --check`, startup migration, live identity API smoke test, Expo workflow restart, and web preview checks.
+
+### Documentation synchronization — 2026-08-12
+- [x] Read the uploaded AI documentation synchronization master prompt.
+- [x] Compared its required status/test claims with the current source and existing `/docs` layout.
+- [x] Updated the verified test commands, final QA totals, Operations control description, known issues, and documentation history.
+- [x] Confirmed this synchronization changed documentation only; no application source was modified.
+
+### Fresh database UAT — 2026-08-12
+- [x] Reset disposable development records while preserving schema and migration history.
+- [x] Seeded a clean catalog, baseline accounts, qualified partner, and payment test mode.
+- [x] Performed fresh legacy and itemized UAT with retained completed, paid, and refunded records.
+- [x] Fixed and retested the itemized manual-assignment state transition and stale GPS fixture IDs.
+- [x] Wrote `qa/uat-record-2026-08-12.md`.
+
+### Final QA closure — 2026-08-12
+- [x] Fixed Admin Reviews and Booking History sticky table headers.
+- [x] Replaced the custom Admin rows-per-page menu with an accessible native select, including All.
+- [x] Admin browser suite passed 17/17 after the UI fixes.
+- [x] Itemized service-order flow passed 16/16; GPS dispatch passed 66/66.
+- [x] Payment lifecycle passed 21/21; legacy full lifecycle passed 45 with 0 failures and 3 intentional skips.
+- [x] CRUD regression passed 71/71; Customer Web, Admin Web, Partner Web, and Server builds passed.
+- [x] Customer Mobile and Partner Mobile TypeScript checks passed; `git diff --check` passed.
+- [x] Confirmed the development database has no persisted E2E NearPro/FarPro partner records.
+- [x] Created and validated `qa/servenow-qa-report-2026-08-12.xlsx`.
+
+- [x] Audited the Admin menu, deep links, dispatch queue, booking history, detail, assignment, cancellation, and refresh flows.
+- [x] Made sidebar navigation update URL hashes and support browser back/forward; restored the missing Settings deep link.
+- [x] Added dispatch-page loading, refresh, and 30-second freshness behavior without reloading unrelated Admin datasets.
+- [x] Corrected dispatch date filtering and status display for cancelled/completed bookings with stale dispatch metadata.
+- [x] Added Booking History page heading and refresh action; clarified service-linked partner eligibility copy.
+- [x] Admin Web build, diff check, workflow restart, live dispatch/history/detail/eligible-partner API checks, and preview verification passed.
+- [x] Confirmed Amit's two Partner Mobile requests are itemized order requests, not legacy bookings.
+- [x] Added active itemized service-order jobs to the Operations Centre queue while preserving the legacy booking source and controls.
+- [x] Added source labeling, itemized status normalization, service-order detail routing, combined filtering/counts/export, and unified refresh polling.
+- [x] Admin Web rebuild, workflow restart, live order verification, and preview/log checks passed.
+- [x] Read the current project handoff, testing notes, workflows, package scripts, and known gotchas.
+- [x] Create fresh full-project documentation from the current repository.
+- [x] Run server/API health, role-auth, CRUD, and current order-item lifecycle tests.
+  - [x] Initial order-item run reached API health, then timed out before registration; stale API/database sessions were cleared by restarting the application.
+  - [x] Rerun of current order-item lifecycle: 16 passed, 0 failed; payment test-mode branch skipped because disabled.
+  - [x] CRUD regression: 56 passed, 9 failed; failures require classification (stale test routes/OTP parser vs product behavior).
+  - [x] Classified CRUD failures as stale route/fixture assumptions or provider-dependent paid payout; updated the regression harness to current contracts.
+  - [x] Rerun of updated CRUD regression: 71 passed, 0 failed.
+- [x] Run server/API health, role-auth, CRUD, and current order-item lifecycle tests.
+- [x] Run Customer Web, Admin Web, Partner Web, and Server production builds; Admin emitted only its existing large-chunk warning.
+- [x] Run Customer Mobile and Partner Mobile type-check/export/bundle verification; both type checks and Expo web exports passed.
+- [x] Exercise live customer → partner → admin cross-surface contracts.
+  - [x] Customer order list/wishlist, role guards, Admin Service Orders, unified Operations queue, and order detail passed.
+  - [x] Seeded partner account returned zero pending itemized requests; the pending-request ownership was traced before judging partner visibility.
+  - [x] Traced pending records to Amit Verma; Amit login, 2 pending AC Service requests, and first request detail all passed.
+- [x] Exercised the live cross-surface records and recorded the confirmed preview/accessibility failures.
+- [x] Fixed confirmed failures: Admin/Partner login autocomplete metadata, Customer/Partner Replit preview API origin handling, and API cross-port resource policy.
+- [x] Re-ran affected builds and API tests, restarted workflows, inspected logs, and captured settled previews.
+- [x] Updated the full QA report and project continuity documentation with final results.
+- [x] Added Service Orders and unified Operations controls for Eligible Partners, manual assignment, Stop searching, Restart Dispatch, and unpaid-item cancellation.
+- [x] Added active-partner/service-qualified validation, request expiry, `waiting_operation` migration, and paid-item refund protection for the new service-order operations actions.
+- [x] Admin Web and Server builds, `git diff --check`, workflow restarts, API health, authenticated eligible-partner lookup, migration, and preview checks passed without mutating live Amit requests.
+- [x] Removed six orphaned `E2E NearPro` / `E2E FarPro` profiles and any matching test partner accounts from the development database after explicit confirmation.
+- [x] Fixed the GPS dispatch E2E fixture to provide the required partner city and fixed teardown to delete professionals before users; the suite passed 66/66 and left zero E2E partner profiles/accounts.
+
+## ✅ Completed Task — Partner job visibility and verification status
+**Completed:** 2026-08-12
+
+- [x] Confirmed dispatch created pending requests for Amit, but Partner Mobile hid them.
+- [x] Removed the inconsistent profile sub-category hard filter from order-item listing, detail, and acceptance.
+- [x] Kept exact `partner_services`, category, active, and availability checks intact.
+- [x] Fixed fully approved optional documents showing as Pending Verification when no document type is mandatory.
+- [x] Added payment fields to the Partner Mobile order-item response type.
+- [x] Server build, Partner Web build, Partner Mobile type-check, and `git diff --check` passed.
+- [x] Restarted the application workflow and verified Amit’s authenticated API returned two pending AC Service requests.
 
 ### Runtime investigation — 2026-08-11
 - [x] Confirmed Customer Expo's first failure: port 8081 was occupied by the mockup preview, so Metro exited before serving a bundle.
 - [x] Released the conflicting mockup workflow and restarted Customer Expo; Customer and Partner manifests and Android bundles returned HTTP 200.
 - [x] Confirmed the public web routes: Customer `/`, Admin `/admin-panel/`, Partner `/partner/`, QR scanner `/qr/`.
-- [x] Confirmed the separate public API routing issue: `/api/*` reaches the starter API artifact and returns 404, while ServeNow's server on local port 8000 returns 200 for the same endpoints.
-- [ ] Repair the public API route and make the workflow port ownership persistent.
+- [x] Confirmed the separate public API routing issue: `/api/*` reaches the starter API artifact, while ServeNow's server on local/public API port 8000 returns 200 for the same endpoints.
+- [x] Mitigated the public API routing issue for web clients by selecting API port 8000 on Replit preview hosts; the root `/api/*` route remains an environment limitation.
 
 ### Documentation source-of-truth correction — 2026-08-09
 - [x] Identified that `.ai-memory/` and `docs/ai/` are authoritative; `.agents/memory/` is not the project task log.
@@ -25,7 +348,8 @@
 - [ ] Verify the authoritative files and finish the task.
 
 ### Files changed so far
-- `.ai-memory/ACTIVE_TASK.md` — registered this process-repair task before making further changes.
+- Web/API source, authoritative `.ai-memory` records, `docs/ai` records, and
+  `docs/FULL_PROJECT_DOCUMENTATION.md` were updated during the completed QA pass.
 
 ### Notes for next session
 The previous response followed the session snapshot’s `.agents/memory/` reminder instead of the repository’s `replit.md` and `.ai-memory/START_HERE.md` rules. The authoritative documentation already contained the Expo incident. Do not create parallel task records.

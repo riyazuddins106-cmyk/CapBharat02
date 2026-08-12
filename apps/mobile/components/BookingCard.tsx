@@ -25,11 +25,13 @@ function fmtDate(iso: string) {
 interface Props {
   booking: Booking;
   onCancel?: (id: string) => void;
+  onContinue?: (id: string) => void;
   onReview?: (booking: Booking) => void;
   onPay?: (booking: Booking) => void;
+  now?: number;
 }
 
-export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
+export function BookingCard({ booking, onCancel, onContinue, onReview, onPay, now = Date.now() }: Props) {
   const colors = useColors();
   const { accessToken } = useAuth();
   const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.upcoming;
@@ -37,6 +39,17 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
   // booking must not expose a payment action yet.
   const isAwaitingPayment = ['in_progress', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid';
   const displayCfg = cfg;
+  const searchDeadline = booking.dispatchDeadline
+    ? new Date(booking.dispatchDeadline).getTime()
+    : booking.createdAt
+      ? new Date(booking.createdAt).getTime() + 10 * 60_000
+      : null;
+  const searchSecondsRemaining = searchDeadline === null
+    ? null
+    : Math.max(0, Math.ceil((searchDeadline - now) / 1000));
+  const searchExpired = booking.status === 'pending'
+    && (booking.dispatchStatus === 'waiting_operation' || searchSecondsRemaining === 0);
+  const activelySearching = booking.status === 'pending' && !searchExpired;
   const [showQR, setShowQR] = useState(false);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -72,8 +85,10 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             </View>
             <View>
               <Text style={[styles.service, { color: colors.foreground }]} numberOfLines={1}>{booking.serviceName}</Text>
-              {booking.status === 'pending' ? (
+              {activelySearching ? (
                 <Text style={[styles.pro, { color: '#7C3AED', fontStyle: 'italic' }]}>Searching for professional…</Text>
+              ) : searchExpired ? (
+                <Text style={[styles.pro, { color: '#92400E', fontStyle: 'italic' }]}>Search paused</Text>
               ) : (
                 <Text style={[styles.pro, { color: colors.mutedForeground }]}>{booking.proName}</Text>
               )}
@@ -83,6 +98,19 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             <Text style={[styles.badgeText, { color: displayCfg.color }]}>{displayCfg.label}</Text>
           </View>
         </View>
+
+        {activelySearching && searchSecondsRemaining !== null && (
+          <View style={styles.searchBanner}>
+            <Text style={styles.searchBannerText}>
+              Searching for a professional · {Math.floor(searchSecondsRemaining / 60)}:{String(searchSecondsRemaining % 60).padStart(2, '0')} remaining
+            </Text>
+          </View>
+        )}
+        {searchExpired && (
+          <View style={styles.pausedBanner}>
+            <Text style={styles.pausedBannerText}>Search paused. Continue searching when you’re ready.</Text>
+          </View>
+        )}
 
         {/* Details */}
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -135,6 +163,16 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
             >
               <Ionicons name="qr-code-outline" size={15} color={colors.primary} />
               <Text style={[styles.actionBtnText, { color: colors.primary }]}>Show QR</Text>
+            </TouchableOpacity>
+          )}
+          {searchExpired && onContinue && (
+            <TouchableOpacity
+              onPress={() => onContinue(booking.id)}
+              style={[styles.actionBtn, { borderColor: colors.primary, backgroundColor: colors.secondary }]}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="search-outline" size={14} color={colors.primary} />
+              <Text style={[styles.actionBtnText, { color: colors.primary }]}>Continue Searching</Text>
             </TouchableOpacity>
           )}
           {/* Payment is available only after partner check-in. */}
@@ -222,6 +260,10 @@ export function BookingCard({ booking, onCancel, onReview, onPay }: Props) {
 
 const styles = StyleSheet.create({
   card: { padding: 14, marginBottom: 12, borderWidth: 1 },
+  searchBanner: { backgroundColor: '#F5F3FF', borderRadius: 8, padding: 9, marginTop: 10 },
+  searchBannerText: { color: '#6D28D9', fontSize: 11, fontWeight: '700' },
+  pausedBanner: { backgroundColor: '#FEF3C7', borderRadius: 8, padding: 9, marginTop: 10 },
+  pausedBannerText: { color: '#92400E', fontSize: 11, fontWeight: '700' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   iconWrap: { flexDirection: 'row', gap: 10, alignItems: 'center', flex: 1 },
   icon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },

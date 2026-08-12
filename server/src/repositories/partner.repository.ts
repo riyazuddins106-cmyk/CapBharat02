@@ -1,7 +1,7 @@
 import { db } from '../config/database.js';
 import {
   bookings, bookingPartnerRequests, professionals, users, payoutRequests,
-  payments, orderItems, orderItemPayments, bookingItems, addresses,
+  payments, orderItems, orderItemPayments, bookingItems, addresses, services,
 } from '../database/schema/index.js';
 import { eq, and, isNull, isNotNull, or, desc, sql, exists } from 'drizzle-orm';
 
@@ -23,7 +23,17 @@ export const partnerRepository = {
   /** List all bookings for this professional, newest first.
    *  Includes: (a) assigned bookings where professionalId matches,
    *  and (b) dispatched bookings where this partner has a pending request. */
-  async listJobs(professionalId: string) {
+  async listJobs(professionalId: string, categoryId: string, subCategoryId: string | null) {
+    const pendingRequestEligibility = and(
+      eq(bookings.categoryId, categoryId),
+      subCategoryId
+        ? or(
+            isNull(services.subCategoryId),
+            eq(services.subCategoryId, subCategoryId),
+          )
+        : undefined,
+    );
+
     return db
       .selectDistinct({
         id: bookings.id,
@@ -48,6 +58,8 @@ export const partnerRepository = {
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
       .leftJoin(addresses, eq(bookings.addressId, addresses.id))
+      .leftJoin(bookingItems, eq(bookingItems.bookingId, bookings.id))
+      .leftJoin(services, eq(bookingItems.serviceId, services.id))
       .leftJoin(
         bookingPartnerRequests,
         and(
@@ -61,7 +73,7 @@ export const partnerRepository = {
           isNull(bookings.deletedAt),
           or(
             eq(bookings.professionalId, professionalId),
-            isNotNull(bookingPartnerRequests.id),
+            and(isNotNull(bookingPartnerRequests.id), pendingRequestEligibility),
           ),
         ),
       )
@@ -71,7 +83,22 @@ export const partnerRepository = {
   /** Get a single job visible to this professional.
    *  Matches if: (a) this partner is the assigned professional,
    *  OR (b) there is a pending dispatch request for this partner. */
-  async findJobByIdAndProfessional(bookingId: string, professionalId: string) {
+  async findJobByIdAndProfessional(
+    bookingId: string,
+    professionalId: string,
+    categoryId: string,
+    subCategoryId: string | null,
+  ) {
+    const pendingRequestEligibility = and(
+      eq(bookings.categoryId, categoryId),
+      subCategoryId
+        ? or(
+            isNull(services.subCategoryId),
+            eq(services.subCategoryId, subCategoryId),
+          )
+        : undefined,
+    );
+
     const [job] = await db
       .select({
         id: bookings.id,
@@ -96,6 +123,8 @@ export const partnerRepository = {
       .from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
       .leftJoin(addresses, eq(bookings.addressId, addresses.id))
+      .leftJoin(bookingItems, eq(bookingItems.bookingId, bookings.id))
+      .leftJoin(services, eq(bookingItems.serviceId, services.id))
       .leftJoin(
         bookingPartnerRequests,
         and(
@@ -110,7 +139,7 @@ export const partnerRepository = {
           isNull(bookings.deletedAt),
           or(
             eq(bookings.professionalId, professionalId),
-            isNotNull(bookingPartnerRequests.id),
+            and(isNotNull(bookingPartnerRequests.id), pendingRequestEligibility),
           ),
         ),
       )

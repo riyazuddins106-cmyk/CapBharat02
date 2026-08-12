@@ -82,6 +82,7 @@ async function request<T>(
 // ── Types ──────────────────────────────────────────────────
 export interface User {
   id: string;
+  username: string;
   email: string;
   fullName: string;
   phone: string | null;
@@ -193,6 +194,10 @@ export interface OrderItemJob {
   orderStatus?: string;
   createdAt?: string;
   completedAt?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  cashReportedAt?: string | null;
+  cashConfirmedAt?: string | null;
 }
 
 export interface OrderItemJobDetail extends OrderItemJob {
@@ -224,6 +229,7 @@ export interface PartnerScheduleJob {
   payout: number;
   durationMinutes: number;
   address: OrderItemJobDetail['address'];
+  handoffPending?: boolean;
 }
 
 export interface PartnerPerformance {
@@ -323,8 +329,21 @@ export interface Category {
   featured: boolean;
 }
 
+export interface SubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  featured: boolean;
+}
+
 export const categoriesApi = {
   list: () => request<Category[]>('/api/categories'),
+  getSubcategories: (categoryId: string) =>
+    request<SubCategory[]>(`/api/categories/${categoryId}/subcategories`),
 };
 
 // ── Auth ───────────────────────────────────────────────────
@@ -351,16 +370,16 @@ export const authApi = {
     }),
 
   forgotPassword: (email: string) =>
-    request<void>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    request<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
 
   resetPassword: (data: { email: string; code: string; newPassword: string }) =>
     request<void>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
 
   resendOtp: (data: { email: string; purpose: string }) =>
-    request<void>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
 
-  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; title: string; city: string; area?: string; pincode?: string }) =>
-    request<{ userId: string; email: string; devCode?: string }>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
+  registerPartner: (data: { fullName: string; email: string; password: string; phone?: string; categoryId: string; subCategoryId: string; title: string; city: string; area?: string; pincode?: string }) =>
+    request<{ userId: string; email: string; devCode?: string; expiresInSeconds?: number; resendAfterSeconds?: number }>('/api/auth/register-partner', { method: 'POST', body: JSON.stringify(data) }),
 
   verifyOtp: (data: { email: string; code: string; purpose: string }) =>
     request<AuthTokens>('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
@@ -388,8 +407,16 @@ export const partnerApi = {
   updateProfile: (data: Partial<Pick<PartnerProfile, 'title' | 'bio' | 'basePrice' | 'priceUnit' | 'tags' | 'badge' | 'payoutUpiId'>>, token: string) =>
     request<PartnerProfile>('/api/partner/profile', { method: 'PATCH', body: JSON.stringify(data), token }),
 
-  updateAccount: (data: { fullName?: string; phone?: string }, token: string) =>
+  updateAccount: (data: { fullName?: string }, token: string) =>
     request<{ message: string }>('/api/partner/account', { method: 'PATCH', body: JSON.stringify(data), token }),
+  requestIdentityChange: (field: 'email' | 'phone', value: string, token: string) =>
+    request<{ field: 'email' | 'phone'; target: string; expiresInMinutes: number; devCode?: string }>('/api/profile/me/identity/request', {
+      method: 'POST', body: JSON.stringify({ field, value }), token,
+    }),
+  verifyIdentityChange: (field: 'email' | 'phone', value: string, code: string, token: string) =>
+    request<User>('/api/profile/me/identity/verify', {
+      method: 'POST', body: JSON.stringify({ field, value, code }), token,
+    }),
 
   changePassword: (currentPassword: string, newPassword: string, token: string) =>
     request<{ message: string }>('/api/profile/me/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }), token }),
@@ -411,6 +438,13 @@ export const partnerApi = {
 
   rejectOrderItemJob: (requestId: string, token: string) =>
     request<{ message: string }>(`/api/partner/order-item-jobs/${requestId}/reject`, { method: 'PATCH', token }),
+
+  passOrderItemJob: (itemId: string, reason: string, token: string) =>
+    request<{ offeredCount: number; remainsAssigned: boolean; message: string }>(`/api/partner/order-item-jobs/${itemId}/pass`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+      token,
+    }),
 
   checkInOrderItem: (itemId: string, qrToken: string, token: string) =>
     request<OrderItemJob>(`/api/partner/order-item-jobs/${itemId}/checkin`, {

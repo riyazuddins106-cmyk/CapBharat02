@@ -20,6 +20,8 @@ interface OtpConfig {
   codeLength: 4 | 6;
 }
 
+export const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
 const DEFAULT_CONFIG: OtpConfig = {
   channels: { email: true, sms: true },
   expiryMinutes: 10,
@@ -65,6 +67,8 @@ const SUBJECTS: Record<OtpCode['purpose'], string> = {
   signup:         'Verify your ServeNow account',
   login:          'Your ServeNow login code',
   password_reset: 'Reset your ServeNow password',
+  change_email:   'Verify your new ServeNow email',
+  change_phone:   'Verify your new ServeNow mobile number',
 };
 
 function buildEmailHtml(purpose: OtpCode['purpose'], code: string, expiryMinutes: number): string {
@@ -73,7 +77,11 @@ function buildEmailHtml(purpose: OtpCode['purpose'], code: string, expiryMinutes
       ? 'Use the code below to verify your account and finish creating your ServeNow account.'
       : purpose === 'login'
       ? 'Use the code below to log in to your ServeNow account.'
-      : 'Use the code below to reset your ServeNow password.';
+      : purpose === 'password_reset'
+      ? 'Use the code below to reset your ServeNow password.'
+      : purpose === 'change_email'
+      ? 'Use the code below to verify your new email address.'
+      : 'Use the code below to verify your new mobile number.';
 
   return `
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
@@ -104,15 +112,20 @@ export const otpService = {
     purpose: OtpCode['purpose'],
     userId?: string,
     phone?: string,
+    options?: { target?: string; sendEmail?: boolean; sendSms?: boolean },
   ): Promise<string> {
     const cfg = await loadConfig();
     const code = generateCode(cfg.codeLength);
     const codeHash = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + cfg.expiryMinutes * 60 * 1000);
 
+    // A newly issued code supersedes every older code for this email/purpose.
+    // This prevents an earlier code from remaining usable after a resend.
+    await otpRepository.consumeActive(email, purpose);
     await otpRepository.create({
       userId: userId ?? null,
       email,
+      target: options?.target ?? null,
       codeHash,
       purpose,
       expiresAt,
@@ -125,13 +138,13 @@ export const otpService = {
       try {
         fs.appendFileSync(
           '/tmp/otp-dev.log',
-          `${new Date().toISOString()} | ${email} | ${purpose} | code=${code} | channels=email:${cfg.channels.email},sms:${cfg.channels.sms}\n`,
+          `${new Date().toISOString()} | ${email} | ${purpose} | target=${options?.target ?? ''} | code=${code} | channels=email:${cfg.channels.email},sms:${cfg.channels.sms}\n`,
         );
       } catch { /* ignore */ }
     }
 
     // ── Email channel ──────────────────────────────────────────────
-    if (cfg.channels.email) {
+    if ((options?.sendEmail ?? true) && cfg.channels.email) {
       try {
         const result = await emailService.send(
           email,
@@ -158,12 +171,12 @@ export const otpService = {
         logger.error(`[otp] Email delivery failed for ${email}: ${(err as Error).message}`);
         deliveryResults.push('email:failed');
       }
-    } else {
+    } else if (options?.sendEmail ?? true) {
       deliveryResults.push('email:disabled');
     }
 
     // ── SMS channel ────────────────────────────────────────────────
-    if (cfg.channels.sms && phone) {
+    if ((options?.sendSms ?? Boolean(phone)) && cfg.channels.sms && phone) {
       // Best-effort: never blocks, never throws
       smsService.sendOtp(phone, code).then(sent => {
         if (sent) {
@@ -173,7 +186,7 @@ export const otpService = {
           logger.info(`[otp] SMS skipped/failed → ${phone.slice(0, 4)}****`);
         }
       }).catch(() => {});
-    } else if (cfg.channels.sms && !phone) {
+    } else if ((options?.sendSms ?? Boolean(phone)) && cfg.channels.sms && !phone) {
       logger.info(`[otp] SMS channel enabled but no phone provided for ${email}`);
     }
 
@@ -182,6 +195,45 @@ export const otpService = {
     }
 
     return code;
+  },
+
+  async resend(
+    email: string,
+    purpose: OtpCode['purpose'],
+    userId?: string,
+    phone?: string,
+  ): Promise<string> {
+    const latest = await otpRepository.findLatest(email, purpose);
+    if (latest) {
+      const elapsedMs = Date.now() - latest.createdAt.getTime();
+      const remainingSeconds = OTP_RESEND_COOLDOWN_SECONDS - Math.floor(elapsedMs / 1000);
+      if (remainingSeconds > 0) {
+        throw AppError.tooManyRequests(
+          `You can request another code in ${remainingSeconds} seconds.`,
+          { retryAfterSeconds: remainingSeconds },
+        );
+      }
+    }
+    return this.issue(email, purpose, userId, phone);
+  },
+
+  async timing(): Promise<{ expiresInSeconds: number; resendAfterSeconds: number }> {
+    const cfg = await loadConfig();
+    return {
+      expiresInSeconds: Math.max(1, Math.round(cfg.expiryMinutes * 60)),
+      resendAfterSeconds: OTP_RESEND_COOLDOWN_SECONDS,
+    };
+  },
+
+  async issueIdentity(
+    userId: string,
+    currentEmail: string,
+    field: 'email' | 'phone',
+    target: string,
+  ): Promise<string> {
+    return field === 'email'
+      ? this.issue(target, 'change_email', userId, undefined, { target, sendEmail: true, sendSms: false })
+      : this.issue(currentEmail, 'change_phone', userId, target, { target, sendEmail: false, sendSms: true });
   },
 
   async verify(email: string, purpose: OtpCode['purpose'], code: string): Promise<void> {
@@ -212,6 +264,38 @@ export const otpService = {
       );
     }
 
+    await otpRepository.consume(otp.id);
+  },
+
+  async verifyIdentity(
+    userId: string,
+    field: 'email' | 'phone',
+    target: string,
+    code: string,
+  ): Promise<void> {
+    const cfg = await loadConfig();
+    const purpose: OtpCode['purpose'] = field === 'email' ? 'change_email' : 'change_phone';
+    const otp = await otpRepository.findLatestActiveForTarget(userId, target, purpose);
+    if (!otp) throw AppError.badRequest('No active verification code found. Please request a new one.');
+    if (otp.expiresAt.getTime() < Date.now()) {
+      throw AppError.badRequest('Verification code has expired. Please request a new one.');
+    }
+
+    const attempts = Number(otp.attempts ?? '0');
+    if (attempts >= cfg.maxAttempts) {
+      throw AppError.tooManyRequests('Too many incorrect attempts. Please request a new code.');
+    }
+
+    const isValid = await bcrypt.compare(code, otp.codeHash);
+    if (!isValid) {
+      await otpRepository.incrementAttempts(otp.id, attempts + 1);
+      const remaining = cfg.maxAttempts - (attempts + 1);
+      throw AppError.badRequest(
+        remaining > 0
+          ? `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
+          : 'Invalid verification code. No more attempts — please request a new code.',
+      );
+    }
     await otpRepository.consume(otp.id);
   },
 };

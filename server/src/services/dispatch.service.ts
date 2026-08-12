@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import {
   bookingAssignmentLogs, bookingItems, bookingPartnerRequests, bookings, professionals, partnerServices,
-  users, addresses,
+  users, addresses, platformSettings, services,
 } from '../database/schema/index.js';
 
 const MAX_RADIUS_KM = 30;
@@ -21,8 +21,26 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 import { AppError } from '../utils/AppError.js';
 import { notificationDbService } from './notificationDb.service.js';
 import { notificationService } from './notification.service.js';
+import { getProfessionalsWithApprovedMandatoryDocuments } from './document.service.js';
 
 const eligibleStatuses = ['searching_partner', 'waiting_operation'];
+
+function serviceMatchesPartnerSubCategory() {
+  return or(
+    isNull(professionals.subCategoryId),
+    isNull(services.subCategoryId),
+    sql`${services.subCategoryId} = ${professionals.subCategoryId}`,
+  );
+}
+
+function serviceMatchesPartnerSubCategoryId(partnerSubCategoryId: string | null) {
+  return partnerSubCategoryId
+    ? or(
+        isNull(services.subCategoryId),
+        eq(services.subCategoryId, partnerSubCategoryId),
+      )
+    : undefined;
+}
 
 async function notifyPartner(pro: { userId: string | null; name: string }, booking: typeof bookings.$inferSelect, type: string) {
   if (!pro.userId) return;
@@ -42,42 +60,24 @@ export const dispatchService = {
     const allCandidates = await db.select({ pro: professionals, user: users })
       .from(partnerServices)
       .innerJoin(professionals, eq(partnerServices.partnerId, professionals.id))
+      .innerJoin(services, eq(partnerServices.serviceId, services.id))
       .leftJoin(users, eq(professionals.userId, users.id))
       .where(and(
         serviceFilter,
+        eq(services.categoryId, professionals.categoryId),
+        serviceMatchesPartnerSubCategory(),
         eq(professionals.isActive, true),
         eq(professionals.availabilityStatus, 'available'),
         isNull(professionals.deletedAt),
       ));
 
-    // ── Document verification gate ─────────────────────────────────────────
     // Only dispatch to partners who have all mandatory docs approved.
-    const mandatoryRows = await db.execute(
-      sql`SELECT type_key FROM document_type_configs WHERE is_mandatory = true AND is_active = true`
+    const verifiedIds = await getProfessionalsWithApprovedMandatoryDocuments(
+      allCandidates.map(({ pro }) => pro.id),
     );
-    const mandatoryKeys: string[] = ((mandatoryRows as any).rows ?? (mandatoryRows as any)).map((r: any) => r.type_key);
-
-    let verifiedCandidates = allCandidates;
-    if (mandatoryKeys.length > 0) {
-      const candidateIds = allCandidates.map(c => c.pro.id);
-      if (candidateIds.length > 0) {
-        const approvedRows = await db.execute(
-          sql`SELECT professional_id, document_type FROM partner_documents
-              WHERE professional_id = ANY(${candidateIds}::uuid[]) AND status = 'approved'`
-        );
-        const approvedByPro = new Map<string, Set<string>>();
-        for (const r of ((approvedRows as any).rows ?? (approvedRows as any)) as any[]) {
-          if (!approvedByPro.has(r.professional_id)) approvedByPro.set(r.professional_id, new Set());
-          approvedByPro.get(r.professional_id)!.add(r.document_type);
-        }
-        verifiedCandidates = allCandidates.filter(({ pro }) => {
-          const approved = approvedByPro.get(pro.id) ?? new Set();
-          return mandatoryKeys.every(k => approved.has(k));
-        });
-        if (verifiedCandidates.length < allCandidates.length) {
-          console.log(`[dispatch] booking=${booking.id} filtered out ${allCandidates.length - verifiedCandidates.length} partner(s) with incomplete documents`);
-        }
-      }
+    const verifiedCandidates = allCandidates.filter(({ pro }) => verifiedIds.has(pro.id));
+    if (verifiedCandidates.length < allCandidates.length) {
+      console.log(`[dispatch] booking=${booking.id} filtered out ${allCandidates.length - verifiedCandidates.length} partner(s) with incomplete documents`);
     }
     // ───────────────────────────────────────────────────────────────────────
     if (!verifiedCandidates.length) return [];
@@ -134,6 +134,50 @@ export const dispatchService = {
   },
 
   async accept(bookingId: string, partnerId: string) {
+    const [existing] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+    if (!existing) throw AppError.notFound('Booking not found.');
+    if (
+      ['searching_partner', 'waiting_operation'].includes(existing.dispatchStatus)
+      && existing.dispatchDeadline
+      && existing.dispatchDeadline.getTime() <= Date.now()
+    ) {
+      await db.update(bookingPartnerRequests).set({ status: 'expired', respondedAt: new Date() })
+        .where(and(eq(bookingPartnerRequests.bookingId, bookingId), eq(bookingPartnerRequests.status, 'pending')));
+      await db.update(bookings).set({ dispatchStatus: 'waiting_operation', updatedAt: new Date() })
+        .where(eq(bookings.id, bookingId));
+      throw AppError.conflict('This search window has ended. The customer can continue searching for a partner.');
+    }
+
+    const [partner] = await db.select({
+      id: professionals.id,
+      categoryId: professionals.categoryId,
+      subCategoryId: professionals.subCategoryId,
+    }).from(professionals).where(eq(professionals.id, partnerId)).limit(1);
+    if (!partner) throw AppError.badRequest('Partner not found.');
+
+    const bookingItemsForEligibility = await db.select({ serviceId: bookingItems.serviceId })
+      .from(bookingItems)
+      .where(eq(bookingItems.bookingId, bookingId));
+    if (bookingItemsForEligibility.length) {
+      const [qualified] = await db.select({ id: partnerServices.partnerId })
+        .from(partnerServices)
+        .innerJoin(services, eq(partnerServices.serviceId, services.id))
+        .where(and(
+          eq(partnerServices.partnerId, partnerId),
+          inArray(partnerServices.serviceId, bookingItemsForEligibility.map((item) => item.serviceId)),
+          eq(services.categoryId, partner.categoryId),
+          serviceMatchesPartnerSubCategoryId(partner.subCategoryId),
+        ))
+        .limit(1);
+      if (!qualified) throw AppError.badRequest('This partner is not eligible for the selected category and sub-category.');
+    } else if (partner.categoryId !== existing.categoryId) {
+      throw AppError.badRequest('This partner is not eligible for the selected category.');
+    }
+
+    const verifiedIds = await getProfessionalsWithApprovedMandatoryDocuments([partnerId]);
+    if (!verifiedIds.has(partnerId)) {
+      throw AppError.badRequest('This partner cannot accept jobs until all required documents are approved.');
+    }
     const result = await db.update(bookings).set({
       professionalId: partnerId,
       proName: sql`(SELECT name FROM professionals WHERE id = ${partnerId})`,
@@ -207,7 +251,90 @@ export const dispatchService = {
     return updated;
   },
 
+  /** Pause expired legacy searches when the customer polls their bookings. */
+  async expireTimedOutForCustomer(customerId: string) {
+    const expired = await db.select({ id: bookings.id })
+      .from(bookings)
+      .where(and(
+        eq(bookings.customerId, customerId),
+        eq(bookings.dispatchStatus, 'searching_partner'),
+        or(
+          lt(bookings.dispatchDeadline, new Date()),
+          and(isNull(bookings.dispatchDeadline), lt(bookings.createdAt, new Date(Date.now() - 10 * 60_000))),
+        ),
+        isNull(bookings.deletedAt),
+      ));
+
+    await Promise.all(expired.map(async ({ id }) => {
+      await db.update(bookingPartnerRequests).set({ status: 'expired', respondedAt: new Date() })
+        .where(and(eq(bookingPartnerRequests.bookingId, id), eq(bookingPartnerRequests.status, 'pending')));
+      await db.update(bookings).set({ dispatchStatus: 'waiting_operation', updatedAt: new Date() })
+        .where(and(eq(bookings.id, id), eq(bookings.dispatchStatus, 'searching_partner')));
+    }));
+  },
+
+  /** Restart the configured search window for an unassigned legacy booking. */
+  async continueSearching(bookingId: string, customerId: string, durationMinutes: number) {
+    const [booking] = await db.select().from(bookings)
+      .where(and(eq(bookings.id, bookingId), eq(bookings.customerId, customerId), isNull(bookings.deletedAt)))
+      .limit(1);
+    if (!booking) throw AppError.notFound('Booking not found.');
+    if (booking.professionalId) throw AppError.badRequest('This booking already has an assigned partner.');
+    if (['cancelled', 'completed'].includes(booking.status)) {
+      throw AppError.badRequest('This booking is already finished.');
+    }
+
+    await db.update(bookingPartnerRequests).set({ status: 'expired', respondedAt: new Date() })
+      .where(and(eq(bookingPartnerRequests.bookingId, bookingId), eq(bookingPartnerRequests.status, 'pending')));
+    const [updated] = await db.update(bookings).set({
+      status: 'pending',
+      dispatchStatus: 'searching_partner',
+      dispatchDeadline: new Date(Date.now() + durationMinutes * 60_000),
+      updatedAt: new Date(),
+    }).where(eq(bookings.id, bookingId)).returning();
+
+    const items = await db.select({ serviceId: bookingItems.serviceId })
+      .from(bookingItems)
+      .where(eq(bookingItems.bookingId, bookingId));
+    await this.broadcast(updated, items.map((item) => item.serviceId).filter(Boolean) as string[]);
+    return updated;
+  },
+
+  /** Expire legacy searches before they are returned in the operations queue. */
+  async expireTimedOutForOperations() {
+    const fallbackCutoff = new Date(Date.now() - 10 * 60_000);
+    const expired = await db.select({ id: bookings.id })
+      .from(bookings)
+      .where(and(
+        eq(bookings.dispatchStatus, 'searching_partner'),
+        or(
+          lt(bookings.dispatchDeadline, new Date()),
+          and(isNull(bookings.dispatchDeadline), lt(bookings.createdAt, fallbackCutoff)),
+        ),
+        isNull(bookings.deletedAt),
+      ));
+
+    await Promise.all(expired.map(async ({ id }) => {
+      await db.update(bookingPartnerRequests)
+        .set({ status: 'expired', respondedAt: new Date() })
+        .where(and(
+          eq(bookingPartnerRequests.bookingId, id),
+          eq(bookingPartnerRequests.status, 'pending'),
+        ));
+      await db.update(bookings)
+        .set({ dispatchStatus: 'waiting_operation', updatedAt: new Date() })
+        .where(and(
+          eq(bookings.id, id),
+          eq(bookings.dispatchStatus, 'searching_partner'),
+        ));
+    }));
+
+    return expired.length;
+  },
+
   async listForOperations(status?: string) {
+    await this.expireTimedOutForOperations();
+
     const rows = await db.select({ booking: bookings, customer: users })
       .from(bookings).innerJoin(users, eq(bookings.customerId, users.id))
       .where(and(isNull(bookings.deletedAt), status ? eq(bookings.dispatchStatus, status) : undefined))
@@ -250,16 +377,36 @@ export const dispatchService = {
     // Return ALL active partners (any status) so admin can see who's busy/free and decide
     const rows = await db.select({ pro: professionals })
       .from(professionals)
-      .where(and(eq(professionals.isActive, true), isNull(professionals.deletedAt)));
-    if (!items.length) return rows.map(({ pro }) => pro);
+      .where(and(
+        eq(professionals.categoryId, booking.categoryId),
+        eq(professionals.isActive, true),
+        isNull(professionals.deletedAt),
+      ));
+    if (!items.length) {
+      const verifiedIds = await getProfessionalsWithApprovedMandatoryDocuments(
+        rows.map(({ pro }) => pro.id),
+      );
+      return rows.map(({ pro }) => pro).filter((partner) => verifiedIds.has(partner.id));
+    }
 
     // A partner is eligible if they offer ANY of the booked services
     const serviceIdList = items.map((i) => i.serviceId);
-    const mapped = await db.select({ partnerId: partnerServices.partnerId }).from(partnerServices)
-      .where(inArray(partnerServices.serviceId, serviceIdList));
+    const mapped = await db.select({ partnerId: partnerServices.partnerId })
+      .from(partnerServices)
+      .innerJoin(services, eq(partnerServices.serviceId, services.id))
+      .innerJoin(professionals, eq(partnerServices.partnerId, professionals.id))
+      .where(and(
+        inArray(partnerServices.serviceId, serviceIdList),
+        eq(services.categoryId, professionals.categoryId),
+        serviceMatchesPartnerSubCategory(),
+      ));
     const ids = new Set(mapped.map((r) => r.partnerId));
     // Sort: available first, then busy, then offline
-    const filtered = rows.filter(({ pro }) => ids.has(pro.id)).map(({ pro }) => pro);
+    const serviceQualified = rows.filter(({ pro }) => ids.has(pro.id)).map(({ pro }) => pro);
+    const verifiedIds = await getProfessionalsWithApprovedMandatoryDocuments(
+      serviceQualified.map((partner) => partner.id),
+    );
+    const filtered = serviceQualified.filter((partner) => verifiedIds.has(partner.id));
     const order: Record<string, number> = { available: 0, busy: 1, offline: 2 };
     filtered.sort((a, b) => (order[a.availabilityStatus] ?? 3) - (order[b.availabilityStatus] ?? 3));
     return filtered;
@@ -269,18 +416,48 @@ export const dispatchService = {
     // Admin can force-assign any active partner regardless of current availability
     const [pro] = await db.select().from(professionals).where(and(eq(professionals.id, partnerId), eq(professionals.isActive, true), isNull(professionals.deletedAt))).limit(1);
     if (!pro) throw AppError.badRequest('Partner not found or inactive.');
+
+    const [booking] = await db.select({
+      id: bookings.id,
+      categoryId: bookings.categoryId,
+    }).from(bookings).where(and(eq(bookings.id, bookingId), isNull(bookings.deletedAt))).limit(1);
+    if (!booking) throw AppError.notFound('Booking not found.');
+
+    const bookingItemsForEligibility = await db.select({ serviceId: bookingItems.serviceId })
+      .from(bookingItems)
+      .where(eq(bookingItems.bookingId, bookingId));
+    if (bookingItemsForEligibility.length) {
+      const [qualified] = await db.select({ id: partnerServices.partnerId })
+        .from(partnerServices)
+        .innerJoin(services, eq(partnerServices.serviceId, services.id))
+        .where(and(
+          eq(partnerServices.partnerId, partnerId),
+          inArray(partnerServices.serviceId, bookingItemsForEligibility.map((item) => item.serviceId)),
+          eq(services.categoryId, pro.categoryId),
+          serviceMatchesPartnerSubCategoryId(pro.subCategoryId),
+        ))
+        .limit(1);
+      if (!qualified) throw AppError.badRequest('This partner is not eligible for the selected category and sub-category.');
+    } else if (pro.categoryId !== booking.categoryId) {
+      throw AppError.badRequest('This partner is not eligible for the selected category.');
+    }
+
+    const verifiedIds = await getProfessionalsWithApprovedMandatoryDocuments([partnerId]);
+    if (!verifiedIds.has(partnerId)) {
+      throw AppError.badRequest('This partner cannot receive jobs until all required documents are approved.');
+    }
     // Allow admin to reassign even if booking already has a professional (force-assign)
-    const [booking] = await db.update(bookings).set({
+    const [updatedBooking] = await db.update(bookings).set({
       professionalId: partnerId, proName: pro.name, status: 'upcoming',
       dispatchStatus: 'assigned', assignmentType: 'manual', assignedBy, updatedAt: new Date(),
     }).where(and(eq(bookings.id, bookingId), isNull(bookings.deletedAt))).returning();
-    if (!booking) throw AppError.notFound('Booking not found.');
+    if (!updatedBooking) throw AppError.notFound('Booking not found.');
     await db.update(bookingPartnerRequests).set({ status: 'expired', respondedAt: new Date() }).where(eq(bookingPartnerRequests.bookingId, bookingId));
     await db.insert(bookingAssignmentLogs).values({ bookingId, partnerId, action: 'MANUAL_ASSIGNED', assignedByUserId: assignedBy });
     await db.update(professionals).set({ availabilityStatus: 'busy', currentBookingStatus: 'busy', updatedAt: new Date() }).where(eq(professionals.id, partnerId));
-    await notifyPartner({ userId: pro.userId, name: pro.name }, booking, 'manual_assignment');
-    await notificationDbService.create({ userId: booking.customerId, title: 'Professional assigned', body: `${pro.name} has been assigned to your booking.`, type: 'booking', data: { bookingId } });
-    return booking;
+    await notifyPartner({ userId: pro.userId, name: pro.name }, updatedBooking, 'manual_assignment');
+    await notificationDbService.create({ userId: updatedBooking.customerId, title: 'Professional assigned', body: `${pro.name} has been assigned to your booking.`, type: 'booking', data: { bookingId } });
+    return updatedBooking;
   },
 
   async history(bookingId?: string) {

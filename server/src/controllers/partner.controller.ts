@@ -20,6 +20,15 @@ async function assertPartnerJob(professionalId: string, jobType: 'booking' | 'or
   if (!row.length) throw AppError.notFound('Job not found or not assigned to you.');
 }
 
+function subCategoryMatchesService(professionalSubCategoryId: string | null) {
+  return professionalSubCategoryId
+    ? or(
+        isNull(services.subCategoryId),
+        eq(services.subCategoryId, professionalSubCategoryId),
+      )
+    : undefined;
+}
+
 export const partnerController = {
   getProfile: asyncHandler(async (req: Request, res: Response) => {
     const data = await partnerService.getProfile(req.user!.userId);
@@ -125,17 +134,18 @@ export const partnerController = {
       scheduledAt: bookings.scheduledAt,
       status: bookings.status,
       customerName: users.fullName,
-      payment: orderItemPayments,
       customerPhone: users.phone,
       address: addresses,
       payout: bookings.price,
       durationMinutes: sql<number>`COALESCE((SELECT SUM(duration) FROM booking_items WHERE booking_id = ${bookings.id}), 60)`,
+      handoffPending: sql<boolean>`false`,
     }).from(bookings)
       .leftJoin(users, eq(bookings.customerId, users.id))
       .leftJoin(addresses, eq(bookings.addressId, addresses.id))
       .where(and(eq(bookings.professionalId, pro.id), isNull(bookings.deletedAt),
         sql`${bookings.scheduledAt} >= ${from.toISOString()}::timestamptz`,
-        sql`${bookings.scheduledAt} <= ${to.toISOString()}::timestamptz`));
+        sql`${bookings.scheduledAt} <= ${to.toISOString()}::timestamptz`,
+        inArray(bookings.status, ['pending', 'upcoming', 'in_progress'])));
 
     const service = await db.select({
       id: orderItems.id,
@@ -147,6 +157,11 @@ export const partnerController = {
       address: addresses,
       payout: orderItems.partnerPayout,
       durationMinutes: orderItems.durationMinutes,
+      handoffPending: sql<boolean>`EXISTS (
+        SELECT 1 FROM order_item_requests AS handoff_requests
+        WHERE handoff_requests.order_item_id = ${orderItems.id}
+          AND handoff_requests.status = 'pending'
+      )`,
     }).from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .innerJoin(services, eq(orderItems.serviceId, services.id))
@@ -154,7 +169,8 @@ export const partnerController = {
       .leftJoin(addresses, eq(orders.addressId, addresses.id))
       .where(and(eq(orderItems.partnerId, pro.id),
         sql`${orderItems.scheduledAt} >= ${from.toISOString()}::timestamptz`,
-        sql`${orderItems.scheduledAt} <= ${to.toISOString()}::timestamptz`));
+        sql`${orderItems.scheduledAt} <= ${to.toISOString()}::timestamptz`,
+        inArray(orderItems.status, ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started'])));
 
     res.json({
       success: true,
@@ -259,6 +275,10 @@ export const partnerController = {
 
   /** GET /api/partner/order-item-jobs — list open requests + assigned items for this partner */
   listOrderItemJobs: asyncHandler(async (req: Request, res: Response) => {
+    // Do not leave an expired request actionable in a partner's job feed just
+    // because the customer or Admin has not opened their list yet.
+    await orderDispatchService.expireTimedOutItems();
+
     const [pro] = await db.select({
       id: professionals.id,
       categoryId: professionals.categoryId,
@@ -288,12 +308,11 @@ export const partnerController = {
         eq(orderItemRequests.partnerId, pro.id),
         eq(orderItemRequests.status, 'pending'),
         eq(services.categoryId, pro.categoryId),
-        pro.subCategoryId
-          ? eq(services.subCategoryId, pro.subCategoryId)
-          : undefined,
+        subCategoryMatchesService(pro.subCategoryId),
       ));
 
-    // Active assigned items (accepted → in progress)
+    // Active assigned items (checked-in/payment/service work only). A future
+    // accepted item belongs on Schedule until the partner arrives.
     const activeItems = await db.select({
       item: orderItems,
       order: orders,
@@ -308,7 +327,7 @@ export const partnerController = {
       .leftJoin(orderItemPayments, eq(orderItemPayments.orderItemId, orderItems.id))
       .where(and(
         eq(orderItems.partnerId, pro.id),
-         inArray(orderItems.status, ['partner_accepted', 'partner_arrived', 'payment_pending', 'payment_completed', 'service_started']),
+         inArray(orderItems.status, ['partner_arrived', 'payment_pending', 'payment_completed', 'service_started']),
       ));
 
     // Completed items (last 30 days)
@@ -421,9 +440,7 @@ export const partnerController = {
         eq(orderItems.id, req.params.itemId),
         or(eq(orderItems.partnerId, pro.id), eq(orderItemRequests.partnerId, pro.id)),
         eq(services.categoryId, pro.categoryId),
-        pro.subCategoryId
-          ? eq(services.subCategoryId, pro.subCategoryId)
-          : undefined,
+        subCategoryMatchesService(pro.subCategoryId),
       ))
       .limit(1);
 
@@ -467,12 +484,10 @@ export const partnerController = {
       .where(and(
         eq(orderItems.id, request.orderItemId),
         eq(services.categoryId, pro.categoryId),
-        pro.subCategoryId
-          ? eq(services.subCategoryId, pro.subCategoryId)
-          : undefined,
+        subCategoryMatchesService(pro.subCategoryId),
       ))
       .limit(1);
-    if (!eligible) throw AppError.badRequest('This service is outside your assigned category.');
+    if (!eligible) throw AppError.badRequest('This service is outside your assigned category or sub-category.');
 
     const data = await orderDispatchService.acceptItem(request.orderItemId, pro.id);
     res.json({ success: true, data });
@@ -491,6 +506,20 @@ export const partnerController = {
 
     await orderDispatchService.rejectItem(request.orderItemId, pro.id);
     res.json({ success: true, data: { message: 'Job request rejected.' } });
+  }),
+
+  /** PATCH /api/partner/order-item-jobs/:itemId/pass — offer a future job to other partners */
+  passOrderItemJob: asyncHandler(async (req: Request, res: Response) => {
+    const [pro] = await db.select({ id: professionals.id })
+      .from(professionals).where(eq(professionals.userId, req.user!.userId)).limit(1);
+    if (!pro) throw AppError.notFound('Partner profile not found.');
+
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (reason.length < 3) throw AppError.badRequest('Please provide a short reason for passing this service.');
+    if (reason.length > 500) throw AppError.badRequest('The pass reason must be 500 characters or fewer.');
+
+    const data = await orderDispatchService.requestHandoff(req.params.itemId, pro.id, reason);
+    res.json({ success: true, data });
   }),
 
   /** PATCH /api/partner/order-item-jobs/:itemId/checkin — partner arrives */

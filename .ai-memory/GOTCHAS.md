@@ -16,6 +16,51 @@
 > Every entry here cost real debugging time. Don't repeat it.
 > Add a new entry any time a fix took more than one attempt.
 
+### Cancellation warnings — use bounded percentages from Booking Settings
+**Problem:** Customer Web displayed hardcoded itemized cancellation warnings, while Customer Mobile had no inline warning and only repeated hardcoded text inside its confirmation modal.
+**Fix:** Store the percentage rate plus minimum and maximum rupee bounds for partner-accepted and partner-arrived cancellation in `booking_config`, return them from the public booking-config endpoint, read them in both customer apps, and calculate the server cancellation fee from the same formula.
+**Warning:** Do not change only the Mobile label. A client-only calculation can disagree with the persisted server fee; calculate the percentage of the applicable service amount, clamp it with `MAX(minimum, MIN(calculated, maximum))`, and cap it at the service price.
+
+### Booking confirmations — never display raw slot minutes
+**Rule:** A booking confirmation must format the persisted order timestamp and service duration; never render the internal slot number directly.
+**Why:** Customer Mobile stores a selected slot as minutes since midnight, so rendering it directly produced incorrect text such as `Tomorrow · 570`.
+**How to apply:** Use the created order's `scheduledAt` as the authoritative value, convert it to the local date/time window, and derive duration from the returned order items.
+
+### Native tab bars — do not override the Android safe-area height
+**Rule:** For Expo Router tabs, avoid a fixed native tab-bar height and hand-tuned Android bottom padding when the system navigation inset is managed by the navigator.
+**Why:** A fixed Customer tab-bar height made the Android back/home/recents controls appear inside the app's bottom bar, unlike the working Partner App.
+**How to apply:** Keep the tab-bar styling limited to colors/borders/label spacing and let Expo Router calculate the native height and bottom inset.
+
+### Cancellation policy placement — disclose at decision points
+**Rule:** Keep product listings free of prominent cancellation-fee labels; use a compact expandable policy on service detail, the full live policy before checkout confirmation, a compact confirmation reminder, and the exact estimate in post-acceptance/check-in cards and the final cancellation modal.
+**Why:** Customers need clear information when making or confirming a booking without turning browsing cards into warnings; the final estimate must match the server calculation and the current Booking Settings.
+**How to apply:** Reuse the public Booking Settings values and the bounded percentage calculation on every customer surface. Say “cancellation fee” in customer copy; reserve “penalty rate” for Admin settings.
+
+### Payment method availability — test mode must still respect configuration
+**Rule:** Public payment methods must be derived from enabled Admin settings and required credentials; Test Mode may simulate configured methods, but must never expose or mark an unconfigured method as paid.
+**Why:** Previously Test Mode exposed every gateway, so selecting an unconfigured manual UPI method moved an item to `service_started` and made tracking claim payment confirmation without a real payment.
+**How to apply:** Require both the UPI enable flag and a non-empty VPA, guard the server endpoint as well as the client list, and derive tracking from `order_item_payments.status = paid`.
+
+### Partner Schedule vs active service work
+**Rule:** An accepted service-order item scheduled in the future is planned work, not an in-progress service. Keep it on Schedule until partner arrival/check-in or later operational states.
+**Why:** The active-items query previously included `partner_accepted`, so work booked for a later date appeared as “In progress” and made the separate Schedule surface seem redundant.
+**How to apply:** Exclude `partner_accepted` from active service feeds, include it in the date-bounded Schedule feed, exclude cancelled/completed work, and keep the planning range long enough for normal advance bookings.
+
+### Expo Go blue error screen — refresh the tunnel QR
+**Rule:** A blue Expo Go “Something went wrong” screen indicates the project bundle/tunnel failed to load; it is not evidence that the Partner App theme is blue.
+**Why:** A failed ngrok attempt can leave a stale QR/link pointing at an unavailable bundle while the configured retry later creates a healthy tunnel.
+**How to apply:** Inspect the Expo workflow log, restart or wait for its retry, and scan the refreshed QR/current `exp://...exp.direct` URL instead of reusing the failed URL.
+
+### Partner future-job handoff
+**Rule:** Passing a future accepted service-order job is an offer, not an immediate unassignment. Keep the original partner on the item until another eligible partner accepts.
+**Why:** Removing the original assignment immediately would leave the customer without a guaranteed partner when no replacement accepts.
+**How to apply:** Broadcast only to matching, document-approved, active, available partners; transfer the item only inside the accepting transaction; otherwise leave the original assignment, payout, and payment state unchanged.
+
+### Partner Web/Mobile job comparisons — verify partner identity before changing dispatch
+**Problem:** A Web partner showed a new itemized request while Mobile appeared empty, suggesting a client/API defect.
+**Fix:** Compare the authenticated partner profile, category/sub-category, availability, response timing, and persisted dispatch deadline. In this case both clients received a populated response before expiry, while Mobile's documented test login was a different busy AC partner and the request belonged to an available Home Cleaning partner.
+**Warning:** Do not broaden dispatch eligibility, remove category matching, or return another partner's requests to make cross-account test screens agree. A one-minute configured search window can also make a previously loaded Web card look newer than a later Mobile empty response.
+
 ### Documentation — use the authoritative memory directory
 **Problem:** A runtime investigation was recorded in `.agents/memory/`, while this project’s required continuity files are `.ai-memory/ACTIVE_TASK.md`, `.ai-memory/CURRENT_STATUS.md`, and `.ai-memory/GOTCHAS.md`.
 **Fix:** Update all three `.ai-memory` files after every completed task, then update the affected `docs/ai` records.
@@ -25,12 +70,249 @@
 
 ## Format for new entries
 ```
+
+### Partner search deadlines — persist the deadline, not client-only elapsed time
+**Problem:** A client-only countdown resets after reload/backgrounding and can
+leave partner requests accepting work after the customer-visible search window.
+**Fix:** Store the deadline on both order items and legacy bookings, expire
+pending requests during customer polling, and enforce the deadline again in
+partner acceptance. Client screens render from the returned timestamp.
+**Warning:** Keep an expiry-only Continue Searching action; while the deadline
+is active, show the countdown instead of offering a restart. Older rows without
+a deadline need a bounded fallback so they do not search indefinitely.
+Every feed that can expose or act on dispatch state must reconcile expired rows
+before reading them; customer polling alone leaves Admin and Partner views stale.
+
+### QR Codes Website — refresh both binary assets and scanner labels
+**Problem:** Restarted Expo tunnels can leave the QR PNGs or the visible URL
+labels stale, even when the QR Codes Website itself is still serving.
+**Fix:** Regenerate both canonical QR PNGs from the current tunnel URL files,
+update the canonical scanner page, restart the QR Codes workflow, and verify
+the rendered page.
+**Warning:** Keep the Customer and Partner URL replacements independent; a
+bulk replacement can accidentally write one app's URL into both labels.
+After confirming Metro has rebuilt and the tunnel is ready, verify the scanner
+refresh log before asking a device to scan.
+
+### Partner Expo QR — distinguish splash loading from an app crash
+**Problem:** A Partner QR scan can appear as a teal/blue screen while Expo Go is
+still loading the tunnel bundle, with no native client error in Replit workflow
+logs.
+**Fix:** Restart the Partner Expo workflow, verify the current QR's manifest and
+bundle return successfully, and scan the freshly generated code from inside Expo
+Go.
+**Warning:** Do not diagnose a native crash from the blue splash alone; a device
+screenshot plus Expo Go logs are required if the current QR remains stuck.
+After every Partner tunnel restart, regenerate and scan the current QR Codes
+page asset; an older QR can produce Expo Go's generic project-loading error.
+
+### QR page must match Expo workflow ports
+**Problem:** The Customer QR card can show "Tunnel starting" even when Metro
+and ngrok are healthy if the QR page reads a different cache port than the
+workflow uses.
+**Fix:** Keep the QR route's Customer and Partner port arguments aligned with
+the configured Expo workflow ports; verify both `/tmp/expo-tunnel-<port>.url`
+and the rendered `/qr` response after restarts.
+**Warning:** Do not infer tunnel health from the QR card alone; inspect the
+workflow's open port and URL cache.
+
+### Partner Expo Router auth redirect — wait for navigator mount
+**Problem:** A root-layout auth redirect can run before Expo Router has mounted
+its native navigator, causing Expo Go's generic blue runtime/project error while
+the same route works in Web.
+**Fix:** Gate redirects on `useRootNavigationState().key` and the first route
+segment, and render the Stack before the auth gate.
+**Warning:** Do not call `router.replace` during the initial root-layout render;
+wait until navigation state is ready.
+
+### Signup recovery — account rows exist before OTP verification
+**Problem:** Registration creates the user row before sending the signup OTP.
+If a customer closes the verification screen, a second registration attempt
+looks like a duplicate email even though the account was never verified.
+**Fix:** An active user with no `emailVerifiedAt` can resume customer signup.
+The server resends the signup OTP through the normal cooldown and updates the
+newly entered password/details; verified accounts remain conflicts.
+**Warning:** Do not treat every existing email as resumable. Disabled or
+verified accounts must not be overwritten by registration.
+
+### Account identity — contact changes require target-aware OTP
+**Problem:** Email is the login identity and phone changes previously went
+through several direct profile/account update paths across five clients. A
+generic OTP lookup by current email would not safely identify a pending new
+contact value.
+**Fix:** Usernames are generated once and protected by a database unique
+constraint. Email/phone changes use separate target-aware OTP records and
+authenticated request/verify endpoints; legacy direct contact updates are
+rejected or strict-validated away. All clients refresh local/auth state after
+verification.
+**Files:** `server/src/database/schema/users.ts`,
+`server/src/database/schema/otpCodes.ts`, `server/src/database/migrate.ts`,
+`server/src/services/otp.service.ts`, profile/Admin/partner clients.
+**Warning:** Never add email or phone back to a generic profile PATCH; the
+identity request must bind the OTP to the proposed target before updating.
+
+---
+
+### OTP delivery — Ethereal is not a real inbox provider
+**Problem:** Development had no SMTP/SendGrid configuration, so Nodemailer
+fell back to Ethereal. It accepted messages and produced preview URLs, but the
+OTP never arrived in the user's Gmail inbox; the UI also made Resend available
+immediately.
+**Fix:** Enforce a target-aware 60-second resend cooldown on the server and
+display a matching client countdown. In non-production, show the development
+code/timing metadata. Older active codes are consumed when a new code is
+issued, and verification checks the configured expiry.
+**Files:** `server/src/services/otp.service.ts`,
+`server/src/repositories/otp.repository.ts`, auth controller/service, and all
+customer/partner OTP screens.
+**Warning:** Do not claim that Ethereal delivered to a real inbox. Configure
+SMTP or SendGrid in Admin → Email Configuration before testing Gmail delivery.
+Gmail SMTP requires 2-Step Verification and a Google App Password; a normal
+Gmail password returns `534-5.7.9 Application-specific password required`.
+After the port/TLS settings are corrected, invalid or incorrectly pasted App
+Passwords return `535-5.7.8 Username and Password not accepted`.
+
+---
+
+### Dispatch eligibility — never trust Admin lists or availability alone
+**Problem:** Automatic dispatch filtered incomplete partner documents, but Admin
+eligible-partner lists and manual assignment only checked active status and
+service qualification. With all document types optional, partners with no
+uploads also passed the old bypass.
+**Fix:** Reuse one server-side document gate for automatic dispatch, Admin
+eligibility, manual assignment, and partner acceptance. Required types must be
+approved; with no required types, at least one current upload is required and
+all current uploads must be approved. REST polling keeps all four client
+surfaces fresh across sessions.
+**Files:** `server/src/services/document.service.ts`,
+`server/src/services/dispatch.service.ts`,
+`server/src/services/orderDispatch.service.ts`, and the four client job/
+booking surfaces.
+**Warning:** Do not rely on `isActive`, `availabilityStatus`, notifications,
+or the UI list as proof of document approval. Recheck documents at assignment
+and acceptance time.
+
+### Dispatch category and sub-category — apply the rule to every surface
+**Problem:** Itemized dispatch already matched a partner's selected
+sub-category, but the legacy booking dispatch and Booking Operations Centre
+eligible-partner path could still list or manually assign a partner based only
+on service qualification.
+**Fix:** Join legacy booking services during automatic dispatch and eligibility
+queries, enforce category/sub-category again during manual assignment and
+partner acceptance, and filter legacy Partner Web/Mobile job visibility plus
+returning-online redispatch with the same rule.
+**Warning:** Do not treat the Admin eligible-partner list as enforcement;
+manual assignment and partner acceptance must revalidate the category and
+sub-category server-side. Profiles without a saved sub-category remain
+category-wide only for backward compatibility.
+
+### Expo Go generic blue screen — verify the device error before changing code
+**Problem:** A Partner device showed Expo Go's generic “Something went wrong”
+screen even though the native tunnel, SDK 54 Android manifest, and exact
+Android bundle were healthy.
+**Fix:** Verify the current QR/cache URL, request the manifest with Expo Go
+headers, download the exact `launchAsset`, and inspect Metro logs. If those
+checks pass, request Expo Go's “View error log” text before changing native
+versions or startup code.
+**Warning:** The blue screen is not the Partner app's ErrorBoundary and does
+not by itself prove a Reanimated, notification, QR, or tunnel defect.
+
+### Partner QR scanner — cache URL and PNG together
+**Problem:** The Partner QR Codes scanner continued displaying an old ngrok
+URL after the live Partner tunnel had moved to a new `exp.direct` URL. Expo Go
+then failed with `java.io.IOException: Failed to download remote update`.
+**Fix:** Regenerate the QR PNG and rewrite the full standalone scanner page from
+the live `/tmp/expo-tunnel-<port>.url` files whenever a tunnel is detected.
+Verify the PNG payload, not only the visible HTML label.
+**Warning:** The API `/qr` page and the static QR Codes workflow are separate
+surfaces; a current API QR page does not prove the static scanner asset is
+current.
+
+---
 ### [Module] — short title
 **Problem:** what went wrong / what was confusing
 **Fix:** exactly what solved it
 **Files:** which files are involved
 **Warning:** what NOT to do (the wrong approach that looks right)
 ```
+
+### Replit preview — API public port and startup race
+**Problem:** The web preview host's root `/api/*` route can be handled by the
+standalone starter artifact instead of ServeNow. Direct browser requests to the
+ServeNow API public port also require cross-origin response headers, and requests
+made while startup migrations are still running can report 503/connection errors.
+**Fix:** On Replit preview hosts, Customer and Partner Web use the same host's
+public API port 8000; the API sets `Cross-Origin-Resource-Policy: cross-origin`
+alongside its existing CORS policy. Local Vite proxy and single-port production
+remain relative.
+**Files:** `apps/customer-web/src/lib/api.ts`,
+`apps/partner-web/src/lib/api.ts`, `server/src/app.ts`.
+**Warning:** Wait for `/api/health` and migration completion before classifying
+preview failures; a startup-race 503 is not the same as a persistent API defect.
+
+---
+
+### Admin service orders — dispatch controls are item-scoped
+**Problem:** The newer `orders` / `order_items` workflow was visible in Admin but
+did not expose the legacy dispatch operations. A first compile pass also missed
+one schema import in the new cancellation handler.
+**Fix:** Keep itemized controls available in both Service Orders and the unified
+Operations queue, validate assignment against active service-qualified partners,
+and run the idempotent `waiting_operation` enum migration before serving queries.
+Use Refund Service for paid items and direct Cancel service only for unpaid items.
+**Files:** `apps/admin-web/src/app/App.tsx`, `apps/admin-web/src/lib/api.ts`,
+`server/src/controllers/admin.controller.ts`, `server/src/routes/admin.routes.ts`,
+`server/src/services/orderDispatch.service.ts`, `server/src/database/migrate.ts`.
+**Warning:** Do not use legacy booking IDs with itemized routes, and do not cancel
+a paid item without going through the refund path.
+
+---
+
+### E2E dispatch fixtures — delete professionals before users
+**Problem:** The dispatch test deleted its temporary users, but
+`professionals.user_id` is `ON DELETE SET NULL`, leaving orphaned test
+professionals visible in Admin eligible-partner results after interrupted runs.
+The fixture also drifted from the partner-registration validator when `city`
+became required.
+**Fix:** Include a valid city in partner fixture registration and explicitly
+delete test professionals (and any assigned bookings) before deleting users.
+**Files:** `server/src/e2e/dispatch.e2e.ts`.
+**Warning:** Never assume deleting a linked user cascades to a professional
+profile; inspect the foreign-key action first.
+
+---
+
+### QA workbook generation — table filters
+**Problem:** XlsxWriter rejects a worksheet when an explicit `autofilter()` overlaps
+the filter that `add_table()` already creates.
+**Fix:** Use the table's built-in filter and do not add a second autofilter range.
+**Files:** `qa/servenow-qa-report-2026-08-12.xlsx` generation
+**Warning:** Keep report tables as the single source of filtering and validate the
+final `.xlsx` with `unzip -t` before presenting it.
+
+---
+
+### Documentation — map imported prompt filenames to existing sources
+**Problem:** An imported documentation prompt may prescribe numbered filenames
+that do not exist in this repository, while the repository already has an
+authoritative `docs/ai/` structure.
+**Fix:** Use `docs/README.md` and `docs/ai/AI-INSTRUCTIONS.md` to map the
+requested topic to the existing authoritative file; update that file instead
+of creating duplicate parallel sources.
+**Files:** `docs/README.md`, `docs/ai/AI-INSTRUCTIONS.md`
+**Warning:** Do not create `22-FIXED-ISSUES.md`-style duplicates when the current
+project records the same topic in `docs/ai/KNOWN-ISSUES.md`, `CHANGELOG.md`, and
+`TASK-HISTORY.md`.
+
+---
+
+### UAT — reset-generated UUIDs
+**Problem:** A full development-data reset regenerates catalog UUIDs, so E2E
+fixtures that embed old category or service IDs fail before reaching the flow.
+**Fix:** Resolve fixture catalog records by stable names at runtime, then use the
+returned IDs for partner registration, service links, and checkout.
+**Warning:** Never copy catalog UUIDs from a prior database snapshot into a
+fresh-database UAT fixture.
 
 ---
 
@@ -126,6 +408,16 @@
 **Problem:** Payout History needed both a date search and a status search without hiding older records.
 **Fix:** Default the local date range to Today–Today, provide one calendar that collects start and end dates, and combine it with an All statuses/Pending/Processing/Paid/Rejected dropdown.
 **Warning:** Keep status normalization aligned with backend values: `approved` and `processing` display/filter as Processing, while unknown values remain Pending.
+
+### Partner dispatch — broadcast and visibility eligibility must stay aligned
+**Problem:** The order dispatcher created a request for a partner with an explicit service link, but the Partner API hid it when the partner profile sub-category did not exactly equal the service sub-category.
+**Fix:** Treat the explicit `partner_services` link plus matching category as the capability decision; do not add a second profile sub-category hard filter in list, detail, or accept queries.
+**Warning:** Do not broadcast to every professional profile. Partners without an explicit service link are intentionally not eligible, even if they are active and online.
+
+### Admin operations — legacy and itemized dispatch coexist
+**Problem:** Partner Mobile can show an order-item request while the Admin Booking Operations Centre appears empty because `/api/operations/dispatch` lists only legacy `bookings`.
+**Fix:** Keep both database models intact, but present legacy bookings and itemized service-order jobs in one clearly source-labeled Operations queue. Route detail clicks to the matching booking or order endpoint.
+**Warning:** Do not infer that a missing legacy dispatch row means an order-item request was not created. Check `orders`, `order_items`, and `order_item_requests` before changing dispatch data.
 
 ---
 
@@ -418,3 +710,31 @@
 **Problem:** The Partner Mobile Schedule endpoint could fail when PostgreSQL received JavaScript `Date` objects inside raw Drizzle SQL comparison fragments.
 **Fix:** Convert the calculated day bounds to ISO strings and explicitly cast them to `timestamptz` for both legacy bookings and service-order items.
 **Warning:** Keep the endpoint’s UTC day-boundary behavior consistent with the mobile client’s `YYYY-MM-DD` range; do not compare date-only strings directly to timestamp columns.
+
+### OTP email — SMTP accepted is not inbox placement
+**Problem:** Partner OTP requests logged as sent, but the user did not see
+them in Gmail.
+**Diagnosis:** The actual stored Gmail SMTP configuration verified and Gmail
+returned `250 2.0.0 OK` with the recipient accepted. The remaining failure
+surface is Gmail filtering or delivery delay, not the API request or SMTP
+transport.
+**Fix:** Check accepted/rejected transport results, search Spam/Promotions/All
+Mail, and show the non-production `devCode` on every OTP screen. Strip it in
+production.
+
+### Partner dashboard eligibility messaging — document status takes precedence
+**Rule:** Dashboard messaging must evaluate required document states before
+availability. Missing or rejected/expired documents override pending review,
+offline, busy, and available states; pending review overrides availability.
+**Why:** A partner can be marked available while still ineligible for dispatch,
+so availability alone would give misleading guidance.
+**Warning:** Keep the priority and wording aligned between Partner Mobile and
+Partner Web whenever document eligibility rules change.
+
+### Partner Mobile document status — share the React Query cache
+**Problem:** The dashboard can keep an empty or older document result if it
+uses different query keys from the Documents screen, even though the document
+is uploaded and approved.
+**Fix:** Use the same user-scoped `doc-types` and `docs` keys across both
+screens, refetch on mount, and include documents in dashboard pull-to-refresh.
+**Warning:** Do not add a second document query key for dashboard eligibility.
