@@ -82,6 +82,30 @@ if [[ -z "$EXPO_PUBLIC_API_URL" && -n "$REPLIT_DEV_DOMAIN" ]]; then
   export EXPO_PUBLIC_API_URL="https://$REPLIT_DEV_DOMAIN:8000"
 fi
 
+register_public_tunnel() {
+  local expo_url="$1"
+  local api_url="${EXPO_TUNNEL_REGISTRY_URL:-}"
+  if [[ -z "$api_url" && -n "${REPLIT_DEV_DOMAIN:-}" ]]; then
+    api_url="https://${REPLIT_DEV_DOMAIN}:8000"
+  fi
+  if [[ -z "$api_url" ]]; then
+    api_url="${EXPO_PUBLIC_API_URL:-}"
+  fi
+  if [[ -z "$expo_url" || -z "$api_url" || -z "${SESSION_SECRET:-}" || -z "${QR_KEY:-}" ]]; then
+    return 0
+  fi
+
+  local payload
+  payload=$(printf '{"app":"%s","url":"%s"}' "$QR_KEY" "$expo_url")
+  if ! curl -fsS --max-time 10 \
+    -X POST "${api_url%/}/api/qr/tunnels" \
+    -H 'Content-Type: application/json' \
+    -H "X-Expo-Tunnel-Key: ${SESSION_SECRET}" \
+    --data "$payload" >/dev/null; then
+    echo "[qr] Could not register ${QR_KEY} tunnel with the public API"
+  fi
+}
+
 # Optional startup delay (stagger Partner App behind Customer App)
 if [[ "$START_DELAY" -gt 0 ]]; then
   echo "Waiting ${START_DELAY}s before starting tunnel (stagger)…"
@@ -179,6 +203,7 @@ Promise.all([
   process.exitCode = 1;
 });
 NODE
+    register_public_tunnel "$url"
   }
 
   NATIVE_MAX_RETRIES=5
@@ -438,6 +463,7 @@ QRCode.toFile(qrPng, expoUrl, { width: 400, margin: 2 }, err => {
   } catch(e) { console.warn('[qr] Could not patch scanner.html:', e.message); }
 });
 " 2>/dev/null || echo "[qr] qrcode module unavailable"
+      register_public_tunnel "$EXPO_GO_URL"
 
       return 0
     fi

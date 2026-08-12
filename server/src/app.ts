@@ -10,6 +10,9 @@ import routes from './routes/index.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { isProduction } from './config/env.js';
+import { db } from './config/database.js';
+import { platformSettings } from './database/schema/platformSettings.js';
+import { eq } from 'drizzle-orm';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,37 +59,12 @@ export function createApp() {
   });
   app.use('/api', apiRateLimiter, routes);
 
-  // In production, serve built web apps as static files.
-  // Each app is built with its own base path:
-  //   customer-web → /          (apps/customer-web/dist)
-  //   admin-web    → /admin-panel/ (apps/admin-web/dist)
-  //   partner-web  → /partner/   (apps/partner-web/dist)
-  if (isProduction) {
-    const root = path.resolve(__dirname, '..', '..'); // workspace root (server/dist → server → workspace root)
-
-    const adminDist   = path.join(root, 'apps', 'admin-web', 'dist');
-    const partnerDist = path.join(root, 'apps', 'partner-web', 'dist');
-    const customerDist= path.join(root, 'apps', 'customer-web', 'dist');
-
-    app.use('/admin-panel', express.static(adminDist));
-    app.get('/admin-panel/*', (_req, res) =>
-      res.sendFile(path.join(adminDist, 'index.html')));
-
-    app.use('/partner', express.static(partnerDist));
-    app.get('/partner/*', (_req, res) =>
-      res.sendFile(path.join(partnerDist, 'index.html')));
-
-    app.use(express.static(customerDist));
-    app.get('*', (_req, res) =>
-      res.sendFile(path.join(customerDist, 'index.html')));
-  }
-
   // QR code page for physical device testing
   app.get('/qr', async (_req, res) => {
     // Derive tunnel URL from .expo/settings.json (urlRandomness field).
     // This is the source of truth — the temp URL files are a secondary cache.
     const workspaceRoot = path.resolve(__dirname, '..', '..');
-    const getUrl = (appDir: string, port: number) => {
+    const getLocalUrl = (appDir: string, port: number) => {
       // The ngrok workflow writes the current Expo Go URL here. Prefer it
       // over Expo's exp.direct settings when an external tunnel is active.
       try {
@@ -102,11 +80,30 @@ export function createApp() {
       // fallback: temp file written by tunnel script
       try { return fs.readFileSync(`/tmp/expo-tunnel-${port}.url`, 'utf8').trim(); } catch { return ''; }
     };
+    const getUrl = async (app: 'customer' | 'partner', appDir: string, port: number) => {
+      const localUrl = getLocalUrl(appDir, port);
+      if (localUrl) return localUrl;
+      try {
+        const [row] = await db
+          .select({ value: platformSettings.value, updatedAt: platformSettings.updatedAt })
+          .from(platformSettings)
+          .where(eq(platformSettings.key, `expo_tunnel_${app}`))
+          .limit(1);
+        if (!row || Date.now() - row.updatedAt.getTime() > 15 * 60 * 1000) return '';
+        const payload = JSON.parse(row.value) as { url?: string };
+        return payload.url ?? '';
+      } catch {
+        return '';
+      }
+    };
     // Customer Expo workflow owns port 8081. Keep this aligned with the
     // workflow so /qr does not show "Tunnel starting" while Metro is healthy.
-    const customerUrl = getUrl('mobile', 8081);
-    const partnerUrl  = getUrl('mobile-partner', 8099);
+    const [customerUrl, partnerUrl] = await Promise.all([
+      getUrl('customer', 'mobile', 8081),
+      getUrl('partner', 'mobile-partner', 8099),
+    ]);
 
+    res.setHeader('Cache-Control', 'no-store');
     const makeQr = async (url: string) => {
       if (!url) return '';
       return QRCode.toDataURL(url, { width: 220, margin: 1, color: { dark: '#1e293b', light: '#f8fafc' } });
@@ -160,6 +157,31 @@ export function createApp() {
 </body>
 </html>`);
   });
+
+  // In production, serve built web apps as static files.
+  // Each app is built with its own base path:
+  //   customer-web → /          (apps/customer-web/dist)
+  //   admin-web    → /admin-panel/ (apps/admin-web/dist)
+  //   partner-web  → /partner/   (apps/partner-web/dist)
+  if (isProduction) {
+    const root = path.resolve(__dirname, '..', '..'); // workspace root (server/dist → server → workspace root)
+
+    const adminDist   = path.join(root, 'apps', 'admin-web', 'dist');
+    const partnerDist = path.join(root, 'apps', 'partner-web', 'dist');
+    const customerDist= path.join(root, 'apps', 'customer-web', 'dist');
+
+    app.use('/admin-panel', express.static(adminDist));
+    app.get('/admin-panel/*', (_req, res) =>
+      res.sendFile(path.join(adminDist, 'index.html')));
+
+    app.use('/partner', express.static(partnerDist));
+    app.get('/partner/*', (_req, res) =>
+      res.sendFile(path.join(partnerDist, 'index.html')));
+
+    app.use(express.static(customerDist));
+    app.get('*', (_req, res) =>
+      res.sendFile(path.join(customerDist, 'index.html')));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

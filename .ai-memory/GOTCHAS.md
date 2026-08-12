@@ -31,6 +31,31 @@
 **Why:** A fixed Customer tab-bar height made the Android back/home/recents controls appear inside the app's bottom bar, unlike the working Partner App.
 **How to apply:** Keep the tab-bar styling limited to colors/borders/label spacing and let Expo Router calculate the native height and bottom inset.
 
+### Managed API artifacts — avoid stale `/api` services in the main publish
+**Rule:** A generic managed API artifact must not declare a production `/api` service when the main product already owns `/api`.
+**Why:** Replit starts registered artifact services during monorepo publishing; an incomplete artifact can fail its own health check and prevent the main autoscale deployment from promoting.
+**How to apply:** Inspect recent build/runtime logs for artifact process failures before changing the main app build. Use the managed artifact TOML replacement flow to remove an obsolete service rather than appending an unrelated artifact build to the root command.
+
+### Expo public environment values — refresh the bundle
+**Rule:** `EXPO_PUBLIC_*` values are embedded when Metro or a production build creates the JavaScript bundle; changing Replit environment variables does not update an already-loaded Expo client.
+**Why:** Expo Go can keep serving the previous QR bundle, and installed production apps cannot receive environment changes without a new build or configured OTA update.
+**How to apply:** Restart the relevant Expo workflow and rescan the fresh QR for development. For installed apps, create a new Expo Launch production build.
+
+### Expo dashboard linkage — project IDs are required
+**Rule:** Expo account authentication alone does not associate a mobile app with an Expo dashboard project or EAS Update channel.
+**Why:** The project ID, update URL, and compatible runtime policy are bundle metadata; without them, Metro can work while Expo.dev shows no update for the app.
+**How to apply:** Add the project-specific `extra.eas.projectId`, `updates.url`, and runtime policy to each app's static `app.json`, then create a production publish.
+
+### Replit web Publish vs Expo Launch
+**Rule:** A normal Replit project Publish does not necessarily start an Expo mobile build or create an Expo OTA Update group.
+**Why:** The regular publish targets the registered web/API deployment, while Expo Update groups come from a separate mobile Expo Launch or OTA update operation.
+**How to apply:** Verify an Expo Launch session exists before diagnosing Expo project metadata; if no session exists, use the mobile Expo publish surface rather than the main web Publish action.
+
+### Expo Launch requires static app configuration
+**Rule:** Keep Expo project metadata in `app.json`; dynamic `app.config.js` wrappers can prevent Replit Expo Launch from resolving and publishing the mobile app.
+**Why:** Replit's Expo publishing flow reads static configuration and may serve development bundles successfully while producing no mobile publish session from a dynamic config.
+**How to apply:** Migrate required settings into `app.json`, remove app-level dynamic config wrappers, restart Metro, and then start Expo Launch.
+
 ### Cancellation policy placement — disclose at decision points
 **Rule:** Keep product listings free of prominent cancellation-fee labels; use a compact expandable policy on service detail, the full live policy before checkout confirmation, a compact confirmation reminder, and the exact estimate in post-acceptance/check-in cards and the final cancellation modal.
 **Why:** Customers need clear information when making or confirming a booking without turning browsing cards into warnings; the final estimate must match the server calculation and the current Booking Settings.

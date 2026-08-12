@@ -7,9 +7,52 @@
 ---
 
 ## ▶ Current Task
-**Task:** Align Customer Mobile bottom navigation with Partner Mobile
+**Task:** Link ServeNow mobile apps to Expo projects
 **Started:** 2026-08-12
-**Status:** COMPLETE — safe-area-aware tab bar and native icon sizing applied
+**Status:** COMPLETE — both app configs linked and fresh bundles verified
+
+## 🔄 Active Task — Expo project linkage — 2026-08-12
+
+- [x] Add the Customer Expo owner, project ID, EAS Update URL, and app-version runtime policy.
+- [x] Add the Partner Expo owner, project ID, EAS Update URL, and app-version runtime policy.
+- [x] Validate both static app configs and `git diff --check`.
+- [x] Restart both Expo workflows and confirm fresh Customer Android/iOS bundles plus Partner tunnel.
+- [ ] Start a mobile Expo Launch session from the mobile publish surface; the regular project Publish did not start one.
+
+## ✅ Completed Task — Expo project linkage — 2026-08-12
+
+- [x] Customer App is linked to Expo project `a290a039-c096-4437-aa82-0f43b13e08b1`.
+- [x] Partner App is linked to Expo project `fc3c1dd9-f990-4f39-8320-29e970317f82`.
+- [x] Expo dashboard updates require a production publish; Metro refresh alone only updates QR development bundles.
+- [x] `getExpoLaunchLogs()` reports no Expo Launch session; the recent regular Replit publish did not create a mobile publish.
+- [x] Removed both dynamic `app.config.js` wrappers because Expo Launch requires static `app.json`.
+
+## 🔄 Active Task — Expo API URL refresh — 2026-08-12
+
+- [x] Confirm Expo reads `EXPO_PUBLIC_API_URL` during bundle initialization.
+- [x] Confirm the published API URL is healthy.
+- [x] Restart Customer and Partner Expo workflows after the shared environment change.
+- [x] Confirm Customer Android/iOS bundles and Partner tunnel rebuild completed.
+
+## ✅ Completed Task — Expo API URL refresh — 2026-08-12
+
+- [x] New QR bundles use the configured production API URL.
+- [x] Existing Expo Go sessions still require a fresh QR scan or reload.
+- [x] Installed production apps require a new production build for environment changes.
+
+## 🔄 Active Task — ServeNow publishing build — 2026-08-12
+
+- [x] Inspect the failed publishing build and production logs.
+- [x] Identify the stale generic API artifact as the source of the `/api` 500 health checks and missing `dist/index.mjs`.
+- [x] Replace its managed artifact TOML with metadata-only configuration, preserving source files while removing its production service and workflow.
+- [x] Run the exact root `pnpm build` and `git diff --check` successfully.
+- [ ] Republish from the Publishing pane.
+
+## ✅ Completed Task — ServeNow publishing build — 2026-08-12
+
+- [x] Main ServeNow deployment remains autoscale with `pnpm build` and `node server/dist/index.js`.
+- [x] The unrelated generic API artifact no longer declares a port-8080 production service or `/api` health check.
+- [x] Customer, Admin, Partner Web, and Server production builds pass locally.
 
 ## 🔄 Active Task — Customer Mobile bottom navigation — 2026-08-12
 

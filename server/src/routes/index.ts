@@ -21,6 +21,8 @@ import dispatchRoutes from './dispatch.routes.js';
 import serviceWishlistRoutes from './serviceWishlist.routes.js';
 import ordersRoutes from './orders.routes.js';
 import { db } from '../config/database.js';
+import { platformSettings } from '../database/schema/platformSettings.js';
+import { eq, inArray } from 'drizzle-orm';
 
 const router = Router();
 
@@ -69,6 +71,84 @@ router.get('/booking-config', async (_req, res) => {
        cancellationFeeAfterCheckinMinAmount: 50,
        cancellationFeeAfterCheckinMaxAmount: 500,
     } });
+  }
+});
+
+const EXPO_TUNNEL_KEYS = ['expo_tunnel_customer', 'expo_tunnel_partner'] as const;
+const EXPO_TUNNEL_TTL_MS = 15 * 60 * 1000;
+
+router.get('/qr/tunnels', async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        key: platformSettings.key,
+        value: platformSettings.value,
+        updatedAt: platformSettings.updatedAt,
+      })
+      .from(platformSettings)
+      .where(inArray(platformSettings.key, [...EXPO_TUNNEL_KEYS]));
+
+    const tunnels: Record<string, { url: string; updatedAt: string } | null> = {
+      customer: null,
+      partner: null,
+    };
+
+    for (const row of rows) {
+      const app = row.key === 'expo_tunnel_customer' ? 'customer' : 'partner';
+      try {
+        const payload = JSON.parse(row.value) as { url?: string };
+        const isFresh = Date.now() - row.updatedAt.getTime() <= EXPO_TUNNEL_TTL_MS;
+        if (isFresh && payload.url) {
+          tunnels[app] = { url: payload.url, updatedAt: row.updatedAt.toISOString() };
+        }
+      } catch {
+        // Ignore malformed or stale tunnel state and keep the public page usable.
+      }
+    }
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, data: tunnels });
+  } catch (error) {
+    console.error('[qr] Failed to read tunnel registry:', error);
+    res.status(503).json({ success: false, error: 'QR tunnel registry unavailable' });
+  }
+});
+
+router.post('/qr/tunnels', async (req, res) => {
+  const expectedKey = process.env.SESSION_SECRET;
+  if (!expectedKey || req.get('x-expo-tunnel-key') !== expectedKey) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  const app = req.body?.app;
+  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+  if (!['customer', 'partner'].includes(app) || !/^exp[s]?:\/\/[^\s]+$/i.test(url)) {
+    return res.status(400).json({ success: false, error: 'Valid app and Expo URL are required' });
+  }
+
+  const key = `expo_tunnel_${app}`;
+  const value = JSON.stringify({ url });
+  try {
+    const [existing] = await db
+      .select({ key: platformSettings.key })
+      .from(platformSettings)
+      .where(eq(platformSettings.key, key))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(platformSettings)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(platformSettings.key, key));
+    } else {
+      await db.insert(platformSettings).values({ key, value });
+    }
+
+    res.set('Cache-Control', 'no-store');
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[qr] Failed to write tunnel registry:', error);
+    return res.status(503).json({ success: false, error: 'QR tunnel registry unavailable' });
   }
 });
 

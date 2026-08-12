@@ -2,6 +2,7 @@
   "expo": {
     "name": "ServeNow",
     "slug": "servenow",
+    "owner": "riyazuddinss-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -34,6 +35,12 @@
       "output": "single",
       "favicon": "./assets/images/icon.png"
     },
+    "updates": {
+      "url": "https://u.expo.dev/a290a039-c096-4437-aa82-0f43b13e08b1"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -52,6 +59,9 @@
     "extra": {
       "appStoreId": "",
       "playStoreId": "",
+      "eas": {
+        "projectId": "a290a039-c096-4437-aa82-0f43b13e08b1"
+      },
       "router": {
         "origin": "https://f3d47d71-5544-4408-ad75-c68024a63ea8-00-1cffxziop2eun.sisko.replit.dev",
         "headOrigin": "https://f3d47d71-5544-4408-ad75-c68024a63ea8-00-1cffxziop2eun.sisko.replit.dev"

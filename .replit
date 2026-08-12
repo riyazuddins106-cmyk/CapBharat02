@@ -72,7 +72,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile && ../../scripts/expo-tunnel.sh 8081 2>&1 | tee /tmp/metro-live.log"
+args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && export EXPO_TUNNEL_REGISTRY_URL=https://cap-bharat-02.replit.app && unset REPLIT_EXPO_DEV_DOMAIN && cd apps/mobile && ../../scripts/expo-tunnel.sh 8081 2>&1 | tee /tmp/metro-live.log"
 waitForPort = 8081
 
 [[workflows.workflow]]
@@ -84,7 +84,8 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && cd apps/mobile-partner && ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
+args = "until [ -f /home/runner/workspace/node_modules/.install-done ]; do sleep 1; done && export EXPO_TUNNEL_REGISTRY_URL=https://cap-bharat-02.replit.app && cd apps/mobile-partner && ../../scripts/expo-tunnel.sh 8099 --authtoken-var NGROK_AUTHTOKEN_2 --start-delay 25"
+waitForPort = 8099
 
 [[workflows.workflow]]
 name = "Partner Web"
@@ -119,6 +120,7 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "587"
 SMTP_SECURE = "false"
 SUPABASE_URL = "https://ugcbxncpipowxqtsczpy.supabase.co"
+EXPO_PUBLIC_API_URL = "https://cap-bharat-02.replit.app"
 
 [userenv.production]
 NODE_ENV = "production"

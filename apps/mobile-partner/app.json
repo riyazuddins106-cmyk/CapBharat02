@@ -2,6 +2,7 @@
   "expo": {
     "name": "ServeNow Partner",
     "slug": "servenow-partner",
+    "owner": "riyazuddinss-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -38,6 +39,12 @@
       "output": "single",
       "favicon": "./assets/images/icon.png"
     },
+    "updates": {
+      "url": "https://u.expo.dev/fc3c1dd9-f990-4f39-8320-29e970317f82"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -54,6 +61,9 @@
       "typedRoutes": true
     },
     "extra": {
+      "eas": {
+        "projectId": "fc3c1dd9-f990-4f39-8320-29e970317f82"
+      },
       "router": {
         "origin": "https://f3d47d71-5544-4408-ad75-c68024a63ea8-00-1cffxziop2eun.sisko.replit.dev",
         "headOrigin": "https://f3d47d71-5544-4408-ad75-c68024a63ea8-00-1cffxziop2eun.sisko.replit.dev"

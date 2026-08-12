@@ -1,5 +1,11 @@
 # Documentation Changelog
 
+## 2026-08-12 — Fix failed ServeNow publishing build
+
+Removed the stale managed API artifact service that was failing the `/api`
+health check and blocking autoscale promotion. Verified the main production
+build after the managed TOML replacement.
+
 ## 2026-08-12 — Align Customer Mobile bottom navigation
 
 Documented the Customer Mobile tab-bar correction: remove the fixed native

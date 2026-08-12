@@ -76,7 +76,12 @@ only; no Replit Cloud deployment is required.
 `https://f486bc9d-d0a6-4cda-b3bf-1a3b132e8568-00-l3myhzsuh2vr.sisko.replit.dev/admin-panel/`
 
 ## Push notifications
-Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. No EAS `projectId` is set — tokens are obtained through the Expo Go anonymous identity. For production standalone builds, run `eas init` in each app directory to get a `projectId` and add it to `app.json` under `extra.eas.projectId`.
+Both apps register Expo push tokens via `PATCH /api/profile/me/push-token`. The
+Customer app is linked to Expo project
+`a290a039-c096-4437-aa82-0f43b13e08b1` and the Partner app to
+`fc3c1dd9-f990-4f39-8320-29e970317f82` through `extra.eas.projectId` in their
+static `app.json` files. Each app also has a matching EAS Update URL and
+app-version runtime policy.
 
 ## Expo tunneling (Replit-native)
 `expo-tunnel.sh` detects `REPLIT_EXPO_DEV_DOMAIN` and skips ngrok entirely, using Replit's built-in Expo proxy. No ngrok tokens needed when running on Replit. ngrok is only used as a fallback outside of Replit.

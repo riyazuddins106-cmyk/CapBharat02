@@ -49,6 +49,9 @@
 - [Partner Schedule date bounds](partner-schedule-date-bounds.md) — cast ISO day bounds to timestamptz when filtering timestamp columns through raw Drizzle SQL.
 - [Booking confirmation details](booking-confirmation-details.md) — format persisted schedule data; never display internal slot minutes in customer-facing confirmation.
 - [Customer tab bar safe area](customer-tab-bar-safe-area.md) — let Expo Router calculate native tab-bar height and Android bottom inset; avoid fixed overrides.
+- [Deployment artifact routing](deployment-artifact-routing.md) — registered artifacts can start during publish and claim routes/ports independently of the main app.
+- [Expo public env refresh](expo-public-env-refresh.md) — EXPO_PUBLIC_* values are bundle-time; restart Metro or make a new production build.
+- [Expo project linkage](expo-project-linkage.md) — EAS access authenticates but project ID/update URL metadata is required for dashboard updates.
 - [Partner future-job handoff](partner-job-handoff.md) — passing is an offer; retain the original assignment until an eligible replacement accepts.
 - [Partner payout filter parity](partner-payout-filter-parity.md) — Partner Web and Mobile must share the same inclusive date-range and payout-status filters; no All time payout-history option.
 - [Customer Expo port ownership](customer-expo-port-ownership.md) — Customer Expo must use its declared free Metro port; stale starter services on that port make Expo exit before QR downloads work.

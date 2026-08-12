@@ -3,6 +3,54 @@
 
 ---
 
+## Expo project linkage — 2026-08-12
+
+Both mobile app static configurations are now linked to the user's Expo
+projects. Each includes the Expo owner, its project-specific
+`https://u.expo.dev/<projectId>` update URL, and an app-version runtime policy.
+
+The Customer Android/iOS bundles rebuilt successfully after the config change,
+and the Partner tunnel refreshed. `getExpoLaunchLogs()` currently reports no
+Expo Launch session, so the recent regular Replit publish did not start a
+mobile publish. A Metro QR refresh does not create an Expo dashboard update.
+
+Replit's official docs describe OTA Update groups as a separate EAS Update
+operation. The agent must not run EAS CLI commands; the supported next step is
+to start the mobile Expo Launch flow from the appropriate publish surface.
+
+Both dynamic mobile `app.config.js` wrappers were removed. Their required
+project IDs, EAS Update URLs, runtime policies, and router metadata are already
+in static `app.json` files. Static config validation passed and both Expo
+workflows restarted cleanly.
+
+## Expo API URL refresh — 2026-08-12
+
+Expo exposes `EXPO_PUBLIC_API_URL` through the JavaScript bundle, so changing
+the shared environment value does not update an already-loaded Expo Go bundle
+or an installed production app. The production API URL is now healthy.
+
+Customer and Partner Expo workflows were restarted. Customer Android and iOS
+bundles completed successfully, and the Partner tunnel reported the configured
+production API URL and refreshed QR. Use the new QR/reload the bundle; an
+installed production build needs a new Expo Launch build.
+
+## ServeNow publishing build — 2026-08-12
+
+The failed publish was not a source compilation failure. The root build
+completed, then Replit started a separate generic API artifact that expected
+`artifacts/api-server/dist/index.mjs` on port 8080. That artifact was not part
+of the pnpm workspace build and its `/api` health check collided with
+ServeNow's own API, causing repeated health-check 500s and a failed autoscale
+promotion.
+
+The managed artifact TOML was replaced with metadata-only configuration. Its
+source remains in the repository, but its production service and workflow were
+removed. The ServeNow deployment still uses the root autoscale configuration:
+`pnpm build`, then `node server/dist/index.js`.
+
+Validation completed: exact root `pnpm build` and `git diff --check`.
+The user must click Publish again to create a new build.
+
 ## Customer Mobile bottom navigation — 2026-08-12
 
 Customer Mobile's bottom tab layout now matches the working Partner Mobile

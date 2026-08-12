@@ -1,5 +1,18 @@
 # Task History
 
+## 2026-08-12 — Fix failed ServeNow publishing build
+
+Task: Diagnose and fix a failed publishing build.
+
+Result: Confirmed the main build passed and found the failure in the
+registered generic API artifact. Removed only its managed production service
+declaration, preserved its source, and verified the exact root build.
+
+Application functionality changed: Deployment configuration only
+
+Verification: `pnpm build`, `git diff --check`, deployment build logs, and
+artifact registration/workflow state.
+
 ## 2026-08-12 — Align Customer Mobile bottom navigation
 
 Task: Make the Customer Mobile bottom navigation and Android system controls

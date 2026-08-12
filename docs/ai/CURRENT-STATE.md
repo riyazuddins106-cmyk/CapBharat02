@@ -4,6 +4,20 @@
 
 2026-08-12
 
+## ServeNow publishing build — 2026-08-12
+
+The failed publish was caused by a separate generic API artifact, not by the
+ServeNow production build. The root build completed, but the artifact expected
+an unavailable bundled entry on port 8080 and its `/api` health check returned
+500, blocking autoscale promotion.
+
+Its managed TOML now contains metadata only; the source remains preserved but
+the stale production service and workflow are removed. The main deployment
+continues to use `pnpm build` and `node server/dist/index.js`.
+
+Verification: exact root `pnpm build` and `git diff --check`. Republish is the
+remaining user action.
+
 ## Customer Mobile bottom navigation — 2026-08-12
 
 Customer Mobile now uses the same safe-area-aware bottom tab behavior as
